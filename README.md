@@ -8,7 +8,7 @@
 
 [![Status](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
 [![License](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
-[![Codex](https://img.shields.io/badge/Codex-first-111827?style=for-the-badge)](./SKILL.md)
+[![Codex](https://img.shields.io/badge/Codex-skill-111827?style=for-the-badge)](./SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
 [![Figures](https://img.shields.io/badge/figures-placeholder--first-f59e0b?style=for-the-badge)](./references/figure-placement.md)
 [![Writing](https://img.shields.io/badge/writing-model--first-7c3aed?style=for-the-badge)](./references/model-synthesis.md)
@@ -18,7 +18,7 @@
 
 ![DeepPaperNote Hero](./assets/hero.svg)
 
-DeepPaperNote is a **Codex-first agent skill** for a very specific workflow:
+DeepPaperNote is a **Codex skill** for a very specific workflow:
 
 - read one paper carefully
 - gather evidence from PDF, metadata sources, and optionally Zotero
@@ -64,7 +64,7 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 
 | Version | Status | Highlights |
 | --- | --- | --- |
-| Unreleased | In progress | Initial public Codex-first workflow, synthesis bundle pipeline, Zotero-first helpers, placeholder-first figure planning |
+| Unreleased | In progress | Initial public Codex workflow, synthesis bundle pipeline, Zotero-first helpers, placeholder-first figure planning |
 
 ## Why DeepPaperNote
 
@@ -248,12 +248,12 @@ This repository is in active early-stage development.
 
 ## 🚀 Future Direction
 
-DeepPaperNote is currently a Codex-first skill.
+DeepPaperNote is currently a Codex skill.
 
 The long-term direction is:
 
 - keep the core workflow portable
-- keep the Codex adapter first-class
+- keep the Codex integration strong and clear
 - later add adapters for other agent environments if the core remains stable
 
 ## Inspirations

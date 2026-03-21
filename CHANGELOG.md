@@ -14,7 +14,7 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ### Added
 
-- Initial public Codex-first skill workflow for generating a deep-reading note from one paper.
+- Initial public Codex skill workflow for generating a deep-reading note from one paper.
 - Model-facing synthesis bundle pipeline with deterministic evidence gathering.
 - Placeholder-first figure planning and Obsidian folder-per-paper output structure.
 - Zotero-first helper workflow for local-library-first paper resolution.

@@ -8,7 +8,7 @@
 
 [![状态](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
 [![许可证](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
-[![Codex](https://img.shields.io/badge/Codex-first-111827?style=for-the-badge)](./SKILL.md)
+[![Codex](https://img.shields.io/badge/Codex-skill-111827?style=for-the-badge)](./SKILL.md)
 [![输出](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
 [![图表](https://img.shields.io/badge/figures-placeholder--first-f59e0b?style=for-the-badge)](./references/figure-placement.md)
 [![写作](https://img.shields.io/badge/writing-model--first-7c3aed?style=for-the-badge)](./references/model-synthesis.md)
@@ -18,7 +18,7 @@
 
 ![DeepPaperNote Hero](./assets/hero.svg)
 
-DeepPaperNote 是一个 **Codex 优先** 的 agent skill，专门做一件事：
+DeepPaperNote 是一个 **Codex skill**，专门做一件事：
 
 - 精读一篇论文
 - 从 PDF、元数据来源以及可选的 Zotero 中收集证据
@@ -64,7 +64,7 @@ pip install -e .
 
 | 版本 | 状态 | 主要内容 |
 | --- | --- | --- |
-| Unreleased | 开发中 | 首个公开版 Codex-first 工作流、synthesis bundle 流程、Zotero-first 辅助能力、placeholder-first 图表规划 |
+| Unreleased | 开发中 | 首个公开版 Codex 工作流、synthesis bundle 流程、Zotero-first 辅助能力、placeholder-first 图表规划 |
 
 ## 为什么做这个
 
@@ -247,12 +247,12 @@ DeepPaperNote/
 
 ## 🔭 后续方向
 
-DeepPaperNote 目前首先是一个 Codex-first skill。
+DeepPaperNote 目前就是一个 Codex skill。
 
 长期方向是：
 
 - 保持核心流程可迁移
-- 继续把 Codex adapter 做扎实
+- 继续把 Codex 集成做扎实
 - 等核心稳定后，再考虑适配其他 agent 环境
 
 ## Inspirations

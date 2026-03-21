@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "deeppapernote"
 version = "0.1.0"
-description = "A Codex-first agent skill for turning one research paper into a high-quality Obsidian note."
+description = "A Codex skill for turning one research paper into a high-quality Obsidian note."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
