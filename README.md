@@ -7,6 +7,7 @@
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
 [![Status](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
+[![License](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
 [![Codex](https://img.shields.io/badge/Codex-first-111827?style=for-the-badge)](./SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
 [![Figures](https://img.shields.io/badge/figures-placeholder--first-f59e0b?style=for-the-badge)](./references/figure-placement.md)
@@ -50,6 +51,20 @@ Typical prompts:
    - build a synthesis bundle
    - let Codex/GPT write the final note
    - lint the note before writing it into Obsidian
+
+If you want the Python dependencies for local development:
+
+```bash
+pip install -e .
+```
+
+## 📝 Changelog Preview
+
+For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
+
+| Version | Status | Highlights |
+| --- | --- | --- |
+| Unreleased | In progress | Initial public Codex-first workflow, synthesis bundle pipeline, Zotero-first helpers, placeholder-first figure planning |
 
 ## Why DeepPaperNote
 
@@ -266,4 +281,4 @@ Contributions are welcome, especially around:
 
 ## License
 
-License to be added before wider public release.
+This project is licensed under the [MIT License](./LICENSE).

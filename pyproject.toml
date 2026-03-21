@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deeppapernote"
+version = "0.1.0"
+description = "A Codex-first agent skill for turning one research paper into a high-quality Obsidian note."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+  { name = "dingdingcar" }
+]
+keywords = [
+  "codex",
+  "skill",
+  "obsidian",
+  "zotero",
+  "paper-reading",
+  "agent",
+  "markdown"
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Text Processing :: Markup :: Markdown",
+]
+dependencies = [
+  "PyMuPDF>=1.24",
+]
+
+[project.urls]
+Homepage = "https://github.com/917Dhj/DeepPaperNote"
+Repository = "https://github.com/917Dhj/DeepPaperNote"
+Issues = "https://github.com/917Dhj/DeepPaperNote/issues"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6.0",
+]
+
+[tool.setuptools]
+py-modules = []
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

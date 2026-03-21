@@ -7,6 +7,7 @@
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
 [![状态](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
+[![许可证](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
 [![Codex](https://img.shields.io/badge/Codex-first-111827?style=for-the-badge)](./SKILL.md)
 [![输出](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
 [![图表](https://img.shields.io/badge/figures-placeholder--first-f59e0b?style=for-the-badge)](./references/figure-placement.md)
@@ -50,6 +51,20 @@ DeepPaperNote 是一个 **Codex 优先** 的 agent skill，专门做一件事：
    - 生成 synthesis bundle
    - 让 Codex/GPT 写最终笔记
    - 在写入 Obsidian 之前先做 lint 检查
+
+如果你想在本地装 Python 依赖用于开发，可以执行：
+
+```bash
+pip install -e .
+```
+
+## 📝 更新日志概览
+
+更完整的版本级更新请见 [CHANGELOG.md](./CHANGELOG.md)。
+
+| 版本 | 状态 | 主要内容 |
+| --- | --- | --- |
+| Unreleased | 开发中 | 首个公开版 Codex-first 工作流、synthesis bundle 流程、Zotero-first 辅助能力、placeholder-first 图表规划 |
 
 ## 为什么做这个
 
@@ -265,4 +280,4 @@ DeepPaperNote 在工作流设计上受到了这些论文阅读 / 笔记生成项
 
 ## License
 
-正式公开前会补上许可证。
+本项目采用 [MIT License](./LICENSE)。
