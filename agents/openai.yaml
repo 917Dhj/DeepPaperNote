@@ -1,0 +1,7 @@
+interface:
+  display_name: "DeepPaperNote"
+  short_description: "Generate a model-written Obsidian deep-reading note for one paper from a deterministic evidence bundle"
+  default_prompt: "Use $DeepPaperNote to first check the local Zotero library when available, then build a deterministic evidence bundle for one paper, have Codex write a high-quality Markdown deep-reading note in clean Chinese, and save it into an Obsidian vault."
+
+policy:
+  allow_implicit_invocation: true
