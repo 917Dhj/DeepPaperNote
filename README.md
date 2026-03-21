@@ -211,12 +211,12 @@ This repository is in active early-stage development.
 
 | Area | Current state |
 | --- | --- |
-| Single-paper preprocessing pipeline | Working |
-| Synthesis bundle generation | Working |
-| Zotero-first helper workflow | Working |
-| Obsidian writing flow | Working |
-| Placeholder-first figure planning | Working |
-| Style and structure linting | Working |
+| Single-paper preprocessing pipeline | ✅ Working |
+| Synthesis bundle generation | ✅ Working |
+| Zotero-first helper workflow | ✅ Working |
+| Obsidian writing flow | ✅ Working |
+| Placeholder-first figure planning | ✅ Working |
+| Style and structure linting | ✅ Working |
 | Public examples | Not added yet |
 | Test suite | Not added yet |
 | CI | Not added yet |

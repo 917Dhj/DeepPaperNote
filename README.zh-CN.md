@@ -210,12 +210,12 @@ DeepPaperNote/
 
 | 模块 | 当前状态 |
 | --- | --- |
-| 单篇论文预处理流程 | 已可用 |
-| synthesis bundle 生成 | 已可用 |
-| Zotero-first 辅助流程 | 已可用 |
-| Obsidian 写入流程 | 已可用 |
-| placeholder-first 图表规划 | 已可用 |
-| 风格与结构 lint | 已可用 |
+| 单篇论文预处理流程 | ✅ 已可用 |
+| synthesis bundle 生成 | ✅ 已可用 |
+| Zotero-first 辅助流程 | ✅ 已可用 |
+| Obsidian 写入流程 | ✅ 已可用 |
+| placeholder-first 图表规划 | ✅ 已可用 |
+| 风格与结构 lint | ✅ 已可用 |
 | 对外 examples | 暂未补齐 |
 | 测试 | 暂未补齐 |
 | CI | 暂未补齐 |
