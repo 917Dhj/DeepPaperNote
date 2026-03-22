@@ -8,7 +8,7 @@ description: Generate a high-quality deep-reading note for a single paper and wr
 Use this skill when the user wants one outcome:
 - read one paper carefully
 - generate a high-quality Markdown note
-- write the note into an Obsidian-style vault
+- save the note into an Obsidian-style vault when configured, or into the current workspace when no vault is configured
 
 Chinese trigger examples:
 - `给这篇论文生成深度笔记`
@@ -113,7 +113,8 @@ Zotero-first rule:
 
 ## Output Rules
 
-- The default output is a Markdown note written into the Obsidian vault.
+- The default output is a Markdown note written into the Obsidian vault when configured.
+- If no Obsidian vault is configured, DeepPaperNote should fall back to saving into the current workspace instead of failing outright.
 - By default, each paper should be written into its own same-name folder, with the note and images stored together.
 - The note must use real heading levels: `#`, `##`, and `###`.
 - High-quality notes should usually contain multiple meaningful `###` subheadings in the technical sections when the paper is non-trivial.

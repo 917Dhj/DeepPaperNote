@@ -23,7 +23,7 @@ DeepPaperNote 是一个 **Codex skill**，专门做一件事：
 - 精读一篇论文
 - 从 PDF、元数据来源以及可选的 Zotero 中收集证据
 - 让大模型真正负责理解和写作
-- 把最终笔记写进 Obsidian vault
+- 优先把最终笔记写进 Obsidian vault；如果没有配置 vault，则退回当前工作区输出
 
 它不是为了生成“看起来工整的摘要”，而是为了生成“以后还会反复回看的研究笔记”。
 
@@ -55,7 +55,7 @@ DeepPaperNote 是一个 **Codex skill**，专门做一件事：
 如果你想在本地装 Python 依赖用于开发，可以执行：
 
 ```bash
-pip install -e .
+python3 -m pip install -e .
 ```
 
 安装后，你也可以直接对 Codex 发一些很短的命令式请求，比如：
@@ -71,9 +71,9 @@ pip install -e .
 
 ## 🔧 配置说明
 
-安装之后，最值得先配置的是两件事。
+安装之后，如果你希望获得 Obsidian 原生的笔记管理体验，真正必需的配置只有一项，其他更多属于可选增强配置。
 
-### 1. 告诉 DeepPaperNote 你的 Obsidian vault 在哪里
+### 必需：告诉 DeepPaperNote 你的 Obsidian vault 在哪里
 
 DeepPaperNote 会把最终笔记写进 Obsidian vault。
 最直接的配置方式是设置环境变量：
@@ -93,9 +93,13 @@ export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 
 | 变量 | 是否必需 | 作用 |
 | --- | --- | --- |
-| `DEEPPAPERNOTE_OBSIDIAN_VAULT` | 写入 vault 时必需 | 你的 Obsidian vault 根目录 |
+| `DEEPPAPERNOTE_OBSIDIAN_VAULT` | 正常写入 vault 时必需 | 你的 Obsidian vault 根目录 |
 | `DEEPPAPERNOTE_PAPERS_DIR` | 可选 | vault 内论文输出目录，默认是 `20_Research/Papers` |
 | `DEEPPAPERNOTE_OUTPUT_DIR` | 可选 | 本地临时产物目录，默认是 `tmp/DeepPaperNote` |
+| `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | 可选 | 当没有配置 Obsidian vault 时，当前工作区下的 fallback 输出目录，默认是 `DeepPaperNote_output` |
+
+如果没有配置 Obsidian vault，DeepPaperNote 依然可以把笔记写到当前工作区下，而不是直接报错。
+这对快速试用很有帮助，但从长期管理角度看，依然更推荐配置好自己的 Obsidian vault。
 
 这些可选路径配置的实际好处是：
 
@@ -194,7 +198,7 @@ OCR 需要的依赖如下：
 
 ```bash
 brew install tesseract
-pip install pytesseract Pillow
+python3 -m pip install --user pytesseract Pillow
 ```
 
 快速验证：
@@ -362,7 +366,7 @@ DeepPaperNote/
 | --- | --- | --- |
 | Codex desktop / CLI | 推荐 | 当前主目标环境 |
 | Python 3.10+ | 必需 | 运行辅助脚本 |
-| 本地 Obsidian vault | 推荐 | 需要配置 `DEEPPAPERNOTE_OBSIDIAN_VAULT` |
+| 本地 Obsidian vault | 写笔记时必需 | 需要配置 `DEEPPAPERNOTE_OBSIDIAN_VAULT` |
 | Zotero + MCP | 可选 | 对本地论文库工作流很有帮助 |
 | OCR 工具 | 可选 | 对扫描版 PDF 更友好 |
 

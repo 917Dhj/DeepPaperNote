@@ -23,7 +23,7 @@ DeepPaperNote is a **Codex skill** for a very specific workflow:
 - read one paper carefully
 - gather evidence from PDF, metadata sources, and optionally Zotero
 - let the language model do the real interpretation
-- write a polished Markdown note into an Obsidian vault
+- write a polished Markdown note into an Obsidian vault when available, or into the current workspace as a fallback
 
 It is built for people who want something better than an abstract rewrite.
 
@@ -55,7 +55,7 @@ Typical prompts:
 If you want the Python dependencies for local development:
 
 ```bash
-pip install -e .
+python3 -m pip install -e .
 ```
 
 After installation, you can also ask Codex with short prompts such as:
@@ -71,9 +71,9 @@ If you want a more explicit onboarding prompt, see [ONBOARDING_PROMPT.md](./ONBO
 
 ## 🔧 Configuration
 
-After installation, there are two pieces of configuration most users should care about.
+After installation, there is one required configuration if you want Obsidian-native note management, plus several optional enhancements.
 
-### 1. Tell DeepPaperNote where your Obsidian vault is
+### Required: Tell DeepPaperNote where your Obsidian vault is
 
 DeepPaperNote writes notes into an Obsidian vault.
 The cleanest way to configure that is with an environment variable:
@@ -93,9 +93,13 @@ What they do:
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DEEPPAPERNOTE_OBSIDIAN_VAULT` | Yes for vault writes | Root path of your Obsidian vault |
+| `DEEPPAPERNOTE_OBSIDIAN_VAULT` | Yes for normal vault writes | Root path of your Obsidian vault |
 | `DEEPPAPERNOTE_PAPERS_DIR` | Optional | Vault-relative paper output folder, default: `20_Research/Papers` |
 | `DEEPPAPERNOTE_OUTPUT_DIR` | Optional | Local temporary artifact directory, default: `tmp/DeepPaperNote` |
+| `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | Optional | Fallback output folder under the current working directory when no Obsidian vault is configured, default: `DeepPaperNote_output` |
+
+If no Obsidian vault is configured, DeepPaperNote can still save notes under the current working directory instead of failing outright.
+That fallback is useful for quick trials, but it is not the recommended long-term note-management workflow.
 
 Why the optional path settings can help:
 
@@ -192,7 +196,7 @@ Install on macOS:
 
 ```bash
 brew install tesseract
-pip install pytesseract Pillow
+python3 -m pip install --user pytesseract Pillow
 ```
 
 Quick verification:
@@ -361,7 +365,7 @@ DeepPaperNote/
 | --- | --- | --- |
 | Codex desktop / CLI | Recommended | Primary target environment |
 | Python 3.10+ | Required | Runs the helper scripts |
-| Obsidian vault | Recommended | Configure `DEEPPAPERNOTE_OBSIDIAN_VAULT` |
+| Obsidian vault | Required for note writing | Configure `DEEPPAPERNOTE_OBSIDIAN_VAULT` |
 | Zotero + MCP | Optional | Best for local-library-first workflows |
 | OCR tooling | Optional | Helpful for scanned PDFs |
 

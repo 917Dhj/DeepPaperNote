@@ -12,6 +12,7 @@ from common import (
     emit,
     ensure_parent,
     maybe_load_json_record,
+    resolve_note_output_mode,
     resolve_obsidian_note_path,
     runtime_config,
 )
@@ -76,8 +77,12 @@ def main() -> None:
         "paper_id": args.paper_id or record.get("paper_id", ""),
         "title": title,
         "note_path": str(target_path),
-        "vault": str(Path(config["obsidian_vault"]).expanduser().resolve()),
     }
+    output_mode, root_path = resolve_note_output_mode(config)
+    payload["output_mode"] = output_mode
+    payload["base_output_root"] = str(root_path)
+    if config.get("obsidian_vault"):
+        payload["vault"] = str(Path(config["obsidian_vault"]).expanduser().resolve())
     emit(payload, args.output)
 
 

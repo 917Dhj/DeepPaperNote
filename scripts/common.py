@@ -723,17 +723,34 @@ def runtime_config() -> dict[str, Any]:
         ),
         "papers_dir": os.environ.get("DEEPPAPERNOTE_PAPERS_DIR", "20_Research/Papers").strip(),
         "output_dir": os.environ.get("DEEPPAPERNOTE_OUTPUT_DIR", "tmp/DeepPaperNote").strip(),
+        "workspace_output_dir": os.environ.get("DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR", "DeepPaperNote_output").strip(),
     }
 
 
-def require_obsidian_vault(config: dict[str, Any]) -> Path:
+def configured_obsidian_vault(config: dict[str, Any]) -> Path | None:
     vault = str(config.get("obsidian_vault", "")).strip()
     if not vault:
-        raise RuntimeError("Missing Obsidian vault configuration. Set DEEPPAPERNOTE_OBSIDIAN_VAULT.")
+        return None
     vault_path = Path(vault).expanduser().resolve()
     if not vault_path.exists() or not vault_path.is_dir():
         raise RuntimeError(f"Configured Obsidian vault does not exist: {vault_path}")
     return vault_path
+
+
+def require_obsidian_vault(config: dict[str, Any]) -> Path:
+    vault_path = configured_obsidian_vault(config)
+    if vault_path is None:
+        raise RuntimeError("Missing Obsidian vault configuration. Set DEEPPAPERNOTE_OBSIDIAN_VAULT.")
+    return vault_path
+
+
+def resolve_note_output_mode(config: dict[str, Any]) -> tuple[str, Path]:
+    vault_path = configured_obsidian_vault(config)
+    if vault_path is not None:
+        return ("obsidian", vault_path)
+    workspace_root = Path.cwd().resolve()
+    output_dir = str(config.get("workspace_output_dir", "DeepPaperNote_output")).strip() or "DeepPaperNote_output"
+    return ("workspace", workspace_root / output_dir)
 
 
 def resolve_obsidian_note_path(
@@ -743,19 +760,19 @@ def resolve_obsidian_note_path(
     subdir: str = "",
     filename: str = "",
 ) -> Path:
-    vault_path = require_obsidian_vault(config)
+    output_mode, root_path = resolve_note_output_mode(config)
     papers_dir = str(config.get("papers_dir", "20_Research/Papers")).strip() or "20_Research/Papers"
-    relative_dir = Path(papers_dir)
+    relative_dir = Path(papers_dir) if output_mode == "obsidian" else Path()
     if subdir:
         subdir_path = Path(subdir)
-        if str(subdir_path).startswith(papers_dir):
+        if output_mode == "obsidian" and str(subdir_path).startswith(papers_dir):
             relative_dir = subdir_path
         else:
             relative_dir = relative_dir / subdir_path
     note_slug = slugify_filename(title)
     target_name = filename or f"{note_slug}.md"
     folder_name = Path(target_name).stem or note_slug
-    return vault_path / relative_dir / folder_name / target_name
+    return root_path / relative_dir / folder_name / target_name
 
 
 def default_pdf_path(record: dict[str, Any], dest_dir: str | None = None) -> Path:

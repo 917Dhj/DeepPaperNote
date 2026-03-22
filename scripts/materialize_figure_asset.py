@@ -7,7 +7,7 @@ import argparse
 import shutil
 from pathlib import Path
 
-from common import emit, maybe_load_json_record, resolve_obsidian_note_path, runtime_config
+from common import emit, maybe_load_json_record, resolve_note_output_mode, resolve_obsidian_note_path, runtime_config
 
 
 def parser() -> argparse.ArgumentParser:
@@ -50,9 +50,9 @@ def main() -> None:
     dest_image = asset_dir / source_image.name
     shutil.copy2(source_image, dest_image)
 
-    vault_root = Path(config["obsidian_vault"]).expanduser().resolve()
-    vault_relative = dest_image.relative_to(vault_root)
-    obsidian_embed = f"![[{vault_relative.as_posix()}]]"
+    output_mode, root_root = resolve_note_output_mode(config)
+    relative_from_note = dest_image.relative_to(note_path.parent)
+    relative_markdown_embed = f"![{args.label or source_image.stem}]({relative_from_note.as_posix()})"
     absolute_markdown_embed = f"![{args.label or source_image.stem}]({dest_image})"
 
     payload = {
@@ -62,11 +62,16 @@ def main() -> None:
         "note_path": str(note_path),
         "source_image": str(source_image),
         "dest_image_path": str(dest_image),
-        "vault_relative_image_path": vault_relative.as_posix(),
-        "obsidian_embed": obsidian_embed,
         "absolute_markdown_embed": absolute_markdown_embed,
+        "relative_markdown_embed": relative_markdown_embed,
         "label": args.label,
+        "output_mode": output_mode,
     }
+
+    if output_mode == "obsidian":
+        vault_relative = dest_image.relative_to(root_root)
+        payload["vault_relative_image_path"] = vault_relative.as_posix()
+        payload["obsidian_embed"] = f"![[{vault_relative.as_posix()}]]"
     emit(payload, args.output)
 
 

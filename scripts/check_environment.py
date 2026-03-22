@@ -86,6 +86,12 @@ def main() -> None:
             "output_dir": str(config.get("output_dir", "")),
             "candidate_vaults": find_obsidian_candidates(),
         },
+        "workspace_fallback": {
+            "available": True,
+            "current_working_directory": str(Path.cwd().resolve()),
+            "workspace_output_dir": str(config.get("workspace_output_dir", "DeepPaperNote_output")),
+            "note": "If no Obsidian vault is configured, DeepPaperNote can still save notes under the current working directory.",
+        },
         "zotero": {
             "local_hints": find_local_zotero_hints(),
             "mcp_available_from_script": False,
