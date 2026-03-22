@@ -58,6 +58,17 @@ If you want the Python dependencies for local development:
 pip install -e .
 ```
 
+After installation, you can also ask Codex with short prompts such as:
+
+- `/deeppapernote doctor`
+- `/deeppapernote start`
+- `查看 deeppapernote 的可用情况`
+- `deeppapernote 有什么功能`
+
+In that mode, DeepPaperNote should explain its capabilities, inspect the current setup, and tell you what is already configured or still missing.
+
+If you want a more explicit onboarding prompt, see [ONBOARDING_PROMPT.md](./ONBOARDING_PROMPT.md).
+
 ## 🔧 Configuration
 
 After installation, there are two pieces of configuration most users should care about.

@@ -15,11 +15,23 @@ Chinese trigger examples:
 - `写一篇高质量论文精读笔记`
 - `把这篇文章整理成 obsidian 笔记`
 - `读这篇论文并生成 md 笔记`
+- `/deeppapernote doctor`
+- `/deeppapernote start`
+- `查看 deeppapernote 的可用情况`
+- `deeppapernote 有什么功能`
+- `帮我检查 deeppapernote 现在能不能用`
 
 This skill is intentionally narrow:
 - it handles one paper at a time
 - it does not update daily reading lists
 - it does not treat a shallow abstract rewrite as a successful output
+
+It also supports a lightweight documentation/setup-assistant mode.
+When the user asks what DeepPaperNote can do, whether it is available, or how to configure it:
+- do not force a paper-writing workflow
+- inspect the local environment first
+- explain the current setup state
+- offer to help complete missing configuration
 
 ## Core Standard
 
@@ -54,6 +66,31 @@ Read [references/evidence-first.md](references/evidence-first.md) before draftin
 Read [references/deep-analysis.md](references/deep-analysis.md) before writing the final note body.
 Read [references/final-writing.md](references/final-writing.md) before turning the structured artifacts into the final user-facing note.
 Read [references/model-synthesis.md](references/model-synthesis.md) for the preferred model-first execution loop after the synthesis bundle is ready.
+
+## Setup-Assistant Mode
+
+If the user asks things like:
+- `/deeppapernote doctor`
+- `/deeppapernote start`
+- `查看 deeppapernote 的可用情况`
+- `deeppapernote 有什么功能`
+- `帮我检查 deeppapernote 现在能不能用`
+
+then switch into setup-assistant mode:
+1. run `scripts/check_environment.py`
+2. if the current Codex environment supports Zotero MCP, check whether it is available
+3. explain:
+   - what DeepPaperNote can do
+   - which required items are already configured
+   - which optional items are available
+   - which recommended items are still missing
+4. group the final status into:
+   - already configured
+   - recommended next configuration
+   - optional but helpful enhancements
+5. if Codex can directly help complete a missing configuration, offer that next
+
+In setup-assistant mode, prefer a practical environment report over generic documentation text.
 
 ## Tool and Source Priority
 
@@ -104,6 +141,7 @@ Use [references/final-writing.md](references/final-writing.md) when drafting the
 ## Scripts
 
 Use these bundled scripts rather than rebuilding the workflow from scratch:
+- `scripts/check_environment.py`
 - `scripts/create_input_record.py`
 - `scripts/locate_zotero_attachment.py`
 - `scripts/resolve_paper.py`
@@ -127,6 +165,12 @@ Preferred usage pattern:
 6. write the note in your own words
 7. lint the note
 8. write it into Obsidian only after lint passes
+
+Setup-assistant usage pattern:
+1. run `scripts/check_environment.py`
+2. summarize what is already usable
+3. explain what each missing item affects
+4. offer to configure missing items rather than just listing docs
 
 Current status:
 - the single-paper deterministic core pipeline is implemented as an MVP

@@ -58,6 +58,17 @@ DeepPaperNote 是一个 **Codex skill**，专门做一件事：
 pip install -e .
 ```
 
+安装后，你也可以直接对 Codex 发一些很短的命令式请求，比如：
+
+- `/deeppapernote doctor`
+- `/deeppapernote start`
+- `查看 deeppapernote 的可用情况`
+- `deeppapernote 有什么功能`
+
+在这种模式下，DeepPaperNote 应该一边介绍自己的能力，一边检查当前配置情况，并告诉你哪些已经配置好了、哪些还缺失。
+
+如果你还希望有一份更明确的引导提示词，也可以参考 [ONBOARDING_PROMPT.md](./ONBOARDING_PROMPT.md)。
+
 ## 🔧 配置说明
 
 安装之后，最值得先配置的是两件事。
