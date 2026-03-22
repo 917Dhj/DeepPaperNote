@@ -58,6 +58,127 @@ If you want the Python dependencies for local development:
 pip install -e .
 ```
 
+## 🔧 Configuration
+
+After installation, there are two pieces of configuration most users should care about.
+
+### 1. Tell DeepPaperNote where your Obsidian vault is
+
+DeepPaperNote writes notes into an Obsidian vault.
+The cleanest way to configure that is with an environment variable:
+
+```bash
+export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/Obsidian_Documents"
+```
+
+Optional related settings:
+
+```bash
+export DEEPPAPERNOTE_PAPERS_DIR="20_Research/Papers"
+export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
+```
+
+What they do:
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DEEPPAPERNOTE_OBSIDIAN_VAULT` | Yes for vault writes | Root path of your Obsidian vault |
+| `DEEPPAPERNOTE_PAPERS_DIR` | Optional | Vault-relative paper output folder, default: `20_Research/Papers` |
+| `DEEPPAPERNOTE_OUTPUT_DIR` | Optional | Local temporary artifact directory, default: `tmp/DeepPaperNote` |
+
+Why the optional path settings can help:
+
+- `DEEPPAPERNOTE_PAPERS_DIR`
+  Useful if your vault does not store papers under `20_Research/Papers`, or if you want DeepPaperNote to fit an existing folder convention without extra manual moves.
+- `DEEPPAPERNOTE_OUTPUT_DIR`
+  Useful if you want all intermediate artifacts in a predictable location for debugging, cleanup, or experimentation.
+
+### 2. If you want local-library paper lookup, configure Zotero MCP
+
+DeepPaperNote can work without Zotero.
+But if you want Codex to search your local Zotero library first, you should configure Zotero MCP:
+
+- Zotero MCP: [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp)
+
+Why it matters:
+
+- local Zotero hits are usually the best identity anchor
+- Codex can prefer your local paper library before internet search
+- local attachments can reduce wrong-title matches
+- it is especially helpful when you already curate papers in Zotero and do not want DeepPaperNote to rediscover the same paper from weaker web matches
+- it also improves reliability for published papers whose title may collide with preprints, workshop versions, or mirrored pages
+
+### Optional: Semantic Scholar API key
+
+This is not required, but if you have a Semantic Scholar API key you can expose it as:
+
+```bash
+export DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY="your_api_key"
+```
+
+Why it can help:
+
+- metadata lookup is usually more stable when Semantic Scholar is available
+- title-based paper resolution can be more reliable for hard-to-match papers
+- author, venue, and abstract backfill may be more complete in some cases
+- it gives DeepPaperNote one more strong source before falling back to weaker guesses
+
+### Optional: OCR tooling for scanned PDFs
+
+OCR is not required for many modern PDFs.
+But it becomes useful when a paper is:
+
+- a scanned PDF
+- an image-based PDF with poor embedded text
+- an older paper where direct text extraction is incomplete
+
+Why DeepPaperNote uses OCR:
+
+- to recover page text when direct PDF extraction is too weak
+- to preserve method and results evidence that would otherwise be lost
+- to improve page-level context around figures and captions
+
+Current OCR logic in DeepPaperNote:
+
+- DeepPaperNote first tries normal PDF text extraction with `PyMuPDF`
+- for each page, it counts how much searchable text was extracted
+- if a page has too little extracted text, it becomes an OCR fallback candidate
+- OCR is then applied to that page only
+- the recovered OCR text is mainly used as page context for later evidence handling and figure/page semantic matching
+
+Important scope note:
+
+- OCR is currently a **page-text fallback**
+- it is **not** the primary extraction path for all PDFs
+- it is **not** used as a replacement for model-side understanding
+- it is **not** used to "understand images" directly
+
+Without OCR, DeepPaperNote still works well on normal digital PDFs, but scanned or low-quality PDFs may produce weaker evidence.
+
+Required software and packages for OCR:
+
+| Layer | Requirement | Purpose |
+| --- | --- | --- |
+| System tool | `tesseract` | The actual OCR engine |
+| Python package | `pytesseract` | Python bridge to `tesseract` |
+| Python package | `Pillow` | Opens rendered page images before OCR |
+| Existing PDF layer | `PyMuPDF` | Renders pages and extracts normal PDF text |
+
+Install on macOS:
+
+```bash
+brew install tesseract
+pip install pytesseract Pillow
+```
+
+Quick verification:
+
+```bash
+tesseract --version
+python3 -c "import pytesseract, PIL; print('python_ok')"
+python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
+```
+
 ## 📝 Changelog Preview
 
 For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
@@ -216,7 +337,7 @@ DeepPaperNote/
 | --- | --- | --- |
 | Codex desktop / CLI | Recommended | Primary target environment |
 | Python 3.10+ | Required | Runs the helper scripts |
-| Obsidian vault | Recommended | Default output target |
+| Obsidian vault | Recommended | Configure `DEEPPAPERNOTE_OBSIDIAN_VAULT` |
 | Zotero + MCP | Optional | Best for local-library-first workflows |
 | OCR tooling | Optional | Helpful for scanned PDFs |
 

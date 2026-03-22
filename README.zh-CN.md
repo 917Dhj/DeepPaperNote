@@ -58,6 +58,127 @@ DeepPaperNote 是一个 **Codex skill**，专门做一件事：
 pip install -e .
 ```
 
+## 🔧 配置说明
+
+安装之后，最值得先配置的是两件事。
+
+### 1. 告诉 DeepPaperNote 你的 Obsidian vault 在哪里
+
+DeepPaperNote 会把最终笔记写进 Obsidian vault。
+最直接的配置方式是设置环境变量：
+
+```bash
+export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian_Documents/绝对路径"
+```
+
+相关的可选配置还有：
+
+```bash
+export DEEPPAPERNOTE_PAPERS_DIR="20_Research/Papers"
+export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
+```
+
+它们的含义是：
+
+| 变量 | 是否必需 | 作用 |
+| --- | --- | --- |
+| `DEEPPAPERNOTE_OBSIDIAN_VAULT` | 写入 vault 时必需 | 你的 Obsidian vault 根目录 |
+| `DEEPPAPERNOTE_PAPERS_DIR` | 可选 | vault 内论文输出目录，默认是 `20_Research/Papers` |
+| `DEEPPAPERNOTE_OUTPUT_DIR` | 可选 | 本地临时产物目录，默认是 `tmp/DeepPaperNote` |
+
+这些可选路径配置的实际好处是：
+
+- `DEEPPAPERNOTE_PAPERS_DIR`
+  如果你的 vault 不是把论文放在 `20_Research/Papers` 下，或者你已经有自己的目录约定，这个配置可以让 DeepPaperNote 直接适配你的现有结构，减少后续手动移动文件。
+- `DEEPPAPERNOTE_OUTPUT_DIR`
+  如果你希望中间产物统一落在一个固定位置，方便调试、清理或做实验，这个配置会比较有用。
+
+### 2. 如果你希望 Codex 先在本地 Zotero 库里找论文，需要配置 Zotero MCP
+
+DeepPaperNote 不依赖 Zotero 才能工作。
+但如果你希望 Codex 优先搜索你本地 Zotero 库中的论文，建议配置 Zotero MCP：
+
+- Zotero MCP: [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp)
+
+为什么值得配：
+
+- 本地 Zotero 命中通常是最可靠的论文身份锚点
+- Codex 可以先查你的本地论文库，再决定要不要联网
+- 本地附件也更有助于减少标题误匹配
+- 如果你本来就用 Zotero 做论文管理，这会比重新去网上“猜测这篇论文是谁”稳得多
+- 对正式发表版、预印本、镜像页面标题相似的场景，Zotero-first 通常会明显降低误匹配概率
+
+### 可选：Semantic Scholar API Key
+
+这不是必需项，但如果你有 Semantic Scholar API key，可以设置：
+
+```bash
+export DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY="your_api_key"
+```
+
+它的好处主要是：
+
+- 元数据补全通常会更稳一些
+- 对一些标题不好匹配的论文，身份解析会更可靠
+- 在作者、venue、摘要等信息回填上，有时会更完整
+- 它能给 DeepPaperNote 多一个较强的元数据来源，减少退回到弱匹配的概率
+
+### 可选：OCR 工具
+
+很多现代 PDF 并不需要 OCR。
+但如果论文是下面这些情况，OCR 会很有帮助：
+
+- 扫描版 PDF
+- 以图片为主、嵌入文本质量很差的 PDF
+- 一些比较老的论文，直接抽文本时内容残缺
+
+DeepPaperNote 为什么要用 OCR：
+
+- 当直接 PDF 抽文本太差时，用它来补页内正文
+- 避免方法和结果证据因为 PDF 编码问题而大量丢失
+- 改善图表附近页内文字上下文的恢复效果
+
+DeepPaperNote 当前的 OCR 使用逻辑是：
+
+- 先用 `PyMuPDF` 做正常的 PDF 文本提取
+- 对每一页统计可搜索文本的字符数
+- 如果某一页直接抽到的文本太少，就把这页视为 OCR fallback 候选
+- 只对这类页面单独做 OCR
+- OCR 恢复出的文本，主要用于补页级证据和后续 figure/page 语义匹配的上下文
+
+需要特别说明的是：
+
+- OCR 目前只是 **页文本兜底方案**
+- 它 **不是** 所有 PDF 的主提取路径
+- 它 **不会** 代替模型去理解论文
+- 它 **不会** 直接负责“理解图片内容”
+
+如果没有 OCR，DeepPaperNote 处理普通数字版 PDF 依然没问题，但面对扫描版或低质量 PDF 时，证据质量会更弱一些。
+
+OCR 需要的依赖如下：
+
+| 层级 | 依赖 | 作用 |
+| --- | --- | --- |
+| 系统工具 | `tesseract` | 真正执行 OCR 识别 |
+| Python 包 | `pytesseract` | Python 调用 `tesseract` 的桥接层 |
+| Python 包 | `Pillow` | 打开页面渲染后的图像再交给 OCR |
+| 现有 PDF 层 | `PyMuPDF` | 负责正常抽文本与页面渲染 |
+
+在 macOS 上的安装方式：
+
+```bash
+brew install tesseract
+pip install pytesseract Pillow
+```
+
+快速验证：
+
+```bash
+tesseract --version
+python3 -c "import pytesseract, PIL; print('python_ok')"
+python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
+```
+
 ## 📝 更新日志概览
 
 更完整的版本级更新请见 [CHANGELOG.md](./CHANGELOG.md)。
@@ -215,7 +336,7 @@ DeepPaperNote/
 | --- | --- | --- |
 | Codex desktop / CLI | 推荐 | 当前主目标环境 |
 | Python 3.10+ | 必需 | 运行辅助脚本 |
-| 本地 Obsidian vault | 推荐 | 默认输出目标 |
+| 本地 Obsidian vault | 推荐 | 需要配置 `DEEPPAPERNOTE_OBSIDIAN_VAULT` |
 | Zotero + MCP | 可选 | 对本地论文库工作流很有帮助 |
 | OCR 工具 | 可选 | 对扫描版 PDF 更友好 |
 
