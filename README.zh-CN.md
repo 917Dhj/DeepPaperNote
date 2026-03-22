@@ -388,8 +388,8 @@ DeepPaperNote/
 | placeholder-first 图表规划 | ✅ 已可用 |
 | 风格与结构 lint | ✅ 已可用 |
 | 对外 examples | 暂未补齐 |
-| 测试 | 暂未补齐 |
-| CI | 暂未补齐 |
+| 测试 | ✅ 已有最小测试集 |
+| CI | ✅ 已配置 GitHub Actions |
 | packaging metadata | 暂未补齐 |
 | 图像匹配 / OCR 稳定性 | 仍需加强 |
 

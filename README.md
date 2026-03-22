@@ -387,8 +387,8 @@ This repository is in active early-stage development.
 | Placeholder-first figure planning | ✅ Working |
 | Style and structure linting | ✅ Working |
 | Public examples | Not added yet |
-| Test suite | Not added yet |
-| CI | Not added yet |
+| Test suite | ✅ Minimal suite added |
+| CI | ✅ GitHub Actions configured |
 | Packaging metadata | Not added yet |
 | Figure matching / OCR robustness | Needs improvement |
 
