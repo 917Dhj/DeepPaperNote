@@ -50,7 +50,8 @@ DeepPaperNote 是一个 **Codex skill**，专门做一件事：
    - 获取元数据和 PDF 证据
    - 生成 synthesis bundle
    - 让 Codex/GPT 写最终笔记
-   - 在写入 Obsidian 之前先做 lint 检查
+   - 在最终保存前先做 lint 检查
+   - 如果配置了 Obsidian 就写入 vault，否则退回当前工作区输出
 
 如果你想在本地装 Python 依赖用于开发，可以执行：
 
@@ -71,7 +72,11 @@ python3 -m pip install -e .
 
 ## 🔧 配置说明
 
-安装之后，如果你希望获得 Obsidian 原生的笔记管理体验，真正必需的配置只有一项，其他更多属于可选增强配置。
+DeepPaperNote 可以在零配置的情况下直接试用。
+
+- 如果没有配置 Obsidian vault，它依然可以把笔记输出到当前工作区
+- 如果你希望获得 Obsidian 原生的笔记管理体验，就需要配置 vault 路径
+- 这一节剩下的内容都属于可选增强配置
 
 ### 必需：告诉 DeepPaperNote 你的 Obsidian vault 在哪里
 

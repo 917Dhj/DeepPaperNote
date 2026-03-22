@@ -50,7 +50,8 @@ Typical prompts:
    - gather metadata and PDF evidence
    - build a synthesis bundle
    - let Codex/GPT write the final note
-   - lint the note before writing it into Obsidian
+   - lint the note before saving it
+   - save it into Obsidian when configured, or into the current workspace as a fallback
 
 If you want the Python dependencies for local development:
 
@@ -71,7 +72,11 @@ If you want a more explicit onboarding prompt, see [ONBOARDING_PROMPT.md](./ONBO
 
 ## 🔧 Configuration
 
-After installation, there is one required configuration if you want Obsidian-native note management, plus several optional enhancements.
+DeepPaperNote can be tried with zero configuration.
+
+- if no Obsidian vault is configured, it can still save notes into the current workspace
+- if you want Obsidian-native note management, you should configure your vault path
+- everything else in this section is optional and improves specific workflows
 
 ### Required: Tell DeepPaperNote where your Obsidian vault is
 
