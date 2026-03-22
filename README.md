@@ -104,12 +104,19 @@ Why the optional path settings can help:
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   Useful if you want all intermediate artifacts in a predictable location for debugging, cleanup, or experimentation.
 
-### 2. If you want local-library paper lookup, configure Zotero MCP
+### Optional: Zotero MCP for local-library-first workflows
 
 DeepPaperNote can work without Zotero.
-But if you want Codex to search your local Zotero library first, you should configure Zotero MCP:
+But if you want Codex to search your local Zotero library first, you should configure a Zotero MCP option that Codex can actually use.
 
-- Zotero MCP: [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp)
+This is most worth setting up if you already use Zotero as your main paper-management or reading workflow.
+
+Recommended ways to think about it:
+
+| Option | Best for | Notes |
+| --- | --- | --- |
+| [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | Lightweight read access | Closer to a minimal Zotero MCP server for search, metadata, and text access |
+| [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | Richer research workflow features | More feature-rich, but depending on your Codex setup it may require extra adaptation rather than working out of the box |
 
 Why it matters:
 
@@ -118,6 +125,12 @@ Why it matters:
 - local attachments can reduce wrong-title matches
 - it is especially helpful when you already curate papers in Zotero and do not want DeepPaperNote to rediscover the same paper from weaker web matches
 - it also improves reliability for published papers whose title may collide with preprints, workshop versions, or mirrored pages
+
+Important note:
+
+- DeepPaperNote does **not** require one specific Zotero MCP implementation
+- for DeepPaperNote, the key capability is that Codex can search Zotero items, inspect metadata, and ideally read local full text
+- some Zotero MCP projects were built with other agent clients in mind, so using them with Codex may require extra adaptation
 
 ### Optional: Semantic Scholar API key
 

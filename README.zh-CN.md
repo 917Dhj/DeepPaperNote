@@ -104,12 +104,21 @@ export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   如果你希望中间产物统一落在一个固定位置，方便调试、清理或做实验，这个配置会比较有用。
 
-### 2. 如果你希望 Codex 先在本地 Zotero 库里找论文，需要配置 Zotero MCP
+### 可选：用于本地文献库优先工作流的 Zotero MCP
 
 DeepPaperNote 不依赖 Zotero 才能工作。
-但如果你希望 Codex 优先搜索你本地 Zotero 库中的论文，建议配置 Zotero MCP：
+但如果你希望 Codex 优先搜索你本地 Zotero 库中的论文，建议配置一个 **Codex 真的能用** 的 Zotero MCP 方案。
 
-- Zotero MCP: [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp)
+这项配置最适合这样的人：
+- 你本来就用 Zotero 做文献管理
+- 你平时主要在 Zotero 里读论文、整理附件和元数据
+
+可以这样理解不同路线：
+
+| 方案 | 更适合什么场景 | 说明 |
+| --- | --- | --- |
+| [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | 轻量的只读访问 | 更接近一个最小化 Zotero MCP server，适合搜索条目、读元数据、读文本 |
+| [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | 更完整的研究工作流能力 | 功能更丰富，但在 Codex 环境里不一定开箱即用，可能还需要额外适配 |
 
 为什么值得配：
 
@@ -118,6 +127,12 @@ DeepPaperNote 不依赖 Zotero 才能工作。
 - 本地附件也更有助于减少标题误匹配
 - 如果你本来就用 Zotero 做论文管理，这会比重新去网上“猜测这篇论文是谁”稳得多
 - 对正式发表版、预印本、镜像页面标题相似的场景，Zotero-first 通常会明显降低误匹配概率
+
+需要特别说明的是：
+
+- DeepPaperNote **不强依赖某一个固定的 Zotero MCP 仓库**
+- 对 DeepPaperNote 来说，最核心的能力是：Codex 能搜索 Zotero 条目、查看元数据、最好还能读取本地全文
+- 有些 Zotero MCP 项目最初是围绕其他 agent 客户端设计的，接到 Codex 上时可能需要额外改造
 
 ### 可选：Semantic Scholar API Key
 
