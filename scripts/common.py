@@ -24,6 +24,13 @@ SEMANTIC_SCHOLAR_SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/se
 OPENALEX_WORKS_URL = "https://api.openalex.org/works"
 CROSSREF_WORKS_URL = "https://api.crossref.org/works"
 DEFAULT_USER_AGENT = "DeepPaperNote/0.1"
+SHELL_CONFIG_FILES = [
+    Path.home() / ".zshenv",
+    Path.home() / ".zprofile",
+    Path.home() / ".zshrc",
+    Path.home() / ".bash_profile",
+    Path.home() / ".bashrc",
+]
 
 try:
     import fitz  # type: ignore
@@ -102,6 +109,44 @@ def slugify_filename(text: str) -> str:
     text = re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE)
     text = re.sub(r"[-\s]+", "_", text).strip("_")
     return text or "paper_note"
+
+
+def shell_config_value(name: str) -> str:
+    pattern = re.compile(rf"^\s*(?:export\s+)?{re.escape(name)}=(.*)$")
+    for path in SHELL_CONFIG_FILES:
+        if not path.exists() or not path.is_file():
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except Exception:
+            continue
+        for raw_line in reversed(lines):
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            match = pattern.match(line)
+            if not match:
+                continue
+            value = match.group(1).strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+                value = value[1:-1]
+            return value.strip()
+    return ""
+
+
+def env_config_value(*names: str, default: str = "") -> str:
+    for name in names:
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    disable_shell_fallback = os.environ.get("DEEPPAPERNOTE_DISABLE_SHELL_CONFIG", "").strip().lower()
+    if disable_shell_fallback in {"1", "true", "yes", "on"}:
+        return default
+    for name in names:
+        value = shell_config_value(name)
+        if value:
+            return value
+    return default
 
 
 def title_similarity(a: str, b: str) -> float:
@@ -242,10 +287,7 @@ def http_get_bytes(url: str, *, timeout: int = 60, headers: dict[str, str] | Non
 
 def semantic_scholar_headers() -> dict[str, str]:
     headers = {"User-Agent": DEFAULT_USER_AGENT}
-    api_key = (
-        os.environ.get("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY", "").strip()
-        or os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "").strip()
-    )
+    api_key = env_config_value("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY", "SEMANTIC_SCHOLAR_API_KEY")
     if api_key:
         headers["x-api-key"] = api_key
     return headers
@@ -717,13 +759,16 @@ def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
 
 def runtime_config() -> dict[str, Any]:
     return {
-        "obsidian_vault": (
-            os.environ.get("DEEPPAPERNOTE_OBSIDIAN_VAULT", "").strip()
-            or os.environ.get("READ_ARXIV_OBSIDIAN_VAULT", "").strip()
+        "obsidian_vault": env_config_value(
+            "DEEPPAPERNOTE_OBSIDIAN_VAULT",
+            "READ_ARXIV_OBSIDIAN_VAULT",
         ),
-        "papers_dir": os.environ.get("DEEPPAPERNOTE_PAPERS_DIR", "20_Research/Papers").strip(),
-        "output_dir": os.environ.get("DEEPPAPERNOTE_OUTPUT_DIR", "tmp/DeepPaperNote").strip(),
-        "workspace_output_dir": os.environ.get("DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR", "DeepPaperNote_output").strip(),
+        "papers_dir": env_config_value("DEEPPAPERNOTE_PAPERS_DIR", default="20_Research/Papers"),
+        "output_dir": env_config_value("DEEPPAPERNOTE_OUTPUT_DIR", default="tmp/DeepPaperNote"),
+        "workspace_output_dir": env_config_value(
+            "DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR",
+            default="DeepPaperNote_output",
+        ),
     }
 
 

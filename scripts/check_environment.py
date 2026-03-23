@@ -5,11 +5,10 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import os
 import shutil
 from pathlib import Path
 
-from common import emit, runtime_config
+from common import emit, env_config_value, runtime_config
 
 
 def parser() -> argparse.ArgumentParser:
@@ -107,8 +106,7 @@ def main() -> None:
         },
         "metadata": {
             "semantic_scholar_api_key_configured": bool(
-                os.environ.get("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY", "").strip()
-                or os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "").strip()
+                env_config_value("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY", "SEMANTIC_SCHOLAR_API_KEY")
             )
         },
     }

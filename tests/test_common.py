@@ -1,8 +1,24 @@
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
-from common import extract_arxiv_id, extract_doi, infer_source_type, resolve_note_output_mode, resolve_obsidian_note_path
+from common import (
+    env_config_value,
+    extract_arxiv_id,
+    extract_doi,
+    infer_source_type,
+    resolve_note_output_mode,
+    resolve_obsidian_note_path,
+    semantic_scholar_headers,
+)
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+ENV_SCRIPT = PROJECT_ROOT / "scripts" / "check_environment.py"
 
 
 def test_extract_doi_from_url_like_text() -> None:
@@ -53,3 +69,33 @@ def test_resolve_obsidian_note_path_in_vault_mode(tmp_path: Path) -> None:
     }
     path = resolve_obsidian_note_path(config, title="My Test Paper", subdir="心理健康")
     assert path == vault / "20_Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
+
+
+def test_env_config_value_falls_back_to_shell_file(tmp_path: Path, monkeypatch) -> None:
+    shell_file = tmp_path / ".zshenv"
+    shell_file.write_text(
+        '\n# comment\nexport DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY="file_based_key"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY", raising=False)
+    monkeypatch.delenv("SEMANTIC_SCHOLAR_API_KEY", raising=False)
+    monkeypatch.setattr("common.SHELL_CONFIG_FILES", [shell_file])
+
+    assert env_config_value("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY") == "file_based_key"
+    assert semantic_scholar_headers()["x-api-key"] == "file_based_key"
+
+
+def test_check_environment_reports_semantic_scholar_key_from_env(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env["DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY"] = "env_key"
+
+    result = subprocess.run(
+        [sys.executable, str(ENV_SCRIPT)],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+    assert payload["metadata"]["semantic_scholar_api_key_configured"] is True
