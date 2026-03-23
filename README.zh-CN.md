@@ -16,7 +16,7 @@
 
 </div>
 
-![DeepPaperNote 主图](./assets/hero.png)
+![DeepPaperNote 主图](./assets/hero.svg)
 
 DeepPaperNote 是一个 **Codex 技能**，专门做一件事：
 
@@ -334,6 +334,7 @@ DeepPaperNote/
 │   └── openai.yaml
 ├── assets/
 │   ├── hero.png
+│   ├── hero.svg
 │   └── note_template.md
 ├── references/
 │   ├── architecture.md

@@ -16,7 +16,7 @@
 
 </div>
 
-![DeepPaperNote Hero](./assets/hero.png)
+![DeepPaperNote Hero](./assets/hero.svg)
 
 DeepPaperNote is a **Codex skill** for a very specific workflow:
 
@@ -333,6 +333,7 @@ DeepPaperNote/
 │   └── openai.yaml
 ├── assets/
 │   ├── hero.png
+│   ├── hero.svg
 │   └── note_template.md
 ├── references/
 │   ├── architecture.md
