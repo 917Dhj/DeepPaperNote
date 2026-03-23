@@ -798,6 +798,101 @@ def resolve_note_output_mode(config: dict[str, Any]) -> tuple[str, Path]:
     return ("workspace", workspace_root / output_dir)
 
 
+DOMAIN_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("心理健康", ("mental health", "depression", "anxiety", "psychiatric", "psychology", "clinical", "patient", "counsel", "therapy")),
+    ("大模型", ("large language model", "llm", "foundation model", "gpt", "transformer", "instruction tuning", "pretrain", "pre-training", "language model", "agent", "reasoning")),
+    ("多模态", ("multimodal", "vision-language", "audio-visual", "video-language", "image-text", "cross-modal")),
+    ("计算机视觉", ("computer vision", "image classification", "object detection", "segmentation", "vision transformer", "visual recognition")),
+    ("强化学习", ("reinforcement learning", "policy optimization", "bandit", "markov decision process", "rl")),
+    ("语音", ("speech", "asr", "automatic speech recognition", "text-to-speech", "speaker recognition", "audio")),
+    ("推荐系统", ("recommendation", "recommender", "ctr prediction", "ranking system")),
+    ("机器人", ("robot", "robotics", "manipulation", "navigation", "control policy")),
+    ("图学习", ("graph neural network", "graph learning", "molecular graph", "gnn")),
+    ("机器学习", ("machine learning", "deep learning", "neural network", "representation learning")),
+]
+
+
+def infer_domain_label(title: str, abstract: str = "") -> str:
+    lower = normalize_whitespace(f"{title} {abstract}").lower()
+    scored: list[tuple[int, str]] = []
+    for label, keywords in DOMAIN_RULES:
+        score = sum(1 for keyword in keywords if keyword in lower)
+        if score > 0:
+            scored.append((score, label))
+    if scored:
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return scored[0][1]
+    paper_type, _ = infer_paper_type(title, abstract)
+    if paper_type == "clinical_or_psychology_empirical":
+        return "心理健康"
+    if paper_type == "AI_method":
+        return "机器学习"
+    return "未分类"
+
+
+def is_probable_paper_folder(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    marker = path / f"{path.name}.md"
+    return marker.exists()
+
+
+def existing_domain_dirs(config: dict[str, Any]) -> list[str]:
+    output_mode, root_path = resolve_note_output_mode(config)
+    papers_dir = str(config.get("papers_dir", "20_Research/Papers")).strip() or "20_Research/Papers"
+    base_dir = root_path / Path(papers_dir) if output_mode == "obsidian" else root_path
+    if not base_dir.exists() or not base_dir.is_dir():
+        return []
+    names: list[str] = []
+    for child in sorted(base_dir.iterdir()):
+        if not child.is_dir():
+            continue
+        if is_probable_paper_folder(child):
+            continue
+        names.append(child.name)
+    return names
+
+
+def domain_name_score(domain_name: str, label: str, title: str, abstract: str) -> int:
+    name = domain_name.strip().lower()
+    score = 0
+    if name == label.lower():
+        score += 100
+    lower = normalize_whitespace(f"{title} {abstract}").lower()
+    for rule_label, keywords in DOMAIN_RULES:
+        if rule_label.lower() != name:
+            continue
+        score += sum(10 for keyword in keywords if keyword in lower)
+    if name in lower:
+        score += 15
+    aliases = {
+        "大模型": ("llm", "large language model", "language model", "transformer", "agent", "multimodal"),
+        "心理健康": ("depression", "anxiety", "mental health", "clinical", "patient", "therapy"),
+    }
+    for canonical, terms in aliases.items():
+        if canonical.lower() == name:
+            score += sum(4 for term in terms if term in lower)
+    return score
+
+
+def resolve_domain_subdir(config: dict[str, Any], *, title: str, abstract: str = "", subdir: str = "") -> str:
+    if subdir.strip():
+        return subdir.strip()
+    label = infer_domain_label(title, abstract)
+    existing = existing_domain_dirs(config)
+    if existing:
+        best_name = ""
+        best_score = -1
+        for domain_name in existing:
+            score = domain_name_score(domain_name, label, title, abstract)
+            if score > best_score:
+                best_name = domain_name
+                best_score = score
+        if best_name and best_score > 0:
+            return best_name
+    return label
+
+
 def resolve_obsidian_note_path(
     config: dict[str, Any],
     *,

@@ -7,7 +7,14 @@ import argparse
 import shutil
 from pathlib import Path
 
-from common import emit, maybe_load_json_record, resolve_note_output_mode, resolve_obsidian_note_path, runtime_config
+from common import (
+    emit,
+    maybe_load_json_record,
+    resolve_domain_subdir,
+    resolve_note_output_mode,
+    resolve_obsidian_note_path,
+    runtime_config,
+)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -34,11 +41,17 @@ def main() -> None:
     config = runtime_config()
     if args.vault:
         config["obsidian_vault"] = args.vault
+    resolved_subdir = resolve_domain_subdir(
+        config,
+        title=title,
+        abstract=str(record.get("abstract", "")),
+        subdir=args.subdir,
+    )
 
     note_path = resolve_obsidian_note_path(
         config,
         title=title,
-        subdir=args.subdir,
+        subdir=resolved_subdir,
         filename=args.filename,
     )
     source_image = Path(args.source_image).expanduser().resolve()
@@ -66,6 +79,7 @@ def main() -> None:
         "relative_markdown_embed": relative_markdown_embed,
         "label": args.label,
         "output_mode": output_mode,
+        "subdir": resolved_subdir,
     }
 
     if output_mode == "obsidian":
