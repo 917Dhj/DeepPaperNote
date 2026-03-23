@@ -14,7 +14,7 @@
         <path id="path6" fill="none" stroke="#64748b" d="M 90 780 L 1510 780"/>
     </g>
     <text id="DeepPaperNote" xml:space="preserve" x="543" y="135" font-family="Impact" font-size="80" font-weight="800" fill="#f8fafc">DeepPaperNote</text>
-    <text id="Turn-one-research-paper" xml:space="preserve" x="440" y="178" font-family="Helvetica" font-size="28" fill="#cbd5e1">Turn one research paper into a high-quality Obsidian note</text>
+    <text id="Turn-one-research-paper" xml:space="preserve" x="440" y="178" font-family="Helvetica" font-size="28" font-weight="300" fill="#cbd5e1">Turn one research paper into a high-quality Obsidian note</text>
     <g id="g2">
         <linearGradient id="linearGradient2" x1="170" y1="250" x2="610" y2="610" gradientUnits="userSpaceOnUse">
             <stop offset="1e-05" stop-color="#0f172a" stop-opacity="1"/>
@@ -39,15 +39,15 @@
     </g>
     <g id="g4">
         <path id="path16" fill="#0f2740" stroke="#1d4ed8" d="M 202 418 L 288 418 C 295.731995 418 302 424.268005 302 432 L 302 446 C 302 453.731995 295.731995 460 288 460 L 202 460 C 194.268021 460 188 453.731995 188 446 L 188 432 C 188 424.268005 194.268021 418 202 418 Z"/>
-        <text id="PDF" xml:space="preserve" x="224" y="449" font-family="Helvetica" font-size="18" fill="#dbeafe">PDF</text>
+        <text id="PDF" xml:space="preserve" x="225" y="446" font-family="Helvetica" font-size="18" fill="#dbeafe">PDF</text>
         <path id="path17" fill="#22163f" stroke="#7c3aed" d="M 332 418 L 438 418 C 445.731995 418 452 424.268005 452 432 L 452 446 C 452 453.731995 445.731995 460 438 460 L 332 460 C 324.268005 460 318 453.731995 318 446 L 318 432 C 318 424.268005 324.268005 418 332 418 Z"/>
-        <text id="Metadata" xml:space="preserve" x="344" y="449" font-family="Helvetica" font-size="18" fill="#e9d5ff">Metadata</text>
+        <text id="Metadata" xml:space="preserve" x="345" y="446" font-family="Helvetica" font-size="18" fill="#e9d5ff">Metadata</text>
         <path id="path18" fill="#402512" stroke="#f59e0b" d="M 482 418 L 574 418 C 581.731995 418 588 424.268005 588 432 L 588 446 C 588 453.731995 581.731995 460 574 460 L 482 460 C 474.268005 460 468 453.731995 468 446 L 468 432 C 468 424.268005 474.268005 418 482 418 Z"/>
-        <text id="Zotero" xml:space="preserve" x="500" y="449" font-family="Helvetica" font-size="18" fill="#fef3c7">Zotero</text>
+        <text id="Zotero" xml:space="preserve" x="500" y="446" font-family="Helvetica" font-size="18" fill="#fef3c7">Zotero</text>
         <path id="path19" fill="#111827" stroke="#334155" d="M 202 480 L 334 480 C 341.731995 480 348 486.268005 348 494 L 348 508 C 348 515.731995 341.731995 522 334 522 L 202 522 C 194.268021 522 188 515.731995 188 508 L 188 494 C 188 486.268005 194.268021 480 202 480 Z"/>
-        <text id="Figures" xml:space="preserve" x="236" y="511" font-family="Helvetica" font-size="18" fill="#e2e8f0">Figures</text>
+        <text id="Figures" xml:space="preserve" x="235" y="508" font-family="Helvetica" font-size="18" fill="#e2e8f0">Figures</text>
         <path id="path20" fill="#111827" stroke="#334155" d="M 378 480 L 546 480 C 553.731995 480 560 486.268005 560 494 L 560 508 C 560 515.731995 553.731995 522 546 522 L 378 522 C 370.268005 522 364 515.731995 364 508 L 364 494 C 364 486.268005 370.268005 480 378 480 Z"/>
-        <text id="Evidence-Bundle" xml:space="preserve" x="391" y="511" font-family="Helvetica" font-size="18" fill="#e2e8f0">Evidence Bundle</text>
+        <text id="Evidence-Bundle" xml:space="preserve" x="398" y="508" font-family="Helvetica" font-size="18" fill="#e2e8f0">Evidence Bundle</text>
         <text id="Resolve-Extract-Verify" xml:space="preserve" x="266" y="572" font-family="Helvetica" font-size="22" fill="#cbd5e1">Resolve. Extract. Verify.</text>
     </g>
     <g id="g5">
@@ -61,13 +61,13 @@
     </g>
     <g id="g6">
         <path id="path26" fill="#0c2218" stroke="#22c55e" d="M 1064 418 L 1204 418 C 1211.731934 418 1218 424.268005 1218 432 L 1218 446 C 1218 453.731995 1211.731934 460 1204 460 L 1064 460 C 1056.268066 460 1050 453.731995 1050 446 L 1050 432 C 1050 424.268005 1056.268066 418 1064 418 Z"/>
-        <text id="Deep-Note" xml:space="preserve" x="1088" y="449" font-family="Helvetica" font-size="18" fill="#dcfce7">Deep Note</text>
+        <text id="Deep-Note" xml:space="preserve" x="1088" y="446" font-family="Helvetica" font-size="18" fill="#dcfce7">Deep Note</text>
         <path id="path27" fill="#11223a" stroke="#38bdf8" d="M 1248 418 L 1388 418 C 1395.731934 418 1402 424.268005 1402 432 L 1402 446 C 1402 453.731995 1395.731934 460 1388 460 L 1248 460 C 1240.268066 460 1234 453.731995 1234 446 L 1234 432 C 1234 424.268005 1240.268066 418 1248 418 Z"/>
-        <text id="text1" xml:space="preserve" x="1285" y="449" font-family="Helvetica" font-size="18" fill="#dbeafe">Figures</text>
+        <text id="text1" xml:space="preserve" x="1285" y="446" font-family="Helvetica" font-size="18" fill="#dbeafe">Figures</text>
         <path id="path28" fill="#23163a" stroke="#a78bfa" d="M 1064 480 L 1204 480 C 1211.731934 480 1218 486.268005 1218 494 L 1218 508 C 1218 515.731995 1211.731934 522 1204 522 L 1064 522 C 1056.268066 522 1050 515.731995 1050 508 L 1050 494 C 1050 486.268005 1056.268066 480 1064 480 Z"/>
-        <text id="Chinese" xml:space="preserve" x="1098" y="511" font-family="Helvetica" font-size="18" fill="#e9d5ff">Chinese</text>
+        <text id="Chinese" xml:space="preserve" x="1098" y="508" font-family="Helvetica" font-size="18" fill="#e9d5ff">Chinese</text>
         <path id="path29" fill="#3d280f" stroke="#f59e0b" d="M 1248 480 L 1388 480 C 1395.731934 480 1402 486.268005 1402 494 L 1402 508 C 1402 515.731995 1395.731934 522 1388 522 L 1248 522 C 1240.268066 522 1234 515.731995 1234 508 L 1234 494 C 1234 486.268005 1240.268066 480 1248 480 Z"/>
-        <text id="Obsidian" xml:space="preserve" x="1279" y="511" font-family="Helvetica" font-size="18" fill="#fef3c7">Obsidian</text>
+        <text id="Obsidian" xml:space="preserve" x="1280" y="508" font-family="Helvetica" font-size="18" fill="#fef3c7">Obsidian</text>
         <text id="Explain-Structure-Save" xml:space="preserve" x="1102" y="572" font-family="Helvetica" font-size="22" fill="#d1fae5">Explain. Structure. Save.</text>
     </g>
     <g id="g7">
@@ -87,5 +87,5 @@
         <text id="Codex-writes" xml:space="preserve" x="739" y="522" font-family="Helvetica" font-size="20" fill="#e2e8f0">Codex writes</text>
     </g>
     <path id="path38" fill="#0f172a" stroke="#334155" stroke-width="2" d="M 201.914886 690 L 1388.085083 690 C 1405.711304 690 1420 700.745178 1420 714 L 1420 758 C 1420 771.254822 1405.711304 782 1388.085083 782 L 201.914886 782 C 184.288803 782 170 771.254822 170 758 L 170 714 C 170 700.745178 184.288803 690 201.914886 690 Z"/>
-    <text id="Scripts-gather-evidence-The" xml:space="preserve" x="199" y="755" font-family="American Typewriter" font-size="30" fill="#f8fafc">Scripts gather evidence. The model understands the paper. The note stays reusable.</text>
+    <text id="Scripts-gather-evidence-The" xml:space="preserve" x="202" y="749" font-family="American Typewriter" font-size="30" fill="#f8fafc">Scripts gather evidence. The model understands the paper. The note stays reusable.</text>
 </svg>
