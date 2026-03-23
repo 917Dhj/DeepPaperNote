@@ -221,7 +221,8 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 | 版本 | 状态 | 主要内容 |
 | --- | --- | --- |
-| 未发布 | 开发中 | 首个公开版 Codex 工作流、综合证据包流程、Zotero 优先辅助能力、占位优先的图表规划 |
+| v0.1.0-alpha | 已发布 | 第一个公开 alpha 版：Codex 工作流、综合证据包流程、Zotero 优先辅助能力、占位优先图表处理、工作区回退输出、OCR 回退、测试与 CI |
+| 未发布 | 暂无面向用户的新变化 | 当前还没有新的 release 级更新 |
 
 ## 为什么做这个
 
