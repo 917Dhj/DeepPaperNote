@@ -12,12 +12,23 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+- No unreleased user-facing changes yet.
+
+## v0.1.0-alpha
+
+First public alpha release of DeepPaperNote.
+
 ### Added
 
 - Initial public Codex skill workflow for generating a deep-reading note from one paper.
 - Model-facing synthesis bundle pipeline with deterministic evidence gathering.
 - Placeholder-first figure planning and Obsidian folder-per-paper output structure.
 - Zotero-first helper workflow for local-library-first paper resolution.
+- Workspace fallback output when no Obsidian vault is configured.
+- OCR fallback for low-text PDF pages.
+- Domain-aware note routing that prefers existing vault domains before creating new ones.
+- Minimal automated test suite and GitHub Actions CI.
+- Setup-assistant entry points such as `/deeppapernote doctor` and `/deeppapernote start`.
 
 ### Documentation
 
@@ -32,5 +43,6 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ### Notes
 
-- The project is still in early public-facing preparation.
-- Tests, CI, and public examples are still being added.
+- This is an alpha release.
+- Figure replacement quality still depends on extraction quality and semantic matching confidence.
+- Some environments may expose different `python3` interpreters across sessions; doctor now reports the active interpreter explicitly.

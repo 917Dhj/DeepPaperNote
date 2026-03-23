@@ -7,6 +7,7 @@
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
 [![状态](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
+[![版本](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.1.0-alpha)
 [![许可证](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
 [![Codex](https://img.shields.io/badge/Codex-skill-111827?style=for-the-badge)](./SKILL.md)
 [![输出](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
