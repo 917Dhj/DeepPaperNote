@@ -39,15 +39,15 @@
     </g>
     <g id="g4">
         <path id="path16" fill="#0f2740" stroke="#1d4ed8" d="M 202 418 L 288 418 C 295.731995 418 302 424.268005 302 432 L 302 446 C 302 453.731995 295.731995 460 288 460 L 202 460 C 194.268021 460 188 453.731995 188 446 L 188 432 C 188 424.268005 194.268021 418 202 418 Z"/>
-        <text id="PDF" xml:space="preserve" x="225" y="446" font-family="Helvetica" font-size="18" fill="#dbeafe">PDF</text>
+        <text id="PDF" xml:space="preserve" x="225" y="447" font-family="Helvetica" font-size="18" fill="#dbeafe">PDF</text>
         <path id="path17" fill="#22163f" stroke="#7c3aed" d="M 332 418 L 438 418 C 445.731995 418 452 424.268005 452 432 L 452 446 C 452 453.731995 445.731995 460 438 460 L 332 460 C 324.268005 460 318 453.731995 318 446 L 318 432 C 318 424.268005 324.268005 418 332 418 Z"/>
         <text id="Metadata" xml:space="preserve" x="345" y="446" font-family="Helvetica" font-size="18" fill="#e9d5ff">Metadata</text>
         <path id="path18" fill="#402512" stroke="#f59e0b" d="M 482 418 L 574 418 C 581.731995 418 588 424.268005 588 432 L 588 446 C 588 453.731995 581.731995 460 574 460 L 482 460 C 474.268005 460 468 453.731995 468 446 L 468 432 C 468 424.268005 474.268005 418 482 418 Z"/>
-        <text id="Zotero" xml:space="preserve" x="500" y="446" font-family="Helvetica" font-size="18" fill="#fef3c7">Zotero</text>
+        <text id="Zotero" xml:space="preserve" x="502" y="447" font-family="Helvetica" font-size="18" fill="#fef3c7">Zotero</text>
         <path id="path19" fill="#111827" stroke="#334155" d="M 202 480 L 334 480 C 341.731995 480 348 486.268005 348 494 L 348 508 C 348 515.731995 341.731995 522 334 522 L 202 522 C 194.268021 522 188 515.731995 188 508 L 188 494 C 188 486.268005 194.268021 480 202 480 Z"/>
         <text id="Figures" xml:space="preserve" x="235" y="508" font-family="Helvetica" font-size="18" fill="#e2e8f0">Figures</text>
         <path id="path20" fill="#111827" stroke="#334155" d="M 378 480 L 546 480 C 553.731995 480 560 486.268005 560 494 L 560 508 C 560 515.731995 553.731995 522 546 522 L 378 522 C 370.268005 522 364 515.731995 364 508 L 364 494 C 364 486.268005 370.268005 480 378 480 Z"/>
-        <text id="Evidence-Bundle" xml:space="preserve" x="398" y="508" font-family="Helvetica" font-size="18" fill="#e2e8f0">Evidence Bundle</text>
+        <text id="Evidence-Bundle" xml:space="preserve" x="393" y="509" font-family="Helvetica" font-size="18" fill="#e2e8f0">Evidence Bundle</text>
         <text id="Resolve-Extract-Verify" xml:space="preserve" x="266" y="572" font-family="Helvetica" font-size="22" fill="#cbd5e1">Resolve. Extract. Verify.</text>
     </g>
     <g id="g5">
