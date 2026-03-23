@@ -219,8 +219,8 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 
 | Version | Status | Highlights |
 | --- | --- | --- |
-| v0.1.0-alpha | Released | First public alpha: Codex workflow, synthesis bundle pipeline, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
-| Unreleased | No user-facing changes yet | No unreleased release-level changes at the moment |
+| v0.1.0-alpha | ✅ Released | First public alpha: Codex workflow, synthesis bundle pipeline, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
+| Unreleased | 🕒 No user-facing changes yet | No unreleased release-level changes at the moment |
 
 ## Why DeepPaperNote
 
