@@ -16,20 +16,20 @@
 
 </div>
 
-![DeepPaperNote Hero](./assets/hero.png)
+![DeepPaperNote 主图](./assets/hero.png)
 
-DeepPaperNote 是一个 **Codex skill**，专门做一件事：
+DeepPaperNote 是一个 **Codex 技能**，专门做一件事：
 
 - 精读一篇论文
 - 从 PDF、元数据来源以及可选的 Zotero 中收集证据
 - 让大模型真正负责理解和写作
-- 优先把最终笔记写进 Obsidian vault；如果没有配置 vault，则退回当前工作区输出
+- 优先把最终笔记写进 Obsidian 库；如果没有配置 Obsidian 库，则退回当前工作区输出
 
 它不是为了生成“看起来工整的摘要”，而是为了生成“以后还会反复回看的研究笔记”。
 
 ## 🚀 快速开始
 
-1. 把这个仓库放进你的 Codex skills 目录：
+1. 把这个仓库放进你的 Codex 技能目录：
 
    ```text
    ~/.codex/skills/DeepPaperNote
@@ -42,16 +42,16 @@ DeepPaperNote 是一个 **Codex skill**，专门做一件事：
 典型触发语句：
 
 - `给这篇论文生成深度笔记`
-- `把这篇文章整理成 obsidian 笔记`
-- `读这篇论文并生成 md 笔记`
+- `把这篇文章整理成 Obsidian 笔记`
+- `读这篇论文并生成 Markdown 笔记`
 
 4. DeepPaperNote 会：
    - 解析论文身份
    - 获取元数据和 PDF 证据
-   - 生成 synthesis bundle
+   - 生成综合证据包
    - 让 Codex/GPT 写最终笔记
-   - 在最终保存前先做 lint 检查
-   - 如果配置了 Obsidian 就写入 vault，否则退回当前工作区输出
+   - 在最终保存前先做格式校验
+   - 如果配置了 Obsidian 库就写入其中，否则退回当前工作区输出
 
 如果你想在本地装 Python 依赖用于开发，可以执行：
 
@@ -74,13 +74,13 @@ python3 -m pip install -e .
 
 DeepPaperNote 可以在零配置的情况下直接试用。
 
-- 如果没有配置 Obsidian vault，它依然可以把笔记输出到当前工作区
-- 如果你希望获得 Obsidian 原生的笔记管理体验，就需要配置 vault 路径
+- 如果没有配置 Obsidian 库，它依然可以把笔记输出到当前工作区
+- 如果你希望获得 Obsidian 原生的笔记管理体验，就需要配置 Obsidian 库路径
 - 这一节剩下的内容都属于可选增强配置
 
-### 必需：告诉 DeepPaperNote 你的 Obsidian vault 在哪里
+### 必需：告诉 DeepPaperNote 你的 Obsidian 库在哪里
 
-DeepPaperNote 会把最终笔记写进 Obsidian vault。
+DeepPaperNote 会把最终笔记写进 Obsidian 库。
 最直接的配置方式是设置环境变量：
 
 ```bash
@@ -98,18 +98,18 @@ export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 
 | 变量 | 是否必需 | 作用 |
 | --- | --- | --- |
-| `DEEPPAPERNOTE_OBSIDIAN_VAULT` | 正常写入 vault 时必需 | 你的 Obsidian vault 根目录 |
-| `DEEPPAPERNOTE_PAPERS_DIR` | 可选 | vault 内论文输出目录，默认是 `20_Research/Papers` |
+| `DEEPPAPERNOTE_OBSIDIAN_VAULT` | 正常写入 Obsidian 库时必需 | 你的 Obsidian 库根目录 |
+| `DEEPPAPERNOTE_PAPERS_DIR` | 可选 | Obsidian 库内论文输出目录，默认是 `20_Research/Papers` |
 | `DEEPPAPERNOTE_OUTPUT_DIR` | 可选 | 本地临时产物目录，默认是 `tmp/DeepPaperNote` |
-| `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | 可选 | 当没有配置 Obsidian vault 时，当前工作区下的 fallback 输出目录，默认是 `DeepPaperNote_output` |
+| `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | 可选 | 当没有配置 Obsidian 库时，当前工作区下的回退输出目录，默认是 `DeepPaperNote_output` |
 
-如果没有配置 Obsidian vault，DeepPaperNote 依然可以把笔记写到当前工作区下，而不是直接报错。
-这对快速试用很有帮助，但从长期管理角度看，依然更推荐配置好自己的 Obsidian vault。
+如果没有配置 Obsidian 库，DeepPaperNote 依然可以把笔记写到当前工作区下，而不是直接报错。
+这对快速试用很有帮助，但从长期管理角度看，依然更推荐配置好自己的 Obsidian 库。
 
 这些可选路径配置的实际好处是：
 
 - `DEEPPAPERNOTE_PAPERS_DIR`
-  如果你的 vault 不是把论文放在 `20_Research/Papers` 下，或者你已经有自己的目录约定，这个配置可以让 DeepPaperNote 直接适配你的现有结构，减少后续手动移动文件。
+  如果你的 Obsidian 库不是把论文放在 `20_Research/Papers` 下，或者你已经有自己的目录约定，这个配置可以让 DeepPaperNote 直接适配你的现有结构，减少后续手动移动文件。
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   如果你希望中间产物统一落在一个固定位置，方便调试、清理或做实验，这个配置会比较有用。
 
@@ -126,7 +126,7 @@ DeepPaperNote 不依赖 Zotero 才能工作。
 
 | 方案 | 更适合什么场景 | 说明 |
 | --- | --- | --- |
-| [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | 轻量的只读访问 | 更接近一个最小化 Zotero MCP server，适合搜索条目、读元数据、读文本 |
+| [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | 轻量的只读访问 | 更接近一个最小化 Zotero MCP 服务，适合搜索条目、读元数据、读文本 |
 | [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | 更完整的研究工作流能力 | 功能更丰富，但在 Codex 环境里不一定开箱即用，可能还需要额外适配 |
 
 为什么值得配：
@@ -135,13 +135,13 @@ DeepPaperNote 不依赖 Zotero 才能工作。
 - Codex 可以先查你的本地论文库，再决定要不要联网
 - 本地附件也更有助于减少标题误匹配
 - 如果你本来就用 Zotero 做论文管理，这会比重新去网上“猜测这篇论文是谁”稳得多
-- 对正式发表版、预印本、镜像页面标题相似的场景，Zotero-first 通常会明显降低误匹配概率
+- 对正式发表版、预印本、镜像页面标题相似的场景，Zotero 优先通常会明显降低误匹配概率
 
 需要特别说明的是：
 
 - DeepPaperNote **不强依赖某一个固定的 Zotero MCP 仓库**
 - 对 DeepPaperNote 来说，最核心的能力是：Codex 能搜索 Zotero 条目、查看元数据、最好还能读取本地全文
-- 有些 Zotero MCP 项目最初是围绕其他 agent 客户端设计的，接到 Codex 上时可能需要额外改造
+- 有些 Zotero MCP 项目最初是围绕其他智能体客户端设计的，接到 Codex 上时可能需要额外改造
 
 ### 可选：Semantic Scholar API Key
 
@@ -177,9 +177,9 @@ DeepPaperNote 当前的 OCR 使用逻辑是：
 
 - 先用 `PyMuPDF` 做正常的 PDF 文本提取
 - 对每一页统计可搜索文本的字符数
-- 如果某一页直接抽到的文本太少，就把这页视为 OCR fallback 候选
+- 如果某一页直接抽到的文本太少，就把这页视为 OCR 回退候选
 - 只对这类页面单独做 OCR
-- OCR 恢复出的文本，主要用于补页级证据和后续 figure/page 语义匹配的上下文
+- OCR 恢复出的文本，主要用于补页级证据和后续图表/页面语义匹配的上下文
 
 需要特别说明的是：
 
@@ -220,14 +220,14 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 | 版本 | 状态 | 主要内容 |
 | --- | --- | --- |
-| Unreleased | 开发中 | 首个公开版 Codex 工作流、synthesis bundle 流程、Zotero-first 辅助能力、placeholder-first 图表规划 |
+| 未发布 | 开发中 | 首个公开版 Codex 工作流、综合证据包流程、Zotero 优先辅助能力、占位优先的图表规划 |
 
 ## 为什么做这个
 
 很多论文总结工具都停得太早：
 
 - 过度依赖摘要
-- 把技术细节压扁成通用 bullet
+- 把技术细节压扁成通用列点
 - 遇到图表提取不稳就直接跳过
 - 产出的笔记看起来整齐，但一周后已经没有研究价值
 
@@ -235,7 +235,7 @@ DeepPaperNote 的基本立场是：
 
 - `scripts` 负责取证、整理、校验
 - Codex/GPT 负责真正理解论文和写作
-- 图表处理遵循 `placeholder-first`
+- 图表处理遵循“占位优先”
 - 文字正确性高于图像完整性
 
 它的目标不是“总结一篇论文”，而是“产出一篇你愿意长期保留的研究笔记”。
@@ -246,9 +246,9 @@ DeepPaperNote 的基本立场是：
 | --- | --- |
 | 模型优先 | 脚本负责确定性工作，不负责假装理解论文。 |
 | 精读笔记而非摘要改写 | 需要重建论文的问题、任务、方法、结果和局限。 |
-| 图表 placeholder-first | 即使没法稳定抽图，也要先保留重要图表在笔记结构中的位置。 |
+| 图表占位优先 | 即使没法稳定抽图，也要先保留重要图表在笔记结构中的位置。 |
 | 原生适配 Obsidian | 每篇论文默认生成自己的文件夹和本地 `images/` 目录。 |
-| Zotero-first | 如果本地 Zotero 已经有论文，优先用它来锚定论文身份。 |
+| Zotero 优先 | 如果本地 Zotero 已经有论文，优先用它来锚定论文身份。 |
 
 ## ⚙️ 工作流
 
@@ -260,26 +260,26 @@ DeepPaperNote 的基本立场是：
 4. 抽取证据
 5. 提取 PDF 图像资产
 6. 规划图表位置
-7. 构建 synthesis bundle
+7. 构建综合证据包
 8. 让 Codex/GPT 写笔记
-9. lint 最终笔记
+9. 校验最终笔记
 10. 写入 Obsidian
 
 核心原则：
 
 - 脚本负责取证
 - 模型负责写作
-- lint 在写入前兜底
+- 格式校验在写入前兜底
 
 相关文档：
 
-- [Workflow](./references/workflow.md)
-- [Architecture](./references/architecture.md)
-- [Model Synthesis](./references/model-synthesis.md)
+- [工作流](./references/workflow.md)
+- [架构](./references/architecture.md)
+- [模型综合写作](./references/model-synthesis.md)
 
 ## 🖼️ 图表策略
 
-DeepPaperNote 采用 `placeholder-first` 策略。
+DeepPaperNote 采用“占位优先”策略。
 
 如果某个图表对理解论文很重要，那么即使图像提取不完整，也应该先把它以占位形式保留在笔记里。
 
@@ -298,7 +298,7 @@ DeepPaperNote 采用 `placeholder-first` 策略。
 - 图可以暂时缺失
 - 文字一定要尽量正确
 
-详见 [Figure Placement](./references/figure-placement.md)。
+详见 [图表放置规则](./references/figure-placement.md)。
 
 ## ✅ 质量标准
 
@@ -318,10 +318,10 @@ DeepPaperNote 对“什么算一篇合格笔记”有明确门槛。
 
 相关文档：
 
-- [Evidence First](./references/evidence-first.md)
-- [Deep Analysis](./references/deep-analysis.md)
-- [Final Writing](./references/final-writing.md)
-- [Note Quality](./references/note-quality.md)
+- [证据优先](./references/evidence-first.md)
+- [深度分析](./references/deep-analysis.md)
+- [最终写作](./references/final-writing.md)
+- [笔记质量标准](./references/note-quality.md)
 
 ## 🗂️ 仓库结构
 
@@ -371,7 +371,7 @@ DeepPaperNote/
 | --- | --- | --- |
 | Codex desktop / CLI | 推荐 | 当前主目标环境 |
 | Python 3.10+ | 必需 | 运行辅助脚本 |
-| 本地 Obsidian vault | 写笔记时必需 | 需要配置 `DEEPPAPERNOTE_OBSIDIAN_VAULT` |
+| 本地 Obsidian 库 | 写笔记时必需 | 需要配置 `DEEPPAPERNOTE_OBSIDIAN_VAULT` |
 | Zotero + MCP | 可选 | 对本地论文库工作流很有帮助 |
 | OCR 工具 | 可选 | 对扫描版 PDF 更友好 |
 
@@ -382,34 +382,34 @@ DeepPaperNote/
 | 模块 | 当前状态 |
 | --- | --- |
 | 单篇论文预处理流程 | ✅ 已可用 |
-| synthesis bundle 生成 | ✅ 已可用 |
-| Zotero-first 辅助流程 | ✅ 已可用 |
+| 综合证据包生成 | ✅ 已可用 |
+| Zotero 优先辅助流程 | ✅ 已可用 |
 | Obsidian 写入流程 | ✅ 已可用 |
-| placeholder-first 图表规划 | ✅ 已可用 |
-| 风格与结构 lint | ✅ 已可用 |
-| 对外 examples | 暂未补齐 |
+| 占位优先图表规划 | ✅ 已可用 |
+| 风格与结构校验 | ✅ 已可用 |
+| 对外示例 | 暂未补齐 |
 | 测试 | ✅ 已有最小测试集 |
 | CI | ✅ 已配置 GitHub Actions |
-| packaging metadata | 暂未补齐 |
+| 打包元数据 | 暂未补齐 |
 | 图像匹配 / OCR 稳定性 | 仍需加强 |
 
 ## 🧭 设计原则
 
-- `Model-first`：理解论文属于语言模型
-- `Evidence-first`：写作必须建立在证据之上
-- `Placeholder-first`：缺图不能破坏笔记结构
-- `Truth over neatness`：提取不确定时要诚实表达
-- `Research usefulness over summary polish`：长期研究价值优先
+- `模型优先`：理解论文属于语言模型
+- `证据优先`：写作必须建立在证据之上
+- `占位优先`：缺图不能破坏笔记结构
+- `真实优先于整齐`：提取不确定时要诚实表达
+- `研究价值优先于摘要式润色`：长期研究价值优先
 
 ## 🔭 后续方向
 
-DeepPaperNote 目前就是一个 Codex skill。
+DeepPaperNote 目前就是一个 Codex 技能。
 
 长期方向是：
 
 - 保持核心流程可迁移
 - 继续把 Codex 集成做扎实
-- 等核心稳定后，再考虑适配其他 agent 环境
+- 等核心稳定后，再考虑适配其他智能体环境
 
 ## Inspirations
 
@@ -421,18 +421,18 @@ DeepPaperNote 在工作流设计上受到了这些论文阅读 / 笔记生成项
 但 DeepPaperNote 希望在这些思路基础上继续坚持几条自己的原则：
 - `scripts` 主要负责取证和整理
 - 真正的论文理解交给语言模型
-- 图表处理优先保留 placeholder 结构，而不是为了插图牺牲文字正确性
+- 图表处理优先保留占位结构，而不是为了插图牺牲文字正确性
 
 ## 贡献
 
 欢迎贡献，尤其是：
 
-- README 和 examples
+- README 和示例
 - tests 和 CI
 - PDF / OCR 稳定性
 - 图像匹配质量
 - 笔记质量评估
-- 多 agent adapter 设计
+- 多智能体适配层设计
 
 ## License
 
