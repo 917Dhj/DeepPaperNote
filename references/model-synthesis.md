@@ -49,6 +49,10 @@ The rule is simple:
    - call `scripts/materialize_figure_asset.py`
    - copy the chosen candidate image into the vault
    - insert the returned Obsidian embed into the note
+   This figure step belongs to the same note-generation task:
+   - do not stop after a text-only draft just to ask the user whether figures should be inserted
+   - finish the replacement-or-placeholder decision before final save
+   - if no image is good enough, keep the placeholder and still finish the note
 
 3. Infer the paper type yourself from the bundle.
    Do not rely on old script classifications unless you are debugging.
@@ -77,6 +81,7 @@ The rule is simple:
    - do not write to Obsidian yet
 
 7. Only after lint passes, run `scripts/write_obsidian_note.py`.
+   The save step should also create the paper-local `images/` directory even when no real image was inserted.
 
 ## What The Model Must Decide
 
@@ -107,3 +112,4 @@ Recommended sequence:
 
 If you already have the final Markdown in memory, `write_obsidian_note.py` also supports `--stdin`.
 If you selected a real figure image, use `materialize_figure_asset.py` before the final save.
+If you did not select any real figure image, still save the final note in one pass with placeholders intact.

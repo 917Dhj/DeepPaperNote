@@ -40,6 +40,9 @@ Do not let scripts make the final semantic choice; scripts should only prepare c
 - If a reliable image is not available, keep the placeholder.
 - Never silently remove a figure just because extraction failed.
 - Text correctness is more important than image completeness.
+- Figure replacement decisions should be completed inside the same note-generation task.
+- Do not produce a text-only note first and then ask the user in a follow-up whether figures should be inserted.
+- If no figure can be confidently replaced, finish the note with placeholders and explain that outcome in the final response.
 
 ## Placeholder Requirements
 

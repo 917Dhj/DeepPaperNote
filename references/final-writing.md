@@ -83,6 +83,8 @@ Final-note figure rules:
 - if you replace a placeholder with a real image, keep the same paper figure id in the caption
 - if an important figure cannot be confidently extracted, keep a placeholder with a short explanation
 - text may be complete even when figures are partial; do not let missing images erase textual coverage
+- complete the figure decision inside the same task as the note generation
+- do not stop after the text draft and ask the user whether to continue with figures unless they explicitly asked for a staged workflow
 - prefer a stable figure callout format in the final note:
   - `> [!figure] Fig. 3 ...`
   - `> 建议位置：...`

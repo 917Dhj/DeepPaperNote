@@ -12,6 +12,7 @@ from common import (
     emit,
     ensure_parent,
     maybe_load_json_record,
+    resolve_domain_subdir,
     resolve_note_output_mode,
     resolve_obsidian_note_path,
     runtime_config,
@@ -30,6 +31,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--vault", default="", help="Target Obsidian vault path.")
     p.add_argument("--subdir", default="", help="Vault-relative subdirectory.")
     p.add_argument("--filename", default="", help="Explicit note filename.")
+    p.add_argument("--asset-subdir", default="images", help="Asset folder name relative to the note directory.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
     return p
 
@@ -61,15 +63,23 @@ def main() -> None:
     config = runtime_config()
     if args.vault:
         config["obsidian_vault"] = args.vault
+    resolved_subdir = resolve_domain_subdir(
+        config,
+        title=title,
+        abstract=str(record.get("abstract", "")),
+        subdir=args.subdir,
+    )
 
     target_path = resolve_obsidian_note_path(
         config,
         title=title,
-        subdir=args.subdir,
+        subdir=resolved_subdir,
         filename=args.filename,
     )
     ensure_parent(target_path)
     Path(target_path).write_text(note_text, encoding="utf-8")
+    asset_dir = target_path.parent / args.asset_subdir
+    asset_dir.mkdir(parents=True, exist_ok=True)
 
     payload = {
         "status": "ok",
@@ -77,6 +87,8 @@ def main() -> None:
         "paper_id": args.paper_id or record.get("paper_id", ""),
         "title": title,
         "note_path": str(target_path),
+        "subdir": resolved_subdir,
+        "images_dir": str(asset_dir),
     }
     output_mode, root_path = resolve_note_output_mode(config)
     payload["output_mode"] = output_mode

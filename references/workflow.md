@@ -97,10 +97,18 @@ For convenience, MVP also includes a runner script that executes the determinist
 
 11. `write_obsidian_note`
     Save the final Markdown into the target vault.
+    Resolve a domain folder before writing:
+    - prefer an existing first-level domain folder when there is a reasonable match
+    - create a new domain only when no existing domain fits well
+    - do not save directly into the bare papers root
+    Complete the figure decision before this step:
+    - replace high-confidence placeholders with real images
+    - keep lower-confidence items as placeholders
+    - do not split text writing and figure handling into two separate user turns by default
     Default vault layout:
     - one folder per paper
     - the note Markdown inside that folder
-    - an `images/` subfolder for materialized figure assets
+    - an `images/` subfolder for materialized figure assets, created even when it stays empty
 
 ## Final Writing Rule
 

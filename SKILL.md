@@ -116,6 +116,11 @@ Zotero-first rule:
 - The default output is a Markdown note written into the Obsidian vault when configured.
 - If no Obsidian vault is configured, DeepPaperNote should fall back to saving into the current workspace instead of failing outright.
 - By default, each paper should be written into its own same-name folder, with the note and images stored together.
+- The note should never default to the bare `20_Research/Papers` root. Choose a domain folder first.
+- Domain selection should be conservative: prefer an existing domain folder in the user's vault when there is a reasonable match; only create a new domain folder when no existing domain fits well.
+- A normal note-generation request should complete in one pass: note text, figure placeholder decisions, image materialization when confident, and final save.
+- Do not stop after a text-only draft just to ask whether the user wants figures inserted. Finish the figure replacement decision inside the same task unless the user explicitly asked for text only.
+- Always create the paper-local `images/` folder during final save, even if no high-confidence images were materialized.
 - The note must use real heading levels: `#`, `##`, and `###`.
 - High-quality notes should usually contain multiple meaningful `###` subheadings in the technical sections when the paper is non-trivial.
 - The note must include figure/table placeholders for all major visuals rather than silently skipping them.

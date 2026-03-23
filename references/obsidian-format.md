@@ -15,6 +15,10 @@ Default file name:
 - default note layout is folder-per-paper:
   - `<领域>/<paper_slug>/<paper_slug>.md`
   - `<领域>/<paper_slug>/images/...`
+- when deciding `<领域>`, prefer matching an existing first-level domain folder under the user's papers directory
+- only create a new domain folder when no existing domain is a reasonable fit
+- do not save new papers directly into the bare papers root
+- always create the paper-local `images/` directory during final save, even if no real image is inserted
 
 If the user already has a vault convention, preserve it.
 
