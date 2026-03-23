@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import shutil
+import sys
 from pathlib import Path
 
 from common import emit, env_config_value, runtime_config
@@ -77,6 +78,13 @@ def main() -> None:
     payload = {
         "status": "ok",
         "script": "check_environment.py",
+        "python": {
+            "executable": sys.executable,
+            "version": sys.version.split()[0],
+            "fitz_installed": import_available("fitz"),
+            "pytesseract_installed": import_available("pytesseract"),
+            "pillow_installed": import_available("PIL"),
+        },
         "obsidian": {
             "configured": bool(obsidian_vault),
             "vault_path": obsidian_vault,
