@@ -2,7 +2,7 @@
 
 # DeepPaperNote
 
-**Turn one research paper into a high-quality Obsidian note you would actually keep.**
+**Turn hard, dense papers into high-quality Obsidian notes you can actually understand, reuse, and keep.**
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
@@ -19,40 +19,66 @@
 
 ![DeepPaperNote Hero](./assets/hero.svg)
 
-DeepPaperNote is a **Codex skill** for a very specific workflow:
+When a paper is full of dense formulas, crowded architecture diagrams, tangled experimental design, and pages of ablations, the problem is often not that the paper is unimportant. It is that the paper is simply hard to digest.
 
-- read one paper carefully
-- gather evidence from PDF, metadata sources, and optionally Zotero
-- let the language model do the real interpretation
-- write a polished Markdown note into an Obsidian vault when available, or into the current workspace as a fallback
+DeepPaperNote is a **Codex skill** built for that problem. It is not trying to paraphrase the abstract one more time. It is trying to reorganize the parts of a paper that are actually worth understanding and keeping.
 
-It is built for people who want something better than an abstract rewrite.
+**Instead of pretending to read the paper for you, it takes over the most time-consuming and error-prone layers of the workflow:**
+
+- 🤖 **Model-led understanding**: let the language model unpack mechanisms, method structure, key comparisons, and limitations.
+- 🗂️ **Automatic evidence collection**: gather evidence from PDFs, metadata sources, and optional Zotero workflows.
+- 💎 **Reusable note output**: generate structured Obsidian-native or plain Markdown notes that are worth revisiting later.
+
+Let scripts handle the repetitive work. Save your attention for actual thinking.
+
+> [!tip]
+> If you already have an Obsidian or Zotero workflow, DeepPaperNote is not trying to replace it. It is trying to automate the most tedious parts of evidence gathering, structuring, and note drafting.
+
+## ✨ Why DeepPaperNote?
+
+Most paper-summary tools stop after producing a neat-looking abstract rewrite. DeepPaperNote cares about two harder questions: **did you actually understand the paper?** and **is the resulting note worth keeping?**
+
+| Capability | What pain it solves |
+| --- | --- |
+| 💡 Make complex mechanisms legible | Instead of paraphrasing the abstract, it breaks down the method backbone, key design choices, real contribution, and the most likely points of confusion. |
+| 🧪 Go beyond surface-level summaries | It forces attention onto the research question, task definition, core results, and honest limitations. |
+| 🖼️ Keep figure context intact | When figure extraction is unstable, it still preserves accurate figure placeholders and explanations so the reading flow does not collapse. |
+| 🔗 Fit into your personal knowledge base | Each paper gets its own folder, local `images/` directory, and Markdown note that works naturally inside Obsidian. |
+| 📚 Local-library-first, more reliable and often faster | If the paper already exists in Zotero, DeepPaperNote can often reuse local records and attachments instead of rediscovering everything from the web. |
+
+## 👀 Who It Is For
+
+- People who regularly wrestle with hard, technical, cross-domain, or high-density papers
+- People who often feel, "I know every word here, but I still do not understand the paragraph"
+- People who do not want vague AI summaries and instead want to understand mechanisms, results, and boundaries
+- People who want to build a reusable local paper-knowledge base in Obsidian
 
 ## Quick Start
 
-1. Put this repository in your Codex skills directory:
+Clone this repository into your Codex skills directory:
 
-   ```text
-   ~/.codex/skills/DeepPaperNote
-   ```
+```bash
+git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
+```
 
-2. Restart Codex.
+Then restart Codex.
 
-3. Trigger the skill with a paper title, DOI, arXiv ID, URL, Zotero item, or local PDF.
+After that, just hand a paper to Codex. A title, DOI, URL, arXiv ID, or local PDF all work.
 
 Typical prompts:
 
 - `给这篇论文生成深度笔记`
 - `把这篇文章整理成 obsidian 笔记`
 - `读这篇论文并生成 md 笔记`
+- `Turn this paper into a note I will actually come back to`
 
-4. DeepPaperNote will:
-   - resolve the paper identity
-   - gather metadata and PDF evidence
-   - build a synthesis bundle
-   - let Codex/GPT write the final note
-   - lint the note before saving it
-   - save it into Obsidian when configured, or into the current workspace as a fallback
+By default, DeepPaperNote will:
+
+- resolve the paper identity
+- gather metadata and PDF evidence
+- plan figure placeholders and attempt high-confidence figure replacement
+- generate the final Markdown note
+- save it into Obsidian when configured, or automatically fall back to the current directory
 
 If you want the Python dependencies for local development:
 
@@ -71,41 +97,40 @@ In that mode, DeepPaperNote should explain its capabilities, inspect the current
 
 If you want a more explicit onboarding prompt, see [ONBOARDING_PROMPT.md](./ONBOARDING_PROMPT.md).
 
-## 🔧 Configuration
+## 🔧 Configuration (works out of the box, improves with setup)
 
 DeepPaperNote can be tried with zero configuration.
 
-- if no Obsidian vault is configured, it can still save notes into the current workspace
-- if you want Obsidian-native note management, you should configure your vault path
+- if no Obsidian vault is configured, it can still save notes into the current working directory
+- if you want an Obsidian-native long-term workflow, you should configure your vault path
 - everything else in this section is optional and improves specific workflows
 
-### Required: Tell DeepPaperNote where your Obsidian vault is
+### Core setup: point DeepPaperNote to your Obsidian vault
 
-DeepPaperNote writes notes into an Obsidian vault.
-The cleanest way to configure that is with an environment variable:
+The cleanest setup is:
 
 ```bash
 export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/Obsidian_Documents"
 ```
 
-Optional related settings:
+<details>
+<summary><strong>🛠️ Show advanced configuration (directories / Zotero MCP / Semantic Scholar / OCR)</strong></summary>
+
+### Directory-related settings
+
+If you want to customize paper output paths or intermediate artifact paths:
 
 ```bash
 export DEEPPAPERNOTE_PAPERS_DIR="20_Research/Papers"
 export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 ```
 
-What they do:
-
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DEEPPAPERNOTE_OBSIDIAN_VAULT` | Yes for normal vault writes | Root path of your Obsidian vault |
+| `DEEPPAPERNOTE_OBSIDIAN_VAULT` | Recommended | Root path of your Obsidian vault |
 | `DEEPPAPERNOTE_PAPERS_DIR` | Optional | Vault-relative paper output folder, default: `20_Research/Papers` |
 | `DEEPPAPERNOTE_OUTPUT_DIR` | Optional | Local temporary artifact directory, default: `tmp/DeepPaperNote` |
 | `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | Optional | Fallback output folder under the current working directory when no Obsidian vault is configured, default: `DeepPaperNote_output` |
-
-If no Obsidian vault is configured, DeepPaperNote can still save notes under the current working directory instead of failing outright.
-That fallback is useful for quick trials, but it is not the recommended long-term note-management workflow.
 
 Why the optional path settings can help:
 
@@ -125,12 +150,13 @@ Recommended ways to think about it:
 
 | Option | Best for | Notes |
 | --- | --- | --- |
-| [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | Lightweight read access | Closer to a minimal Zotero MCP server for search, metadata, and text access |
-| [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | Richer research workflow features | More feature-rich, but depending on your Codex setup it may require extra adaptation rather than working out of the box |
+| [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | Lightweight read access | Closer to a minimal Zotero MCP server for search, metadata, and text access, but not natively designed for Codex, so it usually still needs some adaptation |
+| [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | Richer research workflow features | More feature-rich, but also not natively built for Codex, so using it well in Codex usually requires additional adaptation |
 
 Why it matters:
 
 - local Zotero hits are usually the best identity anchor
+- if the paper is already in your local Zotero library, DeepPaperNote can often reuse local records and attachments instead of searching and downloading again, which also tends to make note generation faster
 - Codex can prefer your local paper library before internet search
 - local attachments can reduce wrong-title matches
 - it is especially helpful when you already curate papers in Zotero and do not want DeepPaperNote to rediscover the same paper from weaker web matches
@@ -140,7 +166,7 @@ Important note:
 
 - DeepPaperNote does **not** require one specific Zotero MCP implementation
 - for DeepPaperNote, the key capability is that Codex can search Zotero items, inspect metadata, and ideally read local full text
-- some Zotero MCP projects were built with other agent clients in mind, so using them with Codex may require extra adaptation
+- the two routes above are **not** plug-and-play Codex-native options today, so stable use in Codex usually requires some adaptation on your side
 
 ### Optional: Semantic Scholar API key
 
@@ -205,6 +231,19 @@ brew install tesseract
 python3 -m pip install --user pytesseract Pillow
 ```
 
+Install on Windows:
+
+```powershell
+winget install UB-Mannheim.TesseractOCR
+py -m pip install --user pytesseract Pillow
+```
+
+If `winget` is unavailable, install Tesseract OCR manually and then run:
+
+```powershell
+py -m pip install --user pytesseract Pillow
+```
+
 Quick verification:
 
 ```bash
@@ -212,6 +251,8 @@ tesseract --version
 python3 -c "import pytesseract, PIL; print('python_ok')"
 python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 ```
+
+</details>
 
 ## 📝 Changelog Preview
 
