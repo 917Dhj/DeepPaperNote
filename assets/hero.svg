@@ -38,12 +38,12 @@
         <text id="Scripts-handle-the-tedious" xml:space="preserve" x="303" y="368" font-family="Helvetica" font-size="18" fill="#94a3b8">Scripts handle the tedious extraction</text>
     </g>
     <g id="g4">
-        <path id="path16" fill="#0f2740" stroke="#1d4ed8" d="M 202 418 L 288 418 C 295.731995 418 302 424.268005 302 432 L 302 446 C 302 453.731995 295.731995 460 288 460 L 202 460 C 194.268021 460 188 453.731995 188 446 L 188 432 C 188 424.268005 194.268021 418 202 418 Z"/>
-        <text id="PDF-Parsing" xml:space="preserve" x="192" y="447" font-family="Helvetica" font-size="18" fill="#dbeafe">PDF Parsing</text>
-        <path id="path17" fill="#22163f" stroke="#7c3aed" d="M 332 418 L 438 418 C 445.731995 418 452 424.268005 452 432 L 452 446 C 452 453.731995 445.731995 460 438 460 L 332 460 C 324.268005 460 318 453.731995 318 446 L 318 432 C 318 424.268005 324.268005 418 332 418 Z"/>
-        <text id="Metadata" xml:space="preserve" x="345" y="446" font-family="Helvetica" font-size="18" fill="#e9d5ff">Metadata</text>
+        <path id="path16" fill="#0f2740" stroke="#1d4ed8" d="M 205.561401 418 L 313.438599 418 C 323.137512 418 331 424.268005 331 432 L 331 446 C 331 453.731995 323.137512 460 313.438599 460 L 205.561401 460 C 195.862518 460 188 453.731995 188 446 L 188 432 C 188 424.268005 195.862518 418 205.561401 418 Z"/>
+        <text id="PDF-Parsing" xml:space="preserve" x="206" y="447" font-family="Helvetica" font-size="18" fill="#dbeafe">PDF Parsing</text>
+        <path id="path17" fill="#22163f" stroke="#7c3aed" d="M 353.492523 418 L 440.507477 418 C 446.854614 418 452 424.268005 452 432 L 452 446 C 452 453.731995 446.854614 460 440.507477 460 L 353.492523 460 C 347.145386 460 342 453.731995 342 446 L 342 432 C 342 424.268005 347.145386 418 353.492523 418 Z"/>
+        <text id="Metadata" xml:space="preserve" x="358" y="446" font-family="Helvetica" font-size="18" fill="#e9d5ff">Metadata</text>
         <path id="path18" fill="#402512" stroke="#f59e0b" d="M 482 418 L 574 418 C 581.731995 418 588 424.268005 588 432 L 588 446 C 588 453.731995 581.731995 460 574 460 L 482 460 C 474.268005 460 468 453.731995 468 446 L 468 432 C 468 424.268005 474.268005 418 482 418 Z"/>
-        <text id="Zotero-first" xml:space="preserve" x="482" y="447" font-family="Helvetica" font-size="18" fill="#fef3c7">Zotero-first</text>
+        <text id="Zotero-first" xml:space="preserve" x="483" y="447" font-family="Helvetica" font-size="18" fill="#fef3c7">Zotero-first</text>
         <path id="path19" fill="#111827" stroke="#334155" d="M 202 480 L 334 480 C 341.731995 480 348 486.268005 348 494 L 348 508 C 348 515.731995 341.731995 522 334 522 L 202 522 C 194.268021 522 188 515.731995 188 508 L 188 494 C 188 486.268005 194.268021 480 202 480 Z"/>
         <text id="Figure-Assets" xml:space="preserve" x="214.472656" y="508" font-family="Helvetica" font-size="18" fill="#e2e8f0">Figure Assets</text>
         <path id="path20" fill="#111827" stroke="#334155" d="M 378 480 L 546 480 C 553.731995 480 560 486.268005 560 494 L 560 508 C 560 515.731995 553.731995 522 546 522 L 378 522 C 370.268005 522 364 515.731995 364 508 L 364 494 C 364 486.268005 370.268005 480 378 480 Z"/>
@@ -63,7 +63,7 @@
         <path id="path26" fill="#0c2218" stroke="#22c55e" d="M 1039.666626 418 L 1216.333374 418 C 1226.090332 418 1234 424.268005 1234 432 L 1234 446 C 1234 453.731995 1226.090332 460 1216.333374 460 L 1039.666626 460 C 1029.909668 460 1022 453.731995 1022 446 L 1022 432 C 1022 424.268005 1029.909668 418 1039.666626 418 Z"/>
         <text id="Mechanism-Breakdown" xml:space="preserve" x="1032" y="446" font-family="Helvetica" font-size="18" fill="#dcfce7">Mechanism Breakdown</text>
         <path id="path27" fill="#11223a" stroke="#38bdf8" d="M 1265.25 418 L 1387.75 418 C 1394.515381 418 1400 424.268005 1400 432 L 1400 446 C 1400 453.731995 1394.515381 460 1387.75 460 L 1265.25 460 C 1258.484497 460 1253 453.731995 1253 446 L 1253 432 C 1253 424.268005 1258.484497 418 1265.25 418 Z"/>
-        <text id="Placeholder-First" xml:space="preserve" x="1256" y="446" font-family="Helvetica" font-size="18" fill="#dbeafe">Placeholder-First</text>
+        <text id="Placeholder-First" xml:space="preserve" x="1257" y="446" font-family="Helvetica" font-size="18" fill="#dbeafe">Placeholder-First</text>
         <path id="path28" fill="#23163a" stroke="#a78bfa" d="M 1036 480 L 1176 480 C 1183.731934 480 1190 486.268005 1190 494 L 1190 508 C 1190 515.731995 1183.731934 522 1176 522 L 1036 522 C 1028.268066 522 1022 515.731995 1022 508 L 1022 494 C 1022 486.268005 1028.268066 480 1036 480 Z"/>
         <text id="Honest-Limitations" xml:space="preserve" x="1029" y="508" font-family="Helvetica" font-size="18" fill="#e9d5ff">Honest Limitations</text>
         <path id="path29" fill="#3d280f" stroke="#f59e0b" d="M 1225.833374 480 L 1384.166626 480 C 1392.911133 480 1400 486.268005 1400 494 L 1400 508 C 1400 515.731995 1392.911133 522 1384.166626 522 L 1225.833374 522 C 1217.088867 522 1210 515.731995 1210 508 L 1210 494 C 1210 486.268005 1217.088867 480 1225.833374 480 Z"/>
