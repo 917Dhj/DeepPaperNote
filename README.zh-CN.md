@@ -17,7 +17,7 @@
 
 </div>
 
-![DeepPaperNote 主图](./assets/hero-zh.svg)
+![DeepPaperNote 主图](./assets/hero.svg)
 
 面对复杂公式、密密麻麻的架构图、绕来绕去的实验设计和一堆容易让人头晕的消融结果，很多论文不是“不重要”，而是真的太难啃。
 
