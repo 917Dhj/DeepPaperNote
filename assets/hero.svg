@@ -13,8 +13,8 @@
         <path id="path5" fill="none" stroke="#64748b" d="M 90 120 L 1510 120"/>
         <path id="path6" fill="none" stroke="#64748b" d="M 90 780 L 1510 780"/>
     </g>
-    <text id="DeepPaperNote" xml:space="preserve" x="543" y="135" font-family="Impact" font-size="80" font-weight="800" fill="#f8fafc">DeepPaperNote</text>
-    <text id="Turn-one-research-paper" xml:space="preserve" x="440" y="178" font-family="Helvetica" font-size="28" font-weight="300" fill="#cbd5e1">Turn one research paper into a high-quality Obsidian note</text>
+    <text id="DeepPaperNote" xml:space="preserve" x="522.422656" y="135" font-family="Impact" font-size="80" font-weight="800" fill="#f8fafc" letter-spacing="3.2">DeepPaperNote</text>
+    <text id="Turn-hard-dense-papers" xml:space="preserve" x="197" y="178" font-family="Helvetica" font-size="28" font-style="italic" font-weight="300" fill="#cbd5e1">Turn hard, dense papers into high-quality Obsidian notes you can actually understand and keep</text>
     <g id="g2">
         <linearGradient id="linearGradient2" x1="170" y1="250" x2="610" y2="610" gradientUnits="userSpaceOnUse">
             <stop offset="1e-05" stop-color="#0f172a" stop-opacity="1"/>
@@ -28,24 +28,24 @@
         <path id="path9" fill="url(#linearGradient3)" stroke="#334155" stroke-width="2" d="M 1022 250 L 1398 250 C 1415.673096 250 1430 264.326904 1430 282 L 1430 578 C 1430 595.673096 1415.673096 610 1398 610 L 1022 610 C 1004.326904 610 990 595.673096 990 578 L 990 282 C 990 264.326904 1004.326904 250 1022 250 Z"/>
     </g>
     <g id="g3">
-        <path id="path10" fill="#172554" stroke="#60a5fa" stroke-width="2" d="M 300 338 C 300 362.300537 280.300537 382 256 382 C 231.699463 382 212 362.300537 212 338 C 212 313.699463 231.699463 294 256 294 C 280.300537 294 300 313.699463 300 338 Z"/>
-        <path id="path11" fill="#e0f2fe" fill-opacity="0.12" stroke="#e0f2fe" stroke-width="2.5" stroke-linejoin="round" d="M 236 314 L 267 314 L 280 327 L 280 362 L 236 362 L 236 314 Z"/>
-        <path id="path12" fill="none" stroke="#e0f2fe" stroke-width="2.5" stroke-linejoin="round" d="M 267 314 L 267 327 L 280 327"/>
-        <path id="path13" fill="none" stroke="#bae6fd" stroke-width="2.5" stroke-linecap="round" d="M 246 338 L 270 338"/>
-        <path id="path14" fill="none" stroke="#bae6fd" stroke-width="2.5" stroke-linecap="round" d="M 246 348 L 270 348"/>
-        <path id="path15" fill="none" stroke="#bae6fd" stroke-width="2.5" stroke-linecap="round" d="M 246 358 L 263 358"/>
-        <text id="Paper-Input" xml:space="preserve" x="316" y="335" font-family="Helvetica" font-size="30" fill="#f8fafc">Paper Input</text>
-        <text id="Evidence-gathered-before-writing" xml:space="preserve" x="316" y="368" font-family="Helvetica" font-size="18" fill="#94a3b8">Evidence gathered before writing</text>
+        <path id="path10" fill="#172554" stroke="#60a5fa" stroke-width="2" d="M 287 338 C 287 362.300537 267.300537 382 243 382 C 218.699463 382 199 362.300537 199 338 C 199 313.699463 218.699463 294 243 294 C 267.300537 294 287 313.699463 287 338 Z"/>
+        <path id="path11" fill="#e0f2fe" fill-opacity="0.12" stroke="#e0f2fe" stroke-width="2.5" stroke-linejoin="round" d="M 223 314 L 254 314 L 267 327 L 267 362 L 223 362 L 223 314 Z"/>
+        <path id="path12" fill="none" stroke="#e0f2fe" stroke-width="2.5" stroke-linejoin="round" d="M 254 314 L 254 327 L 267 327"/>
+        <path id="path13" fill="none" stroke="#bae6fd" stroke-width="2.5" stroke-linecap="round" d="M 233 338 L 257 338"/>
+        <path id="path14" fill="none" stroke="#bae6fd" stroke-width="2.5" stroke-linecap="round" d="M 233 348 L 257 348"/>
+        <path id="path15" fill="none" stroke="#bae6fd" stroke-width="2.5" stroke-linecap="round" d="M 233 358 L 250 358"/>
+        <text id="Paper-Input" xml:space="preserve" x="303" y="335" font-family="Helvetica" font-size="30" fill="#f8fafc">Paper Input</text>
+        <text id="Scripts-handle-the-tedious" xml:space="preserve" x="303" y="368" font-family="Helvetica" font-size="18" fill="#94a3b8">Scripts handle the tedious extraction</text>
     </g>
     <g id="g4">
         <path id="path16" fill="#0f2740" stroke="#1d4ed8" d="M 202 418 L 288 418 C 295.731995 418 302 424.268005 302 432 L 302 446 C 302 453.731995 295.731995 460 288 460 L 202 460 C 194.268021 460 188 453.731995 188 446 L 188 432 C 188 424.268005 194.268021 418 202 418 Z"/>
-        <text id="PDF" xml:space="preserve" x="225" y="447" font-family="Helvetica" font-size="18" fill="#dbeafe">PDF</text>
+        <text id="PDF-Parsing" xml:space="preserve" x="192" y="447" font-family="Helvetica" font-size="18" fill="#dbeafe">PDF Parsing</text>
         <path id="path17" fill="#22163f" stroke="#7c3aed" d="M 332 418 L 438 418 C 445.731995 418 452 424.268005 452 432 L 452 446 C 452 453.731995 445.731995 460 438 460 L 332 460 C 324.268005 460 318 453.731995 318 446 L 318 432 C 318 424.268005 324.268005 418 332 418 Z"/>
         <text id="Metadata" xml:space="preserve" x="345" y="446" font-family="Helvetica" font-size="18" fill="#e9d5ff">Metadata</text>
         <path id="path18" fill="#402512" stroke="#f59e0b" d="M 482 418 L 574 418 C 581.731995 418 588 424.268005 588 432 L 588 446 C 588 453.731995 581.731995 460 574 460 L 482 460 C 474.268005 460 468 453.731995 468 446 L 468 432 C 468 424.268005 474.268005 418 482 418 Z"/>
-        <text id="Zotero" xml:space="preserve" x="502" y="447" font-family="Helvetica" font-size="18" fill="#fef3c7">Zotero</text>
+        <text id="Zotero-first" xml:space="preserve" x="482" y="447" font-family="Helvetica" font-size="18" fill="#fef3c7">Zotero-first</text>
         <path id="path19" fill="#111827" stroke="#334155" d="M 202 480 L 334 480 C 341.731995 480 348 486.268005 348 494 L 348 508 C 348 515.731995 341.731995 522 334 522 L 202 522 C 194.268021 522 188 515.731995 188 508 L 188 494 C 188 486.268005 194.268021 480 202 480 Z"/>
-        <text id="Figures" xml:space="preserve" x="235" y="508" font-family="Helvetica" font-size="18" fill="#e2e8f0">Figures</text>
+        <text id="Figure-Assets" xml:space="preserve" x="214.472656" y="508" font-family="Helvetica" font-size="18" fill="#e2e8f0">Figure Assets</text>
         <path id="path20" fill="#111827" stroke="#334155" d="M 378 480 L 546 480 C 553.731995 480 560 486.268005 560 494 L 560 508 C 560 515.731995 553.731995 522 546 522 L 378 522 C 370.268005 522 364 515.731995 364 508 L 364 494 C 364 486.268005 370.268005 480 378 480 Z"/>
         <text id="Evidence-Bundle" xml:space="preserve" x="393" y="509" font-family="Helvetica" font-size="18" fill="#e2e8f0">Evidence Bundle</text>
         <text id="Resolve-Extract-Verify" xml:space="preserve" x="266" y="572" font-family="Helvetica" font-size="22" fill="#cbd5e1">Resolve. Extract. Verify.</text>
@@ -57,35 +57,38 @@
         <path id="path24" fill="none" stroke="#bbf7d0" stroke-width="2.5" stroke-linecap="round" d="M 1062 339 L 1086 339"/>
         <path id="path25" fill="none" stroke="#bbf7d0" stroke-width="2.5" stroke-linecap="round" d="M 1062 351 L 1078 351"/>
         <text id="Research-Note" xml:space="preserve" x="1134" y="335" font-family="Helvetica" font-size="30" fill="#f8fafc">Research Note</text>
-        <text id="Model-written-structured-reusable" xml:space="preserve" x="1134" y="368" font-family="Helvetica" font-size="18" fill="#94a3b8">Model-written, structured, reusable</text>
+        <text id="Structured-assets-for-your" xml:space="preserve"><tspan x="1134" y="357" font-family="Helvetica" font-size="18" fill="#94a3b8" xml:space="preserve">Structured assets for your</tspan><tspan x="1134" y="379" font-family="Helvetica" font-size="18" fill="#94a3b8" xml:space="preserve">knowledge base</tspan></text>
     </g>
     <g id="g6">
-        <path id="path26" fill="#0c2218" stroke="#22c55e" d="M 1064 418 L 1204 418 C 1211.731934 418 1218 424.268005 1218 432 L 1218 446 C 1218 453.731995 1211.731934 460 1204 460 L 1064 460 C 1056.268066 460 1050 453.731995 1050 446 L 1050 432 C 1050 424.268005 1056.268066 418 1064 418 Z"/>
-        <text id="Deep-Note" xml:space="preserve" x="1088" y="446" font-family="Helvetica" font-size="18" fill="#dcfce7">Deep Note</text>
-        <path id="path27" fill="#11223a" stroke="#38bdf8" d="M 1248 418 L 1388 418 C 1395.731934 418 1402 424.268005 1402 432 L 1402 446 C 1402 453.731995 1395.731934 460 1388 460 L 1248 460 C 1240.268066 460 1234 453.731995 1234 446 L 1234 432 C 1234 424.268005 1240.268066 418 1248 418 Z"/>
-        <text id="text1" xml:space="preserve" x="1285" y="446" font-family="Helvetica" font-size="18" fill="#dbeafe">Figures</text>
-        <path id="path28" fill="#23163a" stroke="#a78bfa" d="M 1064 480 L 1204 480 C 1211.731934 480 1218 486.268005 1218 494 L 1218 508 C 1218 515.731995 1211.731934 522 1204 522 L 1064 522 C 1056.268066 522 1050 515.731995 1050 508 L 1050 494 C 1050 486.268005 1056.268066 480 1064 480 Z"/>
-        <text id="Chinese" xml:space="preserve" x="1098" y="508" font-family="Helvetica" font-size="18" fill="#e9d5ff">Chinese</text>
-        <path id="path29" fill="#3d280f" stroke="#f59e0b" d="M 1248 480 L 1388 480 C 1395.731934 480 1402 486.268005 1402 494 L 1402 508 C 1402 515.731995 1395.731934 522 1388 522 L 1248 522 C 1240.268066 522 1234 515.731995 1234 508 L 1234 494 C 1234 486.268005 1240.268066 480 1248 480 Z"/>
-        <text id="Obsidian" xml:space="preserve" x="1280" y="508" font-family="Helvetica" font-size="18" fill="#fef3c7">Obsidian</text>
-        <text id="Explain-Structure-Save" xml:space="preserve" x="1102" y="572" font-family="Helvetica" font-size="22" fill="#d1fae5">Explain. Structure. Save.</text>
+        <path id="path26" fill="#0c2218" stroke="#22c55e" d="M 1039.666626 418 L 1216.333374 418 C 1226.090332 418 1234 424.268005 1234 432 L 1234 446 C 1234 453.731995 1226.090332 460 1216.333374 460 L 1039.666626 460 C 1029.909668 460 1022 453.731995 1022 446 L 1022 432 C 1022 424.268005 1029.909668 418 1039.666626 418 Z"/>
+        <text id="Mechanism-Breakdown" xml:space="preserve" x="1032" y="446" font-family="Helvetica" font-size="18" fill="#dcfce7">Mechanism Breakdown</text>
+        <path id="path27" fill="#11223a" stroke="#38bdf8" d="M 1265.25 418 L 1387.75 418 C 1394.515381 418 1400 424.268005 1400 432 L 1400 446 C 1400 453.731995 1394.515381 460 1387.75 460 L 1265.25 460 C 1258.484497 460 1253 453.731995 1253 446 L 1253 432 C 1253 424.268005 1258.484497 418 1265.25 418 Z"/>
+        <text id="Placeholder-First" xml:space="preserve" x="1256" y="446" font-family="Helvetica" font-size="18" fill="#dbeafe">Placeholder-First</text>
+        <path id="path28" fill="#23163a" stroke="#a78bfa" d="M 1036 480 L 1176 480 C 1183.731934 480 1190 486.268005 1190 494 L 1190 508 C 1190 515.731995 1183.731934 522 1176 522 L 1036 522 C 1028.268066 522 1022 515.731995 1022 508 L 1022 494 C 1022 486.268005 1028.268066 480 1036 480 Z"/>
+        <text id="Honest-Limitations" xml:space="preserve" x="1029" y="508" font-family="Helvetica" font-size="18" fill="#e9d5ff">Honest Limitations</text>
+        <path id="path29" fill="#3d280f" stroke="#f59e0b" d="M 1225.833374 480 L 1384.166626 480 C 1392.911133 480 1400 486.268005 1400 494 L 1400 508 C 1400 515.731995 1392.911133 522 1384.166626 522 L 1225.833374 522 C 1217.088867 522 1210 515.731995 1210 508 L 1210 494 C 1210 486.268005 1217.088867 480 1225.833374 480 Z"/>
+        <text id="Obsidian-Native" xml:space="preserve" x="1238" y="508" font-family="Helvetica" font-size="18" fill="#fef3c7">Obsidian-Native</text>
+        <text id="Explain-Structure-Save" xml:space="preserve" x="1087" y="572" font-family="Helvetica" font-size="22" fill="#d1fae5">Explain. Structure. Save.</text>
     </g>
     <g id="g7">
-        <linearGradient id="linearGradient4" x1="628" y1="430" x2="920" y2="430" gradientUnits="userSpaceOnUse">
+        <linearGradient id="linearGradient4" x1="628" y1="428" x2="920" y2="428" gradientUnits="userSpaceOnUse">
             <stop offset="1e-05" stop-color="#38bdf8" stop-opacity="1"/>
             <stop offset="0.5" stop-color="#a78bfa" stop-opacity="1"/>
             <stop offset="1" stop-color="#f59e0b" stop-opacity="1"/>
         </linearGradient>
-        <path id="path30" fill="none" stroke="url(#linearGradient4)" stroke-width="22" stroke-linecap="round" d="M 628 430 L 920 430"/>
-        <path id="path31" fill="none" stroke="#f8fafc" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" d="M 896 392 L 972 430 L 896 468"/>
-        <path id="path32" fill="#0f172a" stroke="#64748b" stroke-width="2" d="M 856 430 C 856 460.927948 830.927917 486 800 486 C 769.072083 486 744 460.927948 744 430 C 744 399.072052 769.072083 374 800 374 C 830.927917 374 856 399.072052 856 430 Z"/>
-        <path id="path33" fill="none" stroke="#f8fafc" stroke-width="3.5" stroke-linecap="round" d="M 779 430 C 779 418.402008 788.401978 409 800 409 C 811.598022 409 821 418.402008 821 430 C 821 441.597992 811.598022 451 800 451"/>
-        <path id="path34" fill="none" stroke="#fde68a" stroke-width="3.5" stroke-linecap="round" d="M 800 388 L 800 376"/>
-        <path id="path35" fill="none" stroke="#fde68a" stroke-width="3.5" stroke-linecap="round" d="M 800 484 L 800 472"/>
-        <path id="path36" fill="none" stroke="#fde68a" stroke-width="3.5" stroke-linecap="round" d="M 842 430 L 854 430"/>
-        <path id="path37" fill="none" stroke="#fde68a" stroke-width="3.5" stroke-linecap="round" d="M 746 430 L 758 430"/>
-        <text id="Codex-writes" xml:space="preserve" x="739" y="522" font-family="Helvetica" font-size="20" fill="#e2e8f0">Codex writes</text>
+        <path id="path30" fill="none" stroke="url(#linearGradient4)" stroke-width="22" stroke-linecap="round" d="M 628 428 L 920 428"/>
+        <path id="path31" fill="none" stroke="#f8fafc" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" d="M 896 390 L 972 428 L 896 466"/>
+        <path id="path32" fill="#0f172a" stroke="#64748b" stroke-width="2" d="M 856 428 C 856 458.927948 830.927917 484 800 484 C 769.072083 484 744 458.927948 744 428 C 744 397.072052 769.072083 372 800 372 C 830.927917 372 856 397.072052 856 428 Z"/>
+        <path id="path33" fill="none" stroke="#cbd5e1" stroke-width="3" stroke-linecap="round" d="M 783 416 L 800 404 L 819 414"/>
+        <path id="path34" fill="none" stroke="#cbd5e1" stroke-width="3" stroke-linecap="round" d="M 783 440 L 800 452 L 819 442"/>
+        <path id="path35" fill="none" stroke="#93c5fd" stroke-width="2.5" d="M 783 416 L 783 440 L 800 452 L 819 442 L 819 414 L 800 404 Z"/>
+        <path id="path36" fill="#fde68a" stroke="none" d="M 787 416 C 787 418.209137 785.209106 420 783 420 C 780.790894 420 779 418.209137 779 416 C 779 413.790863 780.790894 412 783 412 C 785.209106 412 787 413.790863 787 416 Z"/>
+        <path id="path37" fill="#fde68a" stroke="none" d="M 804 404 C 804 406.209137 802.209106 408 800 408 C 797.790894 408 796 406.209137 796 404 C 796 401.790863 797.790894 400 800 400 C 802.209106 400 804 401.790863 804 404 Z"/>
+        <path id="path39" fill="#fde68a" stroke="none" d="M 823 414 C 823 416.209137 821.209106 418 819 418 C 816.790894 418 815 416.209137 815 414 C 815 411.790863 816.790894 410 819 410 C 821.209106 410 823 411.790863 823 414 Z"/>
+        <path id="path40" fill="#fde68a" stroke="none" d="M 804 452 C 804 454.209137 802.209106 456 800 456 C 797.790894 456 796 454.209137 796 452 C 796 449.790863 797.790894 448 800 448 C 802.209106 448 804 449.790863 804 452 Z"/>
+        <path id="path41" fill="#fde68a" stroke="none" d="M 823 442 C 823 444.209137 821.209106 446 819 446 C 816.790894 446 815 444.209137 815 442 C 815 439.790863 816.790894 438 819 438 C 821.209106 438 823 439.790863 823 442 Z"/>
+        <text id="Model-Led-Understanding" xml:space="preserve" x="671" y="523" font-family="Helvetica" font-size="22" fill="#e2e8f0">Model-Led Understanding</text>
     </g>
-    <path id="path38" fill="#0f172a" stroke="#334155" stroke-width="2" d="M 201.914886 690 L 1388.085083 690 C 1405.711304 690 1420 700.745178 1420 714 L 1420 758 C 1420 771.254822 1405.711304 782 1388.085083 782 L 201.914886 782 C 184.288803 782 170 771.254822 170 758 L 170 714 C 170 700.745178 184.288803 690 201.914886 690 Z"/>
-    <text id="Scripts-gather-evidence-The" xml:space="preserve" x="202" y="749" font-family="American Typewriter" font-size="30" fill="#f8fafc">Scripts gather evidence. The model understands the paper. The note stays reusable.</text>
+    <path id="path38" fill="#0f172a" stroke="#334155" stroke-width="2" d="M 229.663818 690 L 1369.336182 690 C 1386.271362 690 1400 700.745178 1400 714 L 1400 758 C 1400 771.254822 1386.271362 782 1369.336182 782 L 229.663818 782 C 212.728683 782 199 771.254822 199 758 L 199 714 C 199 700.745178 212.728683 690 229.663818 690 Z"/>
+    <text id="Let-scripts-handle-the" xml:space="preserve" x="235" y="748" font-family="American Typewriter" font-size="30" fill="#f8fafc">Let scripts handle the repetitive work. Save your attention for actual thinking.</text>
 </svg>
