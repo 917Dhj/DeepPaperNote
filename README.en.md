@@ -74,7 +74,7 @@ Typical prompts:
 - `读这篇论文并生成 md 笔记`
 - `Turn this paper into a note I will actually come back to`
 
-By default, DeepPaperNote writes the note in **Chinese**. If you explicitly want an English note, say so in your prompt.
+By default, DeepPaperNote writes the note in **Chinese**. At the moment, Chinese is the only note language that can fully benefit from the skill's current writing and linting rules. If you need English notes, please stay tuned for a future update.
 
 By default, DeepPaperNote will:
 
@@ -400,4 +400,3 @@ The main difference is that DeepPaperNote deliberately keeps scripts focused on 
 - improve high-confidence figure replacement
 - expand tests and regression cases
 - keep the core reusable even though the first public release targets Codex
-

@@ -72,9 +72,9 @@ git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperN
 - 💬 `帮我精读一下这篇 PDF，生成带图表的 Markdown`
 - 💬 `把这篇论文整理成我以后还会回看的笔记`
 
-默认情况下，DeepPaperNote 会自己完成：
+默认情况下，DeepPaperNote 会生成**中文笔记**。当前写作规范和格式校验也主要围绕中文笔记构建；目前中文是唯一能够发挥 skill 完全能力的笔记语言，如需生成英文版笔记，请期待后续更新。
 
-默认情况下，DeepPaperNote 会生成**中文笔记**。如果你明确要求英文版，它再切换成英文输出。
+默认情况下，DeepPaperNote 会自己完成：
 
 - 精准识别论文身份
 - 获取 PDF、元数据和正文证据
