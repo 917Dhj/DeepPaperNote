@@ -7,7 +7,7 @@
 [English](./README.en.md) | [简体中文](./README.md)
 
 [![状态](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
-[![版本](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.1.0-alpha)
+[![版本](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.2.0-alpha)
 [![许可证](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
 [![Codex](https://img.shields.io/badge/Codex-skill-111827?style=for-the-badge)](./SKILL.md)
 [![输出](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
@@ -246,8 +246,9 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 | 版本 | 状态 | 主要内容 |
 | --- | --- | --- |
+| v0.2.0-alpha | ✅ 已发布 | 复现级技术笔记写作升级：显式 `note_plan`、公式感知输出、更强的最终自检、摘要中英双写，以及更严格的格式校验 |
 | v0.1.0-alpha | ✅ 已发布 | 第一个公开 alpha 版：Codex 工作流、综合证据包流程、Zotero 优先辅助能力、占位优先图表处理、工作区回退输出、OCR 回退、测试与 CI |
-| 未发布 | 🕒 持续打磨中 | 正在加强复现级技术写作、显式 `note_plan`、公式保留、更硬的最终自检，以及更严格的格式校验 |
+| 未发布 | 🕒 暂无新的 release 级变化 | 当前还没有下一版 release 的公开更新内容 |
 
 ## 🧠 这不是另一个摘要工具
 

@@ -14,6 +14,31 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - No unreleased user-facing changes yet.
 
+## v0.2.0-alpha
+
+Second public alpha release of DeepPaperNote.
+
+### Changed
+
+- Strengthened the note-writing contract so technical papers are pushed closer to replication-oriented reading notes rather than polished summary rewrites.
+- Added explicit short note planning before final note generation.
+- Added equation-aware output guidance so key formulas can be preserved in LaTeX when they are central to understanding the method.
+- Added stricter final self-review requirements for key numbers, method explanation depth, and technical completeness.
+- Added stronger formatting checks for suspicious mid-sentence line breaks and math accidentally rendered as code.
+- Updated the abstract section contract to keep both the original abstract and a Chinese translation.
+- Made the Chinese README the default GitHub homepage and clarified that Chinese is currently the only fully supported note language.
+
+### Documentation
+
+- Split the English README into `README.en.md` while keeping the Chinese README as the default repository homepage.
+- Updated homepage messaging to better emphasize replication-oriented technical note quality.
+
+### Notes
+
+- This is still an alpha release.
+- Chinese remains the only fully supported output language at this stage.
+- High-confidence figure replacement remains conservative; placeholder-first behavior is still preferred when image certainty is low.
+
 ## v0.1.0-alpha
 
 First public alpha release of DeepPaperNote.

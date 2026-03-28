@@ -7,7 +7,7 @@
 [English](./README.en.md) | [简体中文](./README.md)
 
 [![Status](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
-[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.1.0-alpha)
+[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.2.0-alpha)
 [![License](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
 [![Codex](https://img.shields.io/badge/Codex-skill-111827?style=for-the-badge)](./SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
@@ -264,8 +264,9 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 
 | Version | Status | Highlights |
 | --- | --- | --- |
+| v0.2.0-alpha | ✅ Released | Replication-oriented note-writing upgrade: explicit `note_plan`, equation-aware output, stricter final self-review, bilingual abstract handling, and stronger formatting checks |
 | v0.1.0-alpha | ✅ Released | First public alpha: Codex workflow, synthesis bundle pipeline, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
-| Unreleased | 🕒 In progress | Stronger replication-oriented note writing, explicit `note_plan`, equation-aware output, stricter self-review, and better formatting checks |
+| Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v0.2.0-alpha |
 
 ## Why DeepPaperNote
 
