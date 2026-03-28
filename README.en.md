@@ -19,7 +19,14 @@
 
 ![DeepPaperNote Hero](./assets/hero.svg)
 
-When a paper is packed with dense formulas, crowded architecture diagrams, tangled experimental design, and pages of ablations, the problem is often not that the paper is unimportant. It is that the paper is simply hard to digest.
+**Do you often run into this situation: you want to study a classic paper carefully, but the hardest part is no longer reading it — it is turning that reading into usable notes?** The real time sink usually looks like this:
+
+- jumping back and forth between PDFs, Zotero, web pages, and your note app
+- manually organizing metadata, abstracts, figures, and the method backbone
+- understanding part of the paper, but still spending a long time turning that understanding into structured notes
+- ending up with a note that looks complete but is not something you actually want to revisit later
+
+DeepPaperNote is built for exactly that layer of repetitive, mechanical, but very expensive work. It takes over the gathering, structuring, figure placement, and note production work so you can keep your attention on actual thinking.
 
 DeepPaperNote is a Codex skill for **deep paper reading**. It is not another tool that paraphrases the abstract and stops there. It cares about a harder set of questions:
 
@@ -28,29 +35,37 @@ DeepPaperNote is a Codex skill for **deep paper reading**. It is not another too
 - Are the key equations, experiments, and figure context preserved?
 - Does the final note become something worth keeping in your long-term knowledge base?
 
-**If you are tired of AI paper-summary tools that look complete but still leave you with nothing you would revisit a week later, this skill is probably for you.**
-
 Let scripts handle the repetitive work. Save your attention for actual thinking.
 
 > [!tip]
-> If you already have an Obsidian or Zotero workflow, DeepPaperNote is not trying to replace it. It is trying to automate the most tedious parts of evidence gathering, structuring, and note drafting.
+> If you already have an Obsidian or Zotero workflow, DeepPaperNote is not trying to replace it. It is trying to automate the most tedious parts of evidence gathering, structuring, and note production.
 
-## ✨ Why DeepPaperNote?
+## 🎯 What problems does it solve?
 
-Most paper-summary tools stop after producing a neat-looking abstract rewrite. DeepPaperNote cares about two harder questions: **did you actually understand the paper?** and **is the resulting note worth keeping?**
-
-| Category | 😵 Typical paper-summary tool | ✅ DeepPaperNote |
-| --- | --- | --- |
-| 🎯 Output goal | A smooth-looking summary | A note you can revisit, reuse, and keep |
-| 🔍 Focus | Abstract and high-level conclusions | Mechanisms, evidence, experiments, figure context, and structure |
-| 🧪 Technical depth | Often stops at high-level paraphrase | Tries to preserve key numbers, formulas, implementation logic, and honest limitations |
-| 🖼️ Figure handling | Easy to skip when extraction is unstable | Prioritizes figure placement and context so the note structure stays intact |
-| 📚 Use case | Quick browsing | Deep reading, long-term note-taking, and Obsidian knowledge management |
-| ♻️ Long-term value | Disposable reading aid | Reusable research note |
+| 🎯 Your need / pain point | ✅ What DeepPaperNote does |
+| --- | --- |
+| You want to understand a hard, dense paper faster | It organizes the method backbone, key results, figure context, and limitations into a note you can actually read through |
+| You want to study a classic paper without handwriting a pile of mechanical notes | It handles metadata collection, structure building, figure placeholders, and full note generation so you can spend your energy on understanding |
+| You want the paper to live inside Obsidian as a long-term asset | It creates a paper-specific folder, Markdown note, and local `images/` directory that fit long-term knowledge management |
+| You already manage papers in Zotero and do not want to redo the work | It can prefer local records and attachments, reducing mismatches and often speeding the workflow up |
+| You do not want another polished-looking summary | It leans toward mechanism breakdown, key numbers, formulas, edge cases, and honest limitations |
 
 **In one sentence:**
 
 > DeepPaperNote is a paper-reading-note workflow, not a paper-summary generator.
+
+## ✨ How does it do that?
+
+DeepPaperNote does not look more complete by simply rewriting the abstract in smoother prose. It raises note quality through a few workflow rules:
+
+| 🧭 Core principle | 📝 What it means in practice |
+| --- | --- |
+| 🤖 Model-led understanding | The model is responsible for mechanism breakdown, method structure, key comparisons, and limitations instead of template-like summary writing. |
+| 🗂️ Evidence first | It gathers evidence from PDFs, metadata sources, and optional Zotero workflows before writing, instead of producing claims first and looking for support later. |
+| 🧪 Technical detail first | For technical papers, it tries to preserve key numbers, formulas, implementation logic, and real boundary conditions rather than stopping at high-level paraphrase. |
+| 🖼️ Placeholder-first figures | When image extraction is unstable, it still keeps figure position, explanation, and context so the note structure does not break. |
+| 🔗 Native knowledge-base output | Each paper gets its own folder, Markdown note, and `images/` directory, which makes long-term accumulation much easier. |
+| 📚 Local-library-first resolution | If the paper already exists in Zotero, it can reuse local items and attachments, which is often both more reliable and faster. |
 
 ## 👀 Who It Is For
 
@@ -141,7 +156,7 @@ export DEEPPAPERNOTE_PAPERS_DIR="20_Research/Papers"
 export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 ```
 
-| Variable | Required | Purpose |
+| ⚙️ Variable | Required | 📝 Purpose |
 | --- | --- | --- |
 | `DEEPPAPERNOTE_OBSIDIAN_VAULT` | Recommended | Root path of your Obsidian vault |
 | `DEEPPAPERNOTE_PAPERS_DIR` | Optional | Vault-relative paper output folder, default: `20_Research/Papers` |
@@ -164,7 +179,7 @@ This is most worth setting up if you already use Zotero as your main paper-manag
 
 Recommended ways to think about it:
 
-| Option | Best for | Notes |
+| 🧩 Option | 🎯 Best for | 📝 Notes |
 | --- | --- | --- |
 | [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | Lightweight read access | Closer to a minimal Zotero MCP server for search, metadata, and text access, but not natively designed for Codex, so it usually still needs some adaptation |
 | [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | Richer research workflow features | More feature-rich, but also not natively built for Codex, so using it well in Codex usually requires additional adaptation |
@@ -233,7 +248,7 @@ Without OCR, DeepPaperNote still works well on normal digital PDFs, but scanned 
 
 Required software and packages for OCR:
 
-| Layer | Requirement | Purpose |
+| 🧱 Layer | 📦 Requirement | 📝 Purpose |
 | --- | --- | --- |
 | System tool | `tesseract` | The actual OCR engine |
 | Python package | `pytesseract` | Python bridge to `tesseract` |
@@ -274,7 +289,7 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 
-| Version | Status | Highlights |
+| 🏷️ Version | 🚦 Status | ✨ Highlights |
 | --- | --- | --- |
 | v0.2.0-alpha | ✅ Released | Replication-oriented note-writing upgrade: explicit `note_plan`, equation-aware output, stricter final self-review, bilingual abstract handling, and stronger formatting checks |
 | v0.1.0-alpha | ✅ Released | First public alpha: Codex workflow, synthesis bundle pipeline, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
@@ -387,7 +402,7 @@ DeepPaperNote/
 
 ## 🧰 Current Status
 
-| Area | Status | Notes |
+| 🧩 Area | 🚦 Status | 📝 Notes |
 | --- | --- | --- |
 | Core single-paper workflow | ✅ Working | End-to-end paper → note path exists |
 | Obsidian-native output | ✅ Working | Folder-per-paper with `images/` |
