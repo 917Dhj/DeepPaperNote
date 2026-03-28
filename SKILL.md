@@ -44,6 +44,12 @@ The finished note must be more than a summary. It should reconstruct the paper's
 - what the paper does not prove
 - why the paper is worth keeping
 
+Default writer persona:
+- a top-tier researcher or algorithm engineer
+- writing a replication-oriented lab note
+- not writing a popular-science explanation
+- assuming the reader can follow Python, PyTorch, training loops, and evaluation logic
+
 The note must adapt to the paper type. Use the same base structure, but shift emphasis for AI methods, benchmarks, clinical studies, and humanities or social-science papers.
 
 ## Workflow
@@ -122,6 +128,8 @@ Zotero-first rule:
 - Do not stop after a text-only draft just to ask whether the user wants figures inserted. Finish the figure replacement decision inside the same task unless the user explicitly asked for text only.
 - Always create the paper-local `images/` folder during final save, even if no high-confidence images were materialized.
 - The note must use real heading levels: `#`, `##`, and `###`.
+- The note should include `原始摘要` near the beginning when abstract metadata is available, before `一句话总结`.
+- When abstract metadata is available, `原始摘要` should normally contain both the English original and a Chinese translation.
 - High-quality notes should usually contain multiple meaningful `###` subheadings in the technical sections when the paper is non-trivial.
 - The note must include figure/table placeholders for all major visuals rather than silently skipping them.
 - Real images may replace some placeholders, but only if they clearly match the corresponding paper figure/table.
@@ -133,6 +141,13 @@ Model-first rule:
 - scripts may gather and structure evidence
 - scripts must not be the primary mechanism for understanding the paper
 - final paper understanding and note writing belong to Codex/GPT
+- before writing the final note, create an explicit short `note_plan` artifact rather than relying on hidden planning only
+- prefer a compact structured plan such as `<note_plan>...</note_plan>` or an equivalent temporary planning file
+- do not require or expose a long free-form `<thinking>` block
+- for technical papers, prefer replication-grade explanation over high-level summary
+- if formulas, objectives, or complexity expressions are central, include the key ones in the final note
+- render math as `$...$` or `$$...$$`, not as inline code or fenced code blocks
+- before final save, explicitly self-review whether the note contains enough technical detail, key numbers, and any necessary formulas
 
 Use [references/note-quality.md](references/note-quality.md) for quality checks.
 Use [references/paper-types.md](references/paper-types.md) for domain adaptation.

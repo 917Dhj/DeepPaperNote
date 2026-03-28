@@ -45,16 +45,14 @@ For convenience, MVP also includes a runner script that executes the determinist
 
 4. `extract_evidence`
    Produce an evidence pack rather than a finished note.
+   This stage should favor broad collection over early judgment.
    Evidence targets:
-   - research problem
-   - task definition
-   - data or materials
-   - method
-   - training or analysis details
-   - metrics
-   - strongest results
-   - limitations
+   - section texts
+   - candidate chunks per section
+   - data/material mentions
+   - metrics and numeric claims
    - figure and table captions
+   - enough context for the model to decide what is truly central
 
 5. `extract_pdf_assets`
    Export page-level PDF image assets and page metadata.
@@ -75,12 +73,16 @@ For convenience, MVP also includes a runner script that executes the determinist
    This is the main handoff point from scripts to the language model.
 
 8. Codex/GPT note planning
-   Before drafting the final note, make a dynamic internal note plan:
+   Before drafting the final note, create an explicit short note-planning artifact:
    - infer the paper type
    - decide which sections deserve the most weight
    - decide which sections need `###` subheadings
    - select the most important numbers, comparisons, and figure/table placeholders
    - add paper-specific subsections when the evidence supports them
+   Recommended form:
+   - a compact `<note_plan>...</note_plan>` block
+   - or a temporary planning file saved before the final note
+   Do not rely only on an implicit "hidden planning" step.
 
 9. Codex/GPT synthesis
    The language model reads the synthesis bundle and writes the actual note.
@@ -156,6 +158,8 @@ Suggested keys:
 - `method_evidence`
 - `results_evidence`
 - `limitations_evidence`
+- `section_texts`
+- `candidate_chunks`
 - `figure_captions`
 - `table_captions`
 - `sections`
@@ -187,6 +191,16 @@ Suggested keys:
 - `pdf_assets`
 - `summary`
 - `writing_contract`
+
+### `note_plan`
+
+Suggested keys:
+- `paper_type`
+- `dominant_domain`
+- `must_cover`
+- `key_numbers`
+- `real_comparisons`
+- `section_plan`
 
 ## Failure Policy
 

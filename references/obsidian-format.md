@@ -28,6 +28,13 @@ If the user already has a vault convention, preserve it.
 - Use bullets for metadata and sharply list-shaped content.
 - Keep code or metric identifiers in backticks.
 - Preserve stable internal links where useful.
+- Use normal LaTeX delimiters for math:
+  - inline math: `$...$`
+  - display math:
+    `$$`
+    `...`
+    `$$`
+- Do not wrap formulas in backticks or fenced code blocks unless you are literally showing source code.
 
 ## Figure Placeholder Style
 
@@ -65,15 +72,20 @@ If a real image has been selected and materialized into the vault, prefer an Obs
 ## Default Section Order
 
 1. `核心信息`
-2. `一句话总结`
-3. `研究问题`
-4. `数据与任务定义`
-5. `方法主线`
-6. `关键结果`
-7. `深度分析`
-8. `局限`
-9. `我的笔记`
-10. `引用`
+2. `原始摘要`
+3. `一句话总结`
+4. `研究问题`
+5. `数据与任务定义`
+6. `方法主线`
+7. `关键结果`
+8. `深度分析`
+9. `局限`
+10. `我的笔记`
+11. `引用`
+
+Inside `原始摘要`, prefer this stable internal structure when abstract metadata exists:
+- `### 英文原文`
+- `### 中文翻译`
 
 This order is the stable backbone, not a full outline.
 When the paper is complex, add `###` subsections such as:

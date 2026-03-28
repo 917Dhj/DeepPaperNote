@@ -32,6 +32,19 @@ class EvidenceItem(TypedDict, total=False):
     page_hint: str
 
 
+class CandidateChunk(TypedDict, total=False):
+    text: str
+    source_section: str
+    page_hint: str
+    kind_hint: str
+
+
+class EquationCandidate(TypedDict, total=False):
+    equation: str
+    source_section: str
+    kind_hint: str
+
+
 class EvidencePack(TypedDict, total=False):
     paper_id: str
     problem_evidence: list[EvidenceItem]
@@ -40,9 +53,12 @@ class EvidencePack(TypedDict, total=False):
     method_evidence: list[EvidenceItem]
     results_evidence: list[EvidenceItem]
     limitations_evidence: list[EvidenceItem]
+    equation_candidates: list[EquationCandidate]
     figure_captions: list[dict[str, Any]]
     table_captions: list[dict[str, Any]]
     sections: list[dict[str, Any]]
+    section_texts: dict[str, str]
+    candidate_chunks: dict[str, list[CandidateChunk]]
     quotes: list[dict[str, Any]]
     evidence_quality: str
     extraction_failures: list[str]
@@ -99,9 +115,12 @@ def empty_evidence_pack() -> EvidencePack:
         method_evidence=[],
         results_evidence=[],
         limitations_evidence=[],
+        equation_candidates=[],
         figure_captions=[],
         table_captions=[],
         sections=[],
+        section_texts={},
+        candidate_chunks={},
         quotes=[],
         extraction_failures=[],
         evidence_quality="unknown",

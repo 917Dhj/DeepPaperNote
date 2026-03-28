@@ -55,6 +55,7 @@ If you only have the abstract, say so clearly and treat the note as provisional 
    - which details need `###` subheadings
    - which 3 to 6 numbers matter most
    - which figure/table placeholders are essential
+   - whether the paper needs explicit formulas, objective functions, or complexity expressions
 5. Write the final note in Chinese.
 6. Lint it.
 7. Save into the Obsidian vault only after the note passes.
@@ -67,6 +68,7 @@ If you only have the abstract, say so clearly and treat the note as provisional 
 - Avoid pasting long English sentences into Chinese sections.
 - Do not fabricate metrics, ablations, or claims not supported by evidence.
 - If evidence is weak, write a weak-but-honest note instead of pretending the paper was fully analyzed.
+- For method papers, write like a replication-minded researcher rather than a summary assistant.
 
 ## Section Guide
 
@@ -121,6 +123,9 @@ Explain:
 - what each stage consumes and produces
 - what the model is actually doing
 - what is standard versus paper-specific
+- what the training target or optimization target really is
+- how inference or sampling actually proceeds
+- which implementation details matter for reproducing the claimed gain
 
 For complex papers, use `###` subheadings such as:
 - `### 数据构建`
@@ -158,6 +163,9 @@ Good subsections often include:
 - `### 真正贡献是什么`
 - `### 为什么结果成立`
 - `### 哪些地方容易被误读`
+- `### 训练目标`
+- `### 推理与采样链路`
+- `### 复杂度与扩展性`
 
 ### 局限
 
@@ -188,6 +196,19 @@ When the paper has useful visuals:
 - keep original paper numbering such as `Fig. 1` or `Table 2`
 
 Do not dump every extracted image into the note body.
+
+## Formula Guidance
+
+If a formula is central to understanding the method, do not leave it out just because the rest of the prose reads smoothly.
+
+Typical cases where a formula should appear:
+- probability factorization
+- optimization objective
+- loss definition
+- complexity comparison
+- scaling-law fit
+
+Prefer a few stable, well-explained formulas over many noisy ones.
 
 ## Minimum Honesty Standard
 

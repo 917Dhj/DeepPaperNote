@@ -11,11 +11,13 @@ The note is high quality only if it satisfies most of the checks below.
 - It includes at least one real limitation.
 - It includes an explicit judgment about the paper's actual contribution.
 - It includes at least one paper-specific technical subsection rather than only broad top-level sections.
+- For method-heavy papers, it explains enough mechanism detail that an engineer could re-explain the pipeline without reopening the PDF.
 
 ## Structural Checks
 
 The note should usually include:
 - `核心信息`
+- `原始摘要`
 - `一句话总结`
 - `研究问题`
 - `数据与任务定义`
@@ -30,6 +32,13 @@ For non-trivial papers, it should usually also include multiple `###` subheading
 - `方法主线`
 - `关键结果`
 - `深度分析`
+
+Before the final note is written, there should also be an explicit short planning artifact:
+- a compact `<note_plan>...</note_plan>` block
+- or an equivalent temporary plan file
+
+Bad sign:
+- the model jumps directly to a polished final note with no visible planning artifact at all
 
 ## Depth Checks
 
@@ -69,3 +78,14 @@ Strong notes should also clearly contain:
 - the most important comparison
 - one paper-specific insight
 - one honest limitation
+
+For technical papers, strong notes should usually also contain:
+- at least one method subsection that goes beyond summary into mechanism explanation
+- at least one concrete training / inference / complexity detail
+- at least one key formula or formal expression when the paper's contribution depends on it
+- formulas rendered as math rather than code formatting
+
+When abstract metadata exists, strong notes should also make `原始摘要` genuinely bilingual:
+- retain the English original
+- provide a fluent Chinese translation
+- avoid replacing the translation with a shorter interpretation-only summary

@@ -10,6 +10,7 @@ from pathlib import Path
 
 REQUIRED_SECTIONS = [
     "核心信息",
+    "原始摘要",
     "一句话总结",
     "研究问题",
     "数据与任务定义",
@@ -179,6 +180,102 @@ def inspect_figure_callouts(text: str) -> list[str]:
     return warnings
 
 
+def is_prose_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if stripped.startswith(("#", "-", "*", "> ", "```", "![[", "*论文原图编号")):
+        return False
+    if stripped.startswith("`") and stripped.endswith("`"):
+        return False
+    return True
+
+
+def suspicious_mid_sentence_linebreaks(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    lines = text.splitlines()
+    for idx in range(len(lines) - 1):
+        current = lines[idx].rstrip()
+        nxt = lines[idx + 1].lstrip()
+        if not is_prose_line(current) or not is_prose_line(nxt):
+            continue
+        if is_metadata_line(current) or is_metadata_line(nxt):
+            continue
+        if re.search(r"[。！？.!?：:]$", current):
+            continue
+        if not re.search(r"[，,；;、）)\]」』]$", current):
+            if not re.search(r"[A-Za-z0-9`\u4e00-\u9fff]$", current):
+                continue
+        if not re.match(r"^[A-Za-z0-9`\u4e00-\u9fff(（“‘\"]", nxt):
+            continue
+        issues.append(
+            {
+                "line_number": idx + 1,
+                "line": current.strip(),
+                "next_line": nxt.strip(),
+            }
+        )
+    return issues
+
+
+def suspicious_code_formatted_math(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    lines = text.splitlines()
+    in_fence = False
+    fence_start = 0
+    fence_lines: list[str] = []
+
+    for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            if not in_fence:
+                in_fence = True
+                fence_start = idx
+                fence_lines = []
+            else:
+                fence_text = "\n".join(fence_lines)
+                if re.search(r"(?:^|\\n)\s*(?:[A-Za-z][A-Za-z0-9_]*\s*=|O\(|\\sum|\\prod|\\mathcal|\\log|\\frac)", fence_text):
+                    issues.append(
+                        {
+                            "line_number": fence_start,
+                            "line": "```",
+                            "next_line": fence_lines[0].strip() if fence_lines else "",
+                            "kind": "fenced_math_like_block",
+                        }
+                    )
+                in_fence = False
+                fence_start = 0
+                fence_lines = []
+            continue
+        if in_fence:
+            fence_lines.append(line)
+            continue
+        for match in re.finditer(r"`([^`\n]{3,120})`", line):
+            content = match.group(1).strip()
+            if re.search(r"(=|O\(|\\sum|\\prod|\\mathcal|\\log|\\frac)", content):
+                issues.append(
+                    {
+                        "line_number": idx,
+                        "line": line.strip(),
+                        "next_line": content,
+                        "kind": "inline_code_math_like",
+                    }
+                )
+                break
+    return issues
+
+
+def abstract_translation_warnings(text: str) -> list[str]:
+    warnings: list[str] = []
+    if "## 原始摘要" not in text:
+        return warnings
+    has_english_original = "### 英文原文" in text
+    has_chinese_translation = "### 中文翻译" in text
+    if has_english_original and not has_chinese_translation:
+        warnings.append("abstract_translation_missing")
+    return warnings
+
+
 def main() -> None:
     from common import emit
 
@@ -189,7 +286,10 @@ def main() -> None:
     missing_sections = find_missing_sections(text)
     warnings: list[str] = []
     mixed_issues = mixed_language_issues(text)
+    linebreak_issues = suspicious_mid_sentence_linebreaks(text)
+    code_math_issues = suspicious_code_formatted_math(text)
     warnings.extend(inspect_figure_callouts(text))
+    warnings.extend(abstract_translation_warnings(text))
     if not text.startswith("# "):
         warnings.append("title_heading_missing")
     if "## " not in text:
@@ -204,6 +304,10 @@ def main() -> None:
         warnings.append("note_too_short")
     if mixed_issues:
         warnings.append("mixed_language_lines_present")
+    if linebreak_issues:
+        warnings.append("suspicious_mid_sentence_linebreaks")
+    if code_math_issues:
+        warnings.append("suspicious_code_formatted_math")
 
     payload = {
         "status": "ok",
@@ -214,8 +318,10 @@ def main() -> None:
         "missing_sections": missing_sections,
         "warnings": warnings,
         "mixed_language_issues": mixed_issues,
+        "linebreak_issues": linebreak_issues,
+        "code_math_issues": code_math_issues,
         "passes_basic_structure": not missing_sections and not {"title_heading_missing", "no_level2_sections"} & set(warnings),
-        "passes_style_gate": not mixed_issues,
+        "passes_style_gate": not mixed_issues and not linebreak_issues and not code_math_issues,
     }
     emit(payload, args.output)
 
