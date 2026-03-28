@@ -4,7 +4,7 @@
 
 **Turn hard, dense papers into high-quality Obsidian notes you can actually understand, reuse, and keep.**
 
-[English](./README.en.md) | [简体中文](./README.md)
+[English](./README.md) | [简体中文](./README.zh-CN.md)
 
 [![Status](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
 [![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.2.0-alpha)

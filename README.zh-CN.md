@@ -4,7 +4,7 @@
 
 **把晦涩难懂的硬核论文，转化成真正能读懂、能复用、能留下来的高质量 Obsidian 精读笔记。**
 
-[English](./README.en.md) | [简体中文](./README.md)
+[English](./README.md) | [简体中文](./README.zh-CN.md)
 
 [![状态](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
 [![版本](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.2.0-alpha)
