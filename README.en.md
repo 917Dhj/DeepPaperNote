@@ -2,7 +2,7 @@
 
 # DeepPaperNote
 
-**Turn hard, dense papers into high-quality Obsidian notes you can actually understand, reuse, and keep.**
+**Turn a hard paper into an Obsidian note you will actually want to keep.**
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
@@ -19,16 +19,16 @@
 
 ![DeepPaperNote Hero](./assets/hero.svg)
 
-When a paper is full of dense formulas, crowded architecture diagrams, tangled experimental design, and pages of ablations, the problem is often not that the paper is unimportant. It is that the paper is simply hard to digest.
+When a paper is packed with dense formulas, crowded architecture diagrams, tangled experimental design, and pages of ablations, the problem is often not that the paper is unimportant. It is that the paper is simply hard to digest.
 
-DeepPaperNote is a **Codex skill** built for that problem. It is not trying to paraphrase the abstract one more time. It is trying to reorganize the parts of a paper that are actually worth understanding and keeping.
+DeepPaperNote is a Codex skill for **deep paper reading**. It is not another tool that paraphrases the abstract and stops there. It cares about a harder set of questions:
 
-**Instead of pretending to read the paper for you, it takes over the most time-consuming and error-prone layers of the workflow:**
+- What problem is this paper actually solving?
+- How does the mechanism really work?
+- Are the key equations, experiments, and figure context preserved?
+- Does the final note become something worth keeping in your long-term knowledge base?
 
-- 🤖 **Model-led understanding**: let the language model unpack mechanisms, method structure, key comparisons, limitations, and the parts you would actually need for replication.
-- 🗂️ **Automatic evidence collection**: gather evidence from PDFs, metadata sources, and optional Zotero workflows.
-- 💎 **Reusable note output**: generate structured Obsidian-native or plain Markdown notes that are worth revisiting later.
-- 🧪 **Replication-grade writing contract**: push the note beyond polished summary prose toward implementation logic, key numbers, formulas, and honest technical boundaries.
+**If you are tired of AI paper-summary tools that look complete but still leave you with nothing you would revisit a week later, this skill is probably for you.**
 
 Let scripts handle the repetitive work. Save your attention for actual thinking.
 
@@ -39,14 +39,18 @@ Let scripts handle the repetitive work. Save your attention for actual thinking.
 
 Most paper-summary tools stop after producing a neat-looking abstract rewrite. DeepPaperNote cares about two harder questions: **did you actually understand the paper?** and **is the resulting note worth keeping?**
 
-| Capability | What pain it solves |
-| --- | --- |
-| 💡 Make complex mechanisms legible | Instead of paraphrasing the abstract, it breaks down the method backbone, key design choices, real contribution, and the most likely points of confusion. |
-| 🧪 Push toward replication-grade notes | For technical papers, it leans toward training objectives, inference flow, implementation logic, key numbers, and honest limitations instead of stopping at a polished summary. |
-| ➕ Keep equations when they matter | If formulas, probability factorization, complexity expressions, or objective functions are central to understanding the method, the note should preserve a small number of key LaTeX equations instead of flattening everything into prose. |
-| 🖼️ Keep figure context intact | When figure extraction is unstable, it still preserves accurate figure placeholders and explanations so the reading flow does not collapse. |
-| 🔗 Fit into your personal knowledge base | Each paper gets its own folder, local `images/` directory, and Markdown note that works naturally inside Obsidian. |
-| 📚 Local-library-first, more reliable and often faster | If the paper already exists in Zotero, DeepPaperNote can often reuse local records and attachments instead of rediscovering everything from the web. |
+| Category | 😵 Typical paper-summary tool | ✅ DeepPaperNote |
+| --- | --- | --- |
+| 🎯 Output goal | A smooth-looking summary | A note you can revisit, reuse, and keep |
+| 🔍 Focus | Abstract and high-level conclusions | Mechanisms, evidence, experiments, figure context, and structure |
+| 🧪 Technical depth | Often stops at high-level paraphrase | Tries to preserve key numbers, formulas, implementation logic, and honest limitations |
+| 🖼️ Figure handling | Easy to skip when extraction is unstable | Prioritizes figure placement and context so the note structure stays intact |
+| 📚 Use case | Quick browsing | Deep reading, long-term note-taking, and Obsidian knowledge management |
+| ♻️ Long-term value | Disposable reading aid | Reusable research note |
+
+**In one sentence:**
+
+> DeepPaperNote is a paper-reading-note workflow, not a paper-summary generator.
 
 ## 👀 Who It Is For
 
@@ -55,7 +59,9 @@ Most paper-summary tools stop after producing a neat-looking abstract rewrite. D
 - People who do not want vague AI summaries and instead want to understand mechanisms, results, and boundaries
 - People who want to build a reusable local paper-knowledge base in Obsidian
 
-## Quick Start
+## 🚀 Quick Start
+
+### 1) Install it into your Codex skills directory
 
 Clone this repository into your Codex skills directory:
 
@@ -63,16 +69,18 @@ Clone this repository into your Codex skills directory:
 git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
 ```
 
-Then restart Codex.
+After installation, restart Codex so the skill is loaded.
 
-After that, just hand a paper to Codex. A title, DOI, URL, arXiv ID, or local PDF all work.
+### 2) Start using it immediately
+
+After that, just hand a paper to Codex. A title, DOI, URL, arXiv ID, or local PDF all work. Prompts like these are enough:
 
 Typical prompts:
 
-- `给这篇论文生成深度笔记`
-- `把这篇文章整理成 obsidian 笔记`
-- `读这篇论文并生成 md 笔记`
-- `Turn this paper into a note I will actually come back to`
+- `Generate a deep-reading note for this paper`
+- `Turn this paper into an Obsidian note`
+- `Read this PDF and produce a Markdown note with figure context`
+- `Use DeepPaperNote on this paper and keep the mechanism, key experiments, and figure context intact`
 
 By default, DeepPaperNote writes the note in **Chinese**. At the moment, Chinese is the only note language that can fully benefit from the skill's current writing and linting rules. If you need English notes, please stay tuned for a future update.
 
@@ -84,13 +92,17 @@ By default, DeepPaperNote will:
 - generate the final Markdown note
 - save it into Obsidian when configured, or automatically fall back to the current directory
 
+### 3) You do not need perfect setup on day one
+
+You can try DeepPaperNote even if you have not finished configuring Obsidian, Zotero, or OCR yet.
+
 If you want the Python dependencies for local development:
 
 ```bash
 python3 -m pip install -e .
 ```
 
-After installation, you can also ask Codex with short prompts such as:
+If you want to check the environment first, you can also ask Codex with short prompts such as:
 
 - `/deeppapernote doctor`
 - `/deeppapernote start`
