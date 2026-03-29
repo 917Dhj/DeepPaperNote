@@ -2,7 +2,7 @@
 
 # DeepPaperNote
 
-**Turn a hard paper into an Obsidian note you will actually want to keep.**
+**Turn a complex paper into an Obsidian note you will actually want to keep.**
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
@@ -44,7 +44,7 @@ Let scripts handle the repetitive work. Save your attention for actual thinking.
 
 | 🎯 Your need / pain point | ✅ What DeepPaperNote does |
 | --- | --- |
-| You want to understand a hard, dense paper faster | It organizes the method backbone, key results, figure context, and limitations into a note you can actually read through |
+| You want to understand a complex paper faster | It organizes the method backbone, key results, figure context, and limitations into a note you can actually read through |
 | You want to study a classic paper without handwriting a pile of mechanical notes | It handles metadata collection, structure building, figure placeholders, and full note generation so you can spend your energy on understanding |
 | You want the paper to live inside Obsidian as a long-term asset | It files the paper into a domain-appropriate place inside your Obsidian knowledge base, then creates a paper-specific folder, Markdown note, and local `images/` directory |
 | You already manage papers in Zotero and do not want to redo the work | It can prefer local records and attachments, reducing mismatches and often speeding the workflow up |
