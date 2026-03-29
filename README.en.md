@@ -46,7 +46,7 @@ Let scripts handle the repetitive work. Save your attention for actual thinking.
 | --- | --- |
 | You want to understand a hard, dense paper faster | It organizes the method backbone, key results, figure context, and limitations into a note you can actually read through |
 | You want to study a classic paper without handwriting a pile of mechanical notes | It handles metadata collection, structure building, figure placeholders, and full note generation so you can spend your energy on understanding |
-| You want the paper to live inside Obsidian as a long-term asset | It creates a paper-specific folder, Markdown note, and local `images/` directory that fit long-term knowledge management |
+| You want the paper to live inside Obsidian as a long-term asset | It files the paper into a domain-appropriate place inside your Obsidian knowledge base, then creates a paper-specific folder, Markdown note, and local `images/` directory |
 | You already manage papers in Zotero and do not want to redo the work | It can prefer local records and attachments, reducing mismatches and often speeding the workflow up |
 | You do not want another polished-looking summary | It leans toward mechanism breakdown, key numbers, formulas, edge cases, and honest limitations |
 
@@ -64,15 +64,27 @@ DeepPaperNote does not look more complete by simply rewriting the abstract in sm
 | 🗂️ Evidence first | It gathers evidence from PDFs, metadata sources, and optional Zotero workflows before writing, instead of producing claims first and looking for support later. |
 | 🧪 Technical detail first | For technical papers, it tries to preserve key numbers, formulas, implementation logic, and real boundary conditions rather than stopping at high-level paraphrase. |
 | 🖼️ Placeholder-first figures | When image extraction is unstable, it still keeps figure position, explanation, and context so the note structure does not break. |
-| 🔗 Native knowledge-base output | Each paper gets its own folder, Markdown note, and `images/` directory, which makes long-term accumulation much easier. |
+| 🔗 Native knowledge-base output | It first routes the paper into a domain-appropriate place in your existing knowledge-base structure, then gives each paper its own folder, Markdown note, and `images/` directory. |
 | 📚 Local-library-first resolution | If the paper already exists in Zotero, it can reuse local items and attachments, which is often both more reliable and faster. |
 
 ## 👀 Who It Is For
 
-- People who regularly wrestle with hard, technical, cross-domain, or high-density papers
-- People who often feel, "I know every word here, but I still do not understand the paragraph"
-- People who do not want vague AI summaries and instead want to understand mechanisms, results, and boundaries
-- People who want to build a reusable local paper-knowledge base in Obsidian
+<table>
+  <tr>
+    <td valign="top" width="33%">
+      <strong>👓 People studying hard or classic papers closely</strong><br><br>
+      You are not reading papers just to skim the abstract and move on. You are reading papers with dense formulas, complex architectures, or layered experiments, and you want a note that actually untangles the method backbone, key results, and figure structure.
+    </td>
+    <td valign="top" width="33%">
+      <strong>🗂️ People building a long-term Obsidian knowledge base</strong><br><br>
+      You want paper notes to remain searchable, linkable, and reusable over time. DeepPaperNote files papers into a more suitable place based on their domain, then creates the Markdown note and <code>images/</code> folder so the result fits a real knowledge base.
+    </td>
+    <td valign="top" width="33%">
+      <strong>🤖 People who want more than AI summaries</strong><br><br>
+      You are not looking for a polished-looking recap. You want to know what the paper actually solves, how the method works, which results matter, and where the real limitations or misunderstandings are. DeepPaperNote aims closer to a research note than a summary generator.
+    </td>
+  </tr>
+</table>
 
 ## 🚀 Quick Start
 
