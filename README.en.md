@@ -17,7 +17,7 @@
 
 </div>
 
-![DeepPaperNote Hero](./assets/hero.svg)
+![DeepPaperNote Hero](./assets/hero-academic.svg)
 
 **Do you often run into this situation: you want to study a classic paper carefully, but the hardest part is no longer reading it — it is turning that reading into usable notes?** The real time sink usually looks like this:
 

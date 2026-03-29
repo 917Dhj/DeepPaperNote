@@ -17,7 +17,7 @@
 
 </div>
 
-![DeepPaperNote 主图](./assets/hero.svg)
+![DeepPaperNote 主图](./assets/hero-academic.svg)
 
 **你是否经常遇到这种情况：准备精读一篇经典论文时，最累的往往不是看，而是整理成笔记**。真正耗时间的，通常是这些环节：
 
@@ -372,8 +372,8 @@ DeepPaperNote/
 ├── agents/
 │   └── openai.yaml
 ├── assets/
+│   ├── hero-academic.svg
 │   ├── hero.png
-│   ├── hero.svg
 │   └── note_template.md
 ├── references/
 │   ├── architecture.md
