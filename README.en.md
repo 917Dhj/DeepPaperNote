@@ -42,6 +42,8 @@ Let scripts handle the repetitive work. Save your attention for actual thinking.
 
 ## 🎯 What problems does it solve?
 
+![DeepPaperNote usage example](./assets/usage-example.svg)
+
 | 🎯 Your need / pain point | ✅ What DeepPaperNote does |
 | --- | --- |
 | You want to understand a complex paper faster | It organizes the method backbone, key results, figure context, and limitations into a note you can actually read through |
