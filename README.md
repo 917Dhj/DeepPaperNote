@@ -42,7 +42,7 @@ Let scripts handle the repetitive work. Save your attention for actual thinking.
 
 ## 🎯 What problems does it solve?
 
-![DeepPaperNote usage example](./assets/usage-example.svg)
+![DeepPaperNote usage example](./assets/usage-example.png)
 
 | 🎯 Your need / pain point | ✅ What DeepPaperNote does |
 | --- | --- |
