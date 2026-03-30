@@ -461,27 +461,12 @@ DeepPaperNote 背后的基本判断很简单：
 - 本地论文管理
 - 长期知识库构建和管理
 
-## 🔭 后续方向
-
-DeepPaperNote 目前就是一个 Codex 技能。
-
-长期方向是：
-
-- 保持核心流程可迁移
-- 继续把 Codex 集成做扎实
-- 等核心稳定后，再考虑适配其他智能体环境
-
 ## Inspirations
 
 DeepPaperNote 在工作流设计上受到了这些论文阅读 / 笔记生成项目的启发：
 
 - [heleninsights-dot/phd-deepread-workflow](https://github.com/heleninsights-dot/phd-deepread-workflow)
 - [juliye2025/evil-read-arxiv](https://github.com/juliye2025/evil-read-arxiv)
-
-但 DeepPaperNote 希望在这些思路基础上继续坚持几条自己的原则：
-- `scripts` 主要负责取证和整理
-- 真正的论文理解交给语言模型
-- 图表处理优先保留占位结构，而不是为了插图牺牲文字正确性
 
 ## 贡献
 
@@ -494,6 +479,6 @@ DeepPaperNote 在工作流设计上受到了这些论文阅读 / 笔记生成项
 - 多智能体适配层设计
 - 多语言深度笔记
 
-## License
+## 📄 License
 
 本项目采用 [MIT License](./LICENSE)。

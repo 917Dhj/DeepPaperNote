@@ -434,11 +434,6 @@ DeepPaperNote was influenced by projects that take paper reading, evidence extra
 - [heleninsights-dot/phd-deepread-workflow](https://github.com/heleninsights-dot/phd-deepread-workflow)
 - [juliye2025/evil-read-arxiv](https://github.com/juliye2025/evil-read-arxiv)
 
-The main difference is that DeepPaperNote deliberately keeps scripts focused on evidence handling, while leaving actual paper understanding and final note writing to the language model.
+## 📄 License
 
-## 🚀 Roadmap
-
-- strengthen note quality on hard technical papers
-- improve high-confidence figure replacement
-- expand tests and regression cases
-- keep the core reusable even though the first public release targets Codex
+This project is licensed under the [MIT License](./LICENSE).
