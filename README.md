@@ -410,7 +410,6 @@ Related docs:
 DeepPaperNote/
 ├── SKILL.md
 ├── README.md
-├── README.en.md
 ├── README.zh-CN.md
 ├── CHANGELOG.md
 ├── LICENSE
