@@ -461,23 +461,12 @@ DeepPaperNote 背后的基本判断很简单：
 - 本地论文管理
 - 长期知识库构建和管理
 
-## Inspirations
+## 🧭 Inspirations
 
 DeepPaperNote 在工作流设计上受到了这些论文阅读 / 笔记生成项目的启发：
 
 - [heleninsights-dot/phd-deepread-workflow](https://github.com/heleninsights-dot/phd-deepread-workflow)
 - [juliye2025/evil-read-arxiv](https://github.com/juliye2025/evil-read-arxiv)
-
-## 贡献
-
-欢迎贡献，尤其是：
-
-- README 和示例
-- PDF / OCR 稳定性
-- 图像匹配质量
-- 笔记质量评估
-- 多智能体适配层设计
-- 多语言深度笔记
 
 ## 📄 License
 
