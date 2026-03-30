@@ -357,9 +357,13 @@ Related docs:
 
 ## 🖼️ Figure Strategy
 
-DeepPaperNote uses a **placeholder-first** figure policy.
+When figure handling breaks down, the quality of the whole note usually drops with it.
 
-If a figure is important for understanding the paper, the note should keep a clear placeholder even when image extraction is incomplete.
+That is why DeepPaperNote uses a more structure-first, placeholder-first figure strategy:
+
+- keep the semantic place of important figures inside the note
+- avoid breaking the reading flow when extraction is incomplete
+- show which figure belonged there and why it matters, so you can later revisit the paper and add the image yourself if needed
 
 Recommended placeholder format:
 
@@ -370,28 +374,32 @@ Recommended placeholder format:
 > Current status: Placeholder kept; current extraction only recovered partial subpanels and cannot yet reconstruct the full original figure reliably.
 ```
 
-Basic rule:
+In other words, DeepPaperNote prioritizes:
 
-- images may be incomplete
-- images may be temporarily missing
-- text should remain as correct as possible
+> note completeness and readability over forcing every figure to be extracted automatically at any cost
 
 See [figure placement rules](./references/figure-placement.md).
 
 ## ✅ Quality Bar
 
-DeepPaperNote has a concrete standard for what counts as a usable note.
+DeepPaperNote has a concrete bar for what counts as a usable note.
 
 The final note should:
 
-- preserve the original paper identity and enough metadata to trace it later
-- clearly separate the research question, task definition, method, results, and limitations
-- avoid half-English / half-Chinese prose in Chinese mode
-- preserve important figure context even when image replacement is incomplete
-- feel worth keeping in a long-term knowledge base
+- clearly separate the research question and the task definition
+- explain the real method or analytical pipeline
+- capture the numbers that actually matter
+- point out where the paper is easiest to misread
+- include at least one honest limitation
+- use real heading structure: `#`, `##`, `###`
+- avoid mixed Chinese-English prose in the body
 
-See:
+If the evidence is not strong enough, the workflow should degrade gracefully or fail instead of pretending that a deep reading note is complete.
 
+Related docs:
+
+- [Evidence First](./references/evidence-first.md)
+- [Deep Analysis](./references/deep-analysis.md)
 - [Note Quality](./references/note-quality.md)
 - [Final Writing](./references/final-writing.md)
 - [Figure Placement](./references/figure-placement.md)
@@ -409,24 +417,76 @@ DeepPaperNote/
 ├── ONBOARDING_PROMPT.md
 ├── pyproject.toml
 ├── agents/
+│   └── openai.yaml
 ├── assets/
+│   ├── hero-academic.svg
+│   ├── hero.png
+│   └── note_template.md
 ├── references/
-├── scripts/
-└── tests/
+│   ├── architecture.md
+│   ├── deep-analysis.md
+│   ├── evidence-first.md
+│   ├── figure-placement.md
+│   ├── final-writing.md
+│   ├── metadata-sources.md
+│   ├── model-synthesis.md
+│   ├── note-quality.md
+│   ├── obsidian-format.md
+│   ├── paper-types.md
+│   └── workflow.md
+└── scripts/
+    ├── build_synthesis_bundle.py
+    ├── collect_metadata.py
+    ├── common.py
+    ├── contracts.py
+    ├── create_input_record.py
+    ├── extract_evidence.py
+    ├── extract_pdf_assets.py
+    ├── fetch_pdf.py
+    ├── lint_note.py
+    ├── locate_zotero_attachment.py
+    ├── materialize_figure_asset.py
+    ├── plan_figures.py
+    ├── resolve_paper.py
+    ├── run_pipeline.py
+    └── write_obsidian_note.py
 ```
 
-## 🧰 Current Status
+## 🧰 Recommended Environment
 
-| 🧩 Area | 🚦 Status | 📝 Notes |
+| 🧰 Component | 🚦 Status | 📝 Notes |
 | --- | --- | --- |
-| Core single-paper workflow | ✅ Working | End-to-end paper → note path exists |
-| Obsidian-native output | ✅ Working | Folder-per-paper with `images/` |
-| Workspace fallback | ✅ Working | Works without an Obsidian vault |
-| Zotero-first helper flow | ✅ Working | Optional, depends on user setup |
-| OCR fallback | ✅ Working | Only for low-text PDF pages |
-| Placeholder-first figures | ✅ Working | Real image replacement remains conservative |
-| Tests | ✅ Minimal suite added | Core path, linting, and fallback checks |
-| CI | ✅ GitHub Actions configured | Basic automated validation |
+| Codex desktop / CLI | Recommended | Primary target environment today |
+| Python 3.10+ | Required | Runs the helper scripts |
+| Local Obsidian vault | Recommended | Writes directly into a long-term note system; otherwise falls back to the current working directory |
+| Zotero + MCP | Optional | Helpful for local-library-first paper workflows |
+| OCR tools | Optional | Improves handling of scanned PDFs |
+
+## 🧭 Design Principles
+
+The core judgment behind DeepPaperNote is simple:
+
+1. **A good paper note is not just a paragraph-style summary.**
+
+A useful note should help you understand:
+
+- how the method works
+- where the evidence comes from
+- what the experiments actually show
+- what the real boundaries and limitations are
+
+2. **The goal of paper reading is a reusable research asset.**
+
+Not just “I kind of get it right now,” but something you can revisit, cite, and build on later.
+
+3. **Note generation should serve a real research workflow.**
+
+That is why it is designed to fit naturally with:
+
+- Obsidian
+- Zotero
+- local paper management
+- long-term knowledge-base building
 
 ## 🧭 Inspirations
 
