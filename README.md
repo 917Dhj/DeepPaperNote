@@ -309,25 +309,6 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 | v0.1.0-alpha | ✅ Released | First public alpha: Codex workflow, synthesis bundle pipeline, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
 | Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v0.2.0-alpha |
 
-## Why DeepPaperNote
-
-Most paper-summary workflows stop too early:
-
-- they overfit to the abstract
-- they flatten technical details into generic bullets
-- they silently skip figures when extraction is messy
-- they produce notes that look neat but are not useful a week later
-
-DeepPaperNote takes a different stance:
-
-- scripts gather, structure, and verify evidence
-- the model is responsible for understanding and writing
-- figures follow a placeholder-first strategy
-- textual correctness matters more than image completeness
-
-It is not trying to produce “a summary of the paper.”
-It is trying to produce **a research note worth keeping**.
-
 ## ⚙️ Workflow
 
 The default path is:
