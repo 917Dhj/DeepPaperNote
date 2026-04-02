@@ -25,7 +25,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--content-file", default="", help="Path to the final Markdown content.")
     p.add_argument("--content", default="", help="Inline Markdown content.")
     p.add_argument("--stdin", action="store_true", help="Read Markdown content from stdin.")
-    p.add_argument("--lint-json", default="", help="Optional lint JSON path. Refuse write if style gate or structure gate failed.")
+    p.add_argument("--lint-json", default="", help="Optional lint JSON path. Refuse write if structure, style, or math gate failed.")
     p.add_argument("--title", default="", help="Explicit title override.")
     p.add_argument("--output", default="", help="JSON status output path.")
     p.add_argument("--vault", default="", help="Target Obsidian vault path.")
@@ -50,6 +50,8 @@ def main() -> None:
             raise SystemExit("write_obsidian_note.py refused to write note because basic structure lint failed.")
         if not lint.get("passes_style_gate", False):
             raise SystemExit("write_obsidian_note.py refused to write note because style gate failed.")
+        if not lint.get("passes_math_gate", False):
+            raise SystemExit("write_obsidian_note.py refused to write note because math gate failed.")
 
     if args.content_file:
         note_text = Path(args.content_file).expanduser().resolve().read_text(encoding="utf-8")

@@ -7,6 +7,7 @@
 - Use `###` only when a section genuinely needs internal structure.
 - Do not flatten everything into bullet points.
 - For method, system, benchmark, or clinical empirical papers, prefer meaningful `###` subheadings in technical sections instead of one long undifferentiated block.
+- For method, framework, or system papers, default to `### 机制流程` inside `方法主线` and write it as a numbered 3 to 4 step flow.
 
 ## File Naming
 
@@ -19,6 +20,8 @@ Default file name:
 - only create a new domain folder when no existing domain is a reasonable fit
 - do not save new papers directly into the bare papers root
 - always create the paper-local `images/` directory during final save, even if no real image is inserted
+- the paper-local `images/` directory is part of the required note layout, not an optional optimization
+- if the target is an Obsidian vault but the current environment cannot create that directory yet, request permission escalation rather than omitting it
 
 If the user already has a vault convention, preserve it.
 
@@ -35,6 +38,18 @@ If the user already has a vault convention, preserve it.
     `...`
     `$$`
 - Do not wrap formulas in backticks or fenced code blocks unless you are literally showing source code.
+
+## Core Info Block
+
+`## 核心信息` is a fixed metadata zone.
+
+Formatting and scope rules:
+- use the stable template-style metadata bullets only
+- keep each entry in `- 字段名: 值` form
+- do not add interpretation, commentary, judgment, or takeaway lines inside `核心信息`
+- do not use the last metadata bullet as a place to append extra analysis
+- if a field is missing, leave it blank or mark it as unavailable rather than replacing the field with prose
+- move explanatory content to `一句话总结`、`深度分析`、`我的笔记` or another true analysis section
 
 ## Figure Placeholder Style
 
@@ -72,26 +87,24 @@ If a real image has been selected and materialized into the vault, prefer an Obs
 ## Default Section Order
 
 1. `核心信息`
-2. `原始摘要`
-3. `一句话总结`
-4. `研究问题`
-5. `数据与任务定义`
-6. `方法主线`
-7. `关键结果`
-8. `深度分析`
-9. `局限`
-10. `我的笔记`
-11. `引用`
+2. `原文摘要翻译`
+3. `创新点`
+4. `一句话总结`
+5. `研究问题`
+6. `数据与任务定义`
+7. `方法主线`
+8. `关键结果`
+9. `深度分析`
+10. `局限`
+11. `我的笔记`
+12. `引用`
 
-Inside `原始摘要`, prefer this stable internal structure when abstract metadata exists:
-- `### 英文原文`
-- `### 中文翻译`
+When abstract metadata exists, `原文摘要翻译` should be a single Chinese translation block for the original abstract rather than a bilingual subsection pair.
 
 This order is the stable backbone, not a full outline.
 When the paper is complex, add `###` subsections such as:
 - `### 数据来源`
 - `### 任务定义`
-- `### 方法流程`
-- `### 关键创新`
+- `### 机制流程`
 - `### 为什么结果成立`
 - `### 哪些地方容易被误读`

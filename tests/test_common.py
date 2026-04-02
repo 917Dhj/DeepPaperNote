@@ -11,6 +11,8 @@ from common import (
     existing_domain_dirs,
     extract_arxiv_id,
     extract_doi,
+    extract_mechanism_flow_sentences,
+    extract_negative_claims,
     infer_domain_label,
     infer_source_type,
     resolve_domain_subdir,
@@ -71,6 +73,38 @@ def test_resolve_obsidian_note_path_in_vault_mode(tmp_path: Path) -> None:
         "workspace_output_dir": "DeepPaperNote_output",
     }
     path = resolve_obsidian_note_path(config, title="My Test Paper", subdir="心理健康")
+    assert path == vault / "20_Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
+
+
+def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_already_contains_slug(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    config = {
+        "obsidian_vault": str(vault),
+        "papers_dir": "20_Research/Papers",
+        "workspace_output_dir": "DeepPaperNote_output",
+    }
+    path = resolve_obsidian_note_path(
+        config,
+        title="My Test Paper",
+        subdir="心理健康/My_Test_Paper",
+    )
+    assert path == vault / "20_Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
+
+
+def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_is_papers_relative_path(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    config = {
+        "obsidian_vault": str(vault),
+        "papers_dir": "20_Research/Papers",
+        "workspace_output_dir": "DeepPaperNote_output",
+    }
+    path = resolve_obsidian_note_path(
+        config,
+        title="My Test Paper",
+        subdir="20_Research/Papers/心理健康/My_Test_Paper",
+    )
     assert path == vault / "20_Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
 
 
@@ -153,3 +187,30 @@ def test_check_environment_reports_semantic_scholar_key_from_env(tmp_path: Path)
     assert isinstance(payload["python"]["pytesseract_installed"], bool)
     assert isinstance(payload["python"]["pillow_installed"], bool)
     assert payload["metadata"]["semantic_scholar_api_key_configured"] is True
+
+
+def test_extract_negative_claims_detects_unstable_ablation_sentence() -> None:
+    text = (
+        "Without the retrieval module, F1 drops by 3.2 points and training becomes unstable after 10k steps. "
+        "Our full model improves AUROC by 1.1 points."
+    )
+    claims = extract_negative_claims(text)
+    assert len(claims) == 1
+    assert "drops by 3.2 points" in claims[0]
+
+
+def test_extract_negative_claims_ignores_positive_without_sentence() -> None:
+    text = "Without extra fine-tuning, the model still outperforms the strongest baseline by 2.0 points."
+    claims = extract_negative_claims(text)
+    assert claims == []
+
+
+def test_extract_mechanism_flow_sentences_prefers_action_chain_language() -> None:
+    text = (
+        "The visual encoder extracts frame-level features and sends them to the projection layer. "
+        "The fusion module concatenates audio tokens with visual tokens and compresses them into shared representations. "
+        "The decoder then generates the final response."
+    )
+    claims = extract_mechanism_flow_sentences(text)
+    assert len(claims) == 3
+    assert "extracts frame-level features" in claims[0]

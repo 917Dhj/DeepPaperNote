@@ -14,18 +14,35 @@ Then draft the final note in natural language.
 
 Near the beginning of the note, include:
 - `## 核心信息`
-- `## 原始摘要`
+- `## 原文摘要翻译`
+- `## 创新点`
 - `## 一句话总结`
 
-The `原始摘要` section should preserve the paper's original abstract in readable Chinese note context:
-- if the abstract is available, include it before the one-sentence summary
+`## 核心信息` is a fixed metadata block, not an analysis block.
+Rules for this section:
+- only use the predefined metadata-style fields from the note template
+- keep each line in `- 字段名: 值` form
+- do not add ad hoc fields such as judgments, takeaways, or mini-summaries
+- do not move explanatory prose, evaluation, or "my view" sentences into this section
+- if a field is unavailable, leave it blank or mark it as not clearly available rather than replacing the field with commentary
+
+The `原文摘要翻译` section should be a Chinese translation of the paper's original abstract:
+- if the abstract is available, translate the original abstract into Chinese before the one-sentence summary
 - do not let the summary replace the abstract
-- the summary should explain the paper's real value, while the abstract section preserves the author's original framing
-- do not stop at only the English abstract
-- inside this section, prefer:
-  - `### 英文原文`
-  - `### 中文翻译`
-- the Chinese translation should be fluent and faithful, not a second “一句话总结”
+- do not treat `原文摘要翻译` as your own summary of the full paper; it is the original abstract translated into Chinese
+- do not split this section into `### 英文原文` and `### 中文翻译`
+- keep the section title exactly as `原文摘要翻译`
+- the `原文摘要翻译` section itself must be written in Chinese; do not output English abstract sentences or English-original paragraphs here
+- the Chinese abstract should be fluent and faithful, not a second “一句话总结”
+- do not turn `原文摘要翻译` into a selective excerpt or a compressed highlight list
+- do not add judgments, hindsight, or details learned from later sections of the paper into `原文摘要翻译`; only translate what the original abstract says
+
+The `创新点` section should be a dedicated top-level section after `原文摘要翻译` rather than a hidden bullet buried later.
+It should usually:
+- enumerate 3 to 5 paper-specific innovations
+- explain what problem each innovation addresses
+- explain what new capability, mechanism, or evaluation angle it enables
+- avoid generic praise such as “the paper is novel” without locating the novelty
 
 ## Writer Persona
 
@@ -88,6 +105,26 @@ The final Chinese note must also pass a language-cleanliness check:
 - no half-English half-Chinese prose lines
 - English is allowed only for stable proper nouns or citation metadata
 - if the style gate fails, do not write the note into Obsidian yet
+- do not write for the linter; lint is only a minimum floor, not the writing objective
+- after script lint passes, `final_readability_review` is still required before the note should be treated as polished and ready to save
+
+正文术语策略:
+- default to natural Chinese prose in正文分析
+- keep English only when it is a stable proper noun or source-faithful technical label
+- stable English that may remain:
+  - model names
+  - dataset names
+  - metric names
+  - method names
+  - math symbols
+  - code tokens
+  - original paper figure/table ids
+- English that should usually be rewritten into natural Chinese:
+  - ordinary English phrases
+  - abstract descriptive phrases in analytical prose
+  - leftover English wording that has no clear reason to remain
+- when a first mention benefits from both forms, prefer Chinese-first wording with an English gloss in parentheses
+- do not leave phrases such as `reasoning dataset`, `distillation risk`, or `reward model quality` directly inside Chinese prose when a natural Chinese rendering is available
 
 For non-trivial papers, the note should usually not stop at only broad `##` sections.
 It should use meaningful `###` subheadings where they improve technical clarity.
@@ -105,11 +142,22 @@ Examples:
 - `### 哪些地方容易被误读`
 
 For technical papers, also strongly consider subsections such as:
+- `### 机制流程`
 - `### 训练目标`
 - `### 推理与采样链路`
 - `### 关键实现细节`
 - `### 复杂度与扩展性`
 - `### 消融到底说明了什么`
+
+For method, framework, and system papers, prefer an explicit `### 机制流程` subsection instead of hiding the execution chain inside generic prose.
+That subsection should usually be a 3 to 4 step numbered list covering:
+- what the Input is
+- what the main intermediate transformations are
+- what the Output is
+- what the training or inference loop is actually doing
+- do not rely on a damaged Algorithm block to carry this explanation for you
+- do not let the steps collapse into module-name listing; each step should describe an operation
+- if a high-confidence pipeline or architecture figure matches this execution chain, place it in `### 机制流程`
 
 ## Formula Rule
 
@@ -127,6 +175,10 @@ Use formulas sparingly and purposefully:
 - each formula should help explain the method
 - do not dump many formulas just to look technical
 - if the source extraction is noisy, prefer reconstructing a small, stable core formula rather than copying broken math verbatim
+- after each retained formula, add one sentence explaining what it corresponds to in engineering or code terms
+- do not only translate variable names; explain the concrete operation, loss term, update rule, or control effect
+- formulas in the final Markdown should be written as directly renderable Obsidian/MathJax math, not as JSON-style escaped strings
+- do not double-escape TeX commands such as `\\tau`, `\\frac`, `\\bar`, `\\begin`, or `\\end` when the final note should contain `\tau`, `\frac`, `\bar`, `\begin`, or `\end`
 - use real math delimiters:
   - inline math: `$...$`
   - display math: `$$ ... $$`
@@ -179,7 +231,22 @@ Before outputting the final Markdown, explicitly check:
 - does the note contain concrete numbers, dimensions, complexity terms, or formulas when the paper clearly depends on them?
 - can a reader familiar with Python and deep learning frameworks follow the core method from this note alone?
 - does the method section explain the mechanism rather than only summarize the claim?
+- if this is a method/system/framework paper, does `方法主线` explicitly contain `### 机制流程` with a 3 to 4 step numbered list?
+- if the evidence bundle contains negative or unstable ablation signals, did the note include at least one of them?
+- if the evidence bundle does not contain such signals, did the note explicitly say the paper did not clearly report failed or unstable settings?
 - does the note contain at least one honest limitation and one paper-specific insight?
 - are there any suspicious mid-sentence line breaks left in the prose?
+- after script lint passes, have you reread the full note once more for readability rather than stopping at "lint passed"?
+- are there still any stiff translations, awkward Chinese phrasing, or ordinary English phrases that should be rewritten into natural Chinese?
+- are there any lines that sound like they were written only to satisfy lint or section compliance rather than to help a real reader?
+- if the note includes LaTeX formulas, did you quickly check that the final Markdown uses directly renderable TeX rather than double-escaped commands or broken math delimiters?
+
+This final readability review is a language-and-expression pass, not a second evidence-judgment pass:
+- improve fluency and readability
+- remove stiff translations
+- convert ordinary English phrase leftovers into natural Chinese
+- keep stable proper nouns when forcing a translation would sound worse
+- do not invent new facts, numbers, comparisons, or failure cases during this pass
+- do not use polish as an excuse to flatten the note into a safer but shallower summary
 
 If the answer to the first three questions is "no", the draft is still too shallow and should be revised before save.

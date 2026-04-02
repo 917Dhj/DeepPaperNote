@@ -51,7 +51,9 @@ class EvidencePack(TypedDict, total=False):
     task_evidence: list[EvidenceItem]
     data_evidence: list[EvidenceItem]
     method_evidence: list[EvidenceItem]
+    mechanism_evidence: list[EvidenceItem]
     results_evidence: list[EvidenceItem]
+    ablation_evidence: list[EvidenceItem]
     limitations_evidence: list[EvidenceItem]
     equation_candidates: list[EquationCandidate]
     figure_captions: list[dict[str, Any]]
@@ -113,7 +115,9 @@ def empty_evidence_pack() -> EvidencePack:
         task_evidence=[],
         data_evidence=[],
         method_evidence=[],
+        mechanism_evidence=[],
         results_evidence=[],
+        ablation_evidence=[],
         limitations_evidence=[],
         equation_candidates=[],
         figure_captions=[],

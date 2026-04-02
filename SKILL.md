@@ -64,7 +64,31 @@ Follow this order:
 7. build the synthesis bundle
 8. have Codex/GPT read the bundle and write the note
 9. lint the final note
-10. write into Obsidian
+10. perform `final_readability_review` after lint passes
+11. write into Obsidian
+
+This is the required workflow for a normal single-paper note request, not a loose suggestion.
+Unless this skill explicitly marks a stage as optional, required stages must not be silently skipped, reordered into a shortcut, or treated as complete just because a partial artifact already exists.
+
+Global no-short-circuit rule:
+- do not stop after only the early stages and present the workflow as finished
+- do not treat slowness, inconvenience, or temporary uncertainty as permission to bypass a required stage
+- do not replace the declared workflow with an improvised shortcut
+- if a required stage fails, only do one of three things:
+  - retry that stage
+  - enter a fallback that is explicitly allowed by this skill
+  - stop and report which stage is blocked and which downstream required stages remain incomplete
+- do not describe the whole task as complete while required downstream stages are still pending
+
+Completion-language rule:
+- say `笔记已完成` only when the required workflow is actually complete
+- say `已生成草稿` when drafting is done but lint, final readability review, or save is still pending
+- say `已通过校验` only when lint has actually been run and passed
+- say `已保存到 Obsidian` only when the write step has actually succeeded
+- do not treat `lint 已通过` as equivalent to `整篇笔记已经润色完成`
+- if final readability review is still pending, explicitly say the draft passed script lint but has not finished final language review
+- if the workflow stopped early, name the current stage and the still-missing required stages instead of using completion language
+- lint is a floor, not the writing objective
 
 Read [references/workflow.md](references/workflow.md) for the full pipeline and data contracts.
 Read [references/architecture.md](references/architecture.md) for the separation between the reusable core workflow and the Codex-specific adapter layer.
@@ -97,6 +121,7 @@ then switch into setup-assistant mode:
 5. if Codex can directly help complete a missing configuration, offer that next
 
 In setup-assistant mode, prefer a practical environment report over generic documentation text.
+The no-short-circuit rules above apply to normal note-generation requests, not to this setup-assistant mode.
 
 ## Tool and Source Priority
 
@@ -120,16 +145,26 @@ Zotero-first rule:
 ## Output Rules
 
 - The default output is a Markdown note written into the Obsidian vault when configured.
-- If no Obsidian vault is configured, DeepPaperNote should fall back to saving into the current workspace instead of failing outright.
+- Workspace fallback is allowed only when no Obsidian vault is configured at all.
+- If an Obsidian vault is configured, DeepPaperNote must treat that vault as the required save target rather than silently switching output roots.
+- If the configured vault or its paper-local subdirectories are outside the current writable scope, DeepPaperNote must ask the user for permission escalation instead of downgrading to workspace output.
+- If the user refuses that permission escalation, DeepPaperNote must clearly report that the note has not been saved into Obsidian yet.
+- After such a refusal, DeepPaperNote may save to the workspace only if it asks again and receives explicit user consent for that fallback.
 - By default, each paper should be written into its own same-name folder, with the note and images stored together.
 - The note should never default to the bare `20_Research/Papers` root. Choose a domain folder first.
 - Domain selection should be conservative: prefer an existing domain folder in the user's vault when there is a reasonable match; only create a new domain folder when no existing domain fits well.
 - A normal note-generation request should complete in one pass: note text, figure placeholder decisions, image materialization when confident, and final save.
 - Do not stop after a text-only draft just to ask whether the user wants figures inserted. Finish the figure replacement decision inside the same task unless the user explicitly asked for text only.
 - Always create the paper-local `images/` folder during final save, even if no high-confidence images were materialized.
+- The `images/` folder is part of the required save protocol, not an optional cleanup step. If permission is missing, request it; do not skip the directory.
+- Do not present a workspace write as if the Obsidian save already succeeded.
 - The note must use real heading levels: `#`, `##`, and `###`.
-- The note should include `原始摘要` near the beginning when abstract metadata is available, before `一句话总结`.
-- When abstract metadata is available, `原始摘要` should normally contain both the English original and a Chinese translation.
+- The note should include `原文摘要翻译` near the beginning when abstract metadata is available, before `一句话总结`.
+- When abstract metadata is available, `原文摘要翻译` should directly translate the original paper abstract into Chinese rather than restating it as your own summary.
+- The `原文摘要翻译` section itself should be Chinese-only; do not place English abstract sentences or English paragraph excerpts in that section.
+- Do not mix later judgments, innovation summaries, or hindsight explanations into `原文摘要翻译`; keep it as the original abstract translated into Chinese.
+- The note should include a dedicated `创新点` section immediately after `原文摘要翻译` and before `一句话总结`.
+- The `创新点` section should not be empty praise. It should enumerate the paper's actual innovations and briefly explain why each one matters.
 - High-quality notes should usually contain multiple meaningful `###` subheadings in the technical sections when the paper is non-trivial.
 - The note must include figure/table placeholders for all major visuals rather than silently skipping them.
 - Real images may replace some placeholders, but only if they clearly match the corresponding paper figure/table.
@@ -148,6 +183,9 @@ Model-first rule:
 - if formulas, objectives, or complexity expressions are central, include the key ones in the final note
 - render math as `$...$` or `$$...$$`, not as inline code or fenced code blocks
 - before final save, explicitly self-review whether the note contains enough technical detail, key numbers, and any necessary formulas
+- after script lint passes, reread the full note once more for readability; do not stop at formal compliance only
+- in that final readability review, ordinary English phrase leftovers should usually be rewritten into natural Chinese, while stable proper nouns may remain in English
+- do not use the final readability review to invent new facts, empty filler text, or shallower but safer wording just to satisfy lint
 
 Use [references/note-quality.md](references/note-quality.md) for quality checks.
 Use [references/paper-types.md](references/paper-types.md) for domain adaptation.

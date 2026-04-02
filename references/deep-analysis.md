@@ -126,8 +126,17 @@ Explain:
 - what the training target or optimization target really is
 - how inference or sampling actually proceeds
 - which implementation details matter for reproducing the claimed gain
+- even if an extracted Algorithm block is broken, reconstruct the mechanism in plain engineering language rather than giving up
+- make the reader feel the Input -> key transformation -> Output flow, not just the paper's terminology
+
+For method, framework, or system papers:
+- default to an explicit `### 机制流程` subsection inside `方法主线`
+- write it as a 3 to 4 step numbered list rather than a long paragraph
+- each step should say what goes in, what operation happens, and where the output goes next
+- if the paper has both training and inference details, use `### 机制流程` for the dominant execution chain and leave training recipe details to neighboring subsections
 
 For complex papers, use `###` subheadings such as:
+- `### 机制流程`
 - `### 数据构建`
 - `### 中间表征抽取`
 - `### 模型结构`
@@ -146,6 +155,8 @@ Include:
 For method papers, also ask:
 - does the result support the claimed mechanism
 - is the gain internal-only or external too
+- if the paper reports ablations or removed-module comparisons, include at least one setting that hurt performance, made training unstable, or revealed a trade-off
+- if the evidence bundle contains no such negative ablation signal, say explicitly that the paper did not clearly report failed or unstable settings
 
 ### 深度分析
 
@@ -192,6 +203,7 @@ Seed future follow-up with prompts such as:
 When the paper has useful visuals:
 - preserve placeholders for the important ones
 - prioritize one method figure, one data/task figure, and one result figure or table
+- if a high-confidence pipeline or architecture figure clearly matches the core execution chain, place it in `### 机制流程` first
 - explain why each figure matters
 - keep original paper numbering such as `Fig. 1` or `Table 2`
 
@@ -209,6 +221,8 @@ Typical cases where a formula should appear:
 - scaling-law fit
 
 Prefer a few stable, well-explained formulas over many noisy ones.
+- after each retained formula, add one short engineering explanation of what it means in implementation terms
+- do not stop at naming variables; explain what operation, objective term, or state update the formula corresponds to
 
 ## Minimum Honesty Standard
 

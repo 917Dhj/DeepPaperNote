@@ -12,9 +12,12 @@ from common import (
     enrich_metadata,
     extract_caption_lines,
     extract_dataset_candidates,
+    extract_mechanism_flow_sentences,
     extract_metric_claims,
+    extract_negative_claims,
     extract_pdf_sections,
     extract_pdf_text,
+    infer_paper_type,
     maybe_load_json_record,
     normalize_whitespace,
     paper_id_for_record,
@@ -244,11 +247,20 @@ def main() -> None:
     else:
         extraction_failures.append("pdf_missing")
 
+    paper_type, paper_type_rationale = infer_paper_type(record.get("title", ""), record.get("abstract", ""))
+
     abstract = normalize_whitespace(str(record.get("abstract", "")).strip())
     intro_text = section_map.get("introduction", "") or abstract
     method_text = section_map.get("method", "") or abstract
     experiment_text = section_map.get("experiment", "") or section_map.get("conclusion", "") or abstract
     conclusion_text = section_map.get("conclusion", "") or abstract
+    figure_captions = extract_caption_lines(full_text, "figure")[:12] if full_text else []
+    mechanism_caption_text = " ".join(
+        item.get("caption", "")
+        for item in figure_captions
+        if isinstance(item, dict)
+        and any(token in str(item.get("caption", "")).lower() for token in ["pipeline", "framework", "overview", "architecture", "system", "workflow", "stage"])
+    )
     data_text = " ".join(
         part
         for part in [
@@ -290,11 +302,16 @@ def main() -> None:
         ["we propose", "we present", "we introduce", "framework", "pipeline", "model", "method", "feature", "classifier", "fine-tun", "zero-shot"],
         limit=6,
     ) or [chunk["text"] for chunk in candidates.get("method", [])[:4]]
+    mechanism_sentences = extract_mechanism_flow_sentences(
+        " ".join(part for part in [method_text, mechanism_caption_text] if part),
+        limit=6,
+    ) or method_sentences[:4]
     result_sentences = extract_metric_claims(experiment_text) or pick_sentences_by_keywords(
         experiment_text,
         ["outperform", "improve", "accuracy", "f1", "auc", "auprc", "score", "results show", "achieved"],
         limit=6,
     ) or [chunk["text"] for chunk in candidates.get("experiment", [])[:4]]
+    ablation_sentences = extract_negative_claims(" ".join(part for part in [experiment_text, conclusion_text] if part), limit=6)
     limitation_sentences = pick_sentences_by_keywords(
         conclusion_text,
         ["limitation", "future work", "however", "remain", "generaliz", "need", "further"],
@@ -307,7 +324,9 @@ def main() -> None:
     pack["task_evidence"] = build_items(task_sentences, "task")
     pack["data_evidence"] = build_items(data_sentences, "data")
     pack["method_evidence"] = build_items(method_sentences, "method")
+    pack["mechanism_evidence"] = build_items(mechanism_sentences, "method")
     pack["results_evidence"] = build_items(result_sentences, "experiment")
+    pack["ablation_evidence"] = build_items(ablation_sentences, "experiment")
     pack["limitations_evidence"] = build_items(limitation_sentences, "conclusion")
     pack["equation_candidates"] = extract_equation_candidates(
         full_text=full_text,
@@ -321,7 +340,7 @@ def main() -> None:
         for key, value in section_map.items()
         if normalize_whitespace(value)
     }
-    pack["figure_captions"] = extract_caption_lines(full_text, "figure")[:12] if full_text else []
+    pack["figure_captions"] = figure_captions
     pack["table_captions"] = extract_caption_lines(full_text, "table")[:12] if full_text else []
     pack["sections"] = [
         {"name": key, "length": len(value), "preview": value[:240]}
@@ -338,8 +357,12 @@ def main() -> None:
         "title": record.get("title", ""),
         "evidence_pack": pack,
         "summary": {
+            "paper_type": paper_type,
+            "paper_type_rationale": paper_type_rationale,
             "datasets": extract_dataset_candidates(data_text)[:8],
             "metrics": extract_metric_claims(experiment_text)[:8],
+            "mechanism_signals": mechanism_sentences[:6],
+            "ablation_signals": ablation_sentences[:6],
             "equation_candidates": pack["equation_candidates"][:6],
             "section_keys": list(section_map.keys()),
             "pdf_used": bool(pdf_path.exists()),

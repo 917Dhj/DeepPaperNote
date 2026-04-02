@@ -68,7 +68,6 @@ The rule is simple:
    Examples:
    - `### 数据构建`
    - `### 量表代理特征抽取`
-   - `### 关键创新`
    - `### 为什么结果成立`
    - `### 哪些地方容易被误读`
    Prefer a compact visible block such as:
@@ -85,13 +84,16 @@ The rule is simple:
    Write as a top-tier researcher preparing a replication-oriented lab note, not as a summary assistant.
    Keep the early section order stable:
    - `核心信息`
-   - `原始摘要`
+   - `原文摘要翻译`
+   - `创新点`
    - `一句话总结`
    If abstract metadata is available, include it explicitly rather than letting the summary replace it.
-   Inside `原始摘要`, prefer:
-   - `### 英文原文`
-   - `### 中文翻译`
-   The Chinese translation should preserve the author's abstract meaning rather than collapsing into a short summary.
+   Inside `原文摘要翻译`, use a single Chinese translation block rather than bilingual subheadings.
+   The `原文摘要翻译` section itself must stay Chinese-only; do not place English abstract sentences or excerpted English original text there.
+   Treat `原文摘要翻译` as a translation task: translate the original abstract into Chinese, do not rewrite it into your own paper summary.
+   Do not mix in later judgments, innovation bullets, or deep-analysis content when writing `原文摘要翻译`.
+   The `创新点` section should be a dedicated `##` section, not just a casual sentence inside `一句话总结` or `深度分析`.
+   It should usually list 3 to 5 real innovations and briefly explain what each innovation changes or adds.
 
 6. Run `scripts/lint_note.py` on the drafted note.
    If lint fails:
@@ -99,8 +101,48 @@ The rule is simple:
    - rerun lint
    - do not write to Obsidian yet
 
-7. Only after lint passes, run `scripts/write_obsidian_note.py`.
+7. After the first successful lint pass, perform `final_readability_review`.
+   This is a required model-side reread of the full note.
+   It is for language and expression only:
+   - smooth awkward prose
+   - remove stiff translations
+   - rewrite ordinary English phrase leftovers into natural Chinese
+   - keep stable proper nouns when forcing a translation would sound worse
+   Do not use this stage to:
+   - invent new facts
+   - change core numbers or conclusions
+   - flatten the note into a safer but shallower summary
+
+8. If `final_readability_review` edited the note, rerun `scripts/lint_note.py`.
+   Do not treat the first lint pass as still valid after language edits.
+
+9. Only after lint passes and `final_readability_review` is complete, run `scripts/write_obsidian_note.py`.
    The save step should also create the paper-local `images/` directory even when no real image was inserted.
+
+## Workflow Check Before Final Report
+
+Before giving the final user-facing report, mentally or explicitly verify each required stage:
+- `resolve_paper`
+- `collect_metadata`
+- `fetch_pdf`
+- `extract_evidence`
+- `extract_pdf_assets`
+- `plan_figures`
+- `build_synthesis_bundle`
+- `note_plan`
+- `write_note`
+- `lint_note`
+- `final_readability_review`
+- `write_obsidian_note`
+
+Rules:
+- do not describe the workflow as fully completed unless every required stage above is actually complete
+- if the workflow stops early, explicitly state:
+  - the current blocked or pending stage
+  - which stages are already complete
+  - which downstream required stages are still incomplete
+  - why the workflow cannot yet be treated as complete
+- do not let slowness, inconvenience, or imperfect intermediate outputs justify skipping a remaining required stage
 
 ## What The Model Must Decide
 
@@ -124,17 +166,47 @@ The language model, not the scripts, must decide:
 - Do not treat heuristic figure labels as paper conclusions.
 - Do not delete important figure/table placeholders just because extraction only found partial crops.
 - Do not flatten a technically rich paper into only broad `##` sections with no internal structure.
+- Do not reinterpret "vault configured but permission unavailable" as permission to silently downgrade into workspace mode.
+- Do not skip creation of the paper-local `images/` directory just because the current environment cannot write it yet.
+- Do not present a vault-external save as if the formal Obsidian save already succeeded.
+- Do not present a partially executed workflow as if it were the full DeepPaperNote workflow.
+- Do not let convenience language hide which required stage is still pending.
+- Do not collapse "draft complete" into "note complete".
+- Do not write for the linter.
+- Do not invent facts, failed settings, mechanism details, or comparisons just to satisfy lint or section checks.
+- Do not insert empty compliance prose whose only purpose is to look structurally complete.
+- Do not twist a sentence into unnatural Chinese just to avoid a mixed-language warning.
 
 ## Minimal Save Protocol
 
 Recommended sequence:
 1. draft note to a temporary Markdown file
 2. lint it
-3. save with `write_obsidian_note.py --lint-json ...`
+3. run `final_readability_review`
+4. rerun lint if the readability review edited the note
+5. save with `write_obsidian_note.py --lint-json ...`
+
+Save-mode rule:
+- if no Obsidian vault is configured, workspace fallback is allowed
+- if an Obsidian vault is configured, treat that vault as the required target
+- if the configured vault or its `images/` subdirectory is not currently writable, request permission escalation before saving
+- if permission is refused, stop and clearly report that the note has not been written to Obsidian
+- only if the user is asked again and explicitly approves workspace fallback may the save target change
 
 If you already have the final Markdown in memory, `write_obsidian_note.py` also supports `--stdin`.
 If you selected a real figure image, use `materialize_figure_asset.py` before the final save.
 If you did not select any real figure image, still save the final note in one pass with placeholders intact.
+
+## Completion-Language Rule
+
+Use completion language precisely:
+- say `已完成` only when the required workflow is actually complete
+- say `已生成草稿` when synthesis finished but lint or save is still pending
+- say `已通过校验` only when lint actually ran and passed
+- say `已保存到 Obsidian` only when the formal write step actually succeeded
+- do not treat "lint passed" as meaning "the note is fully polished"
+- if `final_readability_review` has not been completed yet, say the draft passed script lint but is still pending final language review
+- do not treat temporary Markdown files, partial figure work, or incomplete downstream stages as equivalent to full workflow completion
 
 ## Pre-Save Self-Review
 
@@ -143,8 +215,12 @@ Before final save, explicitly review the draft against this checklist:
 - if this is a method paper, does it explain training, inference, and core mechanism rather than only summarize the idea?
 - if formulas or complexity expressions are central to the paper, did you include the key ones in LaTeX?
 - are formulas written with `$...$` or `$$...$$` rather than backticks or fenced code blocks?
+- if the note includes LaTeX formulas, did you verify that the final Markdown uses directly renderable TeX rather than double-escaped commands such as `\\tau` or `\\begin`?
 - would a reader familiar with Python and deep learning tooling understand the implementation logic from the note?
 - are there suspicious mid-sentence line breaks or PDF-style line wrapping artifacts left in the prose?
+- after script lint passes, have you reread the note once more for readability rather than stopping at formal compliance?
+- are there still any ordinary English phrase leftovers that should become natural Chinese?
+- are there any stiff translations, empty compliance sentences, or lines that sound written for lint rather than for a human reader?
 
 If any answer is clearly "no", revise before lint and save.
 

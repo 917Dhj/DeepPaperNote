@@ -35,8 +35,8 @@ def merge_inputs(primary: dict | None, evidence: dict | None, assets: dict | Non
 
 def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
     text = f"{item_id} {caption}".lower()
-    if any(token in text for token in ["pipeline", "framework", "overview", "architecture", "system"]):
-        return "method_overview", "方法主线", "这张图概括了整体方法或系统流程，最适合放在方法主线帮助快速建立结构理解。"
+    if any(token in text for token in ["pipeline", "framework", "overview", "architecture", "system", "workflow", "stage"]):
+        return "method_overview", "机制流程", "这张图概括了整体方法或系统流程；如果匹配置信度足够高，最适合放在 `### 机制流程` 帮助快速建立执行链理解。"
     if any(token in text for token in ["dataset", "data", "corpus", "participants", "recordings", "setup", "distribution", "quality"]):
         return "data_or_task", "数据与任务定义", "这张图更像任务设定或数据说明，放在数据与任务定义最合适。"
     if any(token in text for token in ["accuracy", "score", "performance", "comparison", "win-rate", "results", "recall"]):

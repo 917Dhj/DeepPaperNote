@@ -17,7 +17,8 @@ Priority order:
 
 ## Placement Logic
 
-- Put method overview figures in `方法主线`
+- Put method overview figures in `### 机制流程` when they directly explain the core execution chain
+- If the match is weaker or the note does not need that micro-structure, keep them in `方法主线`
 - Put data or task figures in `数据与任务定义`
 - Put main result figures or tables in `关键结果`
 - Put conceptual diagrams in `研究问题` or `深度分析` if they clarify the argument

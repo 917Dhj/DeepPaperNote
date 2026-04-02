@@ -10,7 +10,8 @@ from pathlib import Path
 
 REQUIRED_SECTIONS = [
     "核心信息",
-    "原始摘要",
+    "原文摘要翻译",
+    "创新点",
     "一句话总结",
     "研究问题",
     "数据与任务定义",
@@ -41,6 +42,59 @@ def find_missing_sections(text: str) -> list[str]:
         if f"## {section}" not in text:
             missing.append(section)
     return missing
+
+
+def front_matter_order_warnings(text: str) -> list[str]:
+    warnings: list[str] = []
+    required_order = ["## 原文摘要翻译", "## 创新点", "## 一句话总结"]
+    positions = []
+    for section in required_order:
+        idx = text.find(section)
+        if idx < 0:
+            return warnings
+        positions.append(idx)
+    if positions != sorted(positions):
+        warnings.append("front_matter_order_invalid")
+    return warnings
+
+
+METHOD_PAPER_SIGNAL_KEYWORDS = [
+    "模型",
+    "框架",
+    "系统",
+    "模块",
+    "编码器",
+    "解码器",
+    "预融合",
+    "attention",
+    "encoder",
+    "decoder",
+    "pipeline",
+    "framework",
+]
+
+MECHANISM_IO_TOKENS = [
+    "输入",
+    "输出",
+    "送入",
+    "送到",
+    "生成",
+    "得到",
+]
+
+MECHANISM_ACTION_TOKENS = [
+    "融合",
+    "投影",
+    "压缩",
+    "对齐",
+    "池化",
+    "提取",
+    "编码",
+    "解码",
+    "拼接",
+    "查询",
+    "更新",
+]
 
 
 ENGLISH_FUNCTION_WORDS = {
@@ -75,6 +129,29 @@ ENGLISH_FUNCTION_WORDS = {
     "when",
     "which",
     "with",
+}
+
+DOUBLE_ESCAPED_TEX_COMMANDS = {
+    "alpha",
+    "bar",
+    "begin",
+    "beta",
+    "end",
+    "exp",
+    "frac",
+    "gamma",
+    "ge",
+    "hat",
+    "left",
+    "le",
+    "log",
+    "mathcal",
+    "mathrm",
+    "prod",
+    "right",
+    "sum",
+    "tau",
+    "tilde",
 }
 
 
@@ -116,12 +193,40 @@ def is_exempt_line(line: str) -> bool:
     return False
 
 
+def section_name_for_line(lines: list[str], line_index: int) -> str:
+    current_section = ""
+    for idx in range(0, line_index + 1):
+        stripped = lines[idx].strip()
+        match = re.match(r"^##\s+(.+)$", stripped)
+        if match:
+            current_section = match.group(1).strip()
+    return current_section
+
+
+def subsection_name_for_line(lines: list[str], line_index: int) -> str:
+    current_subsection = ""
+    for idx in range(0, line_index + 1):
+        stripped = lines[idx].strip()
+        if re.match(r"^##\s+.+$", stripped):
+            current_subsection = ""
+            continue
+        match = re.match(r"^###\s+(.+)$", stripped)
+        if match:
+            current_subsection = match.group(1).strip()
+    return current_subsection
+
+
 def mixed_language_issues(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
-    for idx, line in enumerate(text.splitlines(), start=1):
+    lines = text.splitlines()
+    for idx, line in enumerate(lines, start=1):
         if is_exempt_line(line):
             continue
         stripped = line.strip()
+        section_name = section_name_for_line(lines, idx - 1)
+        subsection_name = subsection_name_for_line(lines, idx - 1)
+        if section_name in {"核心信息", "引用"}:
+            continue
         if not re.search(r"[\u4e00-\u9fff]", stripped):
             continue
         english_words = re.findall(r"\b[A-Za-z][A-Za-z0-9.-]*\b", stripped)
@@ -265,14 +370,267 @@ def suspicious_code_formatted_math(text: str) -> list[dict[str, object]]:
     return issues
 
 
-def abstract_translation_warnings(text: str) -> list[str]:
+def _line_number_from_offset(text: str, offset: int) -> int:
+    return text.count("\n", 0, offset) + 1
+
+
+def _formula_snippet(content: str, limit: int = 120) -> str:
+    normalized = " ".join(content.split())
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: limit - 3] + "..."
+
+
+def _strip_fenced_code_preserve_newlines(text: str) -> str:
+    return re.sub(r"```.*?```", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.DOTALL)
+
+
+def _extract_math_blocks(text: str) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    sanitized = _strip_fenced_code_preserve_newlines(text)
+    blocks: list[dict[str, object]] = []
+    issues: list[dict[str, object]] = []
+    consumed_lines: set[int] = set()
+
+    block_pattern = re.compile(r"(?<!\\)\$\$(.+?)(?<!\\)\$\$", flags=re.DOTALL)
+    for match in block_pattern.finditer(sanitized):
+        start = match.start()
+        line_number = _line_number_from_offset(sanitized, start)
+        content = match.group(1).strip()
+        blocks.append(
+            {
+                "kind": "block",
+                "line_number": line_number,
+                "content": content,
+                "snippet": _formula_snippet(content),
+            }
+        )
+        line_span = match.group(0).count("\n")
+        for extra in range(line_span + 1):
+            consumed_lines.add(line_number + extra)
+
+    delimiter_positions = [m.start() for m in re.finditer(r"(?<!\\)\$\$", sanitized)]
+    if len(delimiter_positions) % 2 == 1:
+        offset = delimiter_positions[-1]
+        issues.append(
+            {
+                "line_number": _line_number_from_offset(sanitized, offset),
+                "snippet": "$$",
+                "reason": "unclosed_math_delimiter",
+            }
+        )
+
+    inline_pattern = re.compile(r"(?<!\\)(?<!\$)\$(?!\$)(.+?)(?<!\\)\$(?!\$)")
+    for idx, line in enumerate(sanitized.splitlines(), start=1):
+        if idx in consumed_lines:
+            continue
+        for match in inline_pattern.finditer(line):
+            content = match.group(1).strip()
+            if not content:
+                continue
+            blocks.append(
+                {
+                    "kind": "inline",
+                    "line_number": idx,
+                    "content": content,
+                    "snippet": _formula_snippet(content),
+                }
+            )
+        if len(re.findall(r"(?<!\\)(?<!\$)\$(?!\$)", line)) % 2 == 1:
+            issues.append(
+                {
+                    "line_number": idx,
+                    "snippet": line.strip(),
+                    "reason": "unclosed_math_delimiter",
+                }
+            )
+    return blocks, issues
+
+
+def _find_unbalanced_braces(expr: str) -> bool:
+    depth = 0
+    for char in expr:
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth < 0:
+                return True
+    return depth != 0
+
+
+def _parse_group_argument(expr: str, start: int) -> int | None:
+    idx = start
+    while idx < len(expr) and expr[idx].isspace():
+        idx += 1
+    if idx >= len(expr) or expr[idx] != "{":
+        return None
+    depth = 0
+    while idx < len(expr):
+        if expr[idx] == "{":
+            depth += 1
+        elif expr[idx] == "}":
+            depth -= 1
+            if depth == 0:
+                return idx + 1
+        idx += 1
+    return None
+
+
+def _has_invalid_frac_arguments(expr: str) -> bool:
+    for match in re.finditer(r"(?<!\\)\\frac\b", expr):
+        next_index = _parse_group_argument(expr, match.end())
+        if next_index is None:
+            return True
+        final_index = _parse_group_argument(expr, next_index)
+        if final_index is None:
+            return True
+    return False
+
+
+def _has_environment_mismatch(expr: str) -> bool:
+    stack: list[str] = []
+    pattern = re.compile(r"(?<!\\)\\(begin|end)\{([A-Za-z*]+)\}")
+    for kind, env in pattern.findall(expr):
+        if kind == "begin":
+            stack.append(env)
+            continue
+        if not stack or stack[-1] != env:
+            return True
+        stack.pop()
+    return bool(stack)
+
+
+def _has_left_right_mismatch(expr: str) -> bool:
+    return len(re.findall(r"(?<!\\)\\left\b", expr)) != len(re.findall(r"(?<!\\)\\right\b", expr))
+
+
+def _has_double_escaped_tex_command(expr: str) -> bool:
+    pattern = r"(?<!\\)\\\\(" + "|".join(sorted(DOUBLE_ESCAPED_TEX_COMMANDS)) + r")\b"
+    return bool(re.search(pattern, expr))
+
+
+def math_render_issues(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    blocks, delimiter_issues = _extract_math_blocks(text)
+    issues.extend(delimiter_issues)
+
+    for block in blocks:
+        content = str(block["content"])
+        line_number = int(block["line_number"])
+        snippet = str(block["snippet"])
+
+        if _has_double_escaped_tex_command(content):
+            issues.append(
+                {
+                    "line_number": line_number,
+                    "snippet": snippet,
+                    "reason": "double_escaped_tex_command",
+                }
+            )
+        if _find_unbalanced_braces(content):
+            issues.append(
+                {
+                    "line_number": line_number,
+                    "snippet": snippet,
+                    "reason": "unbalanced_braces",
+                }
+            )
+        if _has_environment_mismatch(content):
+            issues.append(
+                {
+                    "line_number": line_number,
+                    "snippet": snippet,
+                    "reason": "environment_mismatch",
+                }
+            )
+        if _has_left_right_mismatch(content):
+            issues.append(
+                {
+                    "line_number": line_number,
+                    "snippet": snippet,
+                    "reason": "left_right_mismatch",
+                }
+            )
+        if _has_invalid_frac_arguments(content):
+            issues.append(
+                {
+                    "line_number": line_number,
+                    "snippet": snippet,
+                    "reason": "invalid_frac_arguments",
+                }
+            )
+
+    deduped: list[dict[str, object]] = []
+    seen: set[tuple[int, str, str]] = set()
+    for issue in issues:
+        key = (int(issue["line_number"]), str(issue["snippet"]), str(issue["reason"]))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(issue)
+    return deduped
+
+
+def section_body(text: str, heading: str) -> str:
+    pattern = rf"^##\s+{re.escape(heading)}\s*$"
+    match = re.search(pattern, text, flags=re.MULTILINE)
+    if not match:
+        return ""
+    start = match.end()
+    next_match = re.search(r"^##\s+.+$", text[start:], flags=re.MULTILINE)
+    if not next_match:
+        return text[start:]
+    return text[start : start + next_match.start()]
+
+
+def subsection_body(text: str, section_heading: str, subsection_heading: str) -> str:
+    body = section_body(text, section_heading)
+    if not body:
+        return ""
+    pattern = rf"^###\s+{re.escape(subsection_heading)}\s*$"
+    match = re.search(pattern, body, flags=re.MULTILINE)
+    if not match:
+        return ""
+    start = match.end()
+    next_match = re.search(r"^(?:##|###)\s+.+$", body[start:], flags=re.MULTILINE)
+    if not next_match:
+        return body[start:]
+    return body[start : start + next_match.start()]
+
+
+def method_section_requires_mechanism_flow(text: str) -> bool:
+    body = section_body(text, "方法主线")
+    if not body:
+        return False
+    lower = body.lower()
+    keyword_hits = sum(1 for token in METHOD_PAPER_SIGNAL_KEYWORDS if token.lower() in lower)
+    has_formula = "$$" in body or bool(re.search(r"\$[^$\n]{4,}\$", body))
+    return has_formula or keyword_hits >= 2
+
+
+def mechanism_flow_warnings(text: str) -> list[str]:
     warnings: list[str] = []
-    if "## 原始摘要" not in text:
+    if not method_section_requires_mechanism_flow(text):
         return warnings
-    has_english_original = "### 英文原文" in text
-    has_chinese_translation = "### 中文翻译" in text
-    if has_english_original and not has_chinese_translation:
-        warnings.append("abstract_translation_missing")
+    if "### 机制流程" not in text:
+        warnings.append("mechanism_flow_subsection_missing")
+        return warnings
+
+    body = subsection_body(text, "方法主线", "机制流程")
+    if not body:
+        warnings.append("mechanism_flow_subsection_empty")
+        return warnings
+
+    step_lines = [line.strip() for line in body.splitlines() if re.match(r"^\d+\.\s+", line.strip())]
+    if not 3 <= len(step_lines) <= 4:
+        warnings.append("mechanism_flow_step_count_unexpected")
+
+    step_text = " ".join(step_lines)
+    has_io_signal = any(token in step_text for token in MECHANISM_IO_TOKENS)
+    has_action_signal = any(token in step_text for token in MECHANISM_ACTION_TOKENS)
+    if not (has_io_signal and has_action_signal):
+        warnings.append("mechanism_flow_too_abstract")
+
     return warnings
 
 
@@ -288,8 +646,10 @@ def main() -> None:
     mixed_issues = mixed_language_issues(text)
     linebreak_issues = suspicious_mid_sentence_linebreaks(text)
     code_math_issues = suspicious_code_formatted_math(text)
+    math_issues = math_render_issues(text)
     warnings.extend(inspect_figure_callouts(text))
-    warnings.extend(abstract_translation_warnings(text))
+    warnings.extend(front_matter_order_warnings(text))
+    warnings.extend(mechanism_flow_warnings(text))
     if not text.startswith("# "):
         warnings.append("title_heading_missing")
     if "## " not in text:
@@ -308,6 +668,8 @@ def main() -> None:
         warnings.append("suspicious_mid_sentence_linebreaks")
     if code_math_issues:
         warnings.append("suspicious_code_formatted_math")
+    if math_issues:
+        warnings.append("math_render_issues_present")
 
     payload = {
         "status": "ok",
@@ -320,8 +682,10 @@ def main() -> None:
         "mixed_language_issues": mixed_issues,
         "linebreak_issues": linebreak_issues,
         "code_math_issues": code_math_issues,
-        "passes_basic_structure": not missing_sections and not {"title_heading_missing", "no_level2_sections"} & set(warnings),
+        "math_render_issues": math_issues,
+        "passes_basic_structure": not missing_sections and not {"title_heading_missing", "no_level2_sections", "front_matter_order_invalid"} & set(warnings),
         "passes_style_gate": not mixed_issues and not linebreak_issues and not code_math_issues,
+        "passes_math_gate": not math_issues,
     }
     emit(payload, args.output)
 

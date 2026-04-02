@@ -912,6 +912,8 @@ def resolve_obsidian_note_path(
     note_slug = slugify_filename(title)
     target_name = filename or f"{note_slug}.md"
     folder_name = Path(target_name).stem or note_slug
+    if relative_dir.name == folder_name:
+        return root_path / relative_dir / target_name
     return root_path / relative_dir / folder_name / target_name
 
 
@@ -1105,6 +1107,184 @@ def extract_metric_claims(text: str) -> list[str]:
         seen.add(key)
         claims.append(normalized)
         if len(claims) >= 8:
+            break
+    return claims
+
+
+def extract_negative_claims(text: str, *, limit: int = 6) -> list[str]:
+    claims: list[str] = []
+    seen = set()
+    explicit_negative_tokens = [
+        "worse",
+        "degrade",
+        "degraded",
+        "drop",
+        "dropped",
+        "decrease",
+        "decreased",
+        "unstable",
+        "instability",
+        "fail",
+        "failed",
+        "fails",
+        "collapse",
+        "collapsed",
+        "underperform",
+        "underperformed",
+        "sensitive",
+        "sensitivity",
+        "trade-off",
+        "tradeoff",
+        "hurt performance",
+        "hurts performance",
+    ]
+    ablation_tokens = [
+        "without",
+        "w/o",
+        "remove",
+        "removed",
+        "removing",
+        "omit",
+        "omits",
+        "omitted",
+        "omitting",
+        "ablation",
+    ]
+    performance_tokens = [
+        "accuracy",
+        "f1",
+        "auc",
+        "auprc",
+        "mae",
+        "rmse",
+        "score",
+        "performance",
+        "%",
+        "result",
+        "results",
+        "training",
+        "converge",
+        "convergence",
+        "stable",
+        "stability",
+        "baseline",
+    ]
+    positive_only_tokens = [
+        "outperform",
+        "improv",
+        "better than",
+        "achieve",
+        "state-of-the-art",
+        "sota",
+    ]
+
+    for sentence in split_sentences(text):
+        normalized = normalize_whitespace(sentence)
+        if not normalized:
+            continue
+        lower = normalized.lower()
+        has_explicit_negative = any(token in lower for token in explicit_negative_tokens)
+        has_ablation_marker = any(token in lower for token in ablation_tokens)
+        has_performance_context = any(token in lower for token in performance_tokens) or bool(re.search(r"\d", normalized))
+        has_positive_only = any(token in lower for token in positive_only_tokens)
+
+        if not has_explicit_negative:
+            if not (has_ablation_marker and has_performance_context):
+                continue
+            if has_positive_only and not any(token in lower for token in ["trade-off", "tradeoff", "sensitive", "stability"]):
+                continue
+
+        key = normalize_title(normalized)
+        if key in seen:
+            continue
+        seen.add(key)
+        claims.append(normalized)
+        if len(claims) >= limit:
+            break
+    return claims
+
+
+def extract_mechanism_flow_sentences(text: str, *, limit: int = 8) -> list[str]:
+    claims: list[str] = []
+    seen = set()
+    action_tokens = [
+        "encode",
+        "encoded",
+        "encoding",
+        "extract",
+        "extracted",
+        "project",
+        "projected",
+        "pool",
+        "pooled",
+        "fuse",
+        "fused",
+        "fusion",
+        "concat",
+        "concatenate",
+        "query",
+        "queried",
+        "align",
+        "aligned",
+        "compress",
+        "compressed",
+        "send",
+        "sent",
+        "feed",
+        "fed",
+        "generate",
+        "generated",
+        "predict",
+        "predicted",
+        "decode",
+        "decoded",
+        "update",
+        "updated",
+        "freeze",
+        "frozen",
+        "fine-tune",
+        "finetune",
+    ]
+    flow_tokens = [
+        "input",
+        "inputs",
+        "output",
+        "outputs",
+        "token",
+        "tokens",
+        "feature",
+        "features",
+        "representation",
+        "representations",
+        "encoder",
+        "decoder",
+        "attention",
+        "module",
+        "modules",
+        "llm",
+        "language model",
+        "query token",
+        "cross-attention",
+        "projection",
+        "state",
+        "states",
+    ]
+
+    for sentence in split_sentences(text):
+        normalized = normalize_whitespace(sentence)
+        if not normalized:
+            continue
+        lower = normalized.lower()
+        if not any(token in lower for token in action_tokens):
+            continue
+        if not any(token in lower for token in flow_tokens):
+            continue
+        key = normalize_title(normalized)
+        if key in seen:
+            continue
+        seen.add(key)
+        claims.append(normalized)
+        if len(claims) >= limit:
             break
     return claims
 
