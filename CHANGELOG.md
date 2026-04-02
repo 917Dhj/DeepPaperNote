@@ -14,6 +14,32 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - No unreleased user-facing changes yet.
 
+## v0.3.0-alpha
+
+Third public alpha release of DeepPaperNote.
+
+### Changed
+
+- Added a dedicated `创新点` section near the front of the note and strengthened the front-matter contract.
+- Added explicit `### 机制流程` guidance for method and system papers so the execution chain is reconstructed more clearly.
+- Strengthened ablation handling so notes are more likely to capture failed settings, weaker variants, and trade-offs rather than only best-case results.
+- Renamed the opening abstract block to `原文摘要翻译` and tightened the contract so it is treated as a Chinese translation of the original abstract rather than a newly written summary.
+- Tightened the `核心信息` block into a fixed metadata zone and explicitly forbade analysis or judgment from leaking into it.
+- Added a required `final_readability_review` stage after script lint to improve fluency, remove stiff phrasing, and reduce unnecessary English leftovers.
+- Added a dedicated math syntax gate to catch common Obsidian / MathJax rendering failures before final save.
+- Strengthened the overall workflow contract so the model is less likely to silently skip required stages, downgrade output behavior, or claim completion too early.
+- Tightened Obsidian save rules and fixed the duplicated paper-slug directory bug during note writing.
+
+### Packaging
+
+- Added a release zip asset for v0.3.0-alpha and narrowed the release package to omit README files, license/changelog docs, and showcase media.
+
+### Notes
+
+- This is still an alpha release.
+- Chinese remains the only fully supported output language.
+- Figure replacement is still conservative and placeholder-first when image confidence is insufficient.
+
 ## v0.2.0-alpha
 
 Second public alpha release of DeepPaperNote.
