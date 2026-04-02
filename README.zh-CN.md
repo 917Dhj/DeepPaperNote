@@ -164,6 +164,21 @@ python3 -m pip install PyMuPDF
 export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian_Documents/绝对路径"
 ```
 
+如果你希望 Codex 在之后的新终端会话里也一直读到这个默认配置：
+
+- 在 macOS / Linux 上，建议把它写进 `~/.zshrc` 之类的 shell 配置文件，然后重新加载 shell 或重启 Codex：
+
+```bash
+echo 'export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian_Documents/绝对路径"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+- 在 Windows PowerShell 上，可以把它持久化成用户环境变量，然后重新打开终端（重启 Codex）：
+
+```powershell
+setx DEEPPAPERNOTE_OBSIDIAN_VAULT "C:\Users\YourName\Documents\Obsidian_Documents"
+```
+
 <details>
 <summary><strong>🛠️ 展开查看更多进阶配置（目录自定义 / Zotero MCP / Semantic Scholar / OCR）</strong></summary>
 
@@ -182,6 +197,21 @@ export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 | `DEEPPAPERNOTE_PAPERS_DIR` | 可选 | Obsidian 库内论文输出目录，默认是 `Research/Papers` |
 | `DEEPPAPERNOTE_OUTPUT_DIR` | 可选 | 本地临时产物目录，默认是 `tmp/DeepPaperNote` |
 | `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | 可选 | 当没有配置 Obsidian 库时，当前工作区下的自动降级输出目录，默认是 `DeepPaperNote_output` |
+
+如果你希望 Codex 后续一直默认使用这些值：
+
+- 在 macOS / Linux 上，也建议把它们写进 `~/.zshrc`：
+
+```bash
+echo 'export DEEPPAPERNOTE_PAPERS_DIR="Research/Papers"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+- 在 Windows PowerShell 上，可以把它们持久化成用户环境变量：
+
+```powershell
+setx DEEPPAPERNOTE_PAPERS_DIR "Research/Papers"
+```
 
 这些可选路径配置的实际好处是：
 
