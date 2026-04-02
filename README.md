@@ -179,6 +179,21 @@ The cleanest setup is:
 export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/Obsidian_Documents"
 ```
 
+If you want Codex to keep seeing this default configuration in future terminal sessions:
+
+- on macOS / Linux, add it to your shell config such as `~/.zshrc`, then reload your shell (or Codex):
+
+```bash
+echo 'export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/Obsidian_Documents"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+- on Windows PowerShell, persist it as a user environment variable and then restart your terminal (or Codex):
+
+```powershell
+setx DEEPPAPERNOTE_OBSIDIAN_VAULT "C:\Users\YourName\Documents\Obsidian_Documents"
+```
+
 <details>
 <summary><strong>🛠️ Show advanced configuration (directories / Zotero MCP / Semantic Scholar / OCR)</strong></summary>
 
@@ -197,6 +212,21 @@ export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 | `DEEPPAPERNOTE_PAPERS_DIR` | Optional | Vault-relative paper output folder, default: `Research/Papers` |
 | `DEEPPAPERNOTE_OUTPUT_DIR` | Optional | Local temporary artifact directory, default: `tmp/DeepPaperNote` |
 | `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | Optional | Fallback output folder under the current working directory when no Obsidian vault is configured, default: `DeepPaperNote_output` |
+
+If you want Codex to keep using these values by default:
+
+- on macOS / Linux, add them to your `~/.zshrc` as well:
+
+```bash
+echo 'export DEEPPAPERNOTE_PAPERS_DIR="Research/Papers"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+- on Windows PowerShell, persist them as user environment variables:
+
+```powershell
+setx DEEPPAPERNOTE_PAPERS_DIR "Research/Papers"
+```
 
 Why the optional path settings can help:
 
