@@ -763,7 +763,7 @@ def runtime_config() -> dict[str, Any]:
             "DEEPPAPERNOTE_OBSIDIAN_VAULT",
             "READ_ARXIV_OBSIDIAN_VAULT",
         ),
-        "papers_dir": env_config_value("DEEPPAPERNOTE_PAPERS_DIR", default="20_Research/Papers"),
+        "papers_dir": env_config_value("DEEPPAPERNOTE_PAPERS_DIR", default="Research/Papers"),
         "output_dir": env_config_value("DEEPPAPERNOTE_OUTPUT_DIR", default="tmp/DeepPaperNote"),
         "workspace_output_dir": env_config_value(
             "DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR",
@@ -839,7 +839,7 @@ def is_probable_paper_folder(path: Path) -> bool:
 
 def existing_domain_dirs(config: dict[str, Any]) -> list[str]:
     output_mode, root_path = resolve_note_output_mode(config)
-    papers_dir = str(config.get("papers_dir", "20_Research/Papers")).strip() or "20_Research/Papers"
+    papers_dir = str(config.get("papers_dir", "Research/Papers")).strip() or "Research/Papers"
     base_dir = root_path / Path(papers_dir) if output_mode == "obsidian" else root_path
     if not base_dir.exists() or not base_dir.is_dir():
         return []
@@ -901,7 +901,7 @@ def resolve_obsidian_note_path(
     filename: str = "",
 ) -> Path:
     output_mode, root_path = resolve_note_output_mode(config)
-    papers_dir = str(config.get("papers_dir", "20_Research/Papers")).strip() or "20_Research/Papers"
+    papers_dir = str(config.get("papers_dir", "Research/Papers")).strip() or "Research/Papers"
     relative_dir = Path(papers_dir) if output_mode == "obsidian" else Path()
     if subdir:
         subdir_path = Path(subdir)

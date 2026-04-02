@@ -58,7 +58,7 @@ def test_resolve_obsidian_note_path_in_workspace_mode(tmp_path: Path, monkeypatc
     config = {
         "obsidian_vault": "",
         "workspace_output_dir": "DeepPaperNote_output",
-        "papers_dir": "20_Research/Papers",
+        "papers_dir": "Research/Papers",
     }
     path = resolve_obsidian_note_path(config, title="My Test Paper")
     assert path == tmp_path / "DeepPaperNote_output" / "My_Test_Paper" / "My_Test_Paper.md"
@@ -69,11 +69,11 @@ def test_resolve_obsidian_note_path_in_vault_mode(tmp_path: Path) -> None:
     vault.mkdir()
     config = {
         "obsidian_vault": str(vault),
-        "papers_dir": "20_Research/Papers",
+        "papers_dir": "Research/Papers",
         "workspace_output_dir": "DeepPaperNote_output",
     }
     path = resolve_obsidian_note_path(config, title="My Test Paper", subdir="心理健康")
-    assert path == vault / "20_Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
+    assert path == vault / "Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
 
 
 def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_already_contains_slug(tmp_path: Path) -> None:
@@ -81,7 +81,7 @@ def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_already_conta
     vault.mkdir()
     config = {
         "obsidian_vault": str(vault),
-        "papers_dir": "20_Research/Papers",
+        "papers_dir": "Research/Papers",
         "workspace_output_dir": "DeepPaperNote_output",
     }
     path = resolve_obsidian_note_path(
@@ -89,7 +89,7 @@ def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_already_conta
         title="My Test Paper",
         subdir="心理健康/My_Test_Paper",
     )
-    assert path == vault / "20_Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
+    assert path == vault / "Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
 
 
 def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_is_papers_relative_path(tmp_path: Path) -> None:
@@ -97,20 +97,20 @@ def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_is_papers_rel
     vault.mkdir()
     config = {
         "obsidian_vault": str(vault),
-        "papers_dir": "20_Research/Papers",
+        "papers_dir": "Research/Papers",
         "workspace_output_dir": "DeepPaperNote_output",
     }
     path = resolve_obsidian_note_path(
         config,
         title="My Test Paper",
-        subdir="20_Research/Papers/心理健康/My_Test_Paper",
+        subdir="Research/Papers/心理健康/My_Test_Paper",
     )
-    assert path == vault / "20_Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
+    assert path == vault / "Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
 
 
 def test_existing_domain_dirs_excludes_root_level_paper_folder(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
-    papers = vault / "20_Research" / "Papers"
+    papers = vault / "Research" / "Papers"
     (papers / "大模型").mkdir(parents=True)
     paper_dir = papers / "Attention_Is_All_You_Need"
     paper_dir.mkdir(parents=True)
@@ -118,7 +118,7 @@ def test_existing_domain_dirs_excludes_root_level_paper_folder(tmp_path: Path) -
 
     config = {
         "obsidian_vault": str(vault),
-        "papers_dir": "20_Research/Papers",
+        "papers_dir": "Research/Papers",
         "workspace_output_dir": "DeepPaperNote_output",
     }
     assert existing_domain_dirs(config) == ["大模型"]
@@ -126,7 +126,7 @@ def test_existing_domain_dirs_excludes_root_level_paper_folder(tmp_path: Path) -
 
 def test_resolve_domain_subdir_prefers_existing_domain(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
-    papers = vault / "20_Research" / "Papers"
+    papers = vault / "Research" / "Papers"
     (papers / "大模型").mkdir(parents=True)
     (papers / "心理健康").mkdir(parents=True)
     paper_dir = papers / "Attention_Is_All_You_Need"
@@ -135,7 +135,7 @@ def test_resolve_domain_subdir_prefers_existing_domain(tmp_path: Path) -> None:
 
     config = {
         "obsidian_vault": str(vault),
-        "papers_dir": "20_Research/Papers",
+        "papers_dir": "Research/Papers",
         "workspace_output_dir": "DeepPaperNote_output",
     }
     resolved = resolve_domain_subdir(

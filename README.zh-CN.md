@@ -88,7 +88,7 @@ DeepPaperNote 不是靠“把摘要重新措辞一遍”来显得更完整，而
 
 ## 🚀 快速上手
 
-### 1) 安装到 Codex 技能目录
+### 1) 将 DeepPaperNote 安装到 Codex 技能目录
 
 推荐去 [release](https://github.com/917Dhj/DeepPaperNote/releases) 页面下载最新版本的 zip 包，解压后放进你的 Codex 技能目录。
 
@@ -106,14 +106,27 @@ git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperN
 
 安装完成后，重启 Codex 让技能生效。
 
-### 2) 直接开始使用
+### 2) 安装核心 Python 依赖
+
+在正式处理论文前，需要安装最核心的 Python 依赖：
+
+```bash
+python3 -m pip install PyMuPDF
+```
+
+为什么这一步很重要：
+
+- DeepPaperNote 读取 PDF 主要依赖 `PyMuPDF`
+- 如果没装 `PyMuPDF`，最核心的 PDF 抽取流程就跑不起来
+
+### 3) 直接开始使用
 
 接下来你只需要把论文丢给它就行，标题、DOI、URL、本地 PDF 都可以，你可以直接给出类似这样的指令：
 
-- 💬 `给这篇论文生成深度笔记`
-- 💬 `把这篇文章整理成 Obsidian 笔记`
+- 💬 `给这篇论文生成深度笔记：Attention Is All You Need`
+- 💬 `把这篇文章整理成 Obsidian 笔记：https://arxiv.org/abs/1706.03762`
 - 💬 `帮我精读一下这篇 PDF，生成带图表的 Markdown`
-- 💬 `请用 DeepPaperNote 处理这篇论文，重点保留方法机制、关键实验和图表上下文`
+- 💬 `请用 DeepPaperNote 处理这篇论文：10.48550/arXiv.1706.03762`
 
 默认情况下，DeepPaperNote 会生成**中文笔记**。当前写作规范和格式校验也主要围绕中文笔记构建；目前中文是唯一能够发挥 skill 完全能力的笔记语言，如需生成英文版笔记，请期待后续更新。
 
@@ -125,7 +138,7 @@ git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperN
 - 生成最终 Markdown 笔记
 - 自动写入 Obsidian；如果没有配置 Obsidian，则自动降级输出到当前目录
 
-### 3) 首次使用不必追求完整配置
+### 4) 首次使用不必追求完整配置
 
 如果你还没有完整配置 Obsidian / Zotero / OCR，也可以先试跑。
 
@@ -140,9 +153,10 @@ git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperN
 
 ## 🔧 配置指南（开箱即用，按需进阶）
 
-**DeepPaperNote 支持零配置直接试用**。  
-如果你没有配置 Obsidian，它也能先把笔记自动输出到当前工作目录。  
-但如果你想要更好的长期管理体验，还是强烈建议配置你的 Obsidian 库路径。
+**如果你已经安装好了PyMuPDF，那么你就可以直接开始使用DeepPaperNote生成笔记了**。以下的介绍的配置都是核心功能的扩展，让你能够将DeepPaperNote生成的笔记真正融入你的科研工作流中。  
+
+- 如果你没有配置 Obsidian，它也能先把笔记自动输出到当前工作目录。  
+- 但如果你想要更好的长期管理体验，还是强烈建议配置你的 Obsidian 库路径。
 
 ### 📍 核心配置：指定你的 Obsidian 库
 
@@ -158,21 +172,21 @@ export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian_Documents/绝对路径"
 如果你希望自定义论文目录或中间产物目录，也可以再加：
 
 ```bash
-export DEEPPAPERNOTE_PAPERS_DIR="20_Research/Papers"
+export DEEPPAPERNOTE_PAPERS_DIR="Research/Papers"
 export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 ```
 
 | ⚙️ 变量 | 是否必需 | 📝 作用 |
 | --- | --- | --- |
 | `DEEPPAPERNOTE_OBSIDIAN_VAULT` | **推荐** | **你的 Obsidian 库根目录** |
-| `DEEPPAPERNOTE_PAPERS_DIR` | 可选 | Obsidian 库内论文输出目录，默认是 `20_Research/Papers` |
+| `DEEPPAPERNOTE_PAPERS_DIR` | 可选 | Obsidian 库内论文输出目录，默认是 `Research/Papers` |
 | `DEEPPAPERNOTE_OUTPUT_DIR` | 可选 | 本地临时产物目录，默认是 `tmp/DeepPaperNote` |
 | `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | 可选 | 当没有配置 Obsidian 库时，当前工作区下的自动降级输出目录，默认是 `DeepPaperNote_output` |
 
 这些可选路径配置的实际好处是：
 
 - `DEEPPAPERNOTE_PAPERS_DIR`
-  如果你的 Obsidian 库不是把论文放在 `20_Research/Papers` 下，或者你已经有自己的目录约定，这个配置可以让 DeepPaperNote 直接适配你的现有结构，减少后续手动移动文件。
+  如果你的 Obsidian 库不是把论文放在 `Research/Papers` 下，或者你已经有自己的目录约定，这个配置可以让 DeepPaperNote 直接适配你的现有结构，减少后续手动移动文件。
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   如果你希望中间产物统一落在一个固定位置，方便调试、清理或做实验，这个配置会比较有用。
 
@@ -255,7 +269,6 @@ OCR 需要的依赖如下：
 | 系统工具 | `tesseract` | 真正执行 OCR 识别 |
 | Python 包 | `pytesseract` | Python 调用 `tesseract` 的桥接层 |
 | Python 包 | `Pillow` | 打开页面渲染后的图像再交给 OCR |
-| 现有 PDF 层 | `PyMuPDF` | 负责正常抽文本与页面渲染 |
 
 在 macOS 上的安装方式：
 
@@ -422,6 +435,7 @@ DeepPaperNote/
 | --- | --- | --- |
 | Codex desktop / CLI | 推荐 | 当前主目标环境 |
 | Python 3.10+ | 必需 | 运行辅助脚本 |
+| PyMuPDF | 必需 | 核心 PDF 依赖，可用 `python3 -m pip install PyMuPDF` 安装 |
 | 本地 Obsidian 库 | 推荐 | 配好后可直接写入长期笔记体系；不配时会自动降级输出到当前目录 |
 | Zotero + MCP | 可选 | 对本地论文库工作流很有帮助 |
 | OCR 工具 | 可选 | 对扫描版 PDF 更友好 |

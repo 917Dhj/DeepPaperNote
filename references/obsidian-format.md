@@ -80,7 +80,7 @@ Do not use it in the final user-facing note unless you are debugging the pipelin
 If a real image has been selected and materialized into the vault, prefer an Obsidian embed:
 
 ```md
-![[20_Research/Papers/DeepPaperNote/paper_slug/images/page_003_img_01.png]]
+![[Research/Papers/DeepPaperNote/paper_slug/images/page_003_img_01.png]]
 *论文原图编号：Fig. 2。数据生成流程图。这里插入是因为它最能帮助理解方法主线。*
 ```
 

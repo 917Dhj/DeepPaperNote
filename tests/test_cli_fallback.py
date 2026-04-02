@@ -94,7 +94,7 @@ def test_write_note_in_vault_mode_does_not_duplicate_paper_slug(tmp_path: Path) 
     )
     payload = json.loads(result.stdout)
     note_path = Path(payload["note_path"])
-    assert note_path == vault / "20_Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
+    assert note_path == vault / "Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
     assert note_path.exists()
 
 

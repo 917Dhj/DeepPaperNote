@@ -90,7 +90,7 @@ DeepPaperNote does not look more complete by simply rewriting the abstract in sm
 
 ## 🚀 Quick Start
 
-### 1) Install it into your Codex skills directory
+### 1) Install DeepPaperNote into your Codex skills directory
 
 The recommended way is to download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Codex skills directory:
 
@@ -108,16 +108,29 @@ git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperN
 
 After installation, restart Codex so the skill is loaded.
 
-### 2) Start using it immediately
+### 2) Install the core Python dependency
+
+Before your first real paper run, install the most important Python dependency:
+
+```bash
+python3 -m pip install PyMuPDF
+```
+
+Why this step matters:
+
+- DeepPaperNote reads PDFs through `PyMuPDF`
+- if `PyMuPDF` is missing, the core PDF extraction pipeline will not work
+
+### 3) Start using it immediately
 
 After that, just hand a paper to Codex. A title, DOI, URL, arXiv ID, or local PDF all work. Prompts like these are enough:
 
 Typical prompts:
 
-- `Generate a deep-reading note for this paper`
-- `Turn this paper into an Obsidian note`
+- `Generate a deep-reading note for this paper: Attention Is All You Need`
+- `Turn this paper into an Obsidian note: https://arxiv.org/abs/1706.03762`
 - `Read this PDF and produce a Markdown note with figure context`
-- `Use DeepPaperNote on this paper and keep the mechanism, key experiments, and figure context intact`
+- `Use DeepPaperNote on this paper: 10.48550/arXiv.1706.03762`
 
 By default, DeepPaperNote writes the note in **Chinese**. At the moment, Chinese is the only note language that can fully benefit from the skill's current writing and linting rules. If you need English notes, please stay tuned for a future update.
 
@@ -129,7 +142,7 @@ By default, DeepPaperNote will:
 - generate the final Markdown note
 - save it into Obsidian when configured, or automatically fall back to the current directory
 
-### 3) You do not need perfect setup on day one
+### 4) You do not need perfect setup on day one
 
 You can try DeepPaperNote even if you have not finished configuring Obsidian, Zotero, or OCR yet.
 
@@ -152,7 +165,7 @@ If you want a more explicit onboarding prompt, see [ONBOARDING_PROMPT.md](./ONBO
 
 ## 🔧 Configuration (works out of the box, improves with setup)
 
-DeepPaperNote can be tried with zero configuration.
+Once you have PyMuPDF installed, you're ready to start generating notes with DeepPaperNote right away. The configurations outlined below are extensions of the core features, designed to help you seamlessly integrate the generated notes into your actual research workflow.
 
 - if no Obsidian vault is configured, it can still save notes into the current working directory
 - if you want an Obsidian-native long-term workflow, you should configure your vault path
@@ -174,21 +187,21 @@ export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/Obsidian_Documents"
 If you want to customize paper output paths or intermediate artifact paths:
 
 ```bash
-export DEEPPAPERNOTE_PAPERS_DIR="20_Research/Papers"
+export DEEPPAPERNOTE_PAPERS_DIR="Research/Papers"
 export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 ```
 
 | ⚙️ Variable | Required | 📝 Purpose |
 | --- | --- | --- |
 | `DEEPPAPERNOTE_OBSIDIAN_VAULT` | Recommended | Root path of your Obsidian vault |
-| `DEEPPAPERNOTE_PAPERS_DIR` | Optional | Vault-relative paper output folder, default: `20_Research/Papers` |
+| `DEEPPAPERNOTE_PAPERS_DIR` | Optional | Vault-relative paper output folder, default: `Research/Papers` |
 | `DEEPPAPERNOTE_OUTPUT_DIR` | Optional | Local temporary artifact directory, default: `tmp/DeepPaperNote` |
 | `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | Optional | Fallback output folder under the current working directory when no Obsidian vault is configured, default: `DeepPaperNote_output` |
 
 Why the optional path settings can help:
 
 - `DEEPPAPERNOTE_PAPERS_DIR`
-  Useful if your vault does not store papers under `20_Research/Papers`, or if you want DeepPaperNote to fit an existing folder convention without extra manual moves.
+  Useful if your vault does not store papers under `Research/Papers`, or if you want DeepPaperNote to fit an existing folder convention without extra manual moves.
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   Useful if you want all intermediate artifacts in a predictable location for debugging, cleanup, or experimentation.
 
@@ -275,7 +288,6 @@ Required software and packages for OCR:
 | System tool | `tesseract` | The actual OCR engine |
 | Python package | `pytesseract` | Python bridge to `tesseract` |
 | Python package | `Pillow` | Opens rendered page images before OCR |
-| Existing PDF layer | `PyMuPDF` | Renders pages and extracts normal PDF text |
 
 Install on macOS:
 
@@ -447,6 +459,7 @@ DeepPaperNote/
 | --- | --- | --- |
 | Codex desktop / CLI | Recommended | Primary target environment today |
 | Python 3.10+ | Required | Runs the helper scripts |
+| PyMuPDF | Required | Core PDF dependency; install it with `python3 -m pip install PyMuPDF` |
 | Local Obsidian vault | Recommended | Writes directly into a long-term note system; otherwise falls back to the current working directory |
 | Zotero + MCP | Optional | Helpful for local-library-first paper workflows |
 | OCR tools | Optional | Improves handling of scanned PDFs |

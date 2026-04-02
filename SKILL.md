@@ -151,7 +151,7 @@ Zotero-first rule:
 - If the user refuses that permission escalation, DeepPaperNote must clearly report that the note has not been saved into Obsidian yet.
 - After such a refusal, DeepPaperNote may save to the workspace only if it asks again and receives explicit user consent for that fallback.
 - By default, each paper should be written into its own same-name folder, with the note and images stored together.
-- The note should never default to the bare `20_Research/Papers` root. Choose a domain folder first.
+- The note should never default to the bare `Research/Papers` root. Choose a domain folder first.
 - Domain selection should be conservative: prefer an existing domain folder in the user's vault when there is a reasonable match; only create a new domain folder when no existing domain fits well.
 - A normal note-generation request should complete in one pass: note text, figure placeholder decisions, image materialization when confident, and final save.
 - Do not stop after a text-only draft just to ask whether the user wants figures inserted. Finish the figure replacement decision inside the same task unless the user explicitly asked for text only.
