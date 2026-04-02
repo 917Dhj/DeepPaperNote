@@ -90,7 +90,15 @@ DeepPaperNote 不是靠“把摘要重新措辞一遍”来显得更完整，而
 
 ### 1) 安装到 Codex 技能目录
 
-把仓库克隆到你的 Codex 技能目录：
+推荐去 [release](https://github.com/917Dhj/DeepPaperNote/releases) 页面下载最新版本的 zip 包，解压后放进你的 Codex 技能目录。
+
+例如，下载 `DeepPaperNote-v0.3.0-alpha.zip` 后，可以把解压出来的文件夹放到：
+
+```bash
+~/.codex/skills/DeepPaperNote-v0.3.0-alpha
+```
+
+当然，你也可以选择直接 `git clone`：
 
 ```bash
 git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote

@@ -92,7 +92,15 @@ DeepPaperNote does not look more complete by simply rewriting the abstract in sm
 
 ### 1) Install it into your Codex skills directory
 
-Clone this repository into your Codex skills directory:
+The recommended way is to download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Codex skills directory:
+
+For example, after downloading `DeepPaperNote-v0.3.0-alpha.zip`, you can unzip it and move the extracted folder to:
+
+```bash
+~/.codex/skills/DeepPaperNote-v0.3.0-alpha
+```
+
+Of course, you can also clone the source repository directly:
 
 ```bash
 git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
