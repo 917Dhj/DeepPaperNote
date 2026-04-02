@@ -14,6 +14,25 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - No unreleased user-facing changes yet.
 
+## v0.3.1-alpha
+
+Fourth public alpha release of DeepPaperNote.
+
+### Changed
+
+- Changed the default Obsidian paper root from `20_Research/Papers` to `Research/Papers`.
+- Aligned runtime path resolution, save behavior, and tests with the new default paper root so new notes land in the updated location consistently.
+
+### Packaging
+
+- Rebuilt the release zip from the latest `main` branch state for `v0.3.1-alpha`.
+
+### Notes
+
+- This is still an alpha release.
+- Chinese remains the only fully supported output language.
+- Figure replacement is still conservative and placeholder-first when image confidence is insufficient.
+
 ## v0.3.0-alpha
 
 Third public alpha release of DeepPaperNote.
