@@ -7,7 +7,7 @@
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
 [![Status](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
-[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.3.0-alpha)
+[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.3.1-alpha)
 [![License](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
 [![Codex](https://img.shields.io/badge/Codex-skill-111827?style=for-the-badge)](./SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
@@ -94,10 +94,10 @@ DeepPaperNote does not look more complete by simply rewriting the abstract in sm
 
 The recommended way is to download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Codex skills directory:
 
-For example, after downloading `DeepPaperNote-v0.3.0-alpha.zip`, you can unzip it and move the extracted folder to:
+For example, after downloading `DeepPaperNote-v0.3.1-alpha.zip`, you can unzip it and move the extracted folder to:
 
 ```bash
-~/.codex/skills/DeepPaperNote-v0.3.0-alpha
+~/.codex/skills/DeepPaperNote-v0.3.1-alpha
 ```
 
 Of course, you can also clone the source repository directly:
@@ -355,10 +355,11 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 
 | 🏷️ Version | 🚦 Status | ✨ Highlights |
 | --- | --- | --- |
+| v0.3.1-alpha | ✅ Released | Default Obsidian paper root changed to `Research/Papers`, with runtime path resolution and save behavior aligned to the new location |
 | v0.3.0-alpha | ✅ Released | Major quality upgrade: dedicated innovation section, explicit mechanism flow, stronger workflow discipline, final readability review, math syntax gate, and the new `Original Abstract Translation` front-matter block |
 | v0.2.0-alpha | ✅ Released | Replication-oriented note-writing upgrade: explicit `note_plan`, equation-aware output, stricter final self-review, bilingual abstract handling, and stronger formatting checks |
 | v0.1.0-alpha | ✅ Released | First public alpha: Codex workflow, synthesis bundle pipeline, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
-| Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v0.3.0-alpha |
+| Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v0.3.1-alpha |
 
 ## ⚙️ Workflow
 
