@@ -14,6 +14,28 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - No unreleased user-facing changes yet.
 
+## v0.3.2-alpha
+
+Fifth public alpha release of DeepPaperNote.
+
+### Changed
+
+- Strengthened `local_pdf -> enrich_metadata` so Zotero-style attachment filenames no longer dominate metadata resolution.
+- Added local PDF metadata hints that prefer embedded PDF title, DOI, arXiv identifiers, and first-page title signals before falling back to cleaned filenames.
+- Added local-PDF-only title correction so high-confidence external matches can replace noisy attachment-style titles without changing the global merge policy.
+- Tightened candidate scoring so published venue/DOI records are preferred over preprint-style matches when both are available.
+- Normalized common PDF ligatures such as `ﬁ` and `ﬂ` during text extraction so titles and other extracted strings are cleaner and more stable.
+
+### Packaging
+
+- Rebuilt the release zip from the latest `main` branch state for `v0.3.2-alpha`.
+
+### Notes
+
+- This is still an alpha release.
+- Chinese remains the only fully supported output language.
+- Figure replacement is still conservative and placeholder-first when image confidence is insufficient.
+
 ## v0.3.1-alpha
 
 Fourth public alpha release of DeepPaperNote.

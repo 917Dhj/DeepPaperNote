@@ -104,6 +104,47 @@ def normalize_title(text: str) -> str:
     return re.sub(r"[^a-z0-9\s]", "", normalize_whitespace(text).lower()).strip()
 
 
+LOCAL_PDF_PREFIX_PATTERN = re.compile(r"^(?:[^-]{1,120})\s+-\s+(?:19|20)\d{2}\s+-\s+")
+LOCAL_PDF_SUFFIX_ID_PATTERN = re.compile(r"\s*-\s*\d{4,}\s*$")
+PREPRINT_HINTS = ("medrxiv", "biorxiv", "preprint", "arxiv", "10.1101/", "10.21203/rs.", "preprints.org")
+PDF_LIGATURE_MAP = {
+    "\u00df": "ss",
+    "\ufb00": "ff",
+    "\ufb01": "fi",
+    "\ufb02": "fl",
+    "\ufb03": "ffi",
+    "\ufb04": "ffl",
+}
+
+
+def clean_local_pdf_stem(stem: str) -> str:
+    raw = normalize_whitespace((stem or "").replace("_", " "))
+    if not raw:
+        return ""
+    cleaned = LOCAL_PDF_PREFIX_PATTERN.sub("", raw)
+    cleaned = LOCAL_PDF_SUFFIX_ID_PATTERN.sub("", cleaned)
+    cleaned = normalize_whitespace(cleaned)
+    return cleaned or raw
+
+
+def is_probable_local_pdf_artifact_title(title: str) -> bool:
+    normalized = normalize_whitespace(title)
+    if not normalized:
+        return False
+    if LOCAL_PDF_PREFIX_PATTERN.match(normalized):
+        return True
+    if LOCAL_PDF_SUFFIX_ID_PATTERN.search(normalized):
+        return True
+    return bool(re.search(r"\b(?:et al\.?|等)\b", normalized, flags=re.IGNORECASE) and re.search(r"\b(?:19|20)\d{2}\b", normalized))
+
+
+def normalize_pdf_text_artifacts(text: str) -> str:
+    normalized = text or ""
+    for original, replacement in PDF_LIGATURE_MAP.items():
+        normalized = normalized.replace(original, replacement)
+    return normalized
+
+
 def slugify_filename(text: str) -> str:
     text = normalize_whitespace(text)
     text = re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE)
@@ -167,8 +208,9 @@ def publication_quality_score(record: dict[str, Any]) -> int:
     venue = normalize_whitespace(str(record.get("venue", ""))).lower()
     source_url = normalize_whitespace(str(record.get("source_url", ""))).lower()
     source = normalize_whitespace(str(record.get("source", ""))).lower()
-    joined = " ".join([venue, source_url, source])
-    if any(token in joined for token in ["medrxiv", "biorxiv", "preprint", "arxiv"]):
+    doi = normalize_whitespace(str(record.get("doi", ""))).lower()
+    joined = " ".join([venue, source_url, source, doi])
+    if any(token in joined for token in PREPRINT_HINTS):
         return 0
     if venue or source == "crossref":
         return 2
@@ -181,7 +223,7 @@ def candidate_priority_score(record: dict[str, Any]) -> int:
     doi = normalize_whitespace(str(record.get("doi", ""))).lower()
     joined = " ".join([source, source_url, doi])
 
-    if "preprints.org" in joined or "10.20944/preprints" in joined:
+    if "10.20944/preprints" in joined or any(token in joined for token in PREPRINT_HINTS):
         return 0
 
     if record.get("doi") and publication_quality_score(record) >= 2:
@@ -356,8 +398,23 @@ def fetch_arxiv_entries(*, search_query: str = "", id_list: str = "", max_result
             "max_results": max_results,
         }
     )
-    xml_content = http_get_text(f"https://export.arxiv.org/api/query?{params}")
-    return parse_arxiv_xml(xml_content)
+    try:
+        xml_content = http_get_text(f"https://export.arxiv.org/api/query?{params}")
+    except Exception:
+        return []
+    if not normalize_whitespace(xml_content):
+        return []
+    try:
+        return parse_arxiv_xml(xml_content)
+    except Exception:
+        return []
+
+
+def safe_fetch_arxiv_entries(*, search_query: str = "", id_list: str = "", max_results: int = 10) -> list[dict[str, Any]]:
+    try:
+        return fetch_arxiv_entries(search_query=search_query, id_list=id_list, max_results=max_results)
+    except Exception:
+        return []
 
 
 def normalize_crossref_work(item: dict[str, Any]) -> dict[str, Any]:
@@ -620,24 +677,32 @@ def resolve_reference(value: str) -> dict[str, Any]:
     stripped = (value or "").strip()
     if source_type == "local_pdf":
         path = Path(stripped).expanduser().resolve()
-        return {
+        hints = extract_local_pdf_hints(path)
+        paper = {
             "status": "ok",
             "source_type": "local_pdf",
             "source_url": str(path),
             "local_pdf_path": str(path),
-            "title": path.stem.replace("_", " "),
+            "title": normalize_whitespace(str(hints.get("title", ""))) or clean_local_pdf_stem(path.stem) or path.stem.replace("_", " "),
             "metadata_sources": ["local_pdf"],
-            "paper_id": paper_id_for_record({"title": path.stem}),
         }
+        doi = normalize_whitespace(str(hints.get("doi", "")))
+        arxiv_id = normalize_whitespace(str(hints.get("arxiv_id", "")))
+        if doi:
+            paper["doi"] = doi
+        if arxiv_id:
+            paper["arxiv_id"] = arxiv_id
+        paper["paper_id"] = paper_id_for_record(paper)
+        return paper
     if source_type == "arxiv_id":
-        papers = fetch_arxiv_entries(id_list=extract_arxiv_id(stripped) or "", max_results=1)
+        papers = safe_fetch_arxiv_entries(id_list=extract_arxiv_id(stripped) or "", max_results=1)
         if papers:
             paper = papers[0]
             paper["paper_id"] = paper_id_for_record(paper)
             paper["status"] = "ok"
             return paper
     if source_type == "arxiv_url":
-        papers = fetch_arxiv_entries(id_list=extract_arxiv_id(stripped) or "", max_results=1)
+        papers = safe_fetch_arxiv_entries(id_list=extract_arxiv_id(stripped) or "", max_results=1)
         if papers:
             paper = papers[0]
             paper["paper_id"] = paper_id_for_record(paper)
@@ -691,7 +756,7 @@ def resolve_reference(value: str) -> dict[str, Any]:
         search_semantic_scholar(title, limit=5)
         + search_crossref_by_title(title, limit=5)
         + search_openalex_by_title(title, limit=5)
-        + fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5)
+        + safe_fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5)
     )
     best = choose_best_title_match(title, candidates)
     if best:
@@ -728,7 +793,7 @@ def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
             candidates.append(sem)
 
     if arxiv_id:
-        arxiv = fetch_arxiv_entries(id_list=arxiv_id, max_results=1)
+        arxiv = safe_fetch_arxiv_entries(id_list=arxiv_id, max_results=1)
         if arxiv:
             candidates.append(arxiv[0])
 
@@ -742,7 +807,7 @@ def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
         cross = choose_best_title_match(title, search_crossref_by_title(title, limit=5))
         if cross:
             candidates.append(cross)
-        arxiv = choose_best_title_match(title, fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5))
+        arxiv = choose_best_title_match(title, safe_fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5))
         if arxiv:
             candidates.append(arxiv)
 
@@ -753,6 +818,12 @@ def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
         merged["source_url"] = f"https://doi.org/{merged['doi']}"
     if merged.get("arxiv_id") and not merged.get("pdf_url"):
         merged["pdf_url"] = f"https://arxiv.org/pdf/{merged['arxiv_id']}.pdf"
+    if merged.get("arxiv_id") and not merged.get("doi"):
+        merged["doi"] = f"10.48550/arXiv.{merged['arxiv_id']}"
+    if base.get("source_type") == "local_pdf":
+        corrected_title = choose_local_pdf_corrected_title(base, candidates[1:])
+        if corrected_title:
+            merged["title"] = corrected_title
     merged["paper_id"] = paper_id_for_record(merged)
     return merged
 
@@ -943,7 +1014,7 @@ def split_sentences(text: str) -> list[str]:
 
 
 def clean_pdf_line(line: str) -> str:
-    line = re.sub(r"\s+", " ", line or "").strip()
+    line = re.sub(r"\s+", " ", normalize_pdf_text_artifacts(line or "")).strip()
     if not line:
         return ""
     if re.fullmatch(r"\d+", line):
@@ -1034,6 +1105,92 @@ def extract_pdf_text(pdf_path: Path, max_pages: int | None = None) -> str:
     finally:
         doc.close()
     return "\n".join(texts)
+
+
+def is_plausible_pdf_title_line(line: str) -> bool:
+    normalized = clean_pdf_line(line)
+    lower = normalized.lower()
+    if len(normalized) < 20 or len(normalized.split()) < 4:
+        return False
+    if normalized.count(",") >= 3:
+        return False
+    if any(token in lower for token in ["doi.org/", "http://", "https://", "www.", "check for updates"]):
+        return False
+    if lower in {"abstract", "article", "preprint"}:
+        return False
+    if lower.startswith("npj |") or lower.startswith("arxiv:") or lower.startswith("submitted to"):
+        return False
+    if " doi:" in lower or lower.startswith("doi:"):
+        return False
+    return True
+
+
+def first_page_title_candidate(first_page_text: str) -> str:
+    for raw_line in (first_page_text or "").splitlines():
+        if is_plausible_pdf_title_line(raw_line):
+            return clean_pdf_line(raw_line)
+    return ""
+
+
+def extract_local_pdf_hints(pdf_path: Path) -> dict[str, Any]:
+    raw_title = normalize_whitespace(pdf_path.stem.replace("_", " "))
+    cleaned_title = clean_local_pdf_stem(pdf_path.stem)
+    hints: dict[str, Any] = {"title": cleaned_title or raw_title}
+    if fitz is None:
+        return hints
+
+    metadata_title = ""
+    metadata_subject = ""
+    first_page_text = ""
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception:
+        return hints
+    try:
+        metadata = doc.metadata or {}
+        metadata_title = normalize_whitespace(str(metadata.get("title", "")))
+        metadata_subject = normalize_whitespace(str(metadata.get("subject", "")))
+        if len(doc):
+            first_page_text = doc[0].get_text("text")
+    except Exception:
+        return hints
+    finally:
+        doc.close()
+
+    if metadata_title:
+        hints["title"] = metadata_title
+    else:
+        page_title = first_page_title_candidate(first_page_text)
+        if page_title:
+            hints["title"] = page_title
+
+    searchable = "\n".join(part for part in [metadata_subject, metadata_title, first_page_text] if part)
+    doi = extract_doi(searchable)
+    if doi:
+        hints["doi"] = doi
+    arxiv_id = extract_arxiv_id(searchable)
+    if arxiv_id:
+        hints["arxiv_id"] = arxiv_id
+
+    return hints
+
+
+def choose_local_pdf_corrected_title(base: dict[str, Any], candidates: list[dict[str, Any]]) -> str:
+    current_title = normalize_whitespace(str(base.get("title", "")))
+    if not current_title or not is_probable_local_pdf_artifact_title(current_title):
+        return ""
+    titled_candidates = [candidate for candidate in candidates if normalize_whitespace(str(candidate.get("title", "")))]
+    best = choose_best_title_match(current_title, titled_candidates)
+    if not best:
+        return ""
+    candidate_title = normalize_whitespace(str(best.get("title", "")))
+    if not candidate_title:
+        return ""
+    if title_similarity(current_title, candidate_title) < 0.55:
+        return ""
+    if not (best.get("doi") or best.get("arxiv_id") or publication_quality_score(best) >= 2):
+        return ""
+    return candidate_title
 
 
 def extract_caption_lines(pdf_text: str, kind: str) -> list[dict[str, str]]:
