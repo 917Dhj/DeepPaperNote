@@ -15,23 +15,12 @@ Chinese trigger examples:
 - `写一篇高质量论文精读笔记`
 - `把这篇文章整理成 obsidian 笔记`
 - `读这篇论文并生成 md 笔记`
-- `/deeppapernote doctor`
-- `/deeppapernote start`
-- `查看 deeppapernote 的可用情况`
-- `deeppapernote 有什么功能`
-- `帮我检查 deeppapernote 现在能不能用`
 
 This skill is intentionally narrow:
 - it handles one paper at a time
 - it does not update daily reading lists
 - it does not treat a shallow abstract rewrite as a successful output
-
-It also supports a lightweight documentation/setup-assistant mode.
-When the user asks what DeepPaperNote can do, whether it is available, or how to configure it:
-- do not force a paper-writing workflow
-- inspect the local environment first
-- explain the current setup state
-- offer to help complete missing configuration
+- it does not split the public entrypoint into separate setup, troubleshooting, or start commands
 
 ## Core Standard
 
@@ -62,10 +51,11 @@ Follow this order:
 5. extract PDF image assets
 6. plan figure placement
 7. build the synthesis bundle
-8. have Codex/GPT read the bundle and write the note
-9. lint the final note
-10. perform `final_readability_review` after lint passes
-11. write into Obsidian
+8. have the model read the bundle and plan the note
+9. have the model write the note
+10. lint the final note
+11. perform `final_readability_review` after lint passes
+12. write into Obsidian
 
 This is the required workflow for a normal single-paper note request, not a loose suggestion.
 Unless this skill explicitly marks a stage as optional, required stages must not be silently skipped, reordered into a shortcut, or treated as complete just because a partial artifact already exists.
@@ -91,37 +81,11 @@ Completion-language rule:
 - lint is a floor, not the writing objective
 
 Read [references/workflow.md](references/workflow.md) for the full pipeline and data contracts.
-Read [references/architecture.md](references/architecture.md) for the separation between the reusable core workflow and the Codex-specific adapter layer.
+Read [references/architecture.md](references/architecture.md) for the separation between the reusable core workflow and the platform-adapter layer.
 Read [references/evidence-first.md](references/evidence-first.md) before drafting a high-quality note so that the note is planned around evidence rather than headings alone.
 Read [references/deep-analysis.md](references/deep-analysis.md) before writing the final note body.
 Read [references/final-writing.md](references/final-writing.md) before turning the structured artifacts into the final user-facing note.
 Read [references/model-synthesis.md](references/model-synthesis.md) for the preferred model-first execution loop after the synthesis bundle is ready.
-
-## Setup-Assistant Mode
-
-If the user asks things like:
-- `/deeppapernote doctor`
-- `/deeppapernote start`
-- `查看 deeppapernote 的可用情况`
-- `deeppapernote 有什么功能`
-- `帮我检查 deeppapernote 现在能不能用`
-
-then switch into setup-assistant mode:
-1. run `scripts/check_environment.py`
-2. if the current Codex environment supports Zotero MCP, check whether it is available
-3. explain:
-   - what DeepPaperNote can do
-   - which required items are already configured
-   - which optional items are available
-   - which recommended items are still missing
-4. group the final status into:
-   - already configured
-   - recommended next configuration
-   - optional but helpful enhancements
-5. if Codex can directly help complete a missing configuration, offer that next
-
-In setup-assistant mode, prefer a practical environment report over generic documentation text.
-The no-short-circuit rules above apply to normal note-generation requests, not to this setup-assistant mode.
 
 ## Tool and Source Priority
 
@@ -132,15 +96,15 @@ Prefer the strongest available source in this order:
 4. arXiv or open-access PDF sources
 5. Semantic Scholar or OpenAlex for metadata backfill
 
-When Zotero is available, use Zotero MCP tools first for local-library context. Do not require Zotero to succeed. The skill must still work when the paper is not in the user's library.
+When local bibliography integration is available, use it first for local-library context. Do not require it to succeed. The skill must still work when the paper is not in the user's library.
 
-Zotero-first rule:
-- If the user input is a title, DOI, or arXiv id, first search the local Zotero library.
+Local-library-first rule:
+- If the user input is a title, DOI, or arXiv id, first search the local Zotero library when that integration is available.
 - If Zotero finds the paper, treat that result as the canonical identity resolution step.
-- If the attachment path is not exposed by MCP, use `scripts/locate_zotero_attachment.py` with the attachment key and filename to find the local PDF under the user's Zotero storage.
+- If the attachment path is not exposed by the integration, use `scripts/locate_zotero_attachment.py` with the attachment key and filename to find the local PDF under the user's Zotero storage.
 - If a local attachment path is available, pass it forward as the preferred PDF source.
-- If no local attachment is found, still use the Zotero-resolved metadata to avoid title ambiguity, then fall back to network PDF acquisition only for the file itself.
-- Do not let a weaker title-only internet match override a confident Zotero hit.
+- If no local attachment is found, still use the library-resolved metadata to avoid title ambiguity, then fall back to network PDF acquisition only for the file itself.
+- Do not let a weaker title-only internet match override a confident local-library hit.
 
 ## Output Rules
 
@@ -175,7 +139,7 @@ Zotero-first rule:
 Model-first rule:
 - scripts may gather and structure evidence
 - scripts must not be the primary mechanism for understanding the paper
-- final paper understanding and note writing belong to Codex/GPT
+- final paper understanding and note writing belong to the model
 - before writing the final note, create an explicit short `note_plan` artifact rather than relying on hidden planning only
 - prefer a compact structured plan such as `<note_plan>...</note_plan>` or an equivalent temporary planning file
 - do not require or expose a long free-form `<thinking>` block
@@ -194,7 +158,7 @@ Use [references/figure-placement.md](references/figure-placement.md) for figure 
 Use [references/evidence-first.md](references/evidence-first.md) when deciding how to turn bundle evidence into an actual note plan.
 Use [references/deep-analysis.md](references/deep-analysis.md) when the user expects a note that feels like a real long-term research note.
 Use [references/metadata-sources.md](references/metadata-sources.md) when metadata is incomplete.
-Use [references/architecture.md](references/architecture.md) when deciding whether a change belongs in the reusable core or only in the Codex adapter.
+Use [references/architecture.md](references/architecture.md) when deciding whether a change belongs in the reusable core or only in the platform-adapter layer.
 Use [references/final-writing.md](references/final-writing.md) when drafting the final note in natural language.
 
 ## Scripts
@@ -216,20 +180,19 @@ Use these bundled scripts rather than rebuilding the workflow from scratch:
 - `scripts/write_obsidian_note.py`
 
 Preferred usage pattern:
-1. if Zotero MCP is available, search the local Zotero library first
-2. if Zotero resolves the paper, inspect child attachments; if needed use `scripts/locate_zotero_attachment.py` to find the local PDF
+1. if local bibliography integration is available, search the local Zotero library first
+2. if the library resolves the paper, inspect child attachments; if needed use `scripts/locate_zotero_attachment.py` to find the local PDF
 3. use `scripts/create_input_record.py` to materialize a trusted JSON input record
 4. run `scripts/run_pipeline.py` on the JSON record or original exact source to produce the bundle
 5. read the bundle yourself
 6. write the note in your own words
 7. lint the note
-8. write it into Obsidian only after lint passes
+8. write it into Obsidian only after lint passes and the final readability review is complete
 
-Setup-assistant usage pattern:
-1. run `scripts/check_environment.py`
-2. summarize what is already usable
-3. explain what each missing item affects
-4. offer to configure missing items rather than just listing docs
+Troubleshooting rule:
+- use `scripts/check_environment.py` only when a concrete dependency or integration question is blocking execution
+- explain required dependencies, optional enhancements, and downgrade behavior directly rather than redirecting the skill into a separate troubleshooting workflow
+- do not feature environment inspection as a public pseudo-command surface
 
 Current status:
 - the single-paper deterministic core pipeline is implemented as an MVP

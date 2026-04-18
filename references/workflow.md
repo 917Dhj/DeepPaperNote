@@ -2,14 +2,14 @@
 
 This skill is a single-paper production pipeline.
 
-The pipeline below describes the reusable core workflow, not only the Codex wrapper.
+The pipeline below describes the reusable core workflow plus the model-side handoff expected by any platform adapter.
 
-When local Zotero is available, the Codex adapter should run a Zotero-first preflight before the deterministic pipeline:
+When the current environment exposes local bibliography tooling, run a local-library-first preflight before the deterministic pipeline:
 - search the local Zotero library by title, DOI, or arXiv id
 - if there is a confident local hit, materialize a JSON input record from that trusted metadata
 - inspect child attachments and prefer a local Zotero attachment path if one is available
-- if MCP does not expose the local path, use the attachment key and filename to locate it in common Zotero `storage/` roots
-- only fall back to title-based web resolution when Zotero does not resolve the paper
+- if the integration does not expose the local path, use the attachment key and filename to locate it in common Zotero `storage/` roots
+- only fall back to title-based web resolution when the local library does not resolve the paper
 
 For convenience, MVP also includes a runner script that executes the deterministic stages sequentially:
 - `scripts/run_pipeline.py`
@@ -33,7 +33,7 @@ For a normal single-paper note request, the pipeline below is a required executi
 1. `resolve_paper`
    Normalize the user input into one paper identity.
    Accepted inputs: title, DOI, URL, arXiv ID, local PDF path, Zotero item key.
-   If the input is already a trusted JSON record from Zotero resolution, prefer that over a fresh title search.
+   If the input is already a trusted JSON record from local-library resolution, prefer that over a fresh title search.
    Completion condition:
    - one canonical paper identity is selected
    - obvious title ambiguity is resolved rather than hand-waved
@@ -122,7 +122,7 @@ For a normal single-paper note request, the pipeline below is a required executi
    - stop and report bundle construction as the blocking stage
    - do not replace the bundle with ad hoc memory of prior stages
 
-8. Codex/GPT note planning
+8. model note planning
    Before drafting the final note, create an explicit short note-planning artifact:
    - infer the paper type
    - decide which sections deserve the most weight
@@ -132,14 +132,14 @@ For a normal single-paper note request, the pipeline below is a required executi
    Recommended form:
    - a compact `<note_plan>...</note_plan>` block
    - or a temporary planning file saved before the final note
-   Do not rely only on an implicit "hidden planning" step.
+   Do not rely only on an implicit hidden-planning step.
    Completion condition:
    - an explicit `note_plan` artifact exists
    Allowed on failure:
    - revise planning until a short inspectable plan exists
-   - do not jump straight to prose and claim planning was "basically done"
+   - do not jump straight to prose and claim planning was basically done
 
-9. Codex/GPT synthesis
+9. model synthesis
    The language model reads the synthesis bundle and writes the actual note.
    It should do all understanding-heavy work:
    - choose emphasis
@@ -160,7 +160,7 @@ For a normal single-paper note request, the pipeline below is a required executi
    - lint has actually run and produced a result
    Allowed on failure:
    - revise and rerun lint
-   - do not say the note is "already validated" if lint never ran
+   - do not say the note is already validated if lint never ran
 
 11. `final_readability_review`
    After the first successful script lint pass, reread the full note once more as a language-and-expression quality pass.
@@ -176,7 +176,7 @@ For a normal single-paper note request, the pipeline below is a required executi
    - if edits were made, the note is marked for a lint rerun before save
    Allowed on failure:
    - continue rereading or revising until the readability review is complete
-   - do not treat "lint already passed" as permission to skip this stage
+   - do not treat lint already passed as permission to skip this stage
    - do not invent new facts or change core numbers and conclusions under the name of polish
 
 12. `write_obsidian_note`
@@ -204,12 +204,12 @@ For a normal single-paper note request, the pipeline below is a required executi
     - one folder per paper
     - the note Markdown inside that folder
     - an `images/` subfolder for materialized figure assets, created even when it stays empty
-    Do not claim the note is "already saved to Obsidian" if the vault write or `images/` directory creation never actually happened.
+    Do not claim the note is already saved to Obsidian if the vault write or `images/` directory creation never actually happened.
     Completion condition:
     - the note is actually written to the chosen target, and required paper-local layout is materialized
     Allowed on failure:
     - report the write step as incomplete
-    - do not present "ready to write" or "temporary file exists" as a successful save
+    - do not present ready-to-write or temporary-file-exists as a successful save
 
 ## Final Writing Rule
 
@@ -217,12 +217,11 @@ The structured artifacts are necessary, but they are not the final goal.
 
 For the best note quality:
 - scripts should gather and structure evidence
-- Codex should read the synthesis bundle and write the final note in its own words
+- the model should read the synthesis bundle and write the final note in its own words
 - do not delegate paper understanding to keyword scripts if the model can infer it from the bundle
 
 Use [final-writing.md](final-writing.md) as the last-mile writing guide.
 Use [evidence-first.md](evidence-first.md) and [deep-analysis.md](deep-analysis.md) for the planning and deep-reading rules that should shape the final note.
-
 
 ## Required Contracts
 
@@ -313,6 +312,6 @@ If the PDF or evidence is insufficient:
 ## Portability Rule
 
 Keep the core workflow portable:
-- the data contracts should remain useful outside Codex
-- the scripts should not depend on Codex-only message formatting
+- the data contracts should remain useful outside any one agent runtime
+- the scripts should not depend on platform-specific message formatting
 - platform-specific behavior belongs in the adapter layer

@@ -2,9 +2,9 @@
 
 This skill should be implemented as:
 - a reusable core workflow
-- a thin Codex adapter
+- thin platform adapters
 
-That separation keeps the project useful even if the execution environment changes later.
+That separation keeps the project useful even if the host environment changes later.
 
 ## Layer 1: Reusable Core
 
@@ -26,19 +26,19 @@ These pieces should live primarily in:
 
 The core should be agent-agnostic wherever possible.
 
-## Layer 2: Codex Adapter
+## Layer 2: Platform Adapter Layer
 
-The Codex adapter includes:
+A platform adapter can include:
 - `SKILL.md`
 - `agents/openai.yaml`
+- other distribution-specific manifest files
 - trigger phrasing
-- tool-selection instructions for the Codex environment
-- commentary/final interaction style
-- any Codex-specific Obsidian or MCP calling conventions
-- local Zotero MCP preflight before network title resolution
+- tool-selection instructions for the host environment
+- interaction-style notes
+- host-specific Obsidian or local-library calling conventions
 
 This layer should stay thin.
-Do not bury core business logic only inside `SKILL.md`.
+Do not bury core business logic only inside prompt text or distribution metadata.
 
 ## Design Rule
 
@@ -46,8 +46,8 @@ When adding a new behavior, ask:
 
 1. Would another agent framework also need this behavior?
    - If yes, put it in the core.
-2. Is this only about how Codex discovers or invokes the workflow?
-   - If yes, put it in the adapter.
+2. Is this only about how one host environment discovers or invokes the workflow?
+   - If yes, put it in the adapter layer.
 
 ## What Belongs in Scripts
 
@@ -86,10 +86,11 @@ Keep only:
 - the high-level workflow
 - which scripts to use
 - which references to read
+- the non-negotiable workflow constraints that must remain visible at the entrypoint
 
 ## Portability Goals
 
-A future non-Codex version should be able to reuse:
+A future adapter on another platform should be able to reuse:
 - the same scripts
 - the same contracts
 - the same note template

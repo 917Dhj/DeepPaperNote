@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect the local DeepPaperNote environment and report setup readiness."""
+"""Inspect the local DeepPaperNote environment for maintenance and troubleshooting."""
 
 from __future__ import annotations
 
@@ -78,6 +78,7 @@ def main() -> None:
     payload = {
         "status": "ok",
         "script": "check_environment.py",
+        "tool_role": "maintenance",
         "python": {
             "executable": sys.executable,
             "version": sys.version.split()[0],
@@ -102,7 +103,8 @@ def main() -> None:
         "zotero": {
             "local_hints": find_local_zotero_hints(),
             "mcp_available_from_script": False,
-            "note": "Zotero MCP availability must be checked by Codex at runtime, not by this script.",
+            "session_integration_checked_by_script": False,
+            "note": "Session-scoped library integrations must be checked by the active agent at runtime, not by this script.",
         },
         "ocr": {
             "tesseract_installed": bool(tesseract_path),
@@ -113,6 +115,7 @@ def main() -> None:
             "pdftoppm_path": pdftoppm_path,
         },
         "metadata": {
+            "maintenance_utility": True,
             "semantic_scholar_api_key_configured": bool(
                 env_config_value("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY", "SEMANTIC_SCHOLAR_API_KEY")
             )

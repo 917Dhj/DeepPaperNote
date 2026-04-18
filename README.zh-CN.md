@@ -9,7 +9,7 @@
 [![状态](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
 [![版本](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.3.1-alpha)
 [![许可证](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
-[![Codex](https://img.shields.io/badge/Codex-skill-111827?style=for-the-badge)](./SKILL.md)
+[![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-111827?style=for-the-badge)](./SKILL.md)
 [![输出](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
 [![图表](https://img.shields.io/badge/figures-placeholder--first-f59e0b?style=for-the-badge)](./references/figure-placement.md)
 [![写作](https://img.shields.io/badge/writing-model--first-7c3aed?style=for-the-badge)](./references/model-synthesis.md)
@@ -28,7 +28,7 @@
 
 DeepPaperNote 想解决的，就是这一层重复、机械、但又非常耗时的工作。它会先把整理、结构化、图表定位和笔记成形这些环节做掉，让你把精力留给真正的思考。
 
-DeepPaperNote 是一个面向**论文深度阅读**的 Codex 技能。它不是“再把摘要复述一遍”的论文总结器，而是更关注：
+DeepPaperNote 是一个面向**论文深度阅读**的技能，同一套核心能力可以运行在 Claude Code 和 Codex 上。它更关注：
 
 - 论文到底在解决什么问题
 - 方法机制是怎么工作的
@@ -36,7 +36,7 @@ DeepPaperNote 是一个面向**论文深度阅读**的 Codex 技能。它不是�
 - 最终能不能沉淀成一份**适合长期积累的 Obsidian 笔记**
 
 > [!tip]
-> 如果你已经有自己的 Obsidian / Zotero 工作流，DeepPaperNote 不会试图替代它，而是把最耗时、最容易出错的取证、整理和成稿环节自动化。
+> 如果你已经有自己的 Obsidian / Zotero 工作流，DeepPaperNote 会把最耗时、最容易出错的取证、整理和成稿环节自动化。
 
 ## 🎯 它帮你解决什么问题？
 
@@ -88,9 +88,19 @@ DeepPaperNote 不是靠“把摘要重新措辞一遍”来显得更完整，而
 
 ## 🚀 快速上手
 
-### 1) 将 DeepPaperNote 安装到 Codex 技能目录
+### 1) 将 DeepPaperNote 安装到你的 agent 技能目录
 
-推荐去 [release](https://github.com/917Dhj/DeepPaperNote/releases) 页面下载最新版本的 zip 包，解压后放进你的 Codex 技能目录。
+DeepPaperNote 同时支持 Claude Code 和 Codex。
+
+#### Codex
+
+如果你使用 Agent Skills 兼容安装器，可以直接从这个仓库安装：
+
+```bash
+npx skills add 917Dhj/DeepPaperNote -a codex
+```
+
+如果你更习惯手动安装，推荐去 [release](https://github.com/917Dhj/DeepPaperNote/releases) 页面下载最新版本的 zip 包，解压后放进你的 Codex 技能目录。
 
 例如，下载 `DeepPaperNote-v0.3.1-alpha.zip` 后，可以把解压出来的文件夹放到：
 
@@ -104,7 +114,29 @@ DeepPaperNote 不是靠“把摘要重新措辞一遍”来显得更完整，而
 git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
 ```
 
-安装完成后，重启 Codex 让技能生效。
+#### Claude Code
+
+如果这个仓库已经发布到 Claude Marketplace，你可以优先从 Marketplace 安装。
+
+如果你使用 Agent Skills 兼容安装器，也可以直接从这个仓库安装：
+
+```bash
+npx skills add 917Dhj/DeepPaperNote -a claude
+```
+
+如果你更习惯手动安装，可以把 release 解压后的文件夹放进你的 Claude Code 技能目录：
+
+```bash
+~/.claude/skills/DeepPaperNote-v0.3.1-alpha
+```
+
+也可以直接 `git clone`：
+
+```bash
+git clone https://github.com/917Dhj/DeepPaperNote.git ~/.claude/skills/DeepPaperNote
+```
+
+安装完成后，重启你的 agent 让技能生效。
 
 ### 2) 安装核心 Python 依赖
 
@@ -121,7 +153,7 @@ python3 -m pip install PyMuPDF
 
 ### 3) 直接开始使用
 
-接下来你只需要把论文丢给它就行，标题、DOI、URL、本地 PDF 都可以，你可以直接给出类似这样的指令：
+接下来你只需要把论文丢给 agent 就行，标题、DOI、URL、本地 PDF 都可以，你可以直接给出类似这样的指令：
 
 - 💬 `给这篇论文生成深度笔记：Attention Is All You Need`
 - 💬 `把这篇文章整理成 Obsidian 笔记：https://arxiv.org/abs/1706.03762`
@@ -142,20 +174,17 @@ python3 -m pip install PyMuPDF
 
 如果你还没有完整配置 Obsidian / Zotero / OCR，也可以先试跑。
 
-如果你想先检查环境，也可以直接对 Codex 说：
+如果你想先检查环境，也可以直接对 agent 说：
 
-- 💬 `/deeppapernote doctor`
-- 💬 `/deeppapernote start`
+- 💬 `请帮我检查这台机器上的 DeepPaperNote 是否已经准备好`
 - 💬 `查看 deeppapernote 的可用情况`
 - 💬 `deeppapernote 有什么功能`
 
-如果你还想看更明确的上手提示，也可以参考 [ONBOARDING_PROMPT.md](./ONBOARDING_PROMPT.md)。
-
 ## 🔧 配置指南（开箱即用，按需进阶）
 
-**如果你已经安装好了PyMuPDF，那么你就可以直接开始使用DeepPaperNote生成笔记了**。以下的介绍的配置都是核心功能的扩展，让你能够将DeepPaperNote生成的笔记真正融入你的科研工作流中。  
+**如果你已经安装好了PyMuPDF，那么你就可以直接开始使用DeepPaperNote生成笔记了**。以下介绍的配置都是核心功能的扩展，让你能够将 DeepPaperNote 生成的笔记真正融入你的科研工作流中。
 
-- 如果你没有配置 Obsidian，它也能先把笔记自动输出到当前工作目录。  
+- 如果你没有配置 Obsidian，它也能先把笔记自动输出到当前工作目录。
 - 但如果你想要更好的长期管理体验，还是强烈建议配置你的 Obsidian 库路径。
 
 ### 📍 核心配置：指定你的 Obsidian 库
@@ -164,23 +193,23 @@ python3 -m pip install PyMuPDF
 export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian_Documents/绝对路径"
 ```
 
-如果你希望 Codex 在之后的新终端会话里也一直读到这个默认配置：
+如果你希望 agent 在之后的新终端会话里也一直读到这个默认配置：
 
-- 在 macOS / Linux 上，建议把它写进 `~/.zshrc` 之类的 shell 配置文件，然后重新加载 shell 或重启 Codex：
+- 在 macOS / Linux 上，建议把它写进 `~/.zshrc` 之类的 shell 配置文件，然后重新加载 shell 或重启 agent：
 
 ```bash
 echo 'export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian_Documents/绝对路径"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-- 在 Windows PowerShell 上，可以把它持久化成用户环境变量，然后重新打开终端（重启 Codex）：
+- 在 Windows PowerShell 上，可以把它持久化成用户环境变量，然后重新打开终端：
 
 ```powershell
 setx DEEPPAPERNOTE_OBSIDIAN_VAULT "C:\Users\YourName\Documents\Obsidian_Documents"
 ```
 
 <details>
-<summary><strong>🛠️ 展开查看更多进阶配置（目录自定义 / Zotero MCP / Semantic Scholar / OCR）</strong></summary>
+<summary><strong>🛠️ 展开查看更多进阶配置（目录自定义 / Zotero / Semantic Scholar / OCR）</strong></summary>
 
 ### 目录相关配置
 
@@ -198,7 +227,7 @@ export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 | `DEEPPAPERNOTE_OUTPUT_DIR` | 可选 | 本地临时产物目录，默认是 `tmp/DeepPaperNote` |
 | `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | 可选 | 当没有配置 Obsidian 库时，当前工作区下的自动降级输出目录，默认是 `DeepPaperNote_output` |
 
-如果你希望 Codex 后续一直默认使用这些值：
+如果你希望 agent 后续一直默认使用这些值：
 
 - 在 macOS / Linux 上，也建议把它们写进 `~/.zshrc`：
 
@@ -220,10 +249,10 @@ setx DEEPPAPERNOTE_PAPERS_DIR "Research/Papers"
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   如果你希望中间产物统一落在一个固定位置，方便调试、清理或做实验，这个配置会比较有用。
 
-### 可选：用于本地文献库优先工作流的 Zotero MCP
+### 可选：用于本地文献库优先工作流的 Zotero
 
-DeepPaperNote 不依赖 Zotero 才能工作。  
-但如果你本来就用 Zotero 做文献管理，配置一个 **Codex 真的能用** 的 Zotero MCP 会很值。
+DeepPaperNote 不依赖 Zotero 才能工作。
+但如果你本来就用 Zotero 做文献管理，配置一个你的 agent 真的能用的 Zotero 集成会很值。
 
 它最适合这样的人：
 - 你本来就用 Zotero 做文献管理
@@ -233,23 +262,23 @@ DeepPaperNote 不依赖 Zotero 才能工作。
 
 | 🧩 方案 | 🎯 更适合什么场景 | 📝 说明 |
 | --- | --- | --- |
-| [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | 轻量的只读访问 | 更接近一个最小化 Zotero MCP 服务，适合搜索条目、读元数据、读文本，但并不原生面向 Codex，通常也需要你自己做一点适配 |
-| [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | 更完整的研究工作流能力 | 功能更丰富，但同样不是为 Codex 原生设计的，接进 Codex 时通常需要额外改造 |
+| [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | 轻量的只读访问 | 更接近一个最小化 Zotero MCP 服务，适合搜索条目、读元数据、读文本，但通常仍需要你自己做一点适配 |
+| [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | 更完整的研究工作流能力 | 功能更丰富，但稳定接进你的 agent 环境时通常也需要额外改造 |
 
 为什么值得配：
 
 - 本地 Zotero 命中通常是最可靠的论文身份锚点
 - 如果论文已经在你的本地 Zotero 库里，DeepPaperNote 往往可以直接复用本地条目和附件信息，不必再重新联网搜索和下载，因此生成速度通常也会更快
-- Codex 可以先查你的本地论文库，再决定要不要联网
+- agent 可以先查你的本地论文库，再决定要不要联网
 - 本地附件也更有助于减少标题误匹配
 - 如果你本来就用 Zotero 做论文管理，这会比重新去网上“猜测这篇论文是谁”稳得多
 - 对正式发表版、预印本、镜像页面标题相似的场景，Zotero 优先通常会明显降低误匹配概率
 
 ⚠️需要特别说明的是：
 
-- DeepPaperNote **不强依赖某一个固定的 Zotero MCP 仓库**
-- 对 DeepPaperNote 来说，需要 Zotero MCP 的能力是：让 Codex 能搜索 Zotero 条目、查看元数据、最好还能读取本地全文
-- 上面提到的两条路线目前都**不是原生支持 Codex 的即插即用方案**，如果你想在 Codex 里稳定使用，通常都需要自己做一层适配或改造
+- DeepPaperNote **不强依赖某一个固定的 Zotero 集成仓库**
+- 对 DeepPaperNote 来说，需要的关键能力是：让 agent 能搜索 Zotero 条目、查看元数据、最好还能读取本地全文
+- 上面提到的两条路线目前都**不一定是即插即用方案**，如果你想稳定使用，通常还需要自己做一层适配或改造
 
 ### 可选：Semantic Scholar API Key
 
@@ -268,7 +297,7 @@ export DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY="your_api_key"
 
 ### 可选：OCR 工具
 
-很多现代 PDF 并不需要 OCR。  
+很多现代 PDF 并不需要 OCR。
 但如果论文是下面这些情况，OCR 会很有帮助：
 
 - 扫描版 PDF
@@ -339,7 +368,7 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 | v0.3.1-alpha | ✅ 已发布 | 默认 Obsidian 论文根目录改为 `Research/Papers`，运行时路径解析和写入行为也同步对齐到这个新位置 |
 | v0.3.0-alpha | ✅ 已发布 | 一次较大的质量升级：新增固定创新点章节、显式机制流程、更强的整条 workflow 约束、最终可读性质检、公式语法检查，以及新的 `原文摘要翻译` 前置区块 |
 | v0.2.0-alpha | ✅ 已发布 | 复现级技术笔记写作升级：显式 `note_plan`、公式感知输出、更强的最终自检、摘要中英双写，以及更严格的格式校验 |
-| v0.1.0-alpha | ✅ 已发布 | 第一个公开 alpha 版：Codex 工作流、综合证据包流程、Zotero 优先辅助能力、占位优先图表处理、工作区回退输出、OCR 回退、测试与 CI |
+| v0.1.0-alpha | ✅ 已发布 | 第一个公开 alpha 版：综合证据包流程、Zotero 优先辅助能力、占位优先图表处理、工作区回退输出、OCR 回退、测试与 CI |
 | 未发布 | 🕒 暂无新的 release 级变化 | 当前还没有下一版 release 的公开更新内容，最新版本为 v0.3.1-alpha |
 
 ## ⚙️ 工作流
@@ -353,15 +382,15 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 5. 提取 PDF 图像资产
 6. 规划图表位置
 7. 构建综合证据包
-8. 让 Codex/GPT 写笔记
+8. 让模型写笔记
 9. 校验最终笔记
-10. 写入 Obsidian
+10. 做最终可读性复核并写入 Obsidian
 
 核心原则：
 
 - 脚本负责取证
 - 模型负责写作
-- 格式校验在写入前兜底
+- 格式校验和最终可读性复核在写入前兜底
 
 相关文档：
 
@@ -376,7 +405,7 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 这就是为什么 DeepPaperNote 采用了一种更偏向“结构优先”的图像占位策略：
 
 - 尽量保留图表在笔记中的语义位置
-- 即使图表抽取不理想，也不尽量破坏整体阅读流
+- 即使图表抽取不理想，也尽量不破坏整体阅读流
 - 让你知道某个位置原本对应什么图，为什么值得看。这样你后续读文章的时候可以自己截图，将图片放在笔记中标记好的位置。
 
 笔记中的图像占位格式如下：
@@ -424,8 +453,17 @@ DeepPaperNote/
 ├── SKILL.md
 ├── README.md
 ├── README.zh-CN.md
+├── CHANGELOG.md
+├── LICENSE
+├── pyproject.toml
 ├── agents/
 │   └── openai.yaml
+├── .claude-plugin/
+│   ├── plugin.json
+│   └── marketplace.json
+├── skills/
+│   └── deeppapernote/
+│       └── SKILL.md
 ├── assets/
 │   ├── hero-academic.svg
 │   ├── hero.png
@@ -444,6 +482,7 @@ DeepPaperNote/
 │   └── workflow.md
 └── scripts/
     ├── build_synthesis_bundle.py
+    ├── check_environment.py
     ├── collect_metadata.py
     ├── common.py
     ├── contracts.py
@@ -464,11 +503,11 @@ DeepPaperNote/
 
 | 🧰 组件 | 🚦 状态 | 📝 说明 |
 | --- | --- | --- |
-| Codex desktop / CLI | 推荐 | 当前主目标环境 |
+| Claude Code / Codex | 推荐 | 支持的 agent 环境 |
 | Python 3.10+ | 必需 | 运行辅助脚本 |
 | PyMuPDF | 必需 | 核心 PDF 依赖，可用 `python3 -m pip install PyMuPDF` 安装 |
 | 本地 Obsidian 库 | 推荐 | 配好后可直接写入长期笔记体系；不配时会自动降级输出到当前目录 |
-| Zotero + MCP | 可选 | 对本地论文库工作流很有帮助 |
+| Zotero 集成 | 可选 | 对本地论文库工作流很有帮助 |
 | OCR 工具 | 可选 | 对扫描版 PDF 更友好 |
 
 ## 🧭 设计原则

@@ -9,7 +9,7 @@
 [![Status](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
 [![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.3.1-alpha)
 [![License](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
-[![Codex](https://img.shields.io/badge/Codex-skill-111827?style=for-the-badge)](./SKILL.md)
+[![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-111827?style=for-the-badge)](./SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
 [![Figures](https://img.shields.io/badge/figures-placeholder--first-f59e0b?style=for-the-badge)](./references/figure-placement.md)
 [![Writing](https://img.shields.io/badge/writing-model--first-7c3aed?style=for-the-badge)](./references/model-synthesis.md)
@@ -28,7 +28,7 @@
 
 DeepPaperNote is built for exactly that layer of repetitive, mechanical, but very expensive work. It takes over the gathering, structuring, figure placement, and note production work so you can keep your attention on actual thinking.
 
-DeepPaperNote is a Codex skill for **deep paper reading**. It is not another tool that paraphrases the abstract and stops there. It cares about a harder set of questions:
+DeepPaperNote is a skill for **deep paper reading**. The same core skill can be used from Claude Code and Codex. It cares about a harder set of questions:
 
 - What problem is this paper actually solving?
 - How does the mechanism really work?
@@ -38,7 +38,7 @@ DeepPaperNote is a Codex skill for **deep paper reading**. It is not another too
 Let scripts handle the repetitive work. Save your attention for actual thinking.
 
 > [!tip]
-> If you already have an Obsidian or Zotero workflow, DeepPaperNote is not trying to replace it. It is trying to automate the most tedious parts of evidence gathering, structuring, and note production.
+> If you already have an Obsidian or Zotero workflow, DeepPaperNote is trying to automate the most tedious parts of evidence gathering, structuring, and note production.
 
 ## 🎯 What problems does it solve?
 
@@ -90,9 +90,19 @@ DeepPaperNote does not look more complete by simply rewriting the abstract in sm
 
 ## 🚀 Quick Start
 
-### 1) Install DeepPaperNote into your Codex skills directory
+### 1) Install DeepPaperNote into your agent skill directory
 
-The recommended way is to download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Codex skills directory:
+DeepPaperNote supports both Claude Code and Codex.
+
+#### Codex
+
+If you use an Agent Skills-compatible installer, install from this repository with:
+
+```bash
+npx skills add 917Dhj/DeepPaperNote -a codex
+```
+
+If you prefer the manual path, download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Codex skills directory.
 
 For example, after downloading `DeepPaperNote-v0.3.1-alpha.zip`, you can unzip it and move the extracted folder to:
 
@@ -100,13 +110,35 @@ For example, after downloading `DeepPaperNote-v0.3.1-alpha.zip`, you can unzip i
 ~/.codex/skills/DeepPaperNote-v0.3.1-alpha
 ```
 
-Of course, you can also clone the source repository directly:
+You can also clone the source repository directly:
 
 ```bash
 git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
 ```
 
-After installation, restart Codex so the skill is loaded.
+#### Claude Code
+
+If this repository is published in Claude Marketplace, you can install it there first.
+
+If you use an Agent Skills-compatible installer, install from this repository with:
+
+```bash
+npx skills add 917Dhj/DeepPaperNote -a claude
+```
+
+If you prefer the manual path, download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Claude Code skills directory:
+
+```bash
+~/.claude/skills/DeepPaperNote-v0.3.1-alpha
+```
+
+You can also clone the source repository directly:
+
+```bash
+git clone https://github.com/917Dhj/DeepPaperNote.git ~/.claude/skills/DeepPaperNote
+```
+
+After installation, restart your agent so the skill is loaded.
 
 ### 2) Install the core Python dependency
 
@@ -123,7 +155,7 @@ Why this step matters:
 
 ### 3) Start using it immediately
 
-After that, just hand a paper to Codex. A title, DOI, URL, arXiv ID, or local PDF all work. Prompts like these are enough:
+After that, just hand a paper to the agent. A title, DOI, URL, arXiv ID, or local PDF all work. Prompts like these are enough:
 
 Typical prompts:
 
@@ -152,16 +184,11 @@ If you want the Python dependencies for local development:
 python3 -m pip install -e .
 ```
 
-If you want to check the environment first, you can also ask Codex with short prompts such as:
+If you want to check the environment first, you can also ask the agent with short requests such as:
 
-- `/deeppapernote doctor`
-- `/deeppapernote start`
+- `Please check whether DeepPaperNote is ready on this machine`
 - `查看 deeppapernote 的可用情况`
 - `deeppapernote 有什么功能`
-
-In that mode, DeepPaperNote should explain its capabilities, inspect the current setup, and tell you what is already configured or still missing.
-
-If you want a more explicit onboarding prompt, see [ONBOARDING_PROMPT.md](./ONBOARDING_PROMPT.md).
 
 ## 🔧 Configuration (works out of the box, improves with setup)
 
@@ -179,23 +206,23 @@ The cleanest setup is:
 export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/Obsidian_Documents"
 ```
 
-If you want Codex to keep seeing this default configuration in future terminal sessions:
+If you want your agent to keep seeing this default configuration in future terminal sessions:
 
-- on macOS / Linux, add it to your shell config such as `~/.zshrc`, then reload your shell (or Codex):
+- on macOS / Linux, add it to your shell config such as `~/.zshrc`, then reload your shell (or restart the agent):
 
 ```bash
 echo 'export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/Obsidian_Documents"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-- on Windows PowerShell, persist it as a user environment variable and then restart your terminal (or Codex):
+- on Windows PowerShell, persist it as a user environment variable and then restart your terminal:
 
 ```powershell
 setx DEEPPAPERNOTE_OBSIDIAN_VAULT "C:\Users\YourName\Documents\Obsidian_Documents"
 ```
 
 <details>
-<summary><strong>🛠️ Show advanced configuration (directories / Zotero MCP / Semantic Scholar / OCR)</strong></summary>
+<summary><strong>🛠️ Show advanced configuration (directories / Zotero / Semantic Scholar / OCR)</strong></summary>
 
 ### Directory-related settings
 
@@ -213,7 +240,7 @@ export DEEPPAPERNOTE_OUTPUT_DIR="tmp/DeepPaperNote"
 | `DEEPPAPERNOTE_OUTPUT_DIR` | Optional | Local temporary artifact directory, default: `tmp/DeepPaperNote` |
 | `DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR` | Optional | Fallback output folder under the current working directory when no Obsidian vault is configured, default: `DeepPaperNote_output` |
 
-If you want Codex to keep using these values by default:
+If you want your agent to keep using these values by default:
 
 - on macOS / Linux, add them to your `~/.zshrc` as well:
 
@@ -235,10 +262,10 @@ Why the optional path settings can help:
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   Useful if you want all intermediate artifacts in a predictable location for debugging, cleanup, or experimentation.
 
-### Optional: Zotero MCP for local-library-first workflows
+### Optional: Zotero for local-library-first workflows
 
 DeepPaperNote can work without Zotero.
-But if you want Codex to search your local Zotero library first, you should configure a Zotero MCP option that Codex can actually use.
+But if you want the agent to search your local Zotero library first, you should expose a Zotero integration that your agent runtime can actually use.
 
 This is most worth setting up if you already use Zotero as your main paper-management or reading workflow.
 
@@ -246,23 +273,23 @@ Recommended ways to think about it:
 
 | 🧩 Option | 🎯 Best for | 📝 Notes |
 | --- | --- | --- |
-| [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | Lightweight read access | Closer to a minimal Zotero MCP server for search, metadata, and text access, but not natively designed for Codex, so it usually still needs some adaptation |
-| [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | Richer research workflow features | More feature-rich, but also not natively built for Codex, so using it well in Codex usually requires additional adaptation |
+| [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | Lightweight read access | Closer to a minimal Zotero MCP server for search, metadata, and text access, but it usually still needs some adaptation for your agent runtime |
+| [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | Richer research workflow features | More feature-rich, but stable use usually still requires some integration work on your side |
 
 Why it matters:
 
 - local Zotero hits are usually the best identity anchor
 - if the paper is already in your local Zotero library, DeepPaperNote can often reuse local records and attachments instead of searching and downloading again, which also tends to make note generation faster
-- Codex can prefer your local paper library before internet search
+- the agent can prefer your local paper library before internet search
 - local attachments can reduce wrong-title matches
 - it is especially helpful when you already curate papers in Zotero and do not want DeepPaperNote to rediscover the same paper from weaker web matches
 - it also improves reliability for published papers whose title may collide with preprints, workshop versions, or mirrored pages
 
 Important note:
 
-- DeepPaperNote does **not** require one specific Zotero MCP implementation
-- for DeepPaperNote, the key capability is that Codex can search Zotero items, inspect metadata, and ideally read local full text
-- the two routes above are **not** plug-and-play Codex-native options today, so stable use in Codex usually requires some adaptation on your side
+- DeepPaperNote does **not** require one specific Zotero integration
+- for DeepPaperNote, the key capability is that the agent can search Zotero items, inspect metadata, and ideally read local full text
+- the two routes above are **not** always plug-and-play, so stable use may still require some adaptation on your side
 
 ### Optional: Semantic Scholar API key
 
@@ -307,7 +334,7 @@ Important scope note:
 - OCR is currently a **page-text fallback**
 - it is **not** the primary extraction path for all PDFs
 - it is **not** used as a replacement for model-side understanding
-- it is **not** used to "understand images" directly
+- it is **not** used to understand images directly
 
 Without OCR, DeepPaperNote still works well on normal digital PDFs, but scanned or low-quality PDFs may produce weaker evidence.
 
@@ -358,7 +385,7 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 | v0.3.1-alpha | ✅ Released | Default Obsidian paper root changed to `Research/Papers`, with runtime path resolution and save behavior aligned to the new location |
 | v0.3.0-alpha | ✅ Released | Major quality upgrade: dedicated innovation section, explicit mechanism flow, stronger workflow discipline, final readability review, math syntax gate, and the new `Original Abstract Translation` front-matter block |
 | v0.2.0-alpha | ✅ Released | Replication-oriented note-writing upgrade: explicit `note_plan`, equation-aware output, stricter final self-review, bilingual abstract handling, and stronger formatting checks |
-| v0.1.0-alpha | ✅ Released | First public alpha: Codex workflow, synthesis bundle pipeline, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
+| v0.1.0-alpha | ✅ Released | First public alpha: evidence-bundle workflow, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
 | Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v0.3.1-alpha |
 
 ## ⚙️ Workflow
@@ -372,15 +399,15 @@ The default path is:
 5. extract PDF image assets
 6. plan figure positions
 7. build a synthesis bundle
-8. let Codex/GPT write the note
+8. let the model write the note
 9. lint the final note
-10. write it into Obsidian
+10. perform the final readability review and write it into Obsidian
 
 Core principle:
 
 - scripts gather evidence
 - the model understands and writes
-- linting is the final gate before saving
+- linting and final readability review are the final gates before saving
 
 Related docs:
 
@@ -446,10 +473,15 @@ DeepPaperNote/
 ├── README.zh-CN.md
 ├── CHANGELOG.md
 ├── LICENSE
-├── ONBOARDING_PROMPT.md
 ├── pyproject.toml
 ├── agents/
 │   └── openai.yaml
+├── .claude-plugin/
+│   ├── plugin.json
+│   └── marketplace.json
+├── skills/
+│   └── deeppapernote/
+│       └── SKILL.md
 ├── assets/
 │   ├── hero-academic.svg
 │   ├── hero.png
@@ -468,6 +500,7 @@ DeepPaperNote/
 │   └── workflow.md
 └── scripts/
     ├── build_synthesis_bundle.py
+    ├── check_environment.py
     ├── collect_metadata.py
     ├── common.py
     ├── contracts.py
@@ -488,11 +521,11 @@ DeepPaperNote/
 
 | 🧰 Component | 🚦 Status | 📝 Notes |
 | --- | --- | --- |
-| Codex desktop / CLI | Recommended | Primary target environment today |
+| Claude Code / Codex | Recommended | Supported agent environments |
 | Python 3.10+ | Required | Runs the helper scripts |
 | PyMuPDF | Required | Core PDF dependency; install it with `python3 -m pip install PyMuPDF` |
 | Local Obsidian vault | Recommended | Writes directly into a long-term note system; otherwise falls back to the current working directory |
-| Zotero + MCP | Optional | Helpful for local-library-first paper workflows |
+| Zotero integration | Optional | Helpful for local-library-first paper workflows |
 | OCR tools | Optional | Improves handling of scanned PDFs |
 
 ## 🧭 Design Principles

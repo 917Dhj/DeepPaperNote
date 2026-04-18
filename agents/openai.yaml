@@ -1,7 +1,7 @@
 interface:
   display_name: "DeepPaperNote"
-  short_description: "Generate a model-written Obsidian deep-reading note for one paper from a deterministic evidence bundle"
-  default_prompt: "Use $DeepPaperNote either to inspect the current DeepPaperNote environment and explain configuration status, or to build a deterministic evidence bundle for one paper, have Codex write a high-quality Markdown deep-reading note in clean Chinese, and save it into an Obsidian vault."
+  short_description: "Generate a high-quality deep-reading note for one paper with an evidence-first workflow and Obsidian-oriented save semantics."
+  default_prompt: "Use $DeepPaperNote when the user wants to turn a single paper into a high-quality Markdown deep-reading note. Follow the bundled DeepPaperNote workflow to resolve the paper, gather evidence, plan figure and table placeholders, write the final Chinese note, run lint plus final readability review, and save it into the configured Obsidian-style vault or the workspace fallback when no vault is configured."
 
 policy:
   allow_implicit_invocation: true

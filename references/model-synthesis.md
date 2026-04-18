@@ -17,10 +17,10 @@ The rule is simple:
    - `figure_plan.json`
    - `synthesis_bundle.json`
 
-   Before this step, if local Zotero is available and the user did not provide an exact local PDF path, do a Zotero-first preflight:
+   Before this step, if local bibliography integration is available and the user did not provide an exact local PDF path, do a local-library-first preflight:
    - search the local Zotero library for the paper
    - if the hit is confident, materialize a trusted JSON input record with `scripts/create_input_record.py`
-   - if the hit has an attachment but MCP does not expose the full path, use `scripts/locate_zotero_attachment.py`
+   - if the hit has an attachment but the integration does not expose the full path, use `scripts/locate_zotero_attachment.py`
    - prefer that JSON record over a raw title string
 
 2. Read:
@@ -58,7 +58,7 @@ The rule is simple:
    Do not rely on old script classifications unless you are debugging.
 
 4. Make an explicit short `note_plan` artifact before drafting.
-   Do not rely on a hidden "I'll think about it and then write" step.
+   Do not rely on a hidden `I'll think about it and then write` step.
    The plan should decide:
    - which sections deserve the most weight
    - which sections need `###` subheadings
@@ -166,12 +166,12 @@ The language model, not the scripts, must decide:
 - Do not treat heuristic figure labels as paper conclusions.
 - Do not delete important figure/table placeholders just because extraction only found partial crops.
 - Do not flatten a technically rich paper into only broad `##` sections with no internal structure.
-- Do not reinterpret "vault configured but permission unavailable" as permission to silently downgrade into workspace mode.
+- Do not reinterpret `vault configured but permission unavailable` as permission to silently downgrade into workspace mode.
 - Do not skip creation of the paper-local `images/` directory just because the current environment cannot write it yet.
 - Do not present a vault-external save as if the formal Obsidian save already succeeded.
 - Do not present a partially executed workflow as if it were the full DeepPaperNote workflow.
 - Do not let convenience language hide which required stage is still pending.
-- Do not collapse "draft complete" into "note complete".
+- Do not collapse `draft complete` into `note complete`.
 - Do not write for the linter.
 - Do not invent facts, failed settings, mechanism details, or comparisons just to satisfy lint or section checks.
 - Do not insert empty compliance prose whose only purpose is to look structurally complete.
@@ -204,7 +204,7 @@ Use completion language precisely:
 - say `已生成草稿` when synthesis finished but lint or save is still pending
 - say `已通过校验` only when lint actually ran and passed
 - say `已保存到 Obsidian` only when the formal write step actually succeeded
-- do not treat "lint passed" as meaning "the note is fully polished"
+- do not treat `lint passed` as meaning the note is fully polished
 - if `final_readability_review` has not been completed yet, say the draft passed script lint but is still pending final language review
 - do not treat temporary Markdown files, partial figure work, or incomplete downstream stages as equivalent to full workflow completion
 
@@ -222,7 +222,7 @@ Before final save, explicitly review the draft against this checklist:
 - are there still any ordinary English phrase leftovers that should become natural Chinese?
 - are there any stiff translations, empty compliance sentences, or lines that sound written for lint rather than for a human reader?
 
-If any answer is clearly "no", revise before lint and save.
+If any answer is clearly `no`, revise before lint and save.
 
 ## Planning Artifact Rule
 

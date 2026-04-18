@@ -8,7 +8,7 @@ Use the structured artifacts as inputs:
 - `figure_plan.json`
 - `synthesis_bundle.json`
 
-Then draft the final note in natural language.
+Then let the model draft the final note in natural language.
 
 ## Front-Matter Structure
 
@@ -33,7 +33,7 @@ The `原文摘要翻译` section should be a Chinese translation of the paper's 
 - do not split this section into `### 英文原文` and `### 中文翻译`
 - keep the section title exactly as `原文摘要翻译`
 - the `原文摘要翻译` section itself must be written in Chinese; do not output English abstract sentences or English-original paragraphs here
-- the Chinese abstract should be fluent and faithful, not a second “一句话总结”
+- the Chinese abstract should be fluent and faithful, not a second `一句话总结`
 - do not turn `原文摘要翻译` into a selective excerpt or a compressed highlight list
 - do not add judgments, hindsight, or details learned from later sections of the paper into `原文摘要翻译`; only translate what the original abstract says
 
@@ -42,7 +42,7 @@ It should usually:
 - enumerate 3 to 5 paper-specific innovations
 - explain what problem each innovation addresses
 - explain what new capability, mechanism, or evaluation angle it enables
-- avoid generic praise such as “the paper is novel” without locating the novelty
+- avoid generic praise such as `the paper is novel` without locating the novelty
 
 ## Writer Persona
 
@@ -236,7 +236,7 @@ Before outputting the final Markdown, explicitly check:
 - if the evidence bundle does not contain such signals, did the note explicitly say the paper did not clearly report failed or unstable settings?
 - does the note contain at least one honest limitation and one paper-specific insight?
 - are there any suspicious mid-sentence line breaks left in the prose?
-- after script lint passes, have you reread the full note once more for readability rather than stopping at "lint passed"?
+- after script lint passes, have you reread the full note once more for readability rather than stopping at `lint passed`?
 - are there still any stiff translations, awkward Chinese phrasing, or ordinary English phrases that should be rewritten into natural Chinese?
 - are there any lines that sound like they were written only to satisfy lint or section compliance rather than to help a real reader?
 - if the note includes LaTeX formulas, did you quickly check that the final Markdown uses directly renderable TeX rather than double-escaped commands or broken math delimiters?
@@ -249,4 +249,4 @@ This final readability review is a language-and-expression pass, not a second ev
 - do not invent new facts, numbers, comparisons, or failure cases during this pass
 - do not use polish as an excuse to flatten the note into a safer but shallower summary
 
-If the answer to the first three questions is "no", the draft is still too shallow and should be revised before save.
+If the answer to the first three questions is `no`, the draft is still too shallow and should be revised before save.

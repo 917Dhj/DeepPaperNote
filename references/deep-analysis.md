@@ -22,7 +22,7 @@ Scripts in `DeepPaperNote` are for:
 - planning figure/table candidates
 - linting and writing files
 
-The real value comes from Codex reading the available material and writing the note in its own words.
+The real value comes from the model reading the available material and writing the note in its own words.
 
 ## Source Priority
 
@@ -49,7 +49,7 @@ If you only have the abstract, say so clearly and treat the note as provisional 
    - `clinical/psychology empirical`
    - `survey/tutorial`
    - `humanities/social science`
-4. Make a short internal note plan before drafting.
+4. Make a short explicit note plan before drafting.
    The plan should decide:
    - which sections deserve the most weight
    - which details need `###` subheadings
@@ -58,7 +58,8 @@ If you only have the abstract, say so clearly and treat the note as provisional 
    - whether the paper needs explicit formulas, objective functions, or complexity expressions
 5. Write the final note in Chinese.
 6. Lint it.
-7. Save into the Obsidian vault only after the note passes.
+7. Run the final readability review.
+8. Save into the Obsidian vault only after the note passes lint and the final readability review.
 
 ## Writing Rules
 

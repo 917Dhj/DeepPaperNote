@@ -14,7 +14,7 @@ Instead, use a three-stage model-first pipeline:
 
 1. build an evidence bundle
 2. make a dynamic internal note plan around that evidence
-3. let Codex write the note from the evidence and plan
+3. let the model write the note from the evidence and plan
 
 ## Evidence Bundle
 
@@ -32,7 +32,7 @@ In `DeepPaperNote`, use:
 
 ## Explicit Note Plan
 
-Before drafting the final note, Codex should create an explicit short planning artifact rather than silently "thinking it through" and jumping straight to the final Markdown.
+Before drafting the final note, the agent should create an explicit short planning artifact rather than silently "thinking it through" and jumping straight to the final Markdown.
 
 Do **not** require or expose a long free-form chain-of-thought block such as `<thinking>...</thinking>`.
 Instead, require a compact and inspectable planning block such as `<note_plan>...</note_plan>` or an equivalent temporary planning file.
@@ -80,7 +80,7 @@ The plan should be short, structured, and directly useful for the final draft.
 
 ## Writing Layer
 
-Only after the evidence bundle and explicit note plan exist should Codex draft the final note.
+Only after the evidence bundle and explicit note plan exist should the model draft the final note.
 
 Good final notes should:
 - prioritize numbers and comparisons over generic summary sentences
