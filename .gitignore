@@ -14,3 +14,4 @@ venv/
 dist/
 build/
 *.egg-info/
+.agent-work/
