@@ -21,7 +21,7 @@ Use the following source-of-truth hierarchy when working in this repository:
 - root `SKILL.md` is the canonical workflow definition
 - `scripts/` and `references/` are part of the reusable core
 - `README.md` and `README.zh-CN.md` are user-facing documentation, not the canonical workflow
-- `agents/openai.yaml`, `.claude-plugin/`, and `skills/deeppapernote/` are adapter and distribution layers
+- `agents/openai.yaml` is the Codex adapter layer; the root `SKILL.md` is the Claude Code skill entrypoint
 
 Adapter layers should stay thin and should not redefine the workflow independently.
 
@@ -43,12 +43,10 @@ Future changes should preserve these product invariants:
 
 The repository is layered as follows:
 
-- `SKILL.md` defines the single main skill and canonical entrypoint
+- `SKILL.md` is the canonical workflow definition and the skill entrypoint for both Claude Code and other agents
 - `references/` stores durable workflow and writing guidance
 - `scripts/` implements the deterministic pipeline and support utilities
 - `agents/openai.yaml` is the Codex adapter
-- `.claude-plugin/` is the Claude distribution adapter
-- `skills/deeppapernote/` is the Claude wrapper that points back to the root skill
 - `README.md` and `README.zh-CN.md` are user-facing documentation
 
 ## Environment and Onboarding Boundary
