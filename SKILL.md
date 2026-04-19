@@ -189,6 +189,13 @@ Preferred usage pattern:
 7. lint the note
 8. write it into Obsidian only after lint passes and the final readability review is complete
 
+Python interpreter rule:
+- DeepPaperNote requires Python `>=3.10`.
+- Before running repository scripts, check the interpreter version instead of assuming the current shell default is compatible.
+- If the default `python3` is below `3.10`, automatically look for another available interpreter that satisfies the requirement, such as `python3.12`, `python3.11`, `python3.10`, `/opt/anaconda3/bin/python3`, `/opt/homebrew/bin/python3`, or `/usr/local/bin/python3`.
+- Use the first compatible interpreter you find and continue with that interpreter for the repository scripts in the current task.
+- If no compatible interpreter is available, stop and clearly tell the user which interpreter was found, which version it reported, and that DeepPaperNote requires Python `>=3.10`.
+
 Troubleshooting rule:
 - use `scripts/check_environment.py` only when a concrete dependency or integration question is blocking execution
 - explain required dependencies, optional enhancements, and downgrade behavior directly rather than redirecting the skill into a separate troubleshooting workflow
