@@ -53,7 +53,7 @@ Follow this order:
 7. build the synthesis bundle
 8. have the model read the bundle and plan the note
 9. have the model write the note
-10. lint the final note
+10. lint the final note — if the lint output contains `passes_style_gate: false`, stop immediately and go to the Style Gate Enforcement rule; do not advance to step 11 or 12
 11. perform `final_readability_review` after lint passes
 12. write into Obsidian
 
@@ -96,10 +96,10 @@ Prefer the strongest available source in this order:
 4. arXiv or open-access PDF sources
 5. Semantic Scholar or OpenAlex for metadata backfill
 
-When local bibliography integration is available, use it first for local-library context. Do not require it to succeed. The skill must still work when the paper is not in the user's library.
+Before resolving the paper, actively check Zotero integration: attempt to call the Zotero MCP tool (for example, search for the paper title or list libraries). If the tool responds without error, Zotero is available and the local-library-first rule below applies. If the call fails or the tool is not present, record "Zotero not available" and proceed without it. Do not skip this check — the check itself determines whether local-library-first applies.
 
-Local-library-first rule:
-- If the user input is a title, DOI, or arXiv id, first search the local Zotero library when that integration is available.
+Local-library-first rule (applies only when the Zotero check above succeeds):
+- search the local Zotero library first using the paper title, DOI, or arXiv id
 - If Zotero finds the paper, treat that result as the canonical identity resolution step.
 - If the attachment path is not exposed by the integration, use `scripts/locate_zotero_attachment.py` with the attachment key and filename to find the local PDF under the user's Zotero storage.
 - If a local attachment path is available, pass it forward as the preferred PDF source.
@@ -110,6 +110,7 @@ Local-library-first rule:
 
 - The default output is a Markdown note written into the Obsidian vault when configured.
 - Workspace fallback is allowed only when no Obsidian vault is configured at all.
+- Before using workspace fallback, you must ask the user: "I don't see an Obsidian vault configured. Do you have a vault path you'd like me to save this note to? If yes, please provide the path. If no, I'll save to the current workspace instead." Do not write anywhere until the user responds.
 - If an Obsidian vault is configured, DeepPaperNote must treat that vault as the required save target rather than silently switching output roots.
 - If the configured vault or its paper-local subdirectories are outside the current writable scope, DeepPaperNote must ask the user for permission escalation instead of downgrading to workspace output.
 - If the user refuses that permission escalation, DeepPaperNote must clearly report that the note has not been saved into Obsidian yet.
@@ -134,6 +135,7 @@ Local-library-first rule:
 - Real images may replace some placeholders, but only if they clearly match the corresponding paper figure/table.
 - Figure captions in the note must preserve the original paper numbering such as `Fig. 1` or `Table 2`.
 - The note must pass a style gate: no mixed Chinese-English prose lines except stable proper nouns or citation metadata.
+- Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, stop immediately and show the full lint output to the user. Do not advance to the write step. Do not decide on your own that the remaining failures are acceptable exceptions — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only explicit user instruction may override a failed style gate.
 - If PDF or evidence quality is insufficient for a real deep note, fail closed or clearly label the output as degraded.
 
 Model-first rule:
