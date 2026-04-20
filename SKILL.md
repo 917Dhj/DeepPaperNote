@@ -1,5 +1,5 @@
 ---
-name: DeepPaperNote
+name: deeppapernote
 description: Generate a high-quality deep-reading note for a single paper and write it into an Obsidian-style vault. Use when the user gives a paper title, DOI, URL, arXiv ID, Zotero item, or local PDF and wants a polished Markdown note with strong structure, evidence-based analysis, and figure placeholders.
 ---
 

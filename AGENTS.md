@@ -44,6 +44,7 @@ Future changes should preserve these product invariants:
 The repository is layered as follows:
 
 - `SKILL.md` is the canonical workflow definition and the skill entrypoint for both Claude Code and other agents
+- `CLAUDE.md` provides Claude Code project-level guidance and includes `AGENTS.md` via `@AGENTS.md`
 - `references/` stores durable workflow and writing guidance
 - `scripts/` implements the deterministic pipeline and support utilities
 - `agents/openai.yaml` is the Codex adapter
