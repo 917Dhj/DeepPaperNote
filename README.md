@@ -6,14 +6,14 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
-[![Status](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote)
-[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.3.1-alpha)
-[![License](https://img.shields.io/badge/license-MIT-475569?style=for-the-badge)](./LICENSE)
-[![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-111827?style=for-the-badge)](./SKILL.md)
-[![Output](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge)](./references/obsidian-format.md)
-[![Figures](https://img.shields.io/badge/figures-placeholder--first-f59e0b?style=for-the-badge)](./references/figure-placement.md)
-[![Writing](https://img.shields.io/badge/writing-model--first-7c3aed?style=for-the-badge)](./references/model-synthesis.md)
-[![Changelog](https://img.shields.io/badge/changelog-latest-0f766e?style=for-the-badge)](./CHANGELOG.md)
+[![Status](https://img.shields.io/badge/status-alpha-2563eb?style=for-the-badge&labelColor=111827)](https://github.com/917Dhj/DeepPaperNote)
+[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&style=for-the-badge&labelColor=374151&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.3.1-alpha)
+[![License](https://img.shields.io/badge/license-MIT-c9a227?style=for-the-badge&labelColor=4b5563)](./LICENSE)
+[![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed?style=for-the-badge&labelColor=111827)](./SKILL.md)
+[![Output](https://img.shields.io/badge/output-Obsidian-16a34a?style=for-the-badge&labelColor=1f2937)](./references/obsidian-format.md)
+[![Figures](https://img.shields.io/badge/figures-placeholder--first-f59e0b?style=for-the-badge&labelColor=374151)](./references/figure-placement.md)
+[![Writing](https://img.shields.io/badge/writing-model--first-7c3aed?style=for-the-badge&labelColor=1f2937)](./references/model-synthesis.md)
+[![Changelog](https://img.shields.io/badge/changelog-latest-0f766e?style=for-the-badge&labelColor=374151)](./CHANGELOG.md)
 
 </div>
 
