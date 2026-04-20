@@ -121,7 +121,7 @@ DeepPaperNote 已上架 Claude Marketplace，你可以直接从 Marketplace 安�
 如果你使用 Agent Skills 兼容安装器，也可以直接从这个仓库安装：
 
 ```bash
-npx skills add 917Dhj/DeepPaperNote -a claude
+npx skills add 917Dhj/DeepPaperNote -a claude-code
 ```
 
 如果你更习惯手动安装，可以把 release 解压后的文件夹放进你的 Claude Code 技能目录：

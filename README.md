@@ -121,7 +121,7 @@ DeepPaperNote is available on Claude Marketplace. You can install it from there 
 If you use an Agent Skills-compatible installer, install from this repository with:
 
 ```bash
-npx skills add 917Dhj/DeepPaperNote -a claude
+npx skills add 917Dhj/DeepPaperNote -a claude-code
 ```
 
 If you prefer the manual path, download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Claude Code skills directory:
