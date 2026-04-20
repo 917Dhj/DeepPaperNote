@@ -458,6 +458,11 @@ DeepPaperNote/
 ├── pyproject.toml
 ├── agents/
 │   └── openai.yaml
+├── .claude-plugin/
+│   └── plugin.json
+├── skills/
+│   └── deeppapernote/
+│       └── SKILL.md
 ├── assets/
 │   ├── hero-academic.svg
 │   ├── hero.png
