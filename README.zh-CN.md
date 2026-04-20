@@ -6,8 +6,8 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
-[![状态](https://img.shields.io/badge/status-alpha-2563eb)](https://github.com/917Dhj/DeepPaperNote)
-[![版本](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.3.1-alpha)
+[![状态](https://img.shields.io/badge/status-stable-16a34a)](https://github.com/917Dhj/DeepPaperNote)
+[![版本](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v1.0.0)
 [![许可证](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
 [![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./SKILL.md)
 [![输出](https://img.shields.io/badge/output-Obsidian-16a34a)](./references/obsidian-format.md)
@@ -102,10 +102,10 @@ npx skills add 917Dhj/DeepPaperNote -a codex
 
 如果你更习惯手动安装，推荐去 [release](https://github.com/917Dhj/DeepPaperNote/releases) 页面下载最新版本的 zip 包，解压后放进你的 Codex 技能目录。
 
-例如，下载 `DeepPaperNote-v0.3.1-alpha.zip` 后，可以把解压出来的文件夹放到：
+例如，下载 `DeepPaperNote.zip` 后，可以把解压出来的 `DeepPaperNote` 文件夹放到：
 
 ```bash
-~/.codex/skills/DeepPaperNote-v0.3.1-alpha
+~/.codex/skills/DeepPaperNote
 ```
 
 当然，你也可以选择直接 `git clone`：
@@ -125,7 +125,7 @@ npx skills add 917Dhj/DeepPaperNote -a claude-code
 如果你更习惯手动安装，可以把 release 解压后的文件夹放进你的 Claude Code 技能目录：
 
 ```bash
-~/.claude/skills/DeepPaperNote-v0.3.1-alpha
+~/.claude/skills/DeepPaperNote
 ```
 
 也可以直接 `git clone`：
@@ -363,11 +363,12 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 | 🏷️ 版本 | 🚦 状态 | ✨ 主要内容 |
 | --- | --- | --- |
+| v1.0.0 | ✅ 已发布 | 第一个稳定版：采用纯 skill 结构，支持 Claude Code、Codex、Cursor、Copilot、Gemini CLI 以及其他兼容 Agent Skills 的环境 |
 | v0.3.1-alpha | ✅ 已发布 | 默认 Obsidian 论文根目录改为 `Research/Papers`，运行时路径解析和写入行为也同步对齐到这个新位置 |
 | v0.3.0-alpha | ✅ 已发布 | 一次较大的质量升级：新增固定创新点章节、显式机制流程、更强的整条 workflow 约束、最终可读性质检、公式语法检查，以及新的 `原文摘要翻译` 前置区块 |
 | v0.2.0-alpha | ✅ 已发布 | 复现级技术笔记写作升级：显式 `note_plan`、公式感知输出、更强的最终自检、摘要中英双写，以及更严格的格式校验 |
 | v0.1.0-alpha | ✅ 已发布 | 第一个公开 alpha 版：综合证据包流程、Zotero 优先辅助能力、占位优先图表处理、工作区回退输出、OCR 回退、测试与 CI |
-| 未发布 | 🕒 暂无新的 release 级变化 | 当前还没有下一版 release 的公开更新内容，最新版本为 v0.3.1-alpha |
+| 未发布 | 🕒 暂无新的 release 级变化 | 当前还没有下一版 release 的公开更新内容，最新版本为 v1.0.0 |
 
 ## ⚙️ 工作流
 

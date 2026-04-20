@@ -14,6 +14,26 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - No unreleased user-facing changes yet.
 
+## v1.0.0
+
+First stable release of DeepPaperNote.
+
+### Changed
+
+- Reframed DeepPaperNote as a pure cross-agent skill for Claude Code, Codex, Cursor, Copilot, Gemini CLI, and other Agent Skills-compatible environments.
+- Kept the root `SKILL.md` as the single canonical skill entrypoint.
+- Updated installation guidance for `npx skills add 917Dhj/DeepPaperNote -a codex` and `npx skills add 917Dhj/DeepPaperNote -a claude-code`.
+- Removed experimental onboarding/setup pseudo-surfaces and the temporary Claude plugin wrapper structure.
+- Added `AGENTS.md` and `CLAUDE.md` for repo-level agent guidance.
+- Added explicit Python `>=3.10` interpreter guidance for agents running bundled scripts.
+
+### Preserved
+
+- The evidence-first deep-reading pipeline.
+- Obsidian-first output behavior.
+- Figure/table placeholder-first policy.
+- Lint gate and final readability review.
+
 ## v0.3.2-alpha
 
 Fifth public alpha release of DeepPaperNote.

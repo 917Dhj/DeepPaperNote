@@ -6,8 +6,8 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
-[![Status](https://img.shields.io/badge/status-alpha-2563eb)](https://github.com/917Dhj/DeepPaperNote)
-[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v0.3.1-alpha)
+[![Status](https://img.shields.io/badge/status-stable-16a34a)](https://github.com/917Dhj/DeepPaperNote)
+[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v1.0.0)
 [![License](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
 [![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a)](./references/obsidian-format.md)
@@ -102,10 +102,10 @@ npx skills add 917Dhj/DeepPaperNote -a codex
 
 If you prefer the manual path, download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Codex skills directory.
 
-For example, after downloading `DeepPaperNote-v0.3.1-alpha.zip`, you can unzip it and move the extracted folder to:
+For example, after downloading `DeepPaperNote.zip`, you can unzip it and move the extracted `DeepPaperNote` folder to:
 
 ```bash
-~/.codex/skills/DeepPaperNote-v0.3.1-alpha
+~/.codex/skills/DeepPaperNote
 ```
 
 You can also clone the source repository directly:
@@ -125,7 +125,7 @@ npx skills add 917Dhj/DeepPaperNote -a claude-code
 If you prefer the manual path, download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Claude Code skills directory:
 
 ```bash
-~/.claude/skills/DeepPaperNote-v0.3.1-alpha
+~/.claude/skills/DeepPaperNote
 ```
 
 You can also clone the source repository directly:
@@ -378,11 +378,12 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 
 | 🏷️ Version | 🚦 Status | ✨ Highlights |
 | --- | --- | --- |
+| v1.0.0 | ✅ Released | First stable release: pure cross-agent skill structure for Claude Code, Codex, Cursor, Copilot, Gemini CLI, and other Agent Skills-compatible environments |
 | v0.3.1-alpha | ✅ Released | Default Obsidian paper root changed to `Research/Papers`, with runtime path resolution and save behavior aligned to the new location |
 | v0.3.0-alpha | ✅ Released | Major quality upgrade: dedicated innovation section, explicit mechanism flow, stronger workflow discipline, final readability review, math syntax gate, and the new `Original Abstract Translation` front-matter block |
 | v0.2.0-alpha | ✅ Released | Replication-oriented note-writing upgrade: explicit `note_plan`, equation-aware output, stricter final self-review, bilingual abstract handling, and stronger formatting checks |
 | v0.1.0-alpha | ✅ Released | First public alpha: evidence-bundle workflow, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
-| Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v0.3.1-alpha |
+| Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v1.0.0 |
 
 ## ⚙️ Workflow
 
