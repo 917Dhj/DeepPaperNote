@@ -116,8 +116,6 @@ git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperN
 
 #### Claude Code
 
-DeepPaperNote is available on Claude Marketplace. You can install it from there directly.
-
 If you use an Agent Skills-compatible installer, install from this repository with:
 
 ```bash
@@ -474,11 +472,6 @@ DeepPaperNote/
 ├── pyproject.toml
 ├── agents/
 │   └── openai.yaml
-├── .claude-plugin/
-│   └── plugin.json
-├── skills/
-│   └── deeppapernote/
-│       └── SKILL.md
 ├── assets/
 │   ├── hero-academic.svg
 │   ├── hero.png
