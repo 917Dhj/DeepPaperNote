@@ -53,7 +53,7 @@ Follow this order:
 7. build the synthesis bundle
 8. have the model read the bundle and plan the note
 9. have the model write the note
-10. lint the final note — if the lint output contains `passes_style_gate: false`, stop immediately and go to the Style Gate Enforcement rule; do not advance to step 11 or 12
+10. lint the final note — if the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 11 or 12
 11. perform `final_readability_review` after lint passes
 12. write into Obsidian
 
@@ -135,7 +135,7 @@ Local-library-first rule (applies only when the Zotero check above succeeds):
 - Real images may replace some placeholders, but only if they clearly match the corresponding paper figure/table.
 - Figure captions in the note must preserve the original paper numbering such as `Fig. 1` or `Table 2`.
 - The note must pass a style gate: no mixed Chinese-English prose lines except stable proper nouns or citation metadata.
-- Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, stop immediately and show the full lint output to the user. Do not advance to the write step. Do not decide on your own that the remaining failures are acceptable exceptions — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only explicit user instruction may override a failed style gate.
+- Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, fix the reported issues and re-run lint. Keep fixing and re-running until lint passes — multiple rounds are normal and expected. Do not decide that any failure is an acceptable exception — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only escalate to the user if the same failures appear unchanged across multiple rounds with no reduction, indicating the model is unable to make further progress independently.
 - If PDF or evidence quality is insufficient for a real deep note, fail closed or clearly label the output as degraded.
 
 Model-first rule:
