@@ -45,7 +45,7 @@ DeepPaperNote 是一个面向**论文深度阅读**的技能，同一套核心�
 | 🎯 你的需求 / 痛点 | ✅ DeepPaperNote 怎么帮你 |
 | --- | --- |
 | 想快速读懂一篇很难啃的复杂论文 | 自动整理方法主线、关键结果、图表上下文和局限，生成能直接阅读的深度笔记 |
-| 想精读一篇经典论文，但不想手写很多机械笔记 | 自动完成元数据整理、结构搭建、图表占位和正文笔记生成，把精力留给真正思考 |
+| 想精读一篇经典论文，但不想手写很多机械笔记 | 自动完成元数据整理、结构搭建、图表占位和正文笔记生成，专注于真正有价值的理解 |
 | 想把论文真正沉淀进 Obsidian | 会结合论文领域自动归档到合适的 Obsidian 目录，再生成论文同名文件夹、Markdown 笔记和 `images/` 目录 |
 | 已经在 Zotero 里管理文献，不想重复折腾 | 可优先复用本地论文库和附件，减少误匹配，也通常更快 |
 | 不想只得到一篇“漂亮摘要” | 更强调机制拆解、关键数字、公式、边界条件和真实局限 |
@@ -116,7 +116,7 @@ git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperN
 
 #### Claude Code
 
-如果这个仓库已经发布到 Claude Marketplace，你可以优先从 Marketplace 安装。
+DeepPaperNote 已上架 Claude Marketplace，你可以直接从 Marketplace 安装。
 
 如果你使用 Agent Skills 兼容安装器，也可以直接从这个仓库安装：
 
@@ -168,7 +168,7 @@ python3 -m pip install PyMuPDF
 - 获取 PDF、元数据和正文证据
 - 规划图表占位并尝试高置信度图片替换
 - 生成最终 Markdown 笔记
-- 自动写入 Obsidian；如果没有配置 Obsidian，则自动降级输出到当前目录
+- 自动写入 Obsidian；如果没有配置 Obsidian，则会先询问你是否有库路径，再决定是否降级输出到当前目录
 
 ### 4) 首次使用不必追求完整配置
 
@@ -182,9 +182,9 @@ python3 -m pip install PyMuPDF
 
 ## 🔧 配置指南（开箱即用，按需进阶）
 
-**如果你已经安装好了PyMuPDF，那么你就可以直接开始使用DeepPaperNote生成笔记了**。以下介绍的配置都是核心功能的扩展，让你能够将 DeepPaperNote 生成的笔记真正融入你的科研工作流中。
+**如果你已经安装好了 PyMuPDF，那么你就可以直接开始使用 DeepPaperNote 生成笔记了**。以下介绍的配置都是核心功能的扩展，让你能够将 DeepPaperNote 生成的笔记真正融入你的科研工作流中。
 
-- 如果你没有配置 Obsidian，它也能先把笔记自动输出到当前工作目录。
+- 如果你没有配置 Obsidian，它也能把笔记输出到当前工作目录。
 - 但如果你想要更好的长期管理体验，还是强烈建议配置你的 Obsidian 库路径。
 
 ### 📍 核心配置：指定你的 Obsidian 库
@@ -458,12 +458,6 @@ DeepPaperNote/
 ├── pyproject.toml
 ├── agents/
 │   └── openai.yaml
-├── .claude-plugin/
-│   ├── plugin.json
-│   └── marketplace.json
-├── skills/
-│   └── deeppapernote/
-│       └── SKILL.md
 ├── assets/
 │   ├── hero-academic.svg
 │   ├── hero.png
@@ -506,7 +500,7 @@ DeepPaperNote/
 | Claude Code / Codex | 推荐 | 支持的 agent 环境 |
 | Python 3.10+ | 必需 | 运行辅助脚本 |
 | PyMuPDF | 必需 | 核心 PDF 依赖，可用 `python3 -m pip install PyMuPDF` 安装 |
-| 本地 Obsidian 库 | 推荐 | 配好后可直接写入长期笔记体系；不配时会自动降级输出到当前目录 |
+| 本地 Obsidian 库 | 推荐 | 配好后可直接写入长期笔记体系；未配置时可回退输出到当前目录 |
 | Zotero 集成 | 可选 | 对本地论文库工作流很有帮助 |
 | OCR 工具 | 可选 | 对扫描版 PDF 更友好 |
 
@@ -536,7 +530,7 @@ DeepPaperNote 背后的基本判断很简单：
 - 本地论文管理
 - 长期知识库构建和管理
 
-## 🧭 Inspirations
+## 🧭 致谢与灵感
 
 DeepPaperNote 在工作流设计上受到了这些论文阅读 / 笔记生成项目的启发：
 

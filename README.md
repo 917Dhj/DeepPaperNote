@@ -35,10 +35,8 @@ DeepPaperNote is a skill for **deep paper reading**. The same core skill can be 
 - Are the key equations, experiments, and figure context preserved?
 - Does the final note become something worth keeping in your long-term knowledge base?
 
-Let scripts handle the repetitive work. Save your attention for actual thinking.
-
 > [!tip]
-> If you already have an Obsidian or Zotero workflow, DeepPaperNote is trying to automate the most tedious parts of evidence gathering, structuring, and note production.
+> If you already have an Obsidian or Zotero workflow, DeepPaperNote automates the most tedious parts of evidence gathering, structuring, and note production.
 
 ## 🎯 What problems does it solve?
 
@@ -58,7 +56,7 @@ Let scripts handle the repetitive work. Save your attention for actual thinking.
 
 ## ✨ How does it do that?
 
-DeepPaperNote does not look more complete by simply rewriting the abstract in smoother prose. It raises note quality through a few workflow rules:
+DeepPaperNote does not achieve higher note quality by simply rewriting the abstract in smoother prose. It raises note quality through a few workflow rules:
 
 | 🧭 Core principle | 📝 What it means in practice |
 | --- | --- |
@@ -118,7 +116,7 @@ git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperN
 
 #### Claude Code
 
-If this repository is published in Claude Marketplace, you can install it there first.
+DeepPaperNote is available on Claude Marketplace. You can install it from there directly.
 
 If you use an Agent Skills-compatible installer, install from this repository with:
 
@@ -172,7 +170,7 @@ By default, DeepPaperNote will:
 - gather metadata and PDF evidence
 - plan figure placeholders and attempt high-confidence figure replacement
 - generate the final Markdown note
-- save it into Obsidian when configured, or automatically fall back to the current directory
+- save it into Obsidian when configured, or ask for your vault path before falling back to the current directory
 
 ### 4) You do not need perfect setup on day one
 
@@ -476,12 +474,6 @@ DeepPaperNote/
 ├── pyproject.toml
 ├── agents/
 │   └── openai.yaml
-├── .claude-plugin/
-│   ├── plugin.json
-│   └── marketplace.json
-├── skills/
-│   └── deeppapernote/
-│       └── SKILL.md
 ├── assets/
 │   ├── hero-academic.svg
 │   ├── hero.png
