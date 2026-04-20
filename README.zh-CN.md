@@ -92,37 +92,34 @@ DeepPaperNote 不是靠“把摘要重新措辞一遍”来显得更完整，而
 
 DeepPaperNote 同时支持 Claude Code 和 Codex。
 
-#### Codex
+#### npx Skills（推荐）
 
-如果你使用 Agent Skills 兼容安装器，可以直接从这个仓库安装：
+大多数情况下，可以直接从npx安装：
+
+```bash
+npx skills add 917Dhj/DeepPaperNote
+```
+
+此命令会默认安装到共享的`.agent/skills`目录，这个目录中的 skill 可以被 Codex 等大部分 agent 识别并使用。如果你也想在 Claude Code 里使用，在 **Additional agents** 提示中选择 Claude Code即可。
+
+你也可以直接指定安装给某个 agent：
 
 ```bash
 npx skills add 917Dhj/DeepPaperNote -a codex
+npx skills add 917Dhj/DeepPaperNote -a claude-code
 ```
 
-如果你更习惯手动安装，推荐去 [release](https://github.com/917Dhj/DeepPaperNote/releases) 页面下载最新版本的 zip 包，解压后放进你的 Codex 技能目录。
+#### 手动安装
 
-例如，下载 `DeepPaperNote.zip` 后，可以把解压出来的 `DeepPaperNote` 文件夹放到：
+如果你更习惯手动安装，推荐去 [release](https://github.com/917Dhj/DeepPaperNote/releases) 页面下载最新版本的 zip 包并解压。
+
+Codex 用户可以把解压出来的 `DeepPaperNote` 文件夹放到：
 
 ```bash
 ~/.codex/skills/DeepPaperNote
 ```
 
-当然，你也可以选择直接 `git clone`：
-
-```bash
-git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
-```
-
-#### Claude Code
-
-如果你使用 Agent Skills 兼容安装器，也可以直接从这个仓库安装：
-
-```bash
-npx skills add 917Dhj/DeepPaperNote -a claude-code
-```
-
-如果你更习惯手动安装，可以把 release 解压后的文件夹放进你的 Claude Code 技能目录：
+Claude Code 用户可以把解压出来的 `DeepPaperNote` 文件夹放到：
 
 ```bash
 ~/.claude/skills/DeepPaperNote
@@ -131,6 +128,7 @@ npx skills add 917Dhj/DeepPaperNote -a claude-code
 也可以直接 `git clone`：
 
 ```bash
+git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
 git clone https://github.com/917Dhj/DeepPaperNote.git ~/.claude/skills/DeepPaperNote
 ```
 

@@ -92,37 +92,34 @@ DeepPaperNote does not achieve higher note quality by simply rewriting the abstr
 
 DeepPaperNote supports both Claude Code and Codex.
 
-#### Codex
+#### npx Skills (Recommended)
 
-If you use an Agent Skills-compatible installer, install from this repository with:
+For most users, install directly with npx:
+
+```bash
+npx skills add 917Dhj/DeepPaperNote
+```
+
+This command installs to the shared `.agents/skills` directory by default. Skills in that directory can be recognized and used by Codex and most other agents. If you also want to use DeepPaperNote in Claude Code, choose Claude Code in the **Additional agents** prompt.
+
+You can also install for a specific agent directly:
 
 ```bash
 npx skills add 917Dhj/DeepPaperNote -a codex
+npx skills add 917Dhj/DeepPaperNote -a claude-code
 ```
 
-If you prefer the manual path, download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Codex skills directory.
+#### Manual install
 
-For example, after downloading `DeepPaperNote.zip`, you can unzip it and move the extracted `DeepPaperNote` folder to:
+If you prefer the manual path, download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip and extract it.
+
+For Codex, place the extracted `DeepPaperNote` folder into:
 
 ```bash
 ~/.codex/skills/DeepPaperNote
 ```
 
-You can also clone the source repository directly:
-
-```bash
-git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
-```
-
-#### Claude Code
-
-If you use an Agent Skills-compatible installer, install from this repository with:
-
-```bash
-npx skills add 917Dhj/DeepPaperNote -a claude-code
-```
-
-If you prefer the manual path, download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip, extract it, and place the folder into your Claude Code skills directory:
+For Claude Code, place the extracted `DeepPaperNote` folder into:
 
 ```bash
 ~/.claude/skills/DeepPaperNote
@@ -131,6 +128,7 @@ If you prefer the manual path, download the latest [release](https://github.com/
 You can also clone the source repository directly:
 
 ```bash
+git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
 git clone https://github.com/917Dhj/DeepPaperNote.git ~/.claude/skills/DeepPaperNote
 ```
 
