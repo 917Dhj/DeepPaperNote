@@ -6,6 +6,7 @@ from lint_note import (
     inspect_figure_callouts,
     math_render_issues,
     mixed_language_issues,
+    strip_frontmatter,
     suspicious_code_formatted_math,
     suspicious_mid_sentence_linebreaks,
 )
@@ -197,6 +198,31 @@ def test_find_missing_sections_requires_innovation_section() -> None:
 """
     missing = find_missing_sections(note)
     assert "创新点" in missing
+
+
+def test_strip_frontmatter_removes_yaml_block() -> None:
+    text = "---\ntags:\n  - papers/NLP\ndate: 2024-01-01\n---\n\n# Title\n\n## 核心信息\n"
+    assert strip_frontmatter(text).lstrip().startswith("# Title")
+
+
+def test_strip_frontmatter_is_noop_without_frontmatter() -> None:
+    text = "# Title\n\n## 核心信息\n"
+    assert strip_frontmatter(text) == text
+
+
+def test_title_heading_not_flagged_when_frontmatter_present() -> None:
+    # A note that starts with YAML frontmatter should NOT trigger title_heading_missing.
+    # We test via strip_frontmatter directly since main() does I/O.
+    text = "---\ntags:\n  - papers/NLP\naliases:\n  - MyPaper\ndate: 2024-01-01\ndoi: 10.1234/test\n---\n\n# My Paper Title\n"
+    assert strip_frontmatter(text).lstrip().startswith("# ")
+
+
+def test_mid_sentence_linebreaks_not_triggered_by_frontmatter() -> None:
+    # Frontmatter lines like "date: 2024-01-01\ndoi: 10.xxx" must not be treated as
+    # mid-sentence prose linebreaks.
+    frontmatter_only = "---\ntags:\n  - papers/NLP\naliases:\n  - MyPaper\ndate: 2024-01-01\ndoi: 10.1234/test\n---\n"
+    issues = suspicious_mid_sentence_linebreaks(strip_frontmatter(frontmatter_only))
+    assert issues == []
 
 
 def test_front_matter_order_requires_innovation_after_abstract() -> None:
