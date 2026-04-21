@@ -139,16 +139,23 @@ When the paper is complex, add `###` subsections such as:
 
 ## 引用 Section Format
 
-Each entry in `## 引用` must use an Obsidian wikilink so Obsidian's graph view connects related papers:
+Entries in `## 引用` should link to existing notes in the vault where possible.
+Follow this priority order for each reference:
 
-```markdown
-## 引用
-
-- [[Paper Title One]]
-- [[Paper Title Two]]
-```
+1. **Vault lookup first**: check whether the cited paper already has a note in the vault.
+   - Match by note basename (the `<paper_slug>` part of the folder name).
+   - Match by the `aliases` field in the note's YAML frontmatter.
+2. **If a match is found**: write a wikilink that separates the target from the display text:
+   ```
+   - [[paper_slug_or_alias|Human Readable Title]]
+   ```
+3. **If no match is found**: do not invent a wikilink target. Write the reference as plain text instead:
+   ```
+   - Vaswani et al. (2017). Attention Is All You Need.
+   ```
 
 Rules:
-- Use the English paper title as the wikilink target to match the `<paper_slug>.md` filename convention.
+- Never use a raw English paper title as the wikilink target; it will not match vault filenames.
+- To derive a likely slug from a title: lowercase the title and replace spaces and special characters with underscores — but only use the result as the target if you have confirmed the file exists.
 - List only papers cited or directly relevant to this note.
-- Do not add extra prose, DOIs, or author names in this section; keep it as a wikilink list.
+- Do not add extra DOIs or author metadata when using wikilink format; the display text is enough.
