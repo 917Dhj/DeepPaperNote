@@ -457,7 +457,7 @@ DeepPaperNote/
 │   └── openai.yaml
 ├── assets/
 │   ├── hero-academic.svg
-│   ├── hero.png
+│   ├── usage-example.png
 │   └── note_template.md
 ├── references/
 │   ├── architecture.md
