@@ -634,23 +634,29 @@ def mechanism_flow_warnings(text: str) -> list[str]:
     return warnings
 
 
+def strip_frontmatter(text: str) -> str:
+    """Remove a leading YAML frontmatter block (---...---) if present."""
+    return re.sub(r"^---\n.*?\n---\n?", "", text, count=1, flags=re.DOTALL)
+
+
 def main() -> None:
     from common import emit
 
     args = parser().parse_args()
     path = Path(args.input).expanduser().resolve()
     text = path.read_text(encoding="utf-8")
+    body_text = strip_frontmatter(text)
     headers = extract_headers(text)
     missing_sections = find_missing_sections(text)
     warnings: list[str] = []
     mixed_issues = mixed_language_issues(text)
-    linebreak_issues = suspicious_mid_sentence_linebreaks(text)
+    linebreak_issues = suspicious_mid_sentence_linebreaks(body_text)
     code_math_issues = suspicious_code_formatted_math(text)
     math_issues = math_render_issues(text)
     warnings.extend(inspect_figure_callouts(text))
     warnings.extend(front_matter_order_warnings(text))
     warnings.extend(mechanism_flow_warnings(text))
-    if not text.startswith("# "):
+    if not body_text.lstrip().startswith("# "):
         warnings.append("title_heading_missing")
     if "## " not in text:
         warnings.append("no_level2_sections")
