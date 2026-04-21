@@ -1,3 +1,12 @@
+---
+tags:
+  - papers/
+aliases:
+  - ""
+date: 
+doi: 
+---
+
 # {{title}}
 
 ## 核心信息

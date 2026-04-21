@@ -51,6 +51,34 @@ Formatting and scope rules:
 - if a field is missing, leave it blank or mark it as unavailable rather than replacing the field with prose
 - move explanatory content to `一句话总结`、`深度分析`、`我的笔记` or another true analysis section
 
+## YAML Frontmatter
+
+Every note must start with an Obsidian properties block **above** the `#` title heading.
+
+Required fields:
+- `tags`: use `papers/<domain>` hierarchy, e.g. `papers/NLP`, `papers/CV`, `papers/multimodal`
+- `aliases`: English short name or common abbreviation for wikilink resolution
+- `date`: ISO publication date; use `YYYY` if only the year is known
+- `doi`: DOI string without the `https://doi.org/` prefix; omit the field entirely if unavailable
+
+Example:
+
+```yaml
+---
+tags:
+  - papers/NLP
+aliases:
+  - "Paper Short Name"
+date: 2024-05-01
+doi: 10.18653/v1/2024.acl-long.1
+---
+```
+
+Rules:
+- Do not invent placeholder values for missing fields; omit them instead.
+- The `tags` field must always be present with at least one `papers/<domain>` tag.
+- `aliases` should be the paper's short name or acronym (e.g. "GPT-4", "LoRA"), not a paraphrase.
+
 ## Figure Placeholder Style
 
 Use this callout format as the default and preferred placeholder style:
@@ -108,3 +136,19 @@ When the paper is complex, add `###` subsections such as:
 - `### 机制流程`
 - `### 为什么结果成立`
 - `### 哪些地方容易被误读`
+
+## 引用 Section Format
+
+Each entry in `## 引用` must use an Obsidian wikilink so Obsidian's graph view connects related papers:
+
+```markdown
+## 引用
+
+- [[Paper Title One]]
+- [[Paper Title Two]]
+```
+
+Rules:
+- Use the English paper title as the wikilink target to match the `<paper_slug>.md` filename convention.
+- List only papers cited or directly relevant to this note.
+- Do not add extra prose, DOIs, or author names in this section; keep it as a wikilink list.
