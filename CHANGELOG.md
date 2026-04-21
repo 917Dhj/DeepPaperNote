@@ -14,6 +14,23 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - No unreleased user-facing changes yet.
 
+## v1.0.1
+
+Patch release after `v1.0.0`.
+
+### Changed
+
+- Added YAML frontmatter and wikilink rules for Obsidian-native features.
+- Fixed `lint_note.py` compatibility with YAML frontmatter.
+- Added tests for frontmatter stripping and frontmatter-aware lint compatibility.
+- Fixed wikilink target resolution with a lookup-first, fail-closed approach.
+- Removed unused image assets that were no longer referenced by the README files.
+
+### Notes
+
+- This remains a stable release.
+- The release asset continues to ship as a clean manually installable `DeepPaperNote.zip`.
+
 ## v1.0.0
 
 First stable release of DeepPaperNote.

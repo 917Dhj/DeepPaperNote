@@ -7,7 +7,7 @@
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
 [![Status](https://img.shields.io/badge/status-stable-16a34a)](https://github.com/917Dhj/DeepPaperNote)
-[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v1.0.0)
+[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v1.0.1)
 [![License](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
 [![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a)](./references/obsidian-format.md)
@@ -376,12 +376,13 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 
 | 🏷️ Version | 🚦 Status | ✨ Highlights |
 | --- | --- | --- |
+| v1.0.1 | ✅ Released | Patch release for Obsidian-native frontmatter and wikilink support, lint compatibility fixes, and cleaner README assets |
 | v1.0.0 | ✅ Released | First stable release: pure cross-agent skill structure for Claude Code, Codex, Cursor, Copilot, Gemini CLI, and other Agent Skills-compatible environments |
 | v0.3.1-alpha | ✅ Released | Default Obsidian paper root changed to `Research/Papers`, with runtime path resolution and save behavior aligned to the new location |
 | v0.3.0-alpha | ✅ Released | Major quality upgrade: dedicated innovation section, explicit mechanism flow, stronger workflow discipline, final readability review, math syntax gate, and the new `Original Abstract Translation` front-matter block |
 | v0.2.0-alpha | ✅ Released | Replication-oriented note-writing upgrade: explicit `note_plan`, equation-aware output, stricter final self-review, bilingual abstract handling, and stronger formatting checks |
 | v0.1.0-alpha | ✅ Released | First public alpha: evidence-bundle workflow, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
-| Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v1.0.0 |
+| Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v1.0.1 |
 
 ## ⚙️ Workflow
 
