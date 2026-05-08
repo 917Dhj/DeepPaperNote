@@ -41,6 +41,29 @@ CAPTION_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Used to decide whether a continuation line still belongs to the caption text
+# or has already entered the data body of a table.  A row of pure tabular data
+# usually contains many short numeric tokens separated by spaces, e.g.
+# "0.283  0.321  0.236  0.282".  When such a row appears immediately after the
+# caption start, we must NOT merge it into the caption bbox; otherwise the
+# downstream "table body lives below caption" cropping logic will mistake the
+# numeric row for caption text and shrink the table bbox accordingly.
+_NUMERIC_TOKEN_RE = re.compile(r"^[+-]?(?:\d+\.\d+|\.\d+|\d+)(?:[eE][+-]?\d+)?$")
+
+
+def _looks_like_data_row(text: str) -> bool:
+    """Heuristic: a data row from a tabular layout, not part of a caption."""
+    tokens = text.split()
+    if len(tokens) < 3:
+        return False
+    numeric_tokens = sum(1 for tok in tokens if _NUMERIC_TOKEN_RE.match(tok))
+    return numeric_tokens >= max(2, len(tokens) // 2)
+
+
+def _classify_caption_kind(label: str) -> str:
+    """Return 'table' if the caption label starts with 'Table', else 'figure'."""
+    return "table" if label.strip().lower().startswith("table") else "figure"
+
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "extract pdf assets")
@@ -123,7 +146,14 @@ def _find_caption_blocks(page) -> list[dict]:
     Each anchor contains the full multi-line caption bbox so that the
     downstream crop includes the entire caption text, not just the first line.
 
-    Each anchor: {"label": "Figure 3", "bbox": (x0, y0, x1, y1), "line_text": ...}
+    Each anchor::
+
+        {
+            "label": "Figure 3",
+            "kind": "figure" | "table",
+            "bbox": (x0, y0, x1, y1),
+            "line_text": ...,
+        }
     """
     anchors: list[dict] = []
     blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
@@ -140,10 +170,13 @@ def _find_caption_blocks(page) -> list[dict]:
             if not match:
                 continue
             label = normalize_whitespace(match.group(1))
+            kind = _classify_caption_kind(label)
 
             caption_lines_text = [line_text]
             first_bbox = line["bbox"]
             x0, y0, x1, y1 = first_bbox
+            prev_line_bottom = first_bbox[3]
+            line_height = max(first_bbox[3] - first_bbox[1], 6.0)
 
             for cont_line in lines[line_idx + 1:]:
                 cont_spans = cont_line.get("spans", [])
@@ -154,15 +187,23 @@ def _find_caption_blocks(page) -> list[dict]:
                     break
                 if CAPTION_RE.match(cont_text):
                     break
+                if _looks_like_data_row(cont_text):
+                    break
                 cb = cont_line["bbox"]
+                # Stop merging if the next line is too far below the previous one
+                # (it is then a separate paragraph, not a caption continuation).
+                if cb[1] - prev_line_bottom > line_height * 1.6:
+                    break
                 x0 = min(x0, cb[0])
                 y1 = max(y1, cb[3])
                 x1 = max(x1, cb[2])
+                prev_line_bottom = cb[3]
                 caption_lines_text.append(cont_text)
 
             full_caption = " ".join(caption_lines_text)
             anchors.append({
                 "label": label,
+                "kind": kind,
                 "bbox": (x0, y0, x1, y1),
                 "line_text": full_caption,
             })
@@ -227,13 +268,67 @@ def _find_body_text_blocks(page) -> list[tuple[float, float, float, float, str]]
     return results
 
 
-def _estimate_figure_bbox(
+def _find_paragraph_blocks(page, *, min_chars: int = 200) -> list[tuple[float, float, float, float, str]]:
+    """Return only large prose blocks that look like running paragraphs.
+
+    PyMuPDF often groups an entire tabular column ("DS-Ulysses 629.9 418.3 ...")
+    into a single text block, so the legacy ``_find_body_text_blocks`` filter
+    catches table cells too aggressively.  For deciding whether we have walked
+    out of a table region we want a stricter notion: only blocks whose total
+    text mass and line count look like real prose count as paragraph blocks.
+    """
+    results: list[tuple[float, float, float, float, str]] = []
+    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+    for block in blocks:
+        if block.get("type") != 0:
+            continue
+        lines = block.get("lines", [])
+        full_text = ""
+        for line in lines:
+            for span in line.get("spans", []):
+                full_text += span.get("text", "")
+        full_text = full_text.strip()
+        if len(full_text) < min_chars:
+            continue
+        if CAPTION_RE.match(full_text):
+            continue
+        # Real prose paragraphs have many lines and few numeric-heavy lines.
+        if len(lines) < 3:
+            continue
+        numeric_line_share = 0
+        for line in lines:
+            line_text = "".join(s.get("text", "") for s in line.get("spans", [])).strip()
+            if _looks_like_data_row(line_text):
+                numeric_line_share += 1
+        if numeric_line_share > len(lines) * 0.4:
+            continue
+        bb = block["bbox"]
+        results.append((bb[0], bb[1], bb[2], bb[3], full_text))
+    results.sort(key=lambda b: b[1])
+    return results
+
+
+def _clip_to_page(
+    bbox: tuple[float, float, float, float],
+    page_rect,
+    *,
+    padding: float = 4.0,
+) -> tuple[float, float, float, float]:
+    x0, y0, x1, y1 = bbox
+    x0 = max(page_rect.x0, x0 - padding)
+    y0 = max(page_rect.y0, y0 - padding)
+    x1 = min(page_rect.x1, x1 + padding)
+    y1 = min(page_rect.y1, y1 + padding)
+    return (x0, y0, x1, y1)
+
+
+def _estimate_figure_bbox_above_caption(
     page,
     caption_anchor: dict,
-    next_anchor: dict | None,
+    prev_anchor: dict | None,
     page_rect,
 ) -> tuple[float, float, float, float] | None:
-    """Estimate the bounding box of the figure above (or below) its caption.
+    """Estimate the bounding box of the figure that lives ABOVE its caption.
 
     Strategy:
     1. Collect all xref image rects and vector drawing rects on the page.
@@ -247,8 +342,8 @@ def _estimate_figure_bbox(
     caption_y_bottom = caption_anchor["bbox"][3]
 
     upper_bound = 0.0
-    if next_anchor is not None:
-        upper_bound = next_anchor["bbox"][3] + 2.0
+    if prev_anchor is not None:
+        upper_bound = prev_anchor["bbox"][3] + 2.0
 
     img_rects = _collect_xref_rects(page)
     draw_rects = _collect_drawing_rects(page)
@@ -278,18 +373,290 @@ def _estimate_figure_bbox(
 
     y1 = max(y1, caption_y_bottom + 2.0)
 
-    padding = 4.0
-    x0 = max(page_rect.x0, x0 - padding)
-    y0 = max(page_rect.y0, y0 - padding)
-    x1 = min(page_rect.x1, x1 + padding)
-    y1 = min(page_rect.y1, y1 + padding)
-
-    width = x1 - x0
-    height = y1 - y0
+    bbox = _clip_to_page((x0, y0, x1, y1), page_rect)
+    width = bbox[2] - bbox[0]
+    height = bbox[3] - bbox[1]
     if width < MIN_FIGURE_WIDTH_PT or height < MIN_FIGURE_HEIGHT_PT:
         return None
+    return bbox
 
-    return (x0, y0, x1, y1)
+
+def _collect_text_lines(page) -> list[dict]:
+    """Return per-line records sorted top-to-bottom.
+
+    Each record::
+
+        {"bbox": (x0, y0, x1, y1), "text": str}
+    """
+    lines_out: list[dict] = []
+    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+    for block in blocks:
+        if block.get("type") != 0:
+            continue
+        for line in block.get("lines", []):
+            spans = line.get("spans", [])
+            if not spans:
+                continue
+            text = "".join(s.get("text", "") for s in spans).strip()
+            if not text:
+                continue
+            lines_out.append({"bbox": tuple(line["bbox"]), "text": text})
+    lines_out.sort(key=lambda r: r["bbox"][1])
+    return lines_out
+
+
+def _cluster_lines_into_rows(
+    lines: list[dict], *, y_tolerance: float = 2.0
+) -> list[dict]:
+    """Cluster sibling text lines that share roughly the same vertical band.
+
+    PDFs created by LaTeX often emit one PyMuPDF "line" per cell, so a single
+    visual row of a table is split into many independent line records.  We
+    merge lines whose ``y0`` falls within ``y_tolerance`` points of the row
+    seed so that downstream heuristics can reason about a true logical row.
+
+    Each output record::
+
+        {
+            "bbox": (x0, y0, x1, y1),  # union of all member bboxes
+            "tokens": [str, ...],       # text content of each member, left-to-right
+            "text": str,                # tokens joined by single spaces
+            "members": [dict, ...],     # original line records inside the row
+        }
+    """
+    rows: list[dict] = []
+    sorted_lines = sorted(lines, key=lambda r: (r["bbox"][1], r["bbox"][0]))
+    for line in sorted_lines:
+        bx0, by0, bx1, by1 = line["bbox"]
+        placed = False
+        for row in rows:
+            rx0, ry0, rx1, ry1 = row["bbox"]
+            row_mid = (ry0 + ry1) / 2.0
+            line_mid = (by0 + by1) / 2.0
+            if abs(line_mid - row_mid) <= y_tolerance:
+                row["bbox"] = (
+                    min(rx0, bx0),
+                    min(ry0, by0),
+                    max(rx1, bx1),
+                    max(ry1, by1),
+                )
+                row["members"].append(line)
+                placed = True
+                break
+        if not placed:
+            rows.append({
+                "bbox": (bx0, by0, bx1, by1),
+                "members": [line],
+            })
+
+    for row in rows:
+        row["members"].sort(key=lambda m: m["bbox"][0])
+        row["tokens"] = [m["text"] for m in row["members"]]
+        row["text"] = " ".join(row["tokens"])
+    rows.sort(key=lambda r: r["bbox"][1])
+    return rows
+
+
+def _row_is_table_like(row: dict) -> bool:
+    """A logical row that looks like part of a data table.
+
+    The row qualifies if it has many short tokens (typical for tabular cells).
+    Either:
+    - many independent cells (≥ 3 separate line members), or
+    - a single text whose tokens are dominated by numbers.
+    """
+    members = row.get("members", [])
+    text = row.get("text", "")
+    if len(members) >= 3:
+        # Many separated cells: the typical case for LaTeX-rendered tables
+        # where every cell becomes its own PyMuPDF line.
+        return True
+    return _looks_like_data_row(text)
+
+
+def _line_is_inside_any_block(
+    line_bbox: tuple[float, float, float, float],
+    blocks: list[tuple[float, float, float, float, str]],
+) -> bool:
+    for bb in blocks:
+        if (
+            line_bbox[0] >= bb[0] - 0.5
+            and line_bbox[1] >= bb[1] - 0.5
+            and line_bbox[2] <= bb[2] + 0.5
+            and line_bbox[3] <= bb[3] + 0.5
+        ):
+            return True
+    return False
+
+
+def _grow_table_region(
+    page,
+    caption_anchor: dict,
+    rows: list[dict],
+    paragraph_blocks: list[tuple[float, float, float, float, str]],
+    *,
+    direction: str,
+    upper_bound: float,
+    lower_bound: float,
+) -> tuple[list[tuple[float, float, float, float]], int]:
+    """Walk away from the caption in ``direction`` ('up' or 'down') and collect
+    logical rows that look like part of a tabular layout.
+
+    Returns the list of accepted row bboxes (caption excluded) and the number
+    of rows confirmed as data rows.  The caller decides which direction wins.
+    """
+    caption_y0 = caption_anchor["bbox"][1]
+    caption_y1 = caption_anchor["bbox"][3]
+
+    accepted: list[tuple[float, float, float, float]] = []
+    data_row_count = 0
+    consecutive_non_data = 0
+    seen_data = False
+
+    if direction == "down":
+        candidates = [r for r in rows if r["bbox"][1] > caption_y1 + 0.5]
+        candidates.sort(key=lambda r: r["bbox"][1])
+        boundary_check = lambda ly0, ly1: ly1 >= lower_bound
+    else:
+        candidates = [r for r in rows if r["bbox"][3] < caption_y0 - 0.5]
+        candidates.sort(key=lambda r: r["bbox"][3], reverse=True)
+        boundary_check = lambda ly0, ly1: ly0 <= upper_bound
+
+    for row in candidates:
+        rx0, ry0, rx1, ry1 = row["bbox"]
+        if boundary_check(ry0, ry1):
+            break
+        text = row["text"]
+        is_table_row = _row_is_table_like(row)
+        in_paragraph_block = _line_is_inside_any_block(row["bbox"], paragraph_blocks)
+        # If this row sits entirely inside a real prose paragraph and does not
+        # look table-shaped, we have walked out of the table.
+        if not is_table_row and (in_paragraph_block or len(text) > 200):
+            break
+        if is_table_row:
+            consecutive_non_data = 0
+            data_row_count += 1
+            seen_data = True
+        else:
+            consecutive_non_data += 1
+            # Header / footnote rows are allowed but we should not collect an
+            # unbounded run of them when no real data has been seen yet.
+            if consecutive_non_data > 4 and not seen_data:
+                break
+            if consecutive_non_data > 8:
+                break
+        accepted.append(row["bbox"])
+
+    return accepted, data_row_count
+
+
+def _finalize_table_bbox(
+    page,
+    caption_anchor: dict,
+    extra_rects: list[tuple[float, float, float, float]],
+    page_rect,
+) -> tuple[float, float, float, float] | None:
+    if not extra_rects:
+        return None
+    caption_x0, caption_y0, caption_x1, caption_y1 = caption_anchor["bbox"]
+    accepted: list[tuple[float, float, float, float]] = list(extra_rects) + [
+        (caption_x0, caption_y0, caption_x1, caption_y1)
+    ]
+
+    y0 = min(b[1] for b in accepted)
+    y1 = max(b[3] for b in accepted)
+    for r in _collect_drawing_rects(page):
+        ry_mid = (r[1] + r[3]) / 2.0
+        if y0 - 4.0 <= ry_mid <= y1 + 4.0:
+            accepted.append(r)
+    for r in _collect_xref_rects(page):
+        ry_mid = (r[1] + r[3]) / 2.0
+        if y0 - 4.0 <= ry_mid <= y1 + 4.0:
+            accepted.append(r)
+
+    x0 = min(b[0] for b in accepted)
+    y0 = min(b[1] for b in accepted)
+    x1 = max(b[2] for b in accepted)
+    y1 = max(b[3] for b in accepted)
+
+    bbox = _clip_to_page((x0, y0, x1, y1), page_rect, padding=6.0)
+    width = bbox[2] - bbox[0]
+    height = bbox[3] - bbox[1]
+    if width < MIN_FIGURE_WIDTH_PT or height < MIN_FIGURE_HEIGHT_PT:
+        return None
+    return bbox
+
+
+def _estimate_table_bbox(
+    page,
+    caption_anchor: dict,
+    prev_anchor: dict | None,
+    next_anchor: dict | None,
+    page_rect,
+) -> tuple[float, float, float, float] | None:
+    r"""Estimate the bounding box of a table.
+
+    Tables in academic papers come in two layouts:
+
+    - caption-on-top: ``\caption`` precedes ``\begin{tabular}``;
+    - caption-on-bottom: tabular body precedes ``\caption``.
+
+    LaTeX makes both common, and within a single paper both forms can mix
+    (e.g. wide tables placed with ``[t]`` vs. ``[b]``).  We therefore probe
+    both directions and pick the side with strictly more "data rows" (rows
+    dominated by numeric tokens).  Ties go to the downward side, matching the
+    most common ACM / IEEE template defaults.
+
+    Tables are usually pure text + thin separator lines, so the page rendering
+    of just the union of text-line bboxes is sufficient.  We additionally
+    union any drawing rects (``\hline``, frames) and image rects that fall in
+    the same y-range, in case the paper places company-logo plots inside a
+    table cell.
+    """
+    caption_y0 = caption_anchor["bbox"][1]
+    caption_y1 = caption_anchor["bbox"][3]
+
+    upper_bound = page_rect.y0
+    if prev_anchor is not None:
+        upper_bound = max(page_rect.y0, prev_anchor["bbox"][3] + 2.0)
+
+    lower_bound = page_rect.y1
+    if next_anchor is not None:
+        lower_bound = max(caption_y1 + 1.0, next_anchor["bbox"][1] - 2.0)
+
+    text_lines = _collect_text_lines(page)
+    rows = _cluster_lines_into_rows(text_lines)
+    paragraph_blocks = _find_paragraph_blocks(page)
+
+    down_lines, down_data = _grow_table_region(
+        page,
+        caption_anchor,
+        rows,
+        paragraph_blocks,
+        direction="down",
+        upper_bound=upper_bound,
+        lower_bound=lower_bound,
+    )
+    up_lines, up_data = _grow_table_region(
+        page,
+        caption_anchor,
+        rows,
+        paragraph_blocks,
+        direction="up",
+        upper_bound=upper_bound,
+        lower_bound=lower_bound,
+    )
+
+    if down_data == 0 and up_data == 0:
+        return None
+
+    chosen: list[tuple[float, float, float, float]]
+    if up_data > down_data:
+        chosen = up_lines
+    else:
+        chosen = down_lines
+
+    return _finalize_table_bbox(page, caption_anchor, chosen, page_rect)
 
 
 def _render_crop(page, bbox: tuple[float, float, float, float], dpi: int) -> bytes:
@@ -317,7 +684,21 @@ def extract_figure_regions(
 
     for idx, anchor in enumerate(anchors):
         prev_anchor = anchors[idx - 1] if idx > 0 else None
-        bbox = _estimate_figure_bbox(page, anchor, prev_anchor, page_rect)
+        next_anchor = anchors[idx + 1] if idx + 1 < len(anchors) else None
+        kind = anchor.get("kind", "figure")
+
+        bbox: tuple[float, float, float, float] | None
+        if kind == "table":
+            bbox = _estimate_table_bbox(page, anchor, prev_anchor, next_anchor, page_rect)
+            if bbox is None:
+                # Fall back to the figure-shape estimator in case the table is
+                # actually rendered as an embedded image.
+                bbox = _estimate_figure_bbox_above_caption(page, anchor, prev_anchor, page_rect)
+        else:
+            bbox = _estimate_figure_bbox_above_caption(page, anchor, prev_anchor, page_rect)
+            if bbox is None:
+                bbox = _estimate_table_bbox(page, anchor, prev_anchor, next_anchor, page_rect)
+
         if bbox is None:
             continue
 
@@ -340,6 +721,7 @@ def extract_figure_regions(
             {
                 "page_number": page_number,
                 "label": label,
+                "kind": kind,
                 "caption_text": normalize_whitespace(anchor["line_text"]),
                 "filename": filename,
                 "path": str(output_path),
