@@ -551,6 +551,25 @@ DeepPaperNote was influenced by projects that take paper reading, evidence extra
 - [heleninsights-dot/phd-deepread-workflow](https://github.com/heleninsights-dot/phd-deepread-workflow)
 - [juliye2025/evil-read-arxiv](https://github.com/juliye2025/evil-read-arxiv)
 
+## Star History
+
+<a href="https://star-history.com/#917Dhj/DeepPaperNote&Date">
+  <picture>
+    <source
+      media="(prefers-color-scheme: dark)"
+      srcset="https://api.star-history.com/svg?repos=917Dhj/DeepPaperNote&type=Date&theme=dark"
+    />
+    <source
+      media="(prefers-color-scheme: light)"
+      srcset="https://api.star-history.com/svg?repos=917Dhj/DeepPaperNote&type=Date"
+    />
+    <img
+      alt="Star History Chart"
+      src="https://api.star-history.com/svg?repos=917Dhj/DeepPaperNote&type=Date"
+    />
+  </picture>
+</a>
+
 ## 📄 License
 
 This project is licensed under the [MIT License](./LICENSE).

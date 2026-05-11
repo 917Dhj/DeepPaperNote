@@ -535,6 +535,25 @@ DeepPaperNote 在工作流设计上受到了这些论文阅读 / 笔记生成项
 - [heleninsights-dot/phd-deepread-workflow](https://github.com/heleninsights-dot/phd-deepread-workflow)
 - [juliye2025/evil-read-arxiv](https://github.com/juliye2025/evil-read-arxiv)
 
+## Star History
+
+<a href="https://star-history.com/#917Dhj/DeepPaperNote&Date">
+  <picture>
+    <source
+      media="(prefers-color-scheme: dark)"
+      srcset="https://api.star-history.com/svg?repos=917Dhj/DeepPaperNote&type=Date&theme=dark"
+    />
+    <source
+      media="(prefers-color-scheme: light)"
+      srcset="https://api.star-history.com/svg?repos=917Dhj/DeepPaperNote&type=Date"
+    />
+    <img
+      alt="Star History Chart"
+      src="https://api.star-history.com/svg?repos=917Dhj/DeepPaperNote&type=Date"
+    />
+  </picture>
+</a>
+
 ## 📄 License
 
 本项目采用 [MIT License](./LICENSE)。
