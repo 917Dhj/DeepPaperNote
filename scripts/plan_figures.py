@@ -30,6 +30,7 @@ def merge_inputs(primary: dict | None, evidence: dict | None, assets: dict | Non
     if assets and assets.get("page_assets"):
         merged["page_assets"] = assets["page_assets"]
         merged["image_assets"] = assets.get("image_assets", [])
+        merged["figure_assets"] = assets.get("figure_assets", [])
     return merged
 
 
@@ -163,7 +164,39 @@ def match_snippet(page_text: str, needle: str, *, radius: int = 90) -> str:
     return snippet[:220]
 
 
-def attach_candidate_images(items: list[dict], page_assets: list[dict], image_assets: list[dict]) -> list[dict]:
+def _normalize_label_for_match(label: str) -> str:
+    """Normalize a figure/table label to a canonical form for matching.
+
+    'Figure 3' / 'Fig. 3' / 'fig 3' / 'Figure. 3' all become 'fig 3'.
+    'Table 2' / 'table. 2' / 'Table. 2' all become 'table 2'.
+    """
+    text = normalize_whitespace(label).lower()
+    text = re.sub(r"^figure\.?\s*", "fig ", text)
+    text = re.sub(r"^fig\.?\s*", "fig ", text)
+    text = re.sub(r"^table\.?\s*", "table ", text)
+    return normalize_whitespace(text)
+
+
+def _match_figure_asset(item_id: str, figure_assets: list[dict]) -> dict | None:
+    """Find a figure-level asset whose label matches the plan item id."""
+    target = _normalize_label_for_match(item_id)
+    if not target:
+        return None
+    for asset in figure_assets:
+        asset_label = _normalize_label_for_match(str(asset.get("label", "")))
+        if asset_label == target:
+            return asset
+    return None
+
+
+def attach_candidate_images(
+    items: list[dict],
+    page_assets: list[dict],
+    image_assets: list[dict],
+    figure_assets: list[dict] | None = None,
+) -> list[dict]:
+    figure_assets = figure_assets or []
+
     image_map: dict[int, list[dict]] = {}
     for image in image_assets:
         if not isinstance(image, dict):
@@ -173,10 +206,37 @@ def attach_candidate_images(items: list[dict], page_assets: list[dict], image_as
             continue
         image_map.setdefault(page_number, []).append(image)
 
-    pages_with_images = [page for page in page_assets if isinstance(page, dict) and int(page.get("image_count", 0) or 0) > 0]
+    has_visual = set()
+    for page in page_assets:
+        if not isinstance(page, dict):
+            continue
+        pn = int(page.get("page_number", 0) or 0)
+        img_count = int(page.get("image_count", 0) or 0)
+        fig_count = int(page.get("figure_count", 0) or 0)
+        if img_count > 0 or fig_count > 0:
+            has_visual.add(pn)
+    pages_with_images = [
+        page for page in page_assets
+        if isinstance(page, dict) and int(page.get("page_number", 0) or 0) in has_visual
+    ]
 
     for index, item in enumerate(items):
-        variants = label_variants(str(item.get("id", "")))
+        item_id = str(item.get("id", ""))
+
+        fig_match = _match_figure_asset(item_id, figure_assets)
+        if fig_match:
+            item["figure_asset"] = {
+                "filename": fig_match.get("filename", ""),
+                "path": fig_match.get("path", ""),
+                "width": fig_match.get("width", 0),
+                "height": fig_match.get("height", 0),
+                "size_bytes": fig_match.get("size_bytes", 0),
+                "label": fig_match.get("label", ""),
+                "extraction_level": "figure",
+            }
+            item["insert_mode"] = "figure_asset"
+
+        variants = label_variants(item_id)
         keywords = caption_keywords(str(item.get("caption", "")))
         candidates: list[dict] = []
         for page in pages_with_images:
@@ -236,7 +296,7 @@ def attach_candidate_images(items: list[dict], page_assets: list[dict], image_as
 
         candidates.sort(key=lambda candidate: (-candidate["score"], candidate["page_number"]))
         item["candidate_pages"] = candidates[:3]
-        item["matching_strategy"] = "page-proximity-and-caption-cues"
+        item["matching_strategy"] = "figure-asset-preferred" if fig_match else "page-proximity-and-caption-cues"
     return items
 
 
@@ -254,8 +314,9 @@ def main() -> None:
     evidence_pack = data.get("evidence_pack", {}) if isinstance(data.get("evidence_pack"), dict) else {}
     page_assets = data.get("page_assets", []) if isinstance(data.get("page_assets"), list) else []
     image_assets = data.get("image_assets", []) if isinstance(data.get("image_assets"), list) else []
+    figure_assets = data.get("figure_assets", []) if isinstance(data.get("figure_assets"), list) else []
     items = build_figure_items(evidence_pack, limit=args.max_items)
-    items = attach_candidate_images(items, page_assets, image_assets)
+    items = attach_candidate_images(items, page_assets, image_assets, figure_assets)
     payload = {
         "status": "ok",
         "script": "plan_figures.py",
