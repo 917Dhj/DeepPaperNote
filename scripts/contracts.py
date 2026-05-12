@@ -75,6 +75,9 @@ class FigurePlanItem(TypedDict, total=False):
     priority: int
     anchor_text: str
     insert_mode: str
+    figure_asset_candidate: dict[str, Any]
+    candidate_pages: list[dict[str, Any]]
+    matching_strategy: str
 
 
 class FigurePlan(TypedDict, total=False):

@@ -189,6 +189,20 @@ def _match_figure_asset(item_id: str, figure_assets: list[dict]) -> dict | None:
     return None
 
 
+def _asset_candidate(asset: dict, *, include_label: bool = False) -> dict:
+    candidate = {
+        "filename": asset.get("filename", ""),
+        "path": asset.get("path", ""),
+        "width": asset.get("width", 0),
+        "height": asset.get("height", 0),
+        "size_bytes": asset.get("size_bytes", 0),
+    }
+    if include_label:
+        candidate["label"] = asset.get("label", "")
+        candidate["extraction_level"] = asset.get("extraction_level", "figure")
+    return candidate
+
+
 def attach_candidate_images(
     items: list[dict],
     page_assets: list[dict],
@@ -205,6 +219,15 @@ def attach_candidate_images(
         if page_number <= 0:
             continue
         image_map.setdefault(page_number, []).append(image)
+
+    figure_map: dict[int, list[dict]] = {}
+    for asset in figure_assets:
+        if not isinstance(asset, dict):
+            continue
+        page_number = int(asset.get("page_number", 0) or 0)
+        if page_number <= 0:
+            continue
+        figure_map.setdefault(page_number, []).append(asset)
 
     has_visual = set()
     for page in page_assets:
@@ -225,16 +248,7 @@ def attach_candidate_images(
 
         fig_match = _match_figure_asset(item_id, figure_assets)
         if fig_match:
-            item["figure_asset"] = {
-                "filename": fig_match.get("filename", ""),
-                "path": fig_match.get("path", ""),
-                "width": fig_match.get("width", 0),
-                "height": fig_match.get("height", 0),
-                "size_bytes": fig_match.get("size_bytes", 0),
-                "label": fig_match.get("label", ""),
-                "extraction_level": "figure",
-            }
-            item["insert_mode"] = "figure_asset"
+            item["figure_asset_candidate"] = _asset_candidate(fig_match, include_label=True)
 
         variants = label_variants(item_id)
         keywords = caption_keywords(str(item.get("caption", "")))
@@ -282,21 +296,19 @@ def attach_candidate_images(
                     "matched_terms": matched_terms[:6],
                     "snippet": snippets[0] if snippets else normalize_whitespace(str(page.get("text_preview", "")))[:220],
                     "images": [
-                        {
-                            "filename": img.get("filename", ""),
-                            "path": img.get("path", ""),
-                            "width": img.get("width", 0),
-                            "height": img.get("height", 0),
-                            "size_bytes": img.get("size_bytes", 0),
-                        }
+                        _asset_candidate(img)
                         for img in image_map.get(page_number, [])[:3]
+                    ],
+                    "figure_assets": [
+                        _asset_candidate(asset, include_label=True)
+                        for asset in figure_map.get(page_number, [])[:3]
                     ],
                 }
             )
 
         candidates.sort(key=lambda candidate: (-candidate["score"], candidate["page_number"]))
         item["candidate_pages"] = candidates[:3]
-        item["matching_strategy"] = "figure-asset-preferred" if fig_match else "page-proximity-and-caption-cues"
+        item["matching_strategy"] = "figure-asset-candidate" if fig_match else "page-proximity-and-caption-cues"
     return items
 
 
