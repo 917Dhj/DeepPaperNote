@@ -45,6 +45,29 @@ class EquationCandidate(TypedDict, total=False):
     kind_hint: str
 
 
+class FigureQualitySignals(TypedDict, total=False):
+    visual_quality_status: str
+    quality_reason_codes: list[str]
+    page_coverage_ratio: float
+    visual_rect_count: int
+    visual_body_ratio: float
+    paragraph_text_chars: int
+    table_body_rows: int
+    caption_text_chars: int
+
+
+class FigureAssetCandidate(TypedDict, total=False):
+    filename: str
+    path: str
+    width: int
+    height: int
+    size_bytes: int
+    label: str
+    extraction_level: str
+    quality_signals: FigureQualitySignals
+    candidate_status: str
+
+
 class EvidencePack(TypedDict, total=False):
     paper_id: str
     problem_evidence: list[EvidenceItem]
@@ -75,8 +98,9 @@ class FigurePlanItem(TypedDict, total=False):
     priority: int
     anchor_text: str
     insert_mode: str
-    figure_asset_candidate: dict[str, Any]
+    figure_asset_candidate: FigureAssetCandidate
     candidate_pages: list[dict[str, Any]]
+    candidate_status: str
     matching_strategy: str
 
 

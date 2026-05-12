@@ -133,6 +133,29 @@ def sanitize_page_assets(assets_wrapper: dict, *, limit: int = 24) -> list[dict]
     return sanitized
 
 
+def sanitize_figure_assets(assets_wrapper: dict, *, limit: int = 48) -> list[dict]:
+    sanitized: list[dict] = []
+    for item in (assets_wrapper.get("figure_assets", []) or [])[:limit]:
+        if not isinstance(item, dict):
+            continue
+        record = {
+            "filename": item.get("filename", ""),
+            "path": item.get("path", ""),
+            "page_number": item.get("page_number", 0),
+            "label": item.get("label", ""),
+            "kind": item.get("kind", ""),
+            "caption_text": normalize_whitespace(str(item.get("caption_text", ""))),
+            "width": item.get("width", 0),
+            "height": item.get("height", 0),
+            "size_bytes": item.get("size_bytes", 0),
+            "extraction_level": item.get("extraction_level", ""),
+        }
+        if isinstance(item.get("quality_signals"), dict):
+            record["quality_signals"] = item.get("quality_signals")
+        sanitized.append(record)
+    return sanitized
+
+
 def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets_wrapper: dict) -> dict:
     evidence_pack = evidence_wrapper.get("evidence_pack", {}) if isinstance(evidence_wrapper.get("evidence_pack"), dict) else {}
     figure_plan = figures_wrapper.get("figure_plan", {}) if isinstance(figures_wrapper.get("figure_plan"), dict) else {}
@@ -177,6 +200,7 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             "images_dir": assets_wrapper.get("images_dir", ""),
             "page_assets": sanitize_page_assets(assets_wrapper),
             "image_assets": assets_wrapper.get("image_assets", []),
+            "figure_assets": sanitize_figure_assets(assets_wrapper),
             "ocr_available": assets_wrapper.get("ocr_available", False),
         },
         "summary": evidence_wrapper.get("summary", {}),
@@ -340,6 +364,9 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             },
             "figure_rules": [
                 "先规划主要图表的占位标签，再决定哪些可以替换成真实图片",
+                "label/caption match is not insertion approval; it only proves identity, and visual usability is a separate hard gate.",
+                "Reject caption-only crops, missing table body crops, large text/title/abstract crops, and low visual body ratio crops.",
+                "If visual quality is missing, ambiguous, or marked review/reject, fail closed: keep the placeholder instead of inserting the image.",
                 "如果没有高置信度图像匹配，不要删除占位标签",
                 "图注必须保留论文原始编号，例如 Fig. 1、Table 2",
                 "如果插入的是局部子图或不完整裁剪，必须明确说明",

@@ -82,3 +82,59 @@ def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:
     assert any("工程解释" in rule for rule in formula_rules)
     assert any("ablation_evidence" in rule for rule in self_review_rules)
     assert mechanism_flow_contract["title"] == "机制流程"
+
+
+def test_bundle_exposes_sanitized_figure_asset_quality_and_hard_gate_rules() -> None:
+    synthesis = bundle(
+        metadata={"title": "Figure Paper"},
+        evidence_wrapper={"evidence_pack": {}},
+        figures_wrapper={},
+        assets_wrapper={
+            "figure_assets": [
+                {
+                    "page_number": 1,
+                    "label": "Figure 1",
+                    "kind": "figure",
+                    "caption_text": "Figure 1. Overview.",
+                    "filename": "page_001_fig_figure_1.png",
+                    "path": "/tmp/images/page_001_fig_figure_1.png",
+                    "width": 640,
+                    "height": 320,
+                    "size_bytes": 1234,
+                    "extraction_level": "figure",
+                    "bbox_pt": [0, 0, 500, 400],
+                    "quality_signals": {
+                        "visual_quality_status": "reject",
+                        "quality_reason_codes": ["large_text_block_suspected"],
+                    },
+                    "raw_unwanted": "do not expose",
+                }
+            ]
+        },
+    )
+
+    figure_assets = synthesis["pdf_assets"]["figure_assets"]
+    assert figure_assets == [
+        {
+            "filename": "page_001_fig_figure_1.png",
+            "path": "/tmp/images/page_001_fig_figure_1.png",
+            "page_number": 1,
+            "label": "Figure 1",
+            "kind": "figure",
+            "caption_text": "Figure 1. Overview.",
+            "width": 640,
+            "height": 320,
+            "size_bytes": 1234,
+            "extraction_level": "figure",
+            "quality_signals": {
+                "visual_quality_status": "reject",
+                "quality_reason_codes": ["large_text_block_suspected"],
+            },
+        }
+    ]
+
+    figure_rules_text = "\n".join(synthesis["writing_contract"]["figure_rules"])
+    assert "label/caption match is not insertion approval" in figure_rules_text
+    assert "caption-only" in figure_rules_text
+    assert "missing table body" in figure_rules_text
+    assert "low visual body ratio" in figure_rules_text

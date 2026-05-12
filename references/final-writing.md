@@ -209,6 +209,10 @@ The note should preserve the full figure/table structure even when image extract
 If the bundle contains candidate figure pages or candidate image files:
 - use them as evidence for semantic matching
 - prefer the candidate with the strongest caption/page-context agreement
+- treat identity match and visual usability as separate gates
+- never treat a matching label or caption as sufficient approval to insert an image
+- reject caption-only crops, missing table bodies, large text/title/abstract crops, and crops with very low visual body ratio
+- if visual quality is missing, ambiguous, or failed, keep the placeholder
 - still make the final decision yourself rather than trusting the candidate ranking blindly
 
 Final-note figure rules:

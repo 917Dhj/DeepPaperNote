@@ -34,7 +34,10 @@ The rule is simple:
    If `pdf_assets` is present in the bundle, use it for semantic figure selection:
    - inspect page-level image metadata
    - inspect figure candidate pages and candidate images from `figure_plan`
+   - inspect `figure_assets[].quality_signals` when available
    - match likely figures by page proximity, caption context, and candidate snippets
+   - require both identity match and visual usability before insertion
+   - fail closed on caption-only crops, missing table bodies, large text/title/abstract crops, or very low visual body ratio
    - keep the final semantic matching decision on the model side
    Build the note in placeholder-first order:
    - plan placeholders for all major figures/tables that matter to the note

@@ -189,6 +189,16 @@ def _match_figure_asset(item_id: str, figure_assets: list[dict]) -> dict | None:
     return None
 
 
+def _candidate_status_for_quality(asset: dict) -> str:
+    signals = asset.get("quality_signals")
+    status = signals.get("visual_quality_status", "") if isinstance(signals, dict) else ""
+    if status == "usable":
+        return "usable_candidate"
+    if status == "reject":
+        return "reject_visual_quality"
+    return "needs_visual_quality_check"
+
+
 def _asset_candidate(asset: dict, *, include_label: bool = False) -> dict:
     candidate = {
         "filename": asset.get("filename", ""),
@@ -200,6 +210,9 @@ def _asset_candidate(asset: dict, *, include_label: bool = False) -> dict:
     if include_label:
         candidate["label"] = asset.get("label", "")
         candidate["extraction_level"] = asset.get("extraction_level", "figure")
+        if isinstance(asset.get("quality_signals"), dict):
+            candidate["quality_signals"] = asset.get("quality_signals")
+        candidate["candidate_status"] = _candidate_status_for_quality(asset)
     return candidate
 
 

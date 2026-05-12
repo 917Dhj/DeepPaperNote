@@ -45,6 +45,21 @@ Do not let scripts make the final semantic choice; scripts should only prepare c
 - Do not produce a text-only note first and then ask the user in a follow-up whether figures should be inserted.
 - If no figure can be confidently replaced, finish the note with placeholders and explain that outcome in the final response.
 
+## Visual Quality Gate
+
+Figure/table insertion has two separate gates:
+- identity match: the candidate label, caption, and local context match the planned figure/table
+- visual usability: the crop actually contains the visual body needed by the reader
+
+A label or caption match is not insertion approval.
+Fail closed when visual usability is weak: keep the placeholder instead of inserting the candidate.
+
+Reject candidates that are:
+- caption-only crops
+- tables with no visible table body
+- large text, title-page, or abstract crops masquerading as figures
+- crops where the visual body is tiny relative to the crop
+
 ## Placeholder Requirements
 
 Each placeholder should include:

@@ -60,6 +60,80 @@ def _looks_like_data_row(text: str) -> bool:
     return numeric_tokens >= max(2, len(tokens) // 2)
 
 
+def _rect_area(bbox: tuple[float, float, float, float]) -> float:
+    return max(0.0, bbox[2] - bbox[0]) * max(0.0, bbox[3] - bbox[1])
+
+
+def _intersection_area(
+    a: tuple[float, float, float, float],
+    b: tuple[float, float, float, float],
+) -> float:
+    x0 = max(a[0], b[0])
+    y0 = max(a[1], b[1])
+    x1 = min(a[2], b[2])
+    y1 = min(a[3], b[3])
+    return _rect_area((x0, y0, x1, y1))
+
+
+def _rects_intersect(
+    a: tuple[float, float, float, float],
+    b: tuple[float, float, float, float],
+) -> bool:
+    return _intersection_area(a, b) > 0
+
+
+def _classify_visual_quality(
+    *,
+    kind: str,
+    page_coverage_ratio: float,
+    visual_rect_count: int,
+    visual_body_ratio: float,
+    paragraph_text_chars: int,
+    table_body_rows: int,
+    caption_text_chars: int,
+) -> dict:
+    """Classify whether a caption-matched crop is visually usable.
+
+    This is intentionally conservative. A label/caption match proves identity,
+    but not that the rendered crop contains the figure or table body.
+    """
+    normalized_kind = kind.strip().lower()
+    reasons: list[str] = []
+
+    if normalized_kind == "table":
+        if table_body_rows <= 0:
+            reasons.append("table_body_missing")
+        if table_body_rows <= 1 and visual_body_ratio < 0.03 and caption_text_chars >= 40:
+            reasons.append("caption_only_suspected")
+        status = "reject" if reasons else "usable"
+    else:
+        if paragraph_text_chars >= 450:
+            reasons.append("large_text_block_suspected")
+        if page_coverage_ratio >= 0.70 and paragraph_text_chars >= 250:
+            reasons.append("oversized_page_crop")
+        if visual_rect_count <= 1 and visual_body_ratio < 0.03:
+            reasons.append("low_visual_body_ratio")
+        if any(code in reasons for code in ("large_text_block_suspected", "oversized_page_crop", "low_visual_body_ratio")):
+            status = "reject"
+        elif visual_rect_count == 0 or visual_body_ratio < 0.08:
+            if "low_visual_body_ratio" not in reasons:
+                reasons.append("low_visual_body_ratio")
+            status = "review"
+        else:
+            status = "usable"
+
+    return {
+        "visual_quality_status": status,
+        "quality_reason_codes": reasons,
+        "page_coverage_ratio": round(page_coverage_ratio, 6),
+        "visual_rect_count": int(visual_rect_count),
+        "visual_body_ratio": round(visual_body_ratio, 6),
+        "paragraph_text_chars": int(paragraph_text_chars),
+        "table_body_rows": int(table_body_rows),
+        "caption_text_chars": int(caption_text_chars),
+    }
+
+
 def _classify_caption_kind(label: str) -> str:
     """Return 'table' if the caption label starts with 'Table', else 'figure'."""
     return "table" if label.strip().lower().startswith("table") else "figure"
@@ -246,6 +320,23 @@ def _collect_drawing_rects(page) -> list[tuple[float, float, float, float]]:
     return rects
 
 
+def _visual_signal_for_bbox(page, bbox: tuple[float, float, float, float]) -> tuple[int, float]:
+    """Return visual rect count and visual-area ratio inside a crop."""
+    crop_area = _rect_area(bbox)
+    if crop_area <= 0:
+        return 0, 0.0
+    rects = _collect_xref_rects(page) + _collect_drawing_rects(page)
+    count = 0
+    visual_area = 0.0
+    for rect in rects:
+        area = _intersection_area(rect, bbox)
+        if area <= 0:
+            continue
+        count += 1
+        visual_area += area
+    return count, min(1.0, visual_area / crop_area)
+
+
 def _find_body_text_blocks(page) -> list[tuple[float, float, float, float, str]]:
     """Return bounding boxes of body-text blocks (non-caption) sorted top-to-bottom."""
     results: list[tuple[float, float, float, float, str]] = []
@@ -306,6 +397,67 @@ def _find_paragraph_blocks(page, *, min_chars: int = 200) -> list[tuple[float, f
         results.append((bb[0], bb[1], bb[2], bb[3], full_text))
     results.sort(key=lambda b: b[1])
     return results
+
+
+def _count_paragraph_text_chars_in_bbox(
+    page,
+    bbox: tuple[float, float, float, float],
+    caption_bbox: tuple[float, float, float, float],
+) -> int:
+    """Count prose-like text intersecting a crop, excluding the caption area."""
+    chars = 0
+    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+    for block in blocks:
+        if block.get("type") != 0:
+            continue
+        bb = tuple(block["bbox"])
+        if not _rects_intersect(bb, bbox):
+            continue
+        if _intersection_area(bb, caption_bbox) / max(_rect_area(bb), 1.0) > 0.6:
+            continue
+
+        lines = block.get("lines", [])
+        line_texts = [
+            "".join(s.get("text", "") for s in line.get("spans", [])).strip()
+            for line in lines
+        ]
+        line_texts = [text for text in line_texts if text]
+        full_text = normalize_whitespace(" ".join(line_texts))
+        if len(full_text) < 80:
+            continue
+        if CAPTION_RE.match(full_text):
+            continue
+        numeric_rows = sum(1 for text in line_texts if _looks_like_data_row(text))
+        if line_texts and numeric_rows > len(line_texts) * 0.4:
+            continue
+        chars += len(full_text)
+    return chars
+
+
+def _quality_signals_for_crop(
+    page,
+    kind: str,
+    bbox: tuple[float, float, float, float],
+    caption_anchor: dict,
+    page_rect,
+    *,
+    table_body_rows: int,
+) -> dict:
+    page_area = _rect_area((page_rect.x0, page_rect.y0, page_rect.x1, page_rect.y1))
+    page_coverage_ratio = _rect_area(bbox) / page_area if page_area > 0 else 0.0
+    visual_rect_count, visual_body_ratio = _visual_signal_for_bbox(page, bbox)
+    caption_bbox = tuple(caption_anchor["bbox"])
+    paragraph_text_chars = _count_paragraph_text_chars_in_bbox(page, bbox, caption_bbox)
+    caption_text_chars = len(normalize_whitespace(str(caption_anchor.get("line_text", ""))))
+    return _classify_visual_quality(
+        kind=kind,
+        page_coverage_ratio=page_coverage_ratio,
+        visual_rect_count=visual_rect_count,
+        visual_body_ratio=visual_body_ratio,
+        paragraph_text_chars=paragraph_text_chars,
+        table_body_rows=table_body_rows,
+        caption_text_chars=caption_text_chars,
+    )
 
 
 def _clip_to_page(
@@ -594,6 +746,17 @@ def _estimate_table_bbox(
     next_anchor: dict | None,
     page_rect,
 ) -> tuple[float, float, float, float] | None:
+    result = _estimate_table_bbox_with_rows(page, caption_anchor, prev_anchor, next_anchor, page_rect)
+    return result[0] if result is not None else None
+
+
+def _estimate_table_bbox_with_rows(
+    page,
+    caption_anchor: dict,
+    prev_anchor: dict | None,
+    next_anchor: dict | None,
+    page_rect,
+) -> tuple[tuple[float, float, float, float], int] | None:
     r"""Estimate the bounding box of a table.
 
     Tables in academic papers come in two layouts:
@@ -651,12 +814,18 @@ def _estimate_table_bbox(
         return None
 
     chosen: list[tuple[float, float, float, float]]
+    chosen_data_rows: int
     if up_data > down_data:
         chosen = up_lines
+        chosen_data_rows = up_data
     else:
         chosen = down_lines
+        chosen_data_rows = down_data
 
-    return _finalize_table_bbox(page, caption_anchor, chosen, page_rect)
+    bbox = _finalize_table_bbox(page, caption_anchor, chosen, page_rect)
+    if bbox is None:
+        return None
+    return bbox, chosen_data_rows
 
 
 def _render_crop(page, bbox: tuple[float, float, float, float], dpi: int) -> bytes:
@@ -688,8 +857,13 @@ def extract_figure_regions(
         kind = anchor.get("kind", "figure")
 
         bbox: tuple[float, float, float, float] | None
+        table_body_rows = 0
         if kind == "table":
-            bbox = _estimate_table_bbox(page, anchor, prev_anchor, next_anchor, page_rect)
+            table_result = _estimate_table_bbox_with_rows(page, anchor, prev_anchor, next_anchor, page_rect)
+            if table_result is not None:
+                bbox, table_body_rows = table_result
+            else:
+                bbox = None
             if bbox is None:
                 # Fall back to the figure-shape estimator in case the table is
                 # actually rendered as an embedded image.
@@ -716,6 +890,14 @@ def extract_figure_regions(
 
         width_px = int((bbox[2] - bbox[0]) * dpi / 72.0)
         height_px = int((bbox[3] - bbox[1]) * dpi / 72.0)
+        quality_signals = _quality_signals_for_crop(
+            page,
+            kind,
+            bbox,
+            anchor,
+            page_rect,
+            table_body_rows=table_body_rows,
+        )
 
         assets.append(
             {
@@ -731,6 +913,7 @@ def extract_figure_regions(
                 "bbox_pt": list(bbox),
                 "size_bytes": len(png_bytes),
                 "extraction_level": "figure",
+                "quality_signals": quality_signals,
             }
         )
 
