@@ -14,6 +14,33 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - No unreleased user-facing changes yet.
 
+## v1.1.0
+
+Minor stable release with a major figure/table extraction quality upgrade.
+
+### Added
+
+- Added figure-level PDF asset extraction that renders caption-anchored page regions instead of relying only on raw xref image objects.
+- Added richer `figure_assets` metadata for extracted figures and tables, including labels, captions, extraction kind, and visual quality signals.
+- Added visual quality gates so weak crops can fail closed and remain placeholders instead of being treated as insertion-ready images.
+- Added `figure_assets` to the synthesis bundle so model-side review can inspect richer figure/table candidates.
+- Added regression tests for figure asset candidates, placeholder-first planning, label normalization, and visual quality rejection.
+
+### Changed
+
+- Improved extraction for complete figures, vector-heavy papers, fragmented LaTeX tables, and caption-on-bottom tables.
+- Preserved DeepPaperNote's placeholder-first behavior: extracted figure assets are exposed as candidates, not automatic note insertions.
+- Strengthened figure-placement and final-writing guidance around visual quality review and candidate handling.
+
+### Contributors
+
+- Incorporated the figure-level extraction work from PR #1 by KuangjuX, with follow-up changes to keep insertion semantics placeholder-first.
+
+### Notes
+
+- This remains a stable release.
+- The release asset continues to ship as a clean manually installable `DeepPaperNote.zip`.
+
 ## v1.0.1
 
 Patch release after `v1.0.0`.
