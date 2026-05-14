@@ -11,8 +11,9 @@ htmlcov/
 .env
 .venv/
 venv/
+node_modules/
+.astro/
 dist/
 build/
 *.egg-info/
 .agent-work/
-DESIGN.md

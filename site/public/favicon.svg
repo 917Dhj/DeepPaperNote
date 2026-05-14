@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="DeepPaperNote">
+  <rect width="64" height="64" rx="14" fill="#0a1530"/>
+  <path d="M18 14h18c9 0 16 7 16 18s-7 18-16 18H18V14Z" fill="#ffffff"/>
+  <path d="M28 24h7c5 0 8 3 8 8s-3 8-8 8h-7V24Z" fill="#5645d4"/>
+</svg>

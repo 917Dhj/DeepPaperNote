@@ -1,0 +1,193 @@
+---
+import "../styles/global.css";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="DeepPaperNote turns one dense research paper into an evidence-first Obsidian note worth keeping."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>DeepPaperNote | Evidence-first paper notes for Obsidian</title>
+  </head>
+  <body>
+    <header class="site-header" aria-label="Primary navigation">
+      <a class="brand" href="#" aria-label="DeepPaperNote home">
+        <span class="brand-mark">D</span>
+        <span>DeepPaperNote</span>
+      </a>
+      <nav class="nav-links" aria-label="Page sections">
+        <a href="#showcase">Showcase</a>
+        <a href="#pipeline">Pipeline</a>
+        <a href="#install">Install</a>
+      </nav>
+      <a class="button button-primary" href="#install">Install</a>
+    </header>
+
+    <main>
+      <section class="hero-section" aria-labelledby="hero-title">
+        <div class="hero-decoration dot dot-peach"></div>
+        <div class="hero-decoration dot dot-mint"></div>
+        <div class="hero-decoration dot dot-rose"></div>
+        <div class="hero-decoration wire wire-left"></div>
+        <div class="hero-decoration wire wire-right"></div>
+
+        <div class="hero-content">
+          <h1 id="hero-title">Turn one dense paper into an Obsidian note worth keeping.</h1>
+          <p>
+            DeepPaperNote is an evidence-first reading workflow for researchers who want
+            more than an abstract summary.
+          </p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="button button-primary" href="#install">Install with npx</a>
+            <a class="button button-on-dark" href="https://github.com/917Dhj/DeepPaperNote"
+              >View GitHub</a
+            >
+          </div>
+        </div>
+
+        <div class="workspace-mockup" aria-label="Paper to Obsidian note product preview">
+          <article class="paper-card">
+            <div class="paper-topline">PDF · Zotero · Figures</div>
+            <h2>Attention Is All You Need</h2>
+            <div class="formula-card">Attention(Q, K, V) = softmax(QKᵀ / √dₖ)V</div>
+            <div class="figure-grid">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </article>
+
+          <div class="pipeline-rail" aria-hidden="true">
+            <span>Evidence</span>
+            <strong></strong>
+            <span>Lint</span>
+          </div>
+
+          <article class="note-card">
+            <div class="note-window-bar">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <h2>Obsidian Deep Note</h2>
+            <section>
+              <h3>创新点</h3>
+              <p>Reconstructs the paper's mechanism, not just the abstract.</p>
+            </section>
+            <section>
+              <h3>方法主线</h3>
+              <p>Tracks task definition, model flow, key formulas, and results.</p>
+            </section>
+            <aside class="figure-callout">
+              <strong>Fig. 1 Method Overview</strong>
+              <span>Placeholder kept until the extracted crop passes visual quality.</span>
+            </aside>
+          </article>
+        </div>
+      </section>
+
+      <section class="showcase-section" id="showcase" aria-labelledby="showcase-title">
+        <div class="section-heading">
+          <h2 id="showcase-title">The output is the product.</h2>
+          <p>
+            DeepPaperNote is built around the note you keep: structured, evidence-aware,
+            figure-conscious, and ready for a long-term Obsidian vault.
+          </p>
+        </div>
+
+        <div class="showcase-grid">
+          <article class="feature-card card-yellow">
+            <span class="tag">Result</span>
+            <h3>A reading note, not a recap</h3>
+            <p>
+              The note preserves the paper's question, method backbone, key results,
+              limitations, and reusable research context.
+            </p>
+          </article>
+          <article class="feature-card card-mint">
+            <span class="tag">Evidence</span>
+            <h3>Claims follow the source</h3>
+            <p>
+              Metadata, sections, captions, formulas, and numeric claims are gathered before
+              the final synthesis begins.
+            </p>
+          </article>
+          <article class="feature-card card-rose">
+            <span class="tag">Figures</span>
+            <h3>Figure-aware by default</h3>
+            <p>
+              Major figures and tables keep their place in the note, even when image extraction
+              should fail closed.
+            </p>
+          </article>
+        </div>
+
+        <div class="note-showcase">
+          <div class="note-outline" aria-label="Generated note outline example">
+            <p class="panel-label">Generated structure</p>
+            <h3>DeepPaperNote output</h3>
+            <ul>
+              <li><span>01</span> 原文摘要翻译</li>
+              <li><span>02</span> 创新点</li>
+              <li><span>03</span> 方法主线</li>
+              <li><span>04</span> 关键结果</li>
+              <li><span>05</span> 深度分析</li>
+            </ul>
+          </div>
+          <div class="note-body-preview">
+            <p class="panel-label">Figure placeholder</p>
+            <h3>Fig. 3 Data distribution and quality review</h3>
+            <p>
+              Suggested placement: data and task definition. Kept as a placeholder because the
+              current extraction only recovered a partial crop.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="pipeline-section" id="pipeline" aria-labelledby="pipeline-title">
+        <div class="section-heading">
+          <h2 id="pipeline-title">A disciplined path from paper to note.</h2>
+          <p>
+            Scripts prepare structured evidence. The model does the reading. The final note is
+            linted, reviewed, and saved where your research actually lives.
+          </p>
+        </div>
+        <ol class="pipeline-steps">
+          <li><strong>Resolve</strong><span>Pick one canonical paper identity.</span></li>
+          <li><strong>Evidence</strong><span>Extract sections, captions, metrics, and context.</span></li>
+          <li><strong>Figures</strong><span>Plan major figure and table placeholders first.</span></li>
+          <li><strong>Synthesis</strong><span>Turn the bundle into a deep-reading note.</span></li>
+          <li><strong>Lint</strong><span>Check structure, style, and note completeness.</span></li>
+          <li><strong>Save</strong><span>Write to an Obsidian-style paper folder.</span></li>
+        </ol>
+      </section>
+
+      <section class="install-section" id="install" aria-labelledby="install-title">
+        <div>
+          <h2 id="install-title">Install the skill. Hand it one paper.</h2>
+          <p>
+            Keep the website out of the skill package. Keep the workflow focused on the note.
+          </p>
+        </div>
+        <div class="terminal-card" aria-label="Install commands">
+          <code>npx skills add 917Dhj/DeepPaperNote</code>
+          <code>python3 -m pip install PyMuPDF</code>
+          <code>Use DeepPaperNote on this paper: https://arxiv.org/abs/1706.03762</code>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>DeepPaperNote</span>
+      <a href="https://github.com/917Dhj/DeepPaperNote">GitHub</a>
+      <a href="https://github.com/917Dhj/DeepPaperNote/releases">Releases</a>
+      <a href="https://github.com/917Dhj/DeepPaperNote/issues">Issues</a>
+    </footer>
+  </body>
+</html>
