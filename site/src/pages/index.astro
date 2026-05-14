@@ -1,5 +1,8 @@
 ---
 import "../styles/global.css";
+
+const githubIconPath =
+  "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z";
 ---
 
 <html lang="en">
@@ -10,13 +13,21 @@ import "../styles/global.css";
       name="description"
       content="DeepPaperNote turns one dense research paper into an evidence-first Obsidian note worth keeping."
     />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <title>DeepPaperNote | Evidence-first paper notes for Obsidian</title>
   </head>
   <body>
     <header class="site-header" aria-label="Primary navigation">
       <a class="brand" href="#" aria-label="DeepPaperNote home">
-        <span class="brand-mark">D</span>
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" focusable="false">
+            <path
+              d="M19 14h13c12 0 20 7.5 20 18s-8 18-20 18H19V14Zm10 9v18h4c6.2 0 10-3.4 10-9s-3.8-9-10-9h-4Z"
+              fill="#faf9f5"
+            />
+            <path d="M32 23h1c6.2 0 10 3.4 10 9s-3.8 9-10 9h-1V23Z" fill="#cc785c" />
+          </svg>
+        </span>
         <span>DeepPaperNote</span>
       </a>
       <nav class="nav-links" aria-label="Page sections">
@@ -29,12 +40,6 @@ import "../styles/global.css";
 
     <main>
       <section class="hero-section" aria-labelledby="hero-title">
-        <div class="hero-decoration dot dot-peach"></div>
-        <div class="hero-decoration dot dot-mint"></div>
-        <div class="hero-decoration dot dot-rose"></div>
-        <div class="hero-decoration wire wire-left"></div>
-        <div class="hero-decoration wire wire-right"></div>
-
         <div class="hero-content">
           <h1 id="hero-title">Turn one dense paper into an Obsidian note worth keeping.</h1>
           <p>
@@ -43,51 +48,21 @@ import "../styles/global.css";
           </p>
           <div class="hero-actions" aria-label="Primary actions">
             <a class="button button-primary" href="#install">Install with npx</a>
-            <a class="button button-on-dark" href="https://github.com/917Dhj/DeepPaperNote"
-              >View GitHub</a
-            >
+            <a class="button button-on-dark github-link" href="https://github.com/917Dhj/DeepPaperNote">
+              <svg class="link-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d={githubIconPath} fill="currentColor" />
+              </svg>
+              <span>View GitHub</span>
+            </a>
           </div>
         </div>
 
-        <div class="workspace-mockup" aria-label="Paper to Obsidian note product preview">
-          <article class="paper-card">
-            <div class="paper-topline">PDF · Zotero · Figures</div>
-            <h2>Attention Is All You Need</h2>
-            <div class="formula-card">Attention(Q, K, V) = softmax(QKᵀ / √dₖ)V</div>
-            <div class="figure-grid">
-              <span></span>
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-          </article>
-
-          <div class="pipeline-rail" aria-hidden="true">
-            <span>Evidence</span>
-            <strong></strong>
-            <span>Lint</span>
-          </div>
-
-          <article class="note-card">
-            <div class="note-window-bar">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-            <h2>Obsidian Deep Note</h2>
-            <section>
-              <h3>创新点</h3>
-              <p>Reconstructs the paper's mechanism, not just the abstract.</p>
-            </section>
-            <section>
-              <h3>方法主线</h3>
-              <p>Tracks task definition, model flow, key formulas, and results.</p>
-            </section>
-            <aside class="figure-callout">
-              <strong>Fig. 1 Method Overview</strong>
-              <span>Placeholder kept until the extracted crop passes visual quality.</span>
-            </aside>
-          </article>
+        <div class="demo-frame" aria-label="DeepPaperNote animated product demo">
+          <iframe
+            src="demos/deeppapernote-readme-demo/"
+            title="DeepPaperNote animated product demo"
+            loading="eager"
+          ></iframe>
         </div>
       </section>
 
@@ -185,7 +160,12 @@ import "../styles/global.css";
 
     <footer class="site-footer">
       <span>DeepPaperNote</span>
-      <a href="https://github.com/917Dhj/DeepPaperNote">GitHub</a>
+      <a class="github-link" href="https://github.com/917Dhj/DeepPaperNote">
+        <svg class="link-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d={githubIconPath} fill="currentColor" />
+        </svg>
+        <span>GitHub</span>
+      </a>
       <a href="https://github.com/917Dhj/DeepPaperNote/releases">Releases</a>
       <a href="https://github.com/917Dhj/DeepPaperNote/issues">Issues</a>
     </footer>

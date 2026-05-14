@@ -1,0 +1,1138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DeepPaperNote Clean Demo Draft</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      --bg: #181715;
+      --bg-deep: #1f1e1b;
+      --surface: #252320;
+      --surface-soft: #2f2c28;
+      --cream: #faf9f5;
+      --cream-soft: #e6dfd8;
+      --ink: #faf9f5;
+      --muted: #a09d96;
+      --muted-soft: #8e8b82;
+      --faint: rgba(250, 249, 245, 0.08);
+      --hair: rgba(250, 249, 245, 0.12);
+      --paper: rgba(37, 35, 32, 0.94);
+      --paper-solid: #252320;
+      --green: #cc785c;
+      --green-soft: rgba(204, 120, 92, 0.16);
+      --gold: #e8a55a;
+      --gold-soft: rgba(232, 165, 90, 0.18);
+      --red: #c64545;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+      --serif: "Cormorant Garamond", "EB Garamond", Georgia, "Times New Roman", "Songti SC", "STSong", serif;
+      --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", sans-serif;
+      --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #11100f;
+      color: var(--ink);
+      font-family: var(--sans);
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    .stage {
+      position: relative;
+      width: min(100vw, calc(100vh * 16 / 9));
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(255,255,255,0.72), transparent 29%),
+        radial-gradient(circle at 78% 80%, rgba(177,151,103,0.12), transparent 30%),
+        linear-gradient(135deg, var(--bg), var(--bg-deep));
+      isolation: isolate;
+    }
+
+    .stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(rgba(38,48,43,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(38,48,43,0.028) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(circle at 50% 50%, black 28%, transparent 84%);
+      z-index: 0;
+    }
+
+    .stage::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(244,240,231,0.92), transparent 13%, transparent 87%, rgba(244,240,231,0.92)),
+        linear-gradient(rgba(244,240,231,0.68), transparent 18%, transparent 82%, rgba(244,240,231,0.72));
+      pointer-events: none;
+      z-index: 80;
+    }
+
+    .noise {
+      position: absolute;
+      inset: 0;
+      opacity: 0.18;
+      background-image:
+        radial-gradient(circle at 20% 10%, rgba(32,40,36,0.08) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 60% 90%, rgba(32,40,36,0.05) 0 1px, transparent 1.8px);
+      background-size: 11px 11px, 17px 17px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .brand {
+      position: absolute;
+      left: 7%;
+      top: 6.7%;
+      z-index: 30;
+      font-family: var(--serif);
+      font-size: clamp(28px, 2.4vw, 46px);
+      letter-spacing: -0.04em;
+      color: var(--green);
+      transform-origin: left center;
+    }
+
+    .kicker {
+      position: absolute;
+      right: 7%;
+      top: 7.5%;
+      z-index: 30;
+      font-family: var(--mono);
+      font-size: clamp(9px, 0.7vw, 14px);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(32,40,36,0.48);
+    }
+
+    .paper-stack,
+    .note-stack {
+      position: absolute;
+      top: 17%;
+      width: 33%;
+      height: 65%;
+      z-index: 10;
+      perspective: 1200px;
+    }
+
+    .paper-stack { left: 8%; }
+    .note-stack { right: 8%; }
+
+    .sheet {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(35,45,39,0.13);
+      border-radius: 9px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transform-origin: center;
+    }
+
+    .sheet.back-1 {
+      transform: translate(3.4%, 3.4%) rotate(1.3deg);
+      opacity: 0.45;
+      filter: blur(0.3px);
+    }
+
+    .sheet.back-2 {
+      transform: translate(6.8%, 6.2%) rotate(2.4deg);
+      opacity: 0.26;
+      filter: blur(0.7px);
+    }
+
+    .sheet.main {
+      padding: 8.6% 8.4%;
+    }
+
+    .paper-title {
+      font-family: var(--serif);
+      font-size: clamp(18px, 1.42vw, 29px);
+      line-height: 1.06;
+      letter-spacing: -0.025em;
+      margin-bottom: 5.2%;
+      color: rgba(32,40,36,0.88);
+    }
+
+    .paper-authors {
+      width: 70%;
+      height: 8px;
+      border-radius: 2px;
+      background: rgba(32,40,36,0.13);
+      margin-bottom: 5.6%;
+    }
+
+    .paper-line {
+      height: 7px;
+      border-radius: 2px;
+      margin: 2.7% 0;
+      background: rgba(32,40,36,0.11);
+    }
+
+    .paper-line.short { width: 62%; }
+    .paper-line.mid { width: 82%; }
+    .paper-line.long { width: 96%; }
+
+    .paper-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4%;
+      margin-top: 5.5%;
+    }
+
+    .paper-column-line {
+      height: 5px;
+      margin: 7% 0;
+      border-radius: 2px;
+      background: rgba(32,40,36,0.105);
+    }
+
+    .paper-algo {
+      margin-top: 6%;
+      padding: 3.3%;
+      border: 1px solid rgba(32,40,36,0.11);
+      background: rgba(32,40,36,0.035);
+      font-family: var(--mono);
+      font-size: clamp(6px, 0.5vw, 10px);
+      letter-spacing: 0.05em;
+      color: rgba(32,40,36,0.44);
+    }
+
+    .paper-algo-line {
+      height: 5px;
+      margin: 4.5% 0;
+      border-radius: 2px;
+      background: rgba(86,120,108,0.17);
+    }
+
+    .formula-box,
+    .chart-box,
+    .table-box,
+    .matrix-box {
+      position: absolute;
+      border: 1px solid rgba(32,40,36,0.13);
+      background: rgba(255,253,247,0.92);
+      box-shadow: 0 18px 46px rgba(55,58,48,0.12);
+      z-index: 24;
+    }
+
+    .formula-box {
+      left: 12.4%;
+      top: 35.2%;
+      width: 28.2%;
+      padding: 1.05% 1.18%;
+      border-radius: 8px;
+      font-family: var(--serif);
+      font-size: clamp(13px, 1.04vw, 20px);
+      letter-spacing: -0.035em;
+    }
+
+    .formula-main {
+      display: grid;
+      gap: 0.42em;
+      justify-items: center;
+      white-space: nowrap;
+    }
+
+    .formula-line {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.38em;
+    }
+
+    .formula-line.secondary {
+      font-size: 0.78em;
+      color: rgba(32,40,36,0.74);
+    }
+
+    .frac {
+      display: inline-grid;
+      grid-template-rows: auto auto;
+      align-items: center;
+      line-height: 1.0;
+      text-align: center;
+      transform: translateY(0.03em);
+    }
+
+    .frac span:first-child {
+      padding: 0 0.25em 0.12em;
+      border-bottom: 1.3px solid currentColor;
+    }
+
+    .frac span:last-child {
+      padding: 0.12em 0.25em 0;
+    }
+
+    .formula-sub {
+      margin-top: 3.5%;
+      font-family: var(--mono);
+      font-size: clamp(6px, 0.52vw, 10px);
+      letter-spacing: 0.08em;
+      color: rgba(32,40,36,0.45);
+      text-transform: uppercase;
+    }
+
+    .chart-box {
+      left: 11.6%;
+      top: 62%;
+      width: 13%;
+      height: 13%;
+      border-radius: 7px;
+      padding: 0.8%;
+    }
+
+    .table-box {
+      left: 27%;
+      top: 64.8%;
+      width: 12.5%;
+      height: 11%;
+      border-radius: 7px;
+      padding: 0.75%;
+    }
+
+    .matrix-box {
+      left: 25.8%;
+      top: 48.4%;
+      width: 13.4%;
+      height: 12.2%;
+      border-radius: 7px;
+      padding: 0.7%;
+    }
+
+    .bars {
+      position: absolute;
+      inset: 18% 14% 18% 14%;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      align-items: end;
+      gap: 9%;
+    }
+
+    .bars span {
+      display: block;
+      border-radius: 2px 2px 0 0;
+      background: rgba(86,120,108,0.34);
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6%;
+      height: 100%;
+    }
+
+    .mini-grid span {
+      border-radius: 2px;
+      background: rgba(176,138,77,0.22);
+    }
+
+    .attention-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 4%;
+      height: 100%;
+    }
+
+    .attention-grid span {
+      border-radius: 2px;
+      background: rgba(86,120,108,0.12);
+    }
+
+    .attention-grid span.hot { background: rgba(86,120,108,0.38); }
+    .attention-grid span.mid { background: rgba(176,138,77,0.25); }
+
+    .axis {
+      position: absolute;
+      left: 50%;
+      top: 51%;
+      width: 23%;
+      height: 48%;
+      transform: translate(-50%, -50%);
+      z-index: 34;
+    }
+
+    .axis-line {
+      position: absolute;
+      left: 50%;
+      top: 12%;
+      width: 2px;
+      height: 74%;
+      transform: translateX(-50%);
+      background: linear-gradient(transparent, rgba(86,120,108,0.72), transparent);
+    }
+
+    .axis-node {
+      position: absolute;
+      left: 50%;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0.78);
+      border: 2px solid rgba(86,120,108,0.32);
+      background: var(--bg);
+      box-shadow: 0 0 0 0 rgba(86,120,108,0);
+    }
+
+    .axis-node.active {
+      border-color: var(--green);
+      background: var(--green);
+      box-shadow: 0 0 0 8px rgba(86,120,108,0.11);
+    }
+
+    .axis-label {
+      position: absolute;
+      left: 55%;
+      transform: translateY(-50%);
+      font-family: var(--mono);
+      font-size: clamp(8px, 0.62vw, 12px);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(86,120,108,0.46);
+      white-space: nowrap;
+    }
+
+    .axis-label.active { color: var(--green); }
+
+    .node-0, .label-0 { top: 16%; }
+    .node-1, .label-1 { top: 34%; }
+    .node-2, .label-2 { top: 52%; }
+    .node-3, .label-3 { top: 70%; }
+    .node-4, .label-4 { top: 88%; }
+
+    .note-sheet {
+      padding: 6.4% 7.8%;
+      background: rgba(255,253,247,0.96);
+    }
+
+    .frontmatter {
+      display: grid;
+      grid-template-columns: 25% 1fr;
+      gap: 3% 4%;
+      padding-bottom: 4%;
+      border-bottom: 1px solid rgba(32,40,36,0.11);
+      font-family: var(--mono);
+      font-size: clamp(7px, 0.56vw, 11px);
+      color: rgba(32,40,36,0.54);
+    }
+
+    .fm-value {
+      height: 7px;
+      border-radius: 2px;
+      background: rgba(86,120,108,0.18);
+      align-self: center;
+    }
+
+    .note-title {
+      margin: 4.8% 0 3.2%;
+      font-family: var(--serif);
+      font-size: clamp(22px, 1.65vw, 34px);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: rgba(32,40,36,0.9);
+    }
+
+    .section-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 20px 1fr;
+      align-items: center;
+      gap: 12px;
+      min-height: 23px;
+      margin: 1.65% 0;
+      color: rgba(32,40,36,0.78);
+      font-size: clamp(10px, 0.82vw, 16px);
+    }
+
+    .section-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 6px rgba(86,120,108,0.08);
+    }
+
+    .section-rule {
+      height: 1px;
+      margin-left: 32px;
+      background: rgba(32,40,36,0.08);
+    }
+
+    .note-artifact-row {
+      display: grid;
+      grid-template-columns: 1.32fr 0.9fr;
+      gap: 3.5%;
+      margin: 3.4% 0 2.8%;
+    }
+
+    .note-figure,
+    .note-equation {
+      border: 1px solid rgba(32,40,36,0.11);
+      background: rgba(250,247,239,0.78);
+    }
+
+    .note-figure {
+      min-height: 104px;
+      padding: 4.2%;
+    }
+
+    .figure-caption,
+    .equation-caption {
+      font-family: var(--mono);
+      font-size: clamp(6px, 0.5vw, 10px);
+      letter-spacing: 0.08em;
+      color: rgba(32,40,36,0.42);
+      text-transform: uppercase;
+      margin-bottom: 5%;
+    }
+
+    .plot-area {
+      position: relative;
+      height: 58px;
+      border-left: 1px solid rgba(32,40,36,0.18);
+      border-bottom: 1px solid rgba(32,40,36,0.18);
+      overflow: hidden;
+    }
+
+    .curve {
+      position: absolute;
+      left: 4%;
+      right: 3%;
+      height: 2px;
+      border-radius: 999px;
+      background: var(--green);
+      transform-origin: left center;
+    }
+
+    .curve.a { top: 34%; transform: rotate(-7deg); }
+    .curve.b { top: 58%; background: var(--gold); transform: rotate(-4deg); opacity: 0.85; }
+    .curve.c { top: 73%; background: rgba(32,40,36,0.28); transform: rotate(2deg); }
+
+    .plot-dot {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .note-equation {
+      min-height: 104px;
+      padding: 6% 5%;
+      font-family: var(--serif);
+      color: rgba(32,40,36,0.74);
+    }
+
+    .eq-small {
+      font-size: clamp(10px, 0.76vw, 15px);
+      line-height: 1.35;
+      letter-spacing: -0.02em;
+    }
+
+    .images-chip {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      padding: 2.5% 3%;
+      border: 1px solid rgba(86,120,108,0.18);
+      background: rgba(86,120,108,0.07);
+      font-family: var(--mono);
+      color: var(--green);
+      font-size: clamp(8px, 0.67vw, 13px);
+    }
+
+    .folder {
+      width: 18px;
+      height: 12px;
+      border: 1.5px solid currentColor;
+      position: relative;
+      border-radius: 2px;
+    }
+
+    .folder::before {
+      content: "";
+      position: absolute;
+      left: -1.5px;
+      top: -7px;
+      width: 10px;
+      height: 7px;
+      border: 1.5px solid currentColor;
+      border-bottom: 0;
+      border-top-left-radius: 2px;
+      border-top-right-radius: 2px;
+    }
+
+    .phrase {
+      position: absolute;
+      left: 50%;
+      z-index: 42;
+      transform: translate(-50%, 0);
+      padding: 0.72% 1%;
+      border: 1px solid rgba(86,120,108,0.18);
+      background: rgba(255,253,247,0.84);
+      box-shadow: 0 18px 44px rgba(55,58,48,0.12);
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-size: clamp(8px, 0.66vw, 13px);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      color: var(--green);
+    }
+
+    .phrase.one { top: 28%; }
+    .phrase.two { top: 47%; }
+    .phrase.three { top: 66%; }
+
+    .final {
+      position: absolute;
+      left: 50%;
+      top: 49%;
+      width: 70%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 55;
+    }
+
+    .final h1 {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: clamp(58px, 5.2vw, 100px);
+      line-height: 0.96;
+      letter-spacing: -0.055em;
+      color: var(--green);
+    }
+
+    .final p {
+      margin: 2.8% 0 0;
+      color: rgba(32,40,36,0.7);
+      font-size: clamp(15px, 1.2vw, 24px);
+    }
+
+    .final-rule {
+      width: 31%;
+      height: 2px;
+      margin: 3.5% auto 0;
+      background: linear-gradient(90deg, transparent, rgba(86,120,108,0.64), transparent);
+    }
+
+    .watermark {
+      position: absolute;
+      right: 2.2%;
+      bottom: 2.2%;
+      z-index: 90;
+      font-family: var(--mono);
+      font-size: clamp(7px, 0.55vw, 11px);
+      letter-spacing: 0.14em;
+      color: rgba(32,40,36,0.36);
+      text-transform: uppercase;
+    }
+
+    .stage {
+      background:
+        radial-gradient(circle at 18% 16%, rgba(204,120,92,0.16), transparent 28%),
+        radial-gradient(circle at 74% 76%, rgba(232,165,90,0.10), transparent 31%),
+        radial-gradient(circle at 52% 44%, rgba(250,249,245,0.035), transparent 42%),
+        linear-gradient(135deg, var(--bg), var(--bg-deep));
+    }
+
+    .stage::before {
+      background:
+        linear-gradient(rgba(250,249,245,0.028) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(250,249,245,0.022) 1px, transparent 1px);
+      opacity: 0.62;
+    }
+
+    .stage::after {
+      background:
+        linear-gradient(90deg, rgba(24,23,21,0.96), transparent 15%, transparent 85%, rgba(24,23,21,0.96)),
+        linear-gradient(rgba(24,23,21,0.82), transparent 20%, transparent 80%, rgba(24,23,21,0.88));
+    }
+
+    .noise {
+      opacity: 0.13;
+      background-image:
+        radial-gradient(circle at 20% 10%, rgba(250,249,245,0.12) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 60% 90%, rgba(204,120,92,0.08) 0 1px, transparent 1.8px);
+    }
+
+    .brand,
+    .final h1 {
+      color: var(--green);
+      text-shadow: 0 0 28px rgba(204,120,92,0.13);
+    }
+
+    .kicker,
+    .watermark {
+      color: rgba(250,249,245,0.42);
+    }
+
+    .sheet {
+      border-color: var(--hair);
+      background: linear-gradient(180deg, rgba(37,35,32,0.96), rgba(31,30,27,0.96));
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(250,249,245,0.05);
+    }
+
+    .sheet.back-1,
+    .sheet.back-2 {
+      border-color: rgba(250,249,245,0.07);
+      background: rgba(37,35,32,0.58);
+    }
+
+    .paper-title,
+    .note-title {
+      color: rgba(250,249,245,0.94);
+    }
+
+    .paper-authors,
+    .paper-line,
+    .paper-column-line {
+      background: rgba(250,249,245,0.13);
+    }
+
+    .paper-line.short,
+    .paper-line.mid,
+    .paper-line.long {
+      opacity: 0.9;
+    }
+
+    .paper-algo {
+      border-color: rgba(250,249,245,0.11);
+      background: rgba(24,23,21,0.52);
+      color: rgba(250,249,245,0.48);
+    }
+
+    .paper-algo-line {
+      background: rgba(204,120,92,0.24);
+    }
+
+    .formula-box,
+    .chart-box,
+    .table-box,
+    .matrix-box {
+      border-color: rgba(250,249,245,0.13);
+      background: linear-gradient(180deg, rgba(37,35,32,0.96), rgba(24,23,21,0.94));
+      box-shadow: 0 22px 62px rgba(0,0,0,0.34), inset 0 1px 0 rgba(250,249,245,0.05);
+      color: rgba(250,249,245,0.92);
+    }
+
+    .formula-line.secondary,
+    .formula-sub {
+      color: rgba(250,249,245,0.58);
+    }
+
+    .bars span {
+      background: rgba(204,120,92,0.58);
+    }
+
+    .mini-grid span {
+      background: rgba(232,165,90,0.36);
+    }
+
+    .attention-grid span {
+      background: rgba(250,249,245,0.10);
+    }
+
+    .attention-grid span.hot {
+      background: rgba(204,120,92,0.58);
+    }
+
+    .attention-grid span.mid {
+      background: rgba(232,165,90,0.40);
+    }
+
+    .axis-line {
+      background: linear-gradient(transparent, rgba(204,120,92,0.78), transparent);
+    }
+
+    .axis-node {
+      border-color: rgba(204,120,92,0.34);
+      background: var(--bg);
+      box-shadow: 0 0 0 0 rgba(204,120,92,0);
+    }
+
+    .axis-node.active {
+      border-color: var(--green);
+      background: var(--green);
+      box-shadow: 0 0 0 8px rgba(204,120,92,0.13);
+    }
+
+    .axis-label {
+      color: rgba(250,249,245,0.42);
+    }
+
+    .axis-label.active {
+      color: rgba(250,249,245,0.86);
+    }
+
+    .note-sheet {
+      background: linear-gradient(180deg, rgba(37,35,32,0.97), rgba(31,30,27,0.97));
+    }
+
+    .frontmatter {
+      border-bottom-color: rgba(250,249,245,0.12);
+      color: rgba(250,249,245,0.48);
+    }
+
+    .fm-value {
+      background: rgba(204,120,92,0.20);
+    }
+
+    .section-row {
+      color: rgba(250,249,245,0.78);
+    }
+
+    .section-dot,
+    .plot-dot {
+      background: var(--green);
+      box-shadow: 0 0 0 6px rgba(204,120,92,0.10);
+    }
+
+    .section-rule {
+      background: rgba(250,249,245,0.09);
+    }
+
+    .note-figure,
+    .note-equation {
+      border-color: rgba(250,249,245,0.12);
+      background: rgba(24,23,21,0.46);
+    }
+
+    .figure-caption,
+    .equation-caption {
+      color: rgba(250,249,245,0.46);
+    }
+
+    .plot-area {
+      border-left-color: rgba(250,249,245,0.22);
+      border-bottom-color: rgba(250,249,245,0.22);
+    }
+
+    .curve {
+      background: var(--green);
+    }
+
+    .curve.b {
+      background: var(--gold);
+    }
+
+    .curve.c {
+      background: rgba(250,249,245,0.32);
+    }
+
+    .note-equation {
+      color: rgba(250,249,245,0.76);
+    }
+
+    .images-chip,
+    .phrase {
+      border-color: rgba(204,120,92,0.26);
+      background: rgba(37,35,32,0.88);
+      color: rgba(250,249,245,0.86);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.28), inset 0 1px 0 rgba(250,249,245,0.05);
+    }
+
+    .images-chip {
+      background: rgba(204,120,92,0.10);
+      color: var(--green);
+    }
+
+    .final p {
+      color: rgba(250,249,245,0.72);
+    }
+
+    .final-rule {
+      background: linear-gradient(90deg, transparent, rgba(204,120,92,0.72), transparent);
+    }
+  </style>
+</head>
+<body>
+  <main class="stage" aria-label="DeepPaperNote clean README demo animation">
+    <div class="noise" aria-hidden="true"></div>
+    <div class="brand" id="brand">DeepPaperNote</div>
+    <div class="kicker" id="kicker">single-paper deep reading workflow</div>
+
+    <section class="paper-stack" id="paperStack" aria-label="Unstructured paper input">
+      <div class="sheet back-2"></div>
+      <div class="sheet back-1"></div>
+      <div class="sheet main">
+        <div class="paper-title">A dense AI paper with objectives, attention maps, ablations, and claims</div>
+        <div class="paper-authors"></div>
+        <div class="paper-line long"></div>
+        <div class="paper-line mid"></div>
+        <div class="paper-line long"></div>
+        <div class="paper-line short"></div>
+        <div class="paper-line long"></div>
+        <div class="paper-line mid"></div>
+        <div class="paper-columns">
+          <div>
+            <div class="paper-column-line" style="width: 94%"></div>
+            <div class="paper-column-line" style="width: 78%"></div>
+            <div class="paper-column-line" style="width: 88%"></div>
+            <div class="paper-column-line" style="width: 62%"></div>
+          </div>
+          <div>
+            <div class="paper-column-line" style="width: 88%"></div>
+            <div class="paper-column-line" style="width: 96%"></div>
+            <div class="paper-column-line" style="width: 72%"></div>
+            <div class="paper-column-line" style="width: 84%"></div>
+          </div>
+        </div>
+        <div class="paper-algo">
+          ALGORITHM · POLICY UPDATE
+          <div class="paper-algo-line" style="width: 92%"></div>
+          <div class="paper-algo-line" style="width: 74%"></div>
+          <div class="paper-algo-line" style="width: 84%"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="formula-box" id="formula">
+      <div class="formula-main">
+        <div class="formula-line">
+          Attn(Q,K,V)=softmax(
+        <span class="frac">
+            <span>QK<sup>T</sup></span>
+            <span>√d<sub>k</sub></span>
+        </span>
+          + B)V
+        </div>
+        <div class="formula-line secondary">
+          𝓛(θ)=−∑<sub>t=1</sub><sup>T</sup>log p<sub>θ</sub>(y<sub>t</sub>|x,y<sub>&lt;t</sub>)+λ KL(π<sub>θ</sub>||π<sub>ref</sub>)
+        </div>
+      </div>
+      <div class="formula-sub">sequence objective · policy gradient · regularized alignment</div>
+    </div>
+    <div class="chart-box" id="chart">
+      <div class="bars">
+        <span style="height: 48%"></span>
+        <span style="height: 72%"></span>
+        <span style="height: 58%"></span>
+        <span style="height: 86%"></span>
+        <span style="height: 63%"></span>
+      </div>
+    </div>
+    <div class="matrix-box" id="matrix">
+      <div class="attention-grid">
+        <span></span><span class="mid"></span><span></span><span></span><span class="hot"></span><span></span>
+        <span></span><span></span><span class="hot"></span><span class="mid"></span><span></span><span></span>
+        <span class="mid"></span><span></span><span></span><span class="hot"></span><span></span><span></span>
+        <span></span><span class="hot"></span><span></span><span></span><span class="mid"></span><span></span>
+        <span></span><span></span><span class="mid"></span><span></span><span></span><span class="hot"></span>
+        <span class="hot"></span><span></span><span></span><span class="mid"></span><span></span><span></span>
+      </div>
+    </div>
+    <div class="table-box" id="table">
+      <div class="mini-grid">
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <section class="axis" id="axis" aria-label="Evidence pipeline">
+      <div class="axis-line"></div>
+      <div class="axis-node node-0" id="node0"></div><div class="axis-label label-0" id="label0">resolve</div>
+      <div class="axis-node node-1" id="node1"></div><div class="axis-label label-1" id="label1">evidence</div>
+      <div class="axis-node node-2" id="node2"></div><div class="axis-label label-2" id="label2">figures</div>
+      <div class="axis-node node-3" id="node3"></div><div class="axis-label label-3" id="label3">synthesis</div>
+      <div class="axis-node node-4" id="node4"></div><div class="axis-label label-4" id="label4">lint</div>
+    </section>
+
+    <div class="phrase one" id="phraseOne">Evidence before writing</div>
+    <div class="phrase two" id="phraseTwo">Figure status stays explicit</div>
+    <div class="phrase three" id="phraseThree">Quality gates before save</div>
+
+    <section class="note-stack" id="noteStack" aria-label="Structured Obsidian note">
+      <div class="sheet back-2"></div>
+      <div class="sheet back-1"></div>
+      <div class="sheet main note-sheet">
+        <div class="frontmatter">
+          <div>domain</div><div class="fm-value" style="width: 62%"></div>
+          <div>paper</div><div class="fm-value" style="width: 82%"></div>
+          <div>status</div><div class="fm-value" style="width: 48%"></div>
+        </div>
+        <div class="note-title">A structured Obsidian note</div>
+        <div class="section-row"><span class="section-dot"></span><span>核心信息</span></div>
+        <div class="section-rule"></div>
+        <div class="section-row"><span class="section-dot"></span><span>原文摘要翻译</span></div>
+        <div class="section-rule"></div>
+        <div class="section-row"><span class="section-dot"></span><span>创新点</span></div>
+        <div class="section-rule"></div>
+        <div class="section-row"><span class="section-dot"></span><span>方法主线</span></div>
+        <div class="section-rule"></div>
+        <div class="section-row"><span class="section-dot"></span><span>关键结果</span></div>
+        <div class="note-artifact-row">
+          <div class="note-figure">
+            <div class="figure-caption">Fig. 2 · training dynamics</div>
+            <div class="plot-area">
+              <div class="curve a"></div>
+              <div class="curve b"></div>
+              <div class="curve c"></div>
+              <span class="plot-dot" style="left: 24%; top: 42%;"></span>
+              <span class="plot-dot" style="left: 58%; top: 28%;"></span>
+              <span class="plot-dot" style="left: 82%; top: 19%;"></span>
+            </div>
+          </div>
+          <div class="note-equation">
+            <div class="equation-caption">Key formula</div>
+            <div class="eq-small">Â<sub>i</sub> = r<sub>i</sub> - mean(r)<br>∇<sub>θ</sub>J = 𝔼[Â<sub>i</sub>∇logπ<sub>θ</sub>]</div>
+          </div>
+        </div>
+        <div class="images-chip"><span class="folder"></span><span>paper.md + images/</span></div>
+      </div>
+    </section>
+
+    <section class="final" id="final">
+      <h1>DeepPaperNote</h1>
+      <p>把复杂论文整理成真正值得保留的 Obsidian 深度笔记。</p>
+      <div class="final-rule"></div>
+    </section>
+
+    <div class="watermark">Created by Huashu-Design</div>
+  </main>
+
+  <script>
+    const DURATION = 24;
+    const startTime = performance.now();
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const $ = (id) => document.getElementById(id);
+
+    const els = {
+      brand: $("brand"),
+      kicker: $("kicker"),
+      paperStack: $("paperStack"),
+      formula: $("formula"),
+      chart: $("chart"),
+      matrix: $("matrix"),
+      table: $("table"),
+      axis: $("axis"),
+      noteStack: $("noteStack"),
+      phraseOne: $("phraseOne"),
+      phraseTwo: $("phraseTwo"),
+      phraseThree: $("phraseThree"),
+      final: $("final"),
+      nodes: [$("node0"), $("node1"), $("node2"), $("node3"), $("node4")],
+      labels: [$("label0"), $("label1"), $("label2"), $("label3"), $("label4")]
+    };
+
+    const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+    const mix = (a, b, p) => a + (b - a) * p;
+    const expoOut = (x) => x === 1 ? 1 : 1 - Math.pow(2, -10 * x);
+    const easeInOut = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+    const spring = (x) => 1 - Math.cos(x * Math.PI * 4.2) * Math.exp(-x * 6.2);
+    const gate = (t, a, b, fn = expoOut) => fn(clamp((t - a) / (b - a)));
+    const pulse = (t, a, b) => Math.sin(clamp((t - a) / (b - a)) * Math.PI);
+
+    function set(el, opacity, transform, filter = "") {
+      el.style.opacity = opacity.toFixed(3);
+      el.style.transform = transform;
+      if (filter) el.style.filter = filter;
+    }
+
+    function setPhrase(el, t, a, b) {
+      const intro = gate(t, a, a + 0.55, spring);
+      const hold = pulse(t, a, b);
+      const exit = 1 - gate(t, b - 0.55, b, easeInOut);
+      set(
+        el,
+        intro * hold * exit,
+        `translate(-50%, ${mix(18, 0, intro).toFixed(2)}px) scale(${mix(0.94, 1, intro).toFixed(3)})`
+      );
+    }
+
+    function render(raw) {
+      const t = clamp(raw, 0, DURATION);
+      const intro = gate(t, 0.2, 2.4, spring);
+      const axisIn = gate(t, 4.0, 5.2, spring);
+      const transformPhase = gate(t, 8.0, 15.2, easeInOut);
+      const noteIn = gate(t, 12.2, 16.2, spring);
+      const finalIn = gate(t, 20.9, 22.2, spring);
+      const finalFade = 1 - finalIn;
+
+      set(els.brand, (0.95 - 0.42 * transformPhase) * finalFade, `translateY(${mix(12, 0, intro).toFixed(2)}px) scale(${mix(0.96, 1, intro).toFixed(3)})`);
+      set(els.kicker, intro * finalFade * (1 - gate(t, 15.5, 19.5)), `translateY(${mix(10, 0, intro).toFixed(2)}px)`);
+
+      const paperX = mix(-88, 0, intro) - 50 * transformPhase;
+      const paperOpacity = intro * finalFade * (1 - gate(t, 17.0, 20.5));
+      set(els.paperStack, paperOpacity, `translate(${paperX.toFixed(2)}%, ${Math.sin(t * 0.6) * 1.4}px) rotate(${mix(-1.1, -0.2, intro).toFixed(2)}deg)`);
+
+      const fragmentOpacity = intro * finalFade * (1 - gate(t, 7.2, 12.0));
+      set(els.formula, fragmentOpacity, `translate(${(Math.sin(t * 0.8) * 7 - transformPhase * 100).toFixed(2)}px, ${Math.cos(t * 0.7) * 4}px) rotate(${Math.sin(t * 0.5) * 1.2}deg)`);
+      set(els.chart, fragmentOpacity * 0.92, `translate(${(Math.sin(t * 0.9 + 1) * 8 - transformPhase * 108).toFixed(2)}px, ${Math.cos(t * 0.8) * 5}px) rotate(${-2 + Math.sin(t * 0.7)}deg)`);
+      set(els.matrix, fragmentOpacity * 0.88, `translate(${(Math.sin(t * 0.86 + 1.8) * 8 - transformPhase * 106).toFixed(2)}px, ${Math.cos(t * 0.74) * 5}px) rotate(${1.6 + Math.sin(t * 0.62)}deg)`);
+      set(els.table, fragmentOpacity * 0.9, `translate(${(Math.sin(t * 0.82 + 2) * 8 - transformPhase * 108).toFixed(2)}px, ${Math.cos(t * 0.84) * 5}px) rotate(${2 + Math.sin(t * 0.68)}deg)`);
+
+      set(els.axis, axisIn * finalFade * (1 - gate(t, 17.5, 20.8)), `translate(-50%, -50%) scale(${mix(0.9, 1, axisIn).toFixed(3)})`);
+      const active = Math.max(-1, Math.min(4, Math.floor((t - 4.8) / 0.82)));
+      els.nodes.forEach((n, i) => n.classList.toggle("active", i <= active));
+      els.labels.forEach((l, i) => l.classList.toggle("active", i <= active));
+
+      setPhrase(els.phraseOne, t, 8.7, 11.0);
+      setPhrase(els.phraseTwo, t, 11.0, 13.7);
+      setPhrase(els.phraseThree, t, 13.7, 16.3);
+
+      const noteX = mix(82, 0, noteIn);
+      const noteOpacity = noteIn * finalFade;
+      set(els.noteStack, noteOpacity, `translate(${noteX.toFixed(2)}%, ${Math.sin(t * 0.55 + 1) * 0.8}px) rotate(${mix(1.2, 0.25, noteIn).toFixed(2)}deg) scale(${mix(0.94, 1, noteIn).toFixed(3)})`);
+
+      set(
+        els.final,
+        finalIn,
+        `translate(-50%, -50%) scale(${mix(0.93, 1, finalIn).toFixed(3)})`,
+        `blur(${mix(8, 0, finalIn).toFixed(2)}px)`
+      );
+
+      if (reducedMotion) {
+        set(els.paperStack, 1, "translate(-7%, 0) rotate(-0.5deg)");
+        set(els.axis, 1, "translate(-50%, -50%) scale(1)");
+        set(els.noteStack, 1, "translate(0, 0) rotate(0.2deg)");
+        set(els.final, 0, "translate(-50%, -50%)");
+      }
+    }
+
+    function tick(now) {
+      if (window.__manualSeek) return;
+      const t = reducedMotion ? 18 : (now - startTime) / 1000;
+      render(t);
+      if (t < DURATION) {
+        requestAnimationFrame(tick);
+      } else {
+        render(DURATION);
+      }
+    }
+
+    window.__seek = (seconds) => {
+      window.__manualSeek = true;
+      render(Number(seconds) || 0);
+    };
+
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => requestAnimationFrame(() => {
+        render(0);
+        window.__ready = true;
+        requestAnimationFrame(tick);
+      }));
+    } else {
+      render(0);
+      window.__ready = true;
+      requestAnimationFrame(tick);
+    }
+  </script>
+</body>
+</html>
