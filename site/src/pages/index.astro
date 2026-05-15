@@ -1,4 +1,11 @@
 ---
+import "@fontsource/cormorant-garamond/latin-400.css";
+import "@fontsource/cormorant-garamond/latin-500.css";
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-500.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/jetbrains-mono/latin-400.css";
+import "@fontsource/jetbrains-mono/latin-600.css";
 import "../styles/global.css";
 
 const githubIconPath =
@@ -35,7 +42,23 @@ const githubIconPath =
         <a href="#pipeline">Pipeline</a>
         <a href="#install">Install</a>
       </nav>
-      <a class="button button-primary" href="#install">Install</a>
+      <div class="header-actions" aria-label="Header actions">
+        <a
+          class="star-pill"
+          data-star-pill
+          href="https://github.com/917Dhj/DeepPaperNote/stargazers"
+          aria-label="DeepPaperNote GitHub stars"
+        >
+          <svg class="link-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d={githubIconPath} fill="currentColor" />
+          </svg>
+          <span class="github-label">GitHub</span>
+          <span class="star-pill-divider" aria-hidden="true"></span>
+          <span class="star-pill-icon" aria-hidden="true">★</span>
+          <span class="star-pill-count" data-star-count>Stars</span>
+        </a>
+        <a class="button button-primary" href="#install">Install</a>
+      </div>
     </header>
 
     <main>
@@ -59,7 +82,7 @@ const githubIconPath =
 
         <div class="demo-frame" aria-label="DeepPaperNote animated product demo">
           <iframe
-            src="demos/deeppapernote-readme-demo/"
+            src="demos/deeppapernote-readme-demo/index.html"
             title="DeepPaperNote animated product demo"
             loading="eager"
           ></iframe>
@@ -96,8 +119,8 @@ const githubIconPath =
             <span class="tag">Figures</span>
             <h3>Figure-aware by default</h3>
             <p>
-              Major figures and tables keep their place in the note, even when image extraction
-              should fail closed.
+              Major figures, tables, and formulas stay attached to the reasoning they support,
+              so visual evidence remains part of the deep read.
             </p>
           </article>
         </div>
@@ -114,13 +137,83 @@ const githubIconPath =
               <li><span>05</span> 深度分析</li>
             </ul>
           </div>
-          <div class="note-body-preview">
-            <p class="panel-label">Figure placeholder</p>
-            <h3>Fig. 3 Data distribution and quality review</h3>
-            <p>
-              Suggested placement: data and task definition. Kept as a placeholder because the
-              current extraction only recovered a partial crop.
+          <div class="note-body-preview visual-evidence-panel">
+            <p class="panel-label">Visual evidence</p>
+            <h3>Figures, tables, and formulas stay with the claims they support.</h3>
+            <p class="visual-evidence-copy">
+              DeepPaperNote keeps visual and mathematical evidence inside the Obsidian note,
+              close to the reasoning built from it.
             </p>
+            <div class="visual-artifact" aria-label="Visual evidence note mockup">
+              <div class="artifact-header">
+                <span class="artifact-title">Fig. 2 Model architecture overview</span>
+                <span class="artifact-chip">caption matched</span>
+              </div>
+              <div class="figure-mini-map" aria-label="Model architecture figure mockup">
+                <div class="model-stage input-stage">
+                  <span class="stage-label">Input tokens</span>
+                  <span class="token-row" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                </div>
+                <div class="model-stage compact-stage">
+                  <span class="stage-label">Embedding</span>
+                </div>
+                <div class="attention-block">
+                  <span class="stage-label">Multi-head attention</span>
+                  <span class="attention-heads" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                  <span class="residual-label">residual + norm</span>
+                </div>
+                <div class="model-stage compact-stage">
+                  <span class="stage-label">Feed-forward</span>
+                </div>
+                <div class="model-stage output-stage">
+                  <span class="stage-label">Output states</span>
+                  <span class="state-stack" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                </div>
+              </div>
+              <div class="formula-strip" aria-label="Attention formula">
+                <span>Attention(Q, K, V)</span>
+                <span>= softmax(QK<sup>T</sup> / &radic;d<sub>k</sub>)V</span>
+              </div>
+              <table class="evidence-table" aria-label="Evidence table mockup">
+                <thead>
+                  <tr>
+                    <th>Evidence</th>
+                    <th>Source</th>
+                    <th>Role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Architecture diagram</td>
+                    <td>Fig. 2</td>
+                    <td>Model flow</td>
+                  </tr>
+                  <tr>
+                    <td>Attention equation</td>
+                    <td>Eq. 1</td>
+                    <td>Core math</td>
+                  </tr>
+                  <tr>
+                    <td>Ablation table</td>
+                    <td>Table 4</td>
+                    <td>Result check</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
@@ -159,7 +252,11 @@ const githubIconPath =
     </main>
 
     <footer class="site-footer">
-      <span>DeepPaperNote</span>
+      <span class="footer-credit">
+        <span class="footer-product">DeepPaperNote</span>
+        <span class="footer-muted">· by</span>
+        <a href="https://github.com/917Dhj">917Dhj</a>
+      </span>
       <a class="github-link" href="https://github.com/917Dhj/DeepPaperNote">
         <svg class="link-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
           <path d={githubIconPath} fill="currentColor" />
@@ -169,5 +266,108 @@ const githubIconPath =
       <a href="https://github.com/917Dhj/DeepPaperNote/releases">Releases</a>
       <a href="https://github.com/917Dhj/DeepPaperNote/issues">Issues</a>
     </footer>
+    <script>
+      const starTarget = document.querySelector("[data-star-count]");
+
+      if (starTarget) {
+        const cacheKey = "deeppapernote:github-stars";
+        const cacheTtl = 10 * 60 * 1000;
+        const repoUrl = "https://api.github.com/repos/917Dhj/DeepPaperNote";
+        const starPill = starTarget.closest("[data-star-pill]");
+
+        const formatStars = (count) => {
+          if (!Number.isFinite(count)) {
+            return "Stars";
+          }
+
+          const compactCount = new Intl.NumberFormat("en", {
+            maximumFractionDigits: 1,
+            notation: "compact",
+          })
+            .format(count)
+            .toLowerCase();
+
+          return compactCount;
+        };
+
+        const readCachedStars = () => {
+          try {
+            const cachedValue = localStorage.getItem(cacheKey);
+
+            if (!cachedValue) {
+              return null;
+            }
+
+            const parsedValue = JSON.parse(cachedValue);
+            const count = Number(parsedValue.count);
+            const timestamp = Number(parsedValue.timestamp);
+
+            if (!Number.isFinite(count) || !Number.isFinite(timestamp)) {
+              return null;
+            }
+
+            return { count, timestamp };
+          } catch {
+            return null;
+          }
+        };
+
+        const writeCachedStars = (count) => {
+          try {
+            localStorage.setItem(
+              cacheKey,
+              JSON.stringify({
+                count,
+                timestamp: Date.now(),
+              })
+            );
+          } catch {
+            // Private browsing and strict storage settings can reject localStorage writes.
+          }
+        };
+
+        const applyStars = (count) => {
+          const label = formatStars(count);
+          starTarget.textContent = label;
+          starPill?.setAttribute("aria-label", `${label} stars on GitHub`);
+        };
+
+        const cachedStars = readCachedStars();
+
+        if (cachedStars) {
+          applyStars(cachedStars.count);
+        }
+
+        if (!cachedStars || Date.now() - cachedStars.timestamp >= cacheTtl) {
+          fetch(repoUrl, {
+            headers: {
+              Accept: "application/vnd.github+json",
+            },
+          })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`GitHub stars request failed: ${response.status}`);
+              }
+
+              return response.json();
+            })
+            .then((repo) => {
+              const count = Number(repo.stargazers_count);
+
+              if (!Number.isFinite(count)) {
+                return;
+              }
+
+              applyStars(count);
+              writeCachedStars(count);
+            })
+            .catch(() => {
+              if (!cachedStars) {
+                starTarget.textContent = "Stars";
+              }
+            });
+        }
+      }
+    </script>
   </body>
 </html>

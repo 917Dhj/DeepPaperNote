@@ -5,7 +5,9 @@
     "preview": "astro preview"
   },
   "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.2.11",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "astro": "^5.16.4"
-  },
-  "devDependencies": {}
+  }
 }
