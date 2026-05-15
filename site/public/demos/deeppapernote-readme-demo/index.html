@@ -643,6 +643,59 @@
       text-transform: uppercase;
     }
 
+    .replay-button {
+      position: absolute;
+      left: 2.2%;
+      bottom: 2.2%;
+      z-index: 95;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 0 14px 0 12px;
+      border: 1px solid rgba(250,249,245,0.14);
+      border-radius: 999px;
+      background: rgba(37,35,32,0.9);
+      color: var(--cream);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.28), inset 0 1px 0 rgba(250,249,245,0.06);
+      font-family: var(--sans);
+      font-size: clamp(10px, 0.72vw, 14px);
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 180ms ease, transform 180ms ease, border-color 160ms ease, background 160ms ease;
+      backdrop-filter: blur(14px);
+    }
+
+    .replay-button svg {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      color: var(--green);
+    }
+
+    .replay-button.is-visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .replay-button:not(:disabled):hover,
+    .replay-button:not(:disabled):focus-visible {
+      border-color: rgba(204,120,92,0.55);
+      background: rgba(47,44,40,0.96);
+      outline: none;
+    }
+
+    .replay-button:not(:disabled):hover svg,
+    .replay-button:not(:disabled):focus-visible svg {
+      color: var(--gold);
+    }
+
     .stage {
       background:
         radial-gradient(circle at 18% 16%, rgba(204,120,92,0.16), transparent 28%),
@@ -1004,12 +1057,22 @@
       <div class="final-rule"></div>
     </section>
 
+    <button class="replay-button" id="replayButton" type="button" aria-label="Replay demo" disabled>
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <path
+          d="M8.8 2.2a5.8 5.8 0 1 1-5.55 7.45.78.78 0 0 1 1.5-.43 4.25 4.25 0 1 0 .98-4.21h1.8a.75.75 0 0 1 0 1.5H3.75A.75.75 0 0 1 3 5.76V2a.75.75 0 0 1 1.5 0v1.74A5.77 5.77 0 0 1 8.8 2.2Z"
+          fill="currentColor"
+        />
+      </svg>
+      <span>Replay</span>
+    </button>
     <div class="watermark">Created by Huashu-Design</div>
   </main>
 
   <script>
     const DURATION = 24;
-    const startTime = performance.now();
+    let playbackStartTime = performance.now();
+    let animationFrameId = 0;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const $ = (id) => document.getElementById(id);
 
@@ -1027,6 +1090,7 @@
       phraseTwo: $("phraseTwo"),
       phraseThree: $("phraseThree"),
       final: $("final"),
+      replayButton: $("replayButton"),
       nodes: [$("node0"), $("node1"), $("node2"), $("node3"), $("node4")],
       labels: [$("label0"), $("label1"), $("label2"), $("label3"), $("label4")]
     };
@@ -1106,32 +1170,60 @@
       }
     }
 
+    function setReplayVisible(isVisible) {
+      els.replayButton.classList.toggle("is-visible", isVisible);
+      els.replayButton.disabled = !isVisible;
+    }
+
+    function startPlayback() {
+      window.__manualSeek = false;
+      playbackStartTime = performance.now();
+      setReplayVisible(false);
+      cancelAnimationFrame(animationFrameId);
+
+      if (reducedMotion) {
+        render(DURATION);
+        setReplayVisible(true);
+        return;
+      }
+
+      render(0);
+      animationFrameId = requestAnimationFrame(tick);
+    }
+
     function tick(now) {
       if (window.__manualSeek) return;
-      const t = reducedMotion ? 18 : (now - startTime) / 1000;
+      const t = (now - playbackStartTime) / 1000;
       render(t);
       if (t < DURATION) {
-        requestAnimationFrame(tick);
+        animationFrameId = requestAnimationFrame(tick);
       } else {
         render(DURATION);
+        animationFrameId = 0;
+        setReplayVisible(true);
       }
     }
 
     window.__seek = (seconds) => {
       window.__manualSeek = true;
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = 0;
+      setReplayVisible(Number(seconds) >= DURATION);
       render(Number(seconds) || 0);
     };
+
+    els.replayButton.addEventListener("click", startPlayback);
 
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => requestAnimationFrame(() => {
         render(0);
         window.__ready = true;
-        requestAnimationFrame(tick);
+        startPlayback();
       }));
     } else {
       render(0);
       window.__ready = true;
-      requestAnimationFrame(tick);
+      startPlayback();
     }
   </script>
 </body>
