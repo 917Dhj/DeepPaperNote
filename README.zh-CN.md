@@ -6,6 +6,7 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
+[![主页](https://img.shields.io/badge/%E4%B8%BB%E9%A1%B5-online-2563eb)](https://917dhj.github.io/DeepPaperNote/)
 [![状态](https://img.shields.io/badge/status-stable-16a34a)](https://github.com/917Dhj/DeepPaperNote)
 [![版本](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v1.1.0)
 [![许可证](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
@@ -17,7 +18,7 @@
 
 </div>
 
-![DeepPaperNote 主图](./assets/hero-academic.svg)
+[![DeepPaperNote 主图](./assets/hero-academic.svg)](https://917dhj.github.io/DeepPaperNote/)
 
 **你是否经常遇到这种情况：准备精读一篇经典论文时，最累的往往不是看，而是整理成笔记**。真正耗时间的，通常是这些环节：
 

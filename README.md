@@ -6,6 +6,7 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
+[![Homepage](https://img.shields.io/badge/homepage-online-2563eb)](https://917dhj.github.io/DeepPaperNote/)
 [![Status](https://img.shields.io/badge/status-stable-16a34a)](https://github.com/917Dhj/DeepPaperNote)
 [![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v1.1.0)
 [![License](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
@@ -17,7 +18,7 @@
 
 </div>
 
-![DeepPaperNote Hero](./assets/hero-academic.svg)
+[![DeepPaperNote Hero](./assets/hero-academic.svg)](https://917dhj.github.io/DeepPaperNote/)
 
 **Do you often run into this situation: you want to study a classic paper carefully, but the hardest part is no longer reading it — it is turning that reading into usable notes?** The real time sink usually looks like this:
 
