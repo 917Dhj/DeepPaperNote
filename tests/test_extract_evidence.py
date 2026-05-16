@@ -138,3 +138,6 @@ def test_bundle_exposes_sanitized_figure_asset_quality_and_hard_gate_rules() -> 
     assert "caption-only" in figure_rules_text
     assert "missing table body" in figure_rules_text
     assert "low visual body ratio" in figure_rules_text
+    assert "directly under the most relevant analytical section" in figure_rules_text
+    assert "reject_visual_quality" in figure_rules_text
+    assert "catch-all sections" in figure_rules_text

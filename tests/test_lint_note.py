@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from lint_note import (
+    figure_structure_issues,
+    figure_structure_passes,
     find_missing_sections,
     front_matter_order_warnings,
     inspect_figure_callouts,
@@ -34,6 +36,84 @@ id: Fig.1
 """
     warnings = inspect_figure_callouts(note)
     assert "legacy_figure_placeholder_block_used" in warnings
+
+
+def test_figure_bucket_heading_is_figure_structure_issue() -> None:
+    note = """# Title
+
+## 深度分析
+
+### 剩余图表占位
+
+> [!figure] Fig. 6 补充图
+> 建议位置：深度分析
+> 放置原因：帮助理解补充材料。
+> 当前状态：保留占位；未找到高置信度整图。
+"""
+    issues = figure_structure_issues(note)
+    assert any(issue["reason"] == "figure_placeholder_bucket_heading" for issue in issues)
+    assert figure_structure_passes(note) is False
+
+
+def test_figure_callout_target_section_mismatch_is_flagged() -> None:
+    note = """# Title
+
+## 深度分析
+
+> [!figure] Fig. 1 问题边界图
+> 建议位置：研究问题
+> 放置原因：帮助定义问题边界。
+> 当前状态：保留占位；未找到高置信度整图。
+"""
+    issues = figure_structure_issues(note)
+    assert any(issue["reason"] == "figure_callout_placement_mismatch" for issue in issues)
+
+
+def test_figure_callout_inside_declared_section_passes() -> None:
+    note = """# Title
+
+## 方法主线
+
+### 机制流程
+
+> [!figure] Fig. 2 总体流程
+> 建议位置：方法主线
+> 放置原因：帮助理解执行链。
+> 当前状态：保留占位；未找到高置信度整图。
+
+> [!figure] Fig. 3 机制细节
+> 建议位置：机制流程
+> 放置原因：帮助理解执行链细节。
+> 当前状态：保留占位；未找到高置信度整图。
+"""
+    assert figure_structure_issues(note) == []
+    assert figure_structure_passes(note) is True
+
+
+def test_non_figure_remaining_heading_is_not_flagged() -> None:
+    note = """# Title
+
+## 深度分析
+
+### 剩余问题
+
+这里讨论论文还没有回答的问题。
+"""
+    assert figure_structure_issues(note) == []
+
+
+def test_figure_callout_missing_location_fails_figure_structure_gate() -> None:
+    note = """# Title
+
+## 方法主线
+
+> [!figure] Fig. 1 方法图
+> 放置原因：帮助理解整体流程。
+> 当前状态：保留占位；未找到高置信度整图。
+"""
+    issues = figure_structure_issues(note)
+    assert any(issue["reason"] == "figure_callout_missing_location" for issue in issues)
+    assert figure_structure_passes(note) is False
 
 
 def test_mixed_language_detector_flags_prose_line() -> None:

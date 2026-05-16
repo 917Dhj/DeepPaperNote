@@ -132,6 +132,7 @@ Local-library-first rule (applies only when the Zotero check above succeeds):
 - The `创新点` section should not be empty praise. It should enumerate the paper's actual innovations and briefly explain why each one matters.
 - High-quality notes should usually contain multiple meaningful `###` subheadings in the technical sections when the paper is non-trivial.
 - The note must include figure/table placeholders for all major visuals rather than silently skipping them.
+- Every kept figure/table placeholder must appear directly under the most relevant analytical section named by its `建议位置`; do not collect unresolved placeholders in catch-all sections such as `剩余图表占位` or `Remaining figures`.
 - Real images may replace some placeholders, but only if they clearly match the corresponding paper figure/table.
 - Figure captions in the note must preserve the original paper numbering such as `Fig. 1` or `Table 2`.
 - The note must pass a style gate: no mixed Chinese-English prose lines except stable proper nouns or citation metadata.

@@ -23,6 +23,51 @@ REQUIRED_SECTIONS = [
     "引用",
 ]
 
+FIGURE_TARGET_SECTIONS = {
+    "研究问题",
+    "数据与任务定义",
+    "方法主线",
+    "关键结果",
+    "深度分析",
+    "局限",
+    "我的笔记",
+}
+
+FIGURE_BUCKET_RESIDUE_TOKENS = {
+    "剩余",
+    "残余",
+    "未放置",
+    "未处理",
+    "待补",
+}
+
+FIGURE_BUCKET_VISUAL_TOKENS = {
+    "图",
+    "表",
+    "图片",
+    "图表",
+    "占位",
+}
+
+ENGLISH_FIGURE_BUCKET_RESIDUE_TOKENS = {
+    "remaining",
+    "leftover",
+    "unplaced",
+    "unresolved",
+    "backlog",
+}
+
+ENGLISH_FIGURE_BUCKET_VISUAL_TOKENS = {
+    "figure",
+    "figures",
+    "fig",
+    "figs",
+    "table",
+    "tables",
+    "placeholder",
+    "placeholders",
+}
+
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "lint note")
@@ -283,6 +328,103 @@ def inspect_figure_callouts(text: str) -> list[str]:
     if saw_legacy_block:
         warnings.append("legacy_figure_placeholder_block_used")
     return warnings
+
+
+def is_figure_bucket_heading(title: str) -> bool:
+    normalized = title.strip().lower()
+    has_chinese_residue = any(token in normalized for token in FIGURE_BUCKET_RESIDUE_TOKENS)
+    has_chinese_visual = any(token in normalized for token in FIGURE_BUCKET_VISUAL_TOKENS)
+    if has_chinese_residue and has_chinese_visual:
+        return True
+    has_english_residue = any(token in normalized for token in ENGLISH_FIGURE_BUCKET_RESIDUE_TOKENS)
+    has_english_visual = any(token in normalized for token in ENGLISH_FIGURE_BUCKET_VISUAL_TOKENS)
+    return has_english_residue and has_english_visual
+
+
+def figure_bucket_heading_issues(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    for idx, line in enumerate(text.splitlines(), start=1):
+        match = re.match(r"^(#{2,3})\s+(.+)$", line.strip())
+        if not match:
+            continue
+        heading = match.group(2).strip()
+        if is_figure_bucket_heading(heading):
+            issues.append(
+                {
+                    "line_number": idx,
+                    "heading": heading,
+                    "reason": "figure_placeholder_bucket_heading",
+                }
+            )
+    return issues
+
+
+def figure_callout_placement_issues(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("[FIGURE_PLACEHOLDER]"):
+            issues.append(
+                {
+                    "line_number": idx + 1,
+                    "line": stripped,
+                    "reason": "legacy_figure_placeholder_block_used",
+                }
+            )
+            continue
+        if not stripped.startswith("> [!figure]"):
+            continue
+
+        current_section = section_name_for_line(lines, idx)
+        current_subsection = subsection_name_for_line(lines, idx)
+        location = ""
+        j = idx + 1
+        while j < len(lines):
+            nxt = lines[j].strip()
+            if not nxt.startswith(">"):
+                break
+            if nxt.startswith("> 建议位置："):
+                location = nxt.removeprefix("> 建议位置：").strip()
+                break
+            j += 1
+
+        if not location:
+            issues.append(
+                {
+                    "line_number": idx + 1,
+                    "callout": stripped,
+                    "current_section": current_section,
+                    "current_subsection": current_subsection,
+                    "reason": "figure_callout_missing_location",
+                }
+            )
+            continue
+
+        if current_subsection and current_subsection in location:
+            continue
+        target_sections = [section for section in FIGURE_TARGET_SECTIONS if section in location]
+        if target_sections and current_section not in target_sections:
+            issues.append(
+                {
+                    "line_number": idx + 1,
+                    "callout": stripped,
+                    "current_section": current_section,
+                    "current_subsection": current_subsection,
+                    "declared_location": location,
+                    "target_sections": target_sections,
+                    "reason": "figure_callout_placement_mismatch",
+                }
+            )
+    return issues
+
+
+def figure_structure_issues(text: str) -> list[dict[str, object]]:
+    return figure_bucket_heading_issues(text) + figure_callout_placement_issues(text)
+
+
+def figure_structure_passes(text: str) -> bool:
+    return not figure_structure_issues(text)
 
 
 def is_prose_line(line: str) -> bool:
@@ -653,7 +795,12 @@ def main() -> None:
     linebreak_issues = suspicious_mid_sentence_linebreaks(body_text)
     code_math_issues = suspicious_code_formatted_math(text)
     math_issues = math_render_issues(text)
+    figure_issues = figure_structure_issues(text)
     warnings.extend(inspect_figure_callouts(text))
+    for issue in figure_issues:
+        reason = str(issue.get("reason", ""))
+        if reason and reason not in warnings:
+            warnings.append(reason)
     warnings.extend(front_matter_order_warnings(text))
     warnings.extend(mechanism_flow_warnings(text))
     if not body_text.lstrip().startswith("# "):
@@ -689,9 +836,11 @@ def main() -> None:
         "linebreak_issues": linebreak_issues,
         "code_math_issues": code_math_issues,
         "math_render_issues": math_issues,
+        "figure_structure_issues": figure_issues,
         "passes_basic_structure": not missing_sections and not {"title_heading_missing", "no_level2_sections", "front_matter_order_invalid"} & set(warnings),
         "passes_style_gate": not mixed_issues and not linebreak_issues and not code_math_issues,
         "passes_math_gate": not math_issues,
+        "passes_figure_gate": not figure_issues,
     }
     emit(payload, args.output)
 

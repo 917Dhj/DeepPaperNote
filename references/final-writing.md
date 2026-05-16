@@ -220,6 +220,9 @@ Final-note figure rules:
 - do not rename them to `图 1`, `图 2` just because of note order
 - if you replace a placeholder with a real image, keep the same paper figure id in the caption
 - if an important figure cannot be confidently extracted, keep a placeholder with a short explanation
+- every kept placeholder must appear directly under its most relevant analytical section; do not create catch-all sections such as `剩余图表占位`, `未放置图表`, `Remaining figures`, or `Leftover figures`
+- `reject_visual_quality` means the candidate image is unsafe to insert, not that the final note must keep a placeholder for that rejected candidate
+- for survey papers, summarize repetitive representative-work figures or appendix tables in prose when they do not materially help the reader as standalone callouts
 - text may be complete even when figures are partial; do not let missing images erase textual coverage
 - complete the figure decision inside the same task as the note generation
 - do not stop after the text draft and ask the user whether to continue with figures unless they explicitly asked for a staged workflow

@@ -43,6 +43,9 @@ The rule is simple:
    - plan placeholders for all major figures/tables that matter to the note
    - replace a placeholder with a real image only when the candidate is good enough
    - keep the original paper figure/table id in either case
+   - place every kept placeholder directly under its most relevant analytical section; never create catch-all sections such as `剩余图表占位`, `未放置图表`, `Remaining figures`, or `Leftover figures`
+   - treat `reject_visual_quality` as "do not insert this image", not as an obligation to keep a final-note placeholder for every rejected candidate
+   - for surveys, use prose rather than stacked callouts for repetitive representative-work figures or appendix tables that do not materially help the reader
    - when keeping a placeholder, use the stable four-line callout format:
      - `> [!figure] Fig. 3 ...`
      - `> 建议位置：...`

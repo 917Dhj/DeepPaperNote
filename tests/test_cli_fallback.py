@@ -132,3 +132,79 @@ def test_write_note_refuses_when_math_gate_fails(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "math gate failed" in result.stderr
+
+
+def test_write_note_accepts_legacy_lint_json_without_figure_gate(tmp_path: Path) -> None:
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "passes_basic_structure": True,
+                "passes_style_gate": True,
+                "passes_math_gate": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
+    env.pop("READ_ARXIV_OBSIDIAN_VAULT", None)
+    env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
+    env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WRITE_SCRIPT),
+            "--title",
+            "Legacy Lint Test",
+            "--content",
+            "# Legacy Lint Test\n\nBody.\n",
+            "--lint-json",
+            str(lint_path),
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+    assert Path(payload["note_path"]).exists()
+
+
+def test_write_note_refuses_when_figure_gate_fails(tmp_path: Path) -> None:
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "passes_basic_structure": True,
+                "passes_style_gate": True,
+                "passes_math_gate": True,
+                "passes_figure_gate": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WRITE_SCRIPT),
+            "--title",
+            "Figure Gate Test",
+            "--content",
+            "# Figure Gate Test\n\nBody.\n",
+            "--lint-json",
+            str(lint_path),
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "figure gate failed" in result.stderr

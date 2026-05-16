@@ -45,6 +45,20 @@ Do not let scripts make the final semantic choice; scripts should only prepare c
 - Do not produce a text-only note first and then ask the user in a follow-up whether figures should be inserted.
 - If no figure can be confidently replaced, finish the note with placeholders and explain that outcome in the final response.
 
+## Integrated Placement Rule
+
+Every kept placeholder must be placed directly under the most relevant substantive section named by its `建议位置`.
+Do not collect unresolved placeholders into a catch-all section such as `剩余图表占位`, `未放置图表`, `Remaining figures`, or `Leftover figures`.
+
+`reject_visual_quality` means the candidate image must not be inserted.
+It does not by itself require a final-note placeholder.
+The final placeholder set should come from semantic importance to the note, not from the number of failed extraction candidates.
+
+For survey papers with many representative project figures, appendix tables, or repetitive supplemental visuals:
+- keep a callout only when the visual materially helps the reader understand the argument
+- otherwise summarize the pattern in prose or point the reader back to the appendix/source paper
+- do not stack low-value callouts just to demonstrate that the pipeline saw them
+
 ## Visual Quality Gate
 
 Figure/table insertion has two separate gates:
