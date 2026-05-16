@@ -91,6 +91,7 @@ def _classify_visual_quality(
     paragraph_text_chars: int,
     table_body_rows: int,
     caption_text_chars: int,
+    other_caption_labels: list[str] | None = None,
 ) -> dict:
     """Classify whether a caption-matched crop is visually usable.
 
@@ -98,6 +99,7 @@ def _classify_visual_quality(
     but not that the rendered crop contains the figure or table body.
     """
     normalized_kind = kind.strip().lower()
+    other_caption_labels = list(other_caption_labels or [])
     reasons: list[str] = []
 
     if normalized_kind == "table":
@@ -105,6 +107,10 @@ def _classify_visual_quality(
             reasons.append("table_body_missing")
         if table_body_rows <= 1 and visual_body_ratio < 0.03 and caption_text_chars >= 40:
             reasons.append("caption_only_suspected")
+        if paragraph_text_chars >= 450:
+            reasons.append("table_text_contamination_suspected")
+        if other_caption_labels:
+            reasons.append("multiple_caption_regions_suspected")
         status = "reject" if reasons else "usable"
     else:
         if paragraph_text_chars >= 450:
@@ -131,6 +137,8 @@ def _classify_visual_quality(
         "paragraph_text_chars": int(paragraph_text_chars),
         "table_body_rows": int(table_body_rows),
         "caption_text_chars": int(caption_text_chars),
+        "other_caption_count": len(other_caption_labels),
+        "other_caption_labels": other_caption_labels,
     }
 
 
@@ -434,6 +442,34 @@ def _count_paragraph_text_chars_in_bbox(
     return chars
 
 
+def _other_caption_labels_for_crop(
+    caption_anchors: list[dict],
+    current_anchor: dict,
+    bbox: tuple[float, float, float, float],
+) -> list[str]:
+    """Return other caption labels substantially covered by this crop."""
+    labels: list[str] = []
+    current_label = normalize_whitespace(str(current_anchor.get("label", "")))
+    current_bbox = tuple(current_anchor.get("bbox", ()))
+
+    for anchor in caption_anchors:
+        label = normalize_whitespace(str(anchor.get("label", "")))
+        anchor_bbox = tuple(anchor.get("bbox", ()))
+        if not label or len(anchor_bbox) != 4:
+            continue
+        if label == current_label and anchor_bbox == current_bbox:
+            continue
+
+        overlap = _intersection_area(anchor_bbox, bbox)
+        if overlap <= 0:
+            continue
+        if overlap / max(_rect_area(anchor_bbox), 1.0) < 0.5:
+            continue
+        labels.append(label)
+
+    return sorted(set(labels))
+
+
 def _quality_signals_for_crop(
     page,
     kind: str,
@@ -442,6 +478,7 @@ def _quality_signals_for_crop(
     page_rect,
     *,
     table_body_rows: int,
+    caption_anchors: list[dict] | None = None,
 ) -> dict:
     page_area = _rect_area((page_rect.x0, page_rect.y0, page_rect.x1, page_rect.y1))
     page_coverage_ratio = _rect_area(bbox) / page_area if page_area > 0 else 0.0
@@ -449,6 +486,7 @@ def _quality_signals_for_crop(
     caption_bbox = tuple(caption_anchor["bbox"])
     paragraph_text_chars = _count_paragraph_text_chars_in_bbox(page, bbox, caption_bbox)
     caption_text_chars = len(normalize_whitespace(str(caption_anchor.get("line_text", ""))))
+    other_caption_labels = _other_caption_labels_for_crop(caption_anchors or [], caption_anchor, bbox)
     return _classify_visual_quality(
         kind=kind,
         page_coverage_ratio=page_coverage_ratio,
@@ -457,6 +495,7 @@ def _quality_signals_for_crop(
         paragraph_text_chars=paragraph_text_chars,
         table_body_rows=table_body_rows,
         caption_text_chars=caption_text_chars,
+        other_caption_labels=other_caption_labels,
     )
 
 
@@ -897,6 +936,7 @@ def extract_figure_regions(
             anchor,
             page_rect,
             table_body_rows=table_body_rows,
+            caption_anchors=anchors,
         )
 
         assets.append(

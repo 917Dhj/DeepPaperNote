@@ -116,6 +116,53 @@ def test_figure_callout_missing_location_fails_figure_structure_gate() -> None:
     assert figure_structure_passes(note) is False
 
 
+def test_nonstandard_bracket_figure_placeholder_fails_figure_structure_gate() -> None:
+    note = """# Title
+
+## 研究问题
+
+[图表占位 | Fig. 1] 论文给出的整体任务示意图。
+"""
+    issues = figure_structure_issues(note)
+    assert any(issue["reason"] == "nonstandard_figure_placeholder_format" for issue in issues)
+    assert figure_structure_passes(note) is False
+
+
+def test_nonstandard_colon_and_english_figure_placeholders_fail_gate() -> None:
+    note = """# Title
+
+## 关键结果
+
+图表占位：Table 2 跨数据集结果。
+
+Figure Placeholder | Fig. 3 reasoning example.
+"""
+    issues = figure_structure_issues(note)
+    assert len([issue for issue in issues if issue["reason"] == "nonstandard_figure_placeholder_format"]) == 2
+    assert figure_structure_passes(note) is False
+
+
+def test_real_image_only_note_does_not_fail_figure_structure_gate() -> None:
+    note = """# Title
+
+## 方法主线
+
+![Fig. 2 Architecture](images/page_005_fig_figure_2.png)
+"""
+    assert figure_structure_issues(note) == []
+    assert figure_structure_passes(note) is True
+
+
+def test_chinese_placeholder_policy_prose_is_not_flagged_as_nonstandard_placeholder() -> None:
+    note = """# Title
+
+## 深度分析
+
+这里讨论图表占位策略为什么不能替代正文分析。
+"""
+    assert figure_structure_issues(note) == []
+
+
 def test_mixed_language_detector_flags_prose_line() -> None:
     note = "这篇论文 uses a model and the result is better than baseline in several settings."
     issues = mixed_language_issues(note)

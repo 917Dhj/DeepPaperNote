@@ -141,3 +141,5 @@ def test_bundle_exposes_sanitized_figure_asset_quality_and_hard_gate_rules() -> 
     assert "directly under the most relevant analytical section" in figure_rules_text
     assert "reject_visual_quality" in figure_rules_text
     assert "catch-all sections" in figure_rules_text
+    assert "[!figure]" in figure_rules_text
+    assert "[图表占位 |" in figure_rules_text

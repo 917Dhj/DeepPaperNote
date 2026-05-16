@@ -68,6 +68,21 @@ ENGLISH_FIGURE_BUCKET_VISUAL_TOKENS = {
     "placeholders",
 }
 
+NONSTANDARD_FIGURE_PLACEHOLDER_RE = re.compile(
+    r"""(?ix)
+    ^\s*
+    (?:
+        \[\s*(?:图表|图片|图|表)\s*占位\s*\|[^\]]+\]
+        |
+        (?:图表|图片|图|表)\s*占位\s*[:：]\s*\S+
+        |
+        \[\s*(?:figure|fig|table)\s+placeholder\s*(?:\||:|\]|-|\s+(?:fig(?:ure)?|table)\.?\s*\d)
+        |
+        (?:figure|fig|table)\s+placeholder\s*(?:\||:|-|\s+(?:fig(?:ure)?|table)\.?\s*\d)
+    )
+    """
+)
+
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "lint note")
@@ -359,6 +374,23 @@ def figure_bucket_heading_issues(text: str) -> list[dict[str, object]]:
     return issues
 
 
+def nonstandard_figure_placeholder_issues(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    for idx, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(">"):
+            continue
+        if NONSTANDARD_FIGURE_PLACEHOLDER_RE.match(stripped):
+            issues.append(
+                {
+                    "line_number": idx,
+                    "line": stripped,
+                    "reason": "nonstandard_figure_placeholder_format",
+                }
+            )
+    return issues
+
+
 def figure_callout_placement_issues(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
     lines = text.splitlines()
@@ -420,7 +452,11 @@ def figure_callout_placement_issues(text: str) -> list[dict[str, object]]:
 
 
 def figure_structure_issues(text: str) -> list[dict[str, object]]:
-    return figure_bucket_heading_issues(text) + figure_callout_placement_issues(text)
+    return (
+        figure_bucket_heading_issues(text)
+        + nonstandard_figure_placeholder_issues(text)
+        + figure_callout_placement_issues(text)
+    )
 
 
 def figure_structure_passes(text: str) -> bool:

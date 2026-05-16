@@ -71,10 +71,14 @@ Fail closed when visual usability is weak: keep the placeholder instead of inser
 Reject candidates that are:
 - caption-only crops
 - tables with no visible table body
+- table crops contaminated by running prose or another Figure/Table caption
 - large text, title-page, or abstract crops masquerading as figures
 - crops where the visual body is tiny relative to the crop
 
 ## Placeholder Requirements
+
+Every kept placeholder in the final note must use the standard `[!figure]` callout format.
+Do not use ordinary paragraph markers such as `[图表占位 | Fig. 1]`, `图表占位：Table 2`, or `Figure Placeholder | Fig. 3`.
 
 Each placeholder should include:
 - figure or table id
@@ -102,6 +106,7 @@ The placeholder text should be stable and explicit:
 If a real image is inserted:
 - keep the original paper identifier, for example `Fig. 2` or `Table 1`
 - do not renumber it according to note order
+- prefer the `obsidian_embed` returned by `scripts/materialize_figure_asset.py`
 - if the extracted image is only a subpanel or partial crop, say so explicitly
 
 ## When to Skip

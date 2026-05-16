@@ -211,7 +211,7 @@ If the bundle contains candidate figure pages or candidate image files:
 - prefer the candidate with the strongest caption/page-context agreement
 - treat identity match and visual usability as separate gates
 - never treat a matching label or caption as sufficient approval to insert an image
-- reject caption-only crops, missing table bodies, large text/title/abstract crops, and crops with very low visual body ratio
+- reject caption-only crops, missing table bodies, table crops contaminated by running prose or another Figure/Table caption, large text/title/abstract crops, and crops with very low visual body ratio
 - if visual quality is missing, ambiguous, or failed, keep the placeholder
 - still make the final decision yourself rather than trusting the candidate ranking blindly
 
@@ -219,8 +219,10 @@ Final-note figure rules:
 - keep the original paper numbering, such as `Fig. 1`, `Fig. 3`, `Table 2`
 - do not rename them to `图 1`, `图 2` just because of note order
 - if you replace a placeholder with a real image, keep the same paper figure id in the caption
+- if you replace a placeholder with a real image, prefer the `obsidian_embed` returned by `scripts/materialize_figure_asset.py`
 - if an important figure cannot be confidently extracted, keep a placeholder with a short explanation
 - every kept placeholder must appear directly under its most relevant analytical section; do not create catch-all sections such as `剩余图表占位`, `未放置图表`, `Remaining figures`, or `Leftover figures`
+- every kept placeholder must use the standard `[!figure]` callout format; never use ordinary paragraph markers such as `[图表占位 | Fig. 1]`, `图表占位：Table 2`, or `Figure Placeholder | Fig. 3`
 - `reject_visual_quality` means the candidate image is unsafe to insert, not that the final note must keep a placeholder for that rejected candidate
 - for survey papers, summarize repetitive representative-work figures or appendix tables in prose when they do not materially help the reader as standalone callouts
 - text may be complete even when figures are partial; do not let missing images erase textual coverage

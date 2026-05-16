@@ -37,7 +37,7 @@ The rule is simple:
    - inspect `figure_assets[].quality_signals` when available
    - match likely figures by page proximity, caption context, and candidate snippets
    - require both identity match and visual usability before insertion
-   - fail closed on caption-only crops, missing table bodies, large text/title/abstract crops, or very low visual body ratio
+   - fail closed on caption-only crops, missing table bodies, table crops contaminated by running prose or another Figure/Table caption, large text/title/abstract crops, or very low visual body ratio
    - keep the final semantic matching decision on the model side
    Build the note in placeholder-first order:
    - plan placeholders for all major figures/tables that matter to the note
@@ -51,10 +51,11 @@ The rule is simple:
      - `> 建议位置：...`
      - `> 放置原因：...`
      - `> 当前状态：...`
+   - never use ordinary paragraph markers such as `[图表占位 | Fig. 1]`, `图表占位：Table 2`, or `Figure Placeholder | Fig. 3`
    If you decide to insert a real image instead of leaving a placeholder:
    - call `scripts/materialize_figure_asset.py`
    - copy the chosen candidate image into the vault
-   - insert the returned Obsidian embed into the note
+   - insert the returned Obsidian embed into the note; Markdown image syntax is a compatibility fallback, not the preferred note format
    This figure step belongs to the same note-generation task:
    - do not stop after a text-only draft just to ask the user whether figures should be inserted
    - finish the replacement-or-placeholder decision before final save
