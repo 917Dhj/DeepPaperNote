@@ -14,6 +14,20 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - No unreleased user-facing changes yet.
 
+## v1.1.1
+
+Small patch release that fixes existing logic gaps.
+
+### Fixed
+
+- Tightened final-note linting so retained figure/table placeholders must use the standard `[!figure]` callout format.
+- Strengthened table crop quality checks so crops contaminated by running prose or other figure/table captions fail closed.
+
+### Notes
+
+- This remains a stable release.
+- The release asset continues to ship as a clean manually installable `DeepPaperNote.zip`.
+
 ## v1.1.0
 
 Minor stable release with a major figure/table extraction quality upgrade.
