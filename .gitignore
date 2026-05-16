@@ -16,3 +16,4 @@ build/
 *.egg-info/
 .agent-work/
 DESIGN.md
+.claude/
