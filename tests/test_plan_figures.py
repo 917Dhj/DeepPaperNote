@@ -163,6 +163,43 @@ def test_legacy_image_assets_still_populate_candidate_page_images() -> None:
     ]
 
 
+def test_no_match_does_not_fall_back_to_page_order() -> None:
+    planned = attach_candidate_images(
+        [
+            {
+                "id": "Figure 9",
+                "caption": "Completely unrelated caption.",
+                "insert_mode": "placeholder",
+            }
+        ],
+        page_assets=[
+            {
+                "page_number": 7,
+                "image_count": 1,
+                "figure_count": 0,
+                "page_text": "This page discusses assumptions and baseline setup details.",
+                "text_preview": "This page discusses assumptions and baseline setup details.",
+            }
+        ],
+        image_assets=[
+            {
+                "page_number": 7,
+                "filename": "page_007_img_001.png",
+                "path": "/tmp/images/page_007_img_001.png",
+                "width": 400,
+                "height": 300,
+                "size_bytes": 1024,
+            }
+        ],
+        figure_assets=[],
+    )
+
+    assert planned[0]["insert_mode"] == "placeholder"
+    assert planned[0]["candidate_pages"] == []
+    assert planned[0]["candidate_status"] == "no_match_found"
+    assert planned[0]["matching_strategy"] == "no-match-found"
+
+
 def test_missing_quality_signals_need_visual_check_and_keep_placeholder_mode() -> None:
     planned = attach_candidate_images(
         [

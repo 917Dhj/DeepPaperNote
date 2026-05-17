@@ -293,12 +293,6 @@ def attach_candidate_images(
                         snippets.append(snippet)
             score += min(keyword_hits, 3)
 
-            if score == 0 and index < len(pages_with_images):
-                fallback_page = int(pages_with_images[index].get("page_number", 0) or 0)
-                if page_number == fallback_page:
-                    score = 1
-                    matched_terms.append("order_fallback")
-
             if score <= 0:
                 continue
 
@@ -321,7 +315,13 @@ def attach_candidate_images(
 
         candidates.sort(key=lambda candidate: (-candidate["score"], candidate["page_number"]))
         item["candidate_pages"] = candidates[:3]
-        item["matching_strategy"] = "figure-asset-candidate" if fig_match else "page-proximity-and-caption-cues"
+        if fig_match:
+            item["matching_strategy"] = "figure-asset-candidate"
+        elif candidates:
+            item["matching_strategy"] = "page-proximity-and-caption-cues"
+        else:
+            item["candidate_status"] = "no_match_found"
+            item["matching_strategy"] = "no-match-found"
     return items
 
 
