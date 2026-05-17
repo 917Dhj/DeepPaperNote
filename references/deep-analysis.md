@@ -28,11 +28,10 @@ The real value comes from the model reading the available material and writing t
 
 Use sources in this order:
 
-1. existing Obsidian note, if the user wants an update rather than a fresh note
-2. synthesis bundle metadata
-3. evidence extracted from the full PDF
-4. figure/table captions and candidate assets
-5. abstract only, as the weakest fallback
+1. synthesis bundle metadata
+2. evidence extracted from the full PDF
+3. figure/table captions and candidate assets
+4. abstract only, as the weakest fallback
 
 For a finished long-term note, prefer the complete PDF over the abstract.
 
