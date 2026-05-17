@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 
 from common import maybe_load_json_record, normalize_whitespace
+from contracts import NOTE_REQUIRED_SECTIONS
 
 
 SECTION_TEXT_LIMIT_SECTIONS = 8
@@ -315,20 +316,7 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
                 "核心结果 vs 好看的结果",
                 "作者声称什么 vs 论文没有证明什么",
             ],
-            "must_include_sections": [
-                "核心信息",
-                "原文摘要翻译",
-                "创新点",
-                "一句话总结",
-                "研究问题",
-                "数据与任务定义",
-                "方法主线",
-                "关键结果",
-                "深度分析",
-                "局限",
-                "我的笔记",
-                "引用",
-            ],
+            "must_include_sections": list(NOTE_REQUIRED_SECTIONS),
             "core_info_contract": {
                 "role": "fixed_metadata_block",
                 "format": "template_style_metadata_bullets",

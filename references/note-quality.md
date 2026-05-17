@@ -17,7 +17,7 @@ The note is high quality only if it satisfies most of the checks below.
 
 The note should usually include:
 - `核心信息`
-- `摘要`
+- `原文摘要翻译`
 - `创新点`
 - `一句话总结`
 - `研究问题`
@@ -27,6 +27,7 @@ The note should usually include:
 - `深度分析`
 - `局限`
 - `我的笔记`
+- `引用`
 
 For non-trivial papers, it should usually also include multiple `###` subheadings inside:
 - `数据与任务定义`

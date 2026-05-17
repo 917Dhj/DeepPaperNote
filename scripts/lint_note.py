@@ -8,21 +8,9 @@ import json
 import re
 from pathlib import Path
 
+from contracts import NOTE_REQUIRED_SECTIONS
 
-REQUIRED_SECTIONS = [
-    "核心信息",
-    "原文摘要翻译",
-    "创新点",
-    "一句话总结",
-    "研究问题",
-    "数据与任务定义",
-    "方法主线",
-    "关键结果",
-    "深度分析",
-    "局限",
-    "我的笔记",
-    "引用",
-]
+REQUIRED_SECTIONS = NOTE_REQUIRED_SECTIONS
 
 NOTE_PLAN_STRING_FIELDS = (
     "paper_type",

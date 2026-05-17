@@ -6,6 +6,22 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 
+NOTE_REQUIRED_SECTIONS: tuple[str, ...] = (
+    "核心信息",
+    "原文摘要翻译",
+    "创新点",
+    "一句话总结",
+    "研究问题",
+    "数据与任务定义",
+    "方法主线",
+    "关键结果",
+    "深度分析",
+    "局限",
+    "我的笔记",
+    "引用",
+)
+
+
 class MetadataRecord(TypedDict, total=False):
     title: str
     translated_title: str
