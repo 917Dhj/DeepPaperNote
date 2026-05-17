@@ -49,6 +49,26 @@ CAPTION_RE = re.compile(
 # downstream "table body lives below caption" cropping logic will mistake the
 # numeric row for caption text and shrink the table bbox accordingly.
 _NUMERIC_TOKEN_RE = re.compile(r"^[+-]?(?:\d+\.\d+|\.\d+|\d+)(?:[eE][+-]?\d+)?$")
+_TEXT_TABLE_SEPARATOR_RE = re.compile(r"(?:\t+|\s{2,}|[|;])")
+_TEXT_TABLE_PROSE_STARTERS = {
+    "a",
+    "an",
+    "it",
+    "our",
+    "that",
+    "the",
+    "these",
+    "this",
+    "those",
+    "we",
+}
+_TEXT_TABLE_PROSE_CONNECTORS = {
+    "although",
+    "because",
+    "therefore",
+    "whereas",
+    "which",
+}
 
 
 def _looks_like_data_row(text: str) -> bool:
@@ -58,6 +78,31 @@ def _looks_like_data_row(text: str) -> bool:
         return False
     numeric_tokens = sum(1 for tok in tokens if _NUMERIC_TOKEN_RE.match(tok))
     return numeric_tokens >= max(2, len(tokens) // 2)
+
+
+def _looks_like_text_table_row(text: str) -> bool:
+    """Heuristic: a short textual row from a comparison/categorization table."""
+    raw = text.strip()
+    cleaned = normalize_whitespace(raw)
+    tokens = cleaned.split()
+    if len(tokens) < 3 or len(cleaned) > 180:
+        return False
+
+    cells = [cell.strip() for cell in _TEXT_TABLE_SEPARATOR_RE.split(raw) if cell.strip()]
+    if len(cells) >= 3 and all(len(cell.split()) <= 8 for cell in cells):
+        return True
+
+    normalized_tokens = [tok.strip(".,:()[]{}").lower() for tok in tokens]
+    if cleaned.endswith((".", "?", "!")):
+        return False
+    if normalized_tokens[0] in _TEXT_TABLE_PROSE_STARTERS:
+        return False
+    if any(tok in _TEXT_TABLE_PROSE_CONNECTORS for tok in normalized_tokens):
+        return False
+
+    average_token_length = sum(len(tok.strip(".,:()[]{}")) for tok in tokens) / len(tokens)
+    long_tokens = sum(1 for tok in tokens if len(tok.strip(".,:()[]{}")) > 18)
+    return len(tokens) <= 8 and average_token_length <= 9.0 and long_tokens <= 1
 
 
 def _rect_area(bbox: tuple[float, float, float, float]) -> float:
@@ -654,7 +699,7 @@ def _row_is_table_like(row: dict) -> bool:
     The row qualifies if it has many short tokens (typical for tabular cells).
     Either:
     - many independent cells (≥ 3 separate line members), or
-    - a single text whose tokens are dominated by numbers.
+    - a single text whose tokens look like numeric or textual table body cells.
     """
     members = row.get("members", [])
     text = row.get("text", "")
@@ -662,7 +707,7 @@ def _row_is_table_like(row: dict) -> bool:
         # Many separated cells: the typical case for LaTeX-rendered tables
         # where every cell becomes its own PyMuPDF line.
         return True
-    return _looks_like_data_row(text)
+    return _looks_like_data_row(text) or _looks_like_text_table_row(text)
 
 
 def _line_is_inside_any_block(
@@ -694,7 +739,8 @@ def _grow_table_region(
     logical rows that look like part of a tabular layout.
 
     Returns the list of accepted row bboxes (caption excluded) and the number
-    of rows confirmed as data rows.  The caller decides which direction wins.
+    of rows confirmed as table body rows.  The caller decides which direction
+    wins.
     """
     caption_y0 = caption_anchor["bbox"][1]
     caption_y1 = caption_anchor["bbox"][3]
@@ -805,9 +851,9 @@ def _estimate_table_bbox_with_rows(
 
     LaTeX makes both common, and within a single paper both forms can mix
     (e.g. wide tables placed with ``[t]`` vs. ``[b]``).  We therefore probe
-    both directions and pick the side with strictly more "data rows" (rows
-    dominated by numeric tokens).  Ties go to the downward side, matching the
-    most common ACM / IEEE template defaults.
+    both directions and pick the side with strictly more confirmed table body
+    rows.  Ties go to the downward side, matching the most common ACM / IEEE
+    template defaults.
 
     Tables are usually pure text + thin separator lines, so the page rendering
     of just the union of text-line bboxes is sufficient.  We additionally

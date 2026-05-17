@@ -1,6 +1,31 @@
 from __future__ import annotations
 
-from extract_pdf_assets import _classify_visual_quality, _other_caption_labels_for_crop
+from extract_pdf_assets import (
+    _classify_visual_quality,
+    _looks_like_text_table_row,
+    _other_caption_labels_for_crop,
+    _row_is_table_like,
+)
+
+
+def test_text_table_row_accepts_explicit_column_separators() -> None:
+    assert _looks_like_text_table_row("Method | Strengths | Weaknesses") is True
+
+
+def test_text_table_row_accepts_compact_text_comparison_row() -> None:
+    assert _looks_like_text_table_row("BERT strong baseline poor interpretability") is True
+
+
+def test_text_table_row_rejects_natural_language_sentence() -> None:
+    text = "This method improves robustness because it uses a better training objective."
+
+    assert _looks_like_text_table_row(text) is False
+
+
+def test_row_is_table_like_accepts_single_line_text_table_row() -> None:
+    row = {"members": [{"text": "Method | Strengths | Weaknesses"}], "text": "Method | Strengths | Weaknesses"}
+
+    assert _row_is_table_like(row) is True
 
 
 def test_quality_classification_rejects_table_without_body_rows() -> None:
