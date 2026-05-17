@@ -5,12 +5,32 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+try:
+    import fitz  # type: ignore
+except ImportError:  # pragma: no cover
+    fitz = None
+
 from build_synthesis_bundle import bundle
 from extract_evidence import evidence_quality
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXTRACT_EVIDENCE_SCRIPT = PROJECT_ROOT / "scripts" / "extract_evidence.py"
+
+
+def write_test_pdf(path: Path, pages: list[str]) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for PDF coverage integration tests.")
+    doc = fitz.open()
+    try:
+        for text in pages:
+            page = doc.new_page()
+            page.insert_text((72, 72), text)
+        doc.save(path)
+    finally:
+        doc.close()
 
 
 def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
@@ -44,6 +64,64 @@ def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
     assert payload["summary"]["ablation_signals"]
     assert payload["summary"]["mechanism_signals"]
     assert payload["summary"]["paper_type"] == "AI_method"
+
+
+def test_extract_evidence_outputs_pdf_coverage_for_truncated_pdf(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pages = [
+        (
+            "Abstract\nWe propose a coverage-aware extraction test.\n"
+            "Introduction\nThis paper studies evidence coverage."
+        ),
+        "Method\nThe method scans bounded PDF pages and records transparent coverage.",
+        "Experiment\nThe experiment reports a useful result.",
+    ]
+    pages.extend(f"Main content page {index}" for index in range(4, 10))
+    pages.append("References\n[1] Ignored reference.")
+    pages.extend(f"Reference tail page {index}" for index in range(11, 20))
+    pages.append("Appendix\nAdditional experiments live here.")
+    pages.extend(f"Appendix tail page {index}" for index in range(21, 26))
+    write_test_pdf(pdf_path, pages)
+
+    input_payload = {
+        "paper_id": "paper:coverage",
+        "title": "Coverage Transparent Paper",
+        "abstract": "We propose a coverage-aware extraction test.",
+        "pdf_path": str(pdf_path),
+    }
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "evidence.json"
+    input_path.write_text(json.dumps(input_payload, ensure_ascii=False), encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_EVIDENCE_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--max-pages",
+            "18",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    coverage = payload["evidence_pack"]["pdf_coverage"]
+    assert coverage["total_pages"] == 25
+    assert coverage["text_max_pages"] == 18
+    assert coverage["text_pages_scanned"] == 18
+    assert coverage["truncated_due_to_page_limit"] is True
+    assert coverage["references_start_page"] == 10
+    assert coverage["appendix_detected"] is True
+    assert coverage["appendix_start_page"] == 20
+    assert coverage["section_stop_reason"] == "references"
+    assert coverage["section_stop_page"] == 10
+    assert payload["summary"]["pdf_coverage"] == coverage
 
 
 def test_evidence_quality_caps_abstract_fallback_chunks_at_low() -> None:
@@ -117,6 +195,21 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
                     "missing_core_sections": ["introduction", "method", "experiment"],
                     "fallback_sections": ["introduction", "method", "experiment", "conclusion"],
                 },
+                "pdf_coverage": {
+                    "total_pages": 25,
+                    "text_max_pages": 18,
+                    "text_pages_scanned": 18,
+                    "truncated_due_to_page_limit": True,
+                    "appendix_detected": True,
+                    "appendix_start_page": 20,
+                    "references_start_page": 10,
+                    "section_stop_reason": "references",
+                    "section_stop_page": 10,
+                },
+                "section_texts": {
+                    "method": "方法" * 2500,
+                    "experiment": "实验结果",
+                },
                 "extraction_failures": ["section_coverage_poor"],
             }
         },
@@ -133,9 +226,36 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
             "missing_core_sections": ["introduction", "method", "experiment"],
             "fallback_sections": ["introduction", "method", "experiment", "conclusion"],
         },
+        "pdf_coverage": {
+            "total_pages": 25,
+            "text_max_pages": 18,
+            "text_pages_scanned": 18,
+            "truncated_due_to_page_limit": True,
+            "appendix_detected": True,
+            "appendix_start_page": 20,
+            "references_start_page": 10,
+            "section_stop_reason": "references",
+            "section_stop_page": 10,
+        },
+        "bundle_text_budget": {
+            "section_text_max_chars": 4000,
+            "section_text_limit_sections": 8,
+            "section_text_original_chars": {
+                "method": 5000,
+                "experiment": 4,
+            },
+            "section_text_included_chars": {
+                "method": 4000,
+                "experiment": 4,
+            },
+            "section_text_truncated_sections": ["method"],
+        },
         "extraction_failures": ["section_coverage_poor"],
     }
-    assert any("coverage" in rule for rule in synthesis["writing_contract"]["self_review_rules"])
+    review_rules = synthesis["writing_contract"]["self_review_rules"]
+    assert any("bundle.coverage" in rule for rule in review_rules)
+    assert any("max_pages" in rule for rule in review_rules)
+    assert any("bundle_text_budget" in rule for rule in review_rules)
 
 
 def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:

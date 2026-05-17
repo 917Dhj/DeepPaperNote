@@ -79,6 +79,18 @@ class SectionExtractionCoverage(TypedDict, total=False):
     fallback_sections: list[str]
 
 
+class PdfCoverage(TypedDict, total=False):
+    total_pages: int | None
+    text_max_pages: int | None
+    text_pages_scanned: int
+    truncated_due_to_page_limit: bool
+    appendix_detected: bool
+    appendix_start_page: int | None
+    references_start_page: int | None
+    section_stop_reason: str
+    section_stop_page: int | None
+
+
 class EvidencePack(TypedDict, total=False):
     paper_id: str
     problem_evidence: list[EvidenceItem]
@@ -98,6 +110,7 @@ class EvidencePack(TypedDict, total=False):
     language_hint: str
     section_sources: dict[str, str]
     section_extraction_coverage: SectionExtractionCoverage
+    pdf_coverage: PdfCoverage
     quotes: list[dict[str, Any]]
     evidence_quality: str
     extraction_failures: list[str]
@@ -170,6 +183,7 @@ def empty_evidence_pack() -> EvidencePack:
         language_hint="unknown",
         section_sources={},
         section_extraction_coverage={},
+        pdf_coverage={},
         quotes=[],
         extraction_failures=[],
         evidence_quality="unknown",

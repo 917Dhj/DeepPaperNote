@@ -1136,6 +1136,20 @@ STOP_SECTION_ALIASES = {
     "致谢",
 }
 
+STOP_SECTION_REASONS = {
+    "references": "references",
+    "bibliography": "references",
+    "参考文献": "references",
+    "appendix": "appendix",
+    "appendices": "appendix",
+    "supplementary material": "appendix",
+    "附录": "appendix",
+    "补充材料": "appendix",
+    "acknowledgments": "acknowledgments",
+    "acknowledgements": "acknowledgments",
+    "致谢": "acknowledgments",
+}
+
 
 def match_section_heading(line: str) -> str | None:
     normalized = normalize_heading(line)
@@ -1147,6 +1161,74 @@ def match_section_heading(line: str) -> str | None:
         if normalized in aliases:
             return section
     return None
+
+
+def stop_section_reason(line: str, *, allow_prefix: bool = False) -> str:
+    normalized = normalize_heading(line)
+    if not normalized:
+        return ""
+    reason = STOP_SECTION_REASONS.get(normalized, "")
+    if reason or not allow_prefix:
+        return reason
+    if normalized.startswith(("references ", "bibliography ")):
+        return "references"
+    if normalized.startswith(("appendix ", "appendices ", "supplementary material ")):
+        return "appendix"
+    if normalized.startswith(("acknowledgments ", "acknowledgements ")):
+        return "acknowledgments"
+    return ""
+
+
+def pdf_coverage_summary(pdf_path: Path, max_pages: int | None = None) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "total_pages": None,
+        "text_max_pages": max_pages,
+        "text_pages_scanned": 0,
+        "truncated_due_to_page_limit": False,
+        "appendix_detected": False,
+        "appendix_start_page": None,
+        "references_start_page": None,
+        "section_stop_reason": "",
+        "section_stop_page": None,
+    }
+    if fitz is None or not pdf_path.is_file():
+        return summary
+
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception:
+        return summary
+
+    try:
+        total_pages = len(doc)
+        page_limit = total_pages if max_pages is None else min(total_pages, max_pages)
+        summary["total_pages"] = total_pages
+        summary["text_pages_scanned"] = page_limit
+        summary["truncated_due_to_page_limit"] = max_pages is not None and total_pages > max_pages
+
+        for page_index in range(total_pages):
+            page_number = page_index + 1
+            text = doc[page_index].get_text("text")
+            for raw_line in text.splitlines():
+                line = clean_pdf_line(raw_line)
+                if not line:
+                    continue
+                exact_reason = stop_section_reason(line)
+                detected_reason = exact_reason or stop_section_reason(line, allow_prefix=True)
+                if not detected_reason:
+                    continue
+                if detected_reason == "references" and summary["references_start_page"] is None:
+                    summary["references_start_page"] = page_number
+                if detected_reason == "appendix" and summary["appendix_start_page"] is None:
+                    summary["appendix_start_page"] = page_number
+                    summary["appendix_detected"] = True
+                if exact_reason and not summary["section_stop_reason"]:
+                    summary["section_stop_reason"] = exact_reason
+                    summary["section_stop_page"] = page_number
+                break
+    finally:
+        doc.close()
+    return summary
 
 
 def extract_pdf_sections(pdf_path: Path, max_pages: int | None = None) -> dict[str, str]:

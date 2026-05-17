@@ -23,6 +23,7 @@ from common import (
     enrich_metadata,
     match_section_heading,
     normalize_pdf_text_artifacts,
+    pdf_coverage_summary,
     resolve_reference,
     resolve_domain_subdir,
     resolve_note_output_mode,
@@ -158,6 +159,28 @@ def test_extract_pdf_sections_supports_chinese_headings(tmp_path: Path, monkeypa
     assert sections["method"] == "我们构建了一个分阶段处理管线。"
     assert sections["experiment"] == "该方法在三个数据集上提升明显。"
     assert "conclusion" not in sections
+
+
+def test_pdf_coverage_reports_page_limit_and_late_appendix(tmp_path: Path, monkeypatch) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    pages = [f"Page {index}" for index in range(1, 26)]
+    pages[9] = "References\n[1] Ignored reference."
+    pages[19] = "Appendix\nAdditional experiments."
+    fake_doc = FakePdfDoc(metadata={}, pages=pages)
+    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+
+    coverage = pdf_coverage_summary(pdf_path, max_pages=18)
+
+    assert coverage["total_pages"] == 25
+    assert coverage["text_max_pages"] == 18
+    assert coverage["text_pages_scanned"] == 18
+    assert coverage["truncated_due_to_page_limit"] is True
+    assert coverage["references_start_page"] == 10
+    assert coverage["appendix_detected"] is True
+    assert coverage["appendix_start_page"] == 20
+    assert coverage["section_stop_reason"] == "references"
+    assert coverage["section_stop_page"] == 10
 
 
 def test_extract_local_pdf_hints_prefers_pdf_metadata_title_and_doi(tmp_path: Path, monkeypatch) -> None:

@@ -22,6 +22,7 @@ from common import (
     normalize_whitespace,
     paper_id_for_record,
     pick_sentences_by_keywords,
+    pdf_coverage_summary,
     resolve_reference,
     split_sentences,
 )
@@ -368,18 +369,27 @@ def evidence_quality(pack: dict) -> str:
 def main() -> None:
     args = parser().parse_args()
     record = ensure_record(args.input)
-    pdf_path = Path(str(record.get("pdf_path", "")).strip()).expanduser()
+    pdf_value = str(record.get("pdf_path", "")).strip()
+    pdf_path = Path(pdf_value).expanduser() if pdf_value else None
 
-    if not pdf_path.exists():
+    if pdf_path is None or not pdf_path.is_file():
         from_fetch = maybe_load_json_record(args.input) or {}
         pdf_candidate = str(from_fetch.get("pdf_path", "")).strip()
         if pdf_candidate:
-            pdf_path = Path(pdf_candidate).expanduser()
+            candidate_path = Path(pdf_candidate).expanduser()
+            if candidate_path.is_file():
+                pdf_path = candidate_path
 
     section_map: dict[str, str] = {}
     full_text = ""
     extraction_failures: list[str] = []
-    if pdf_path.exists():
+    has_pdf = pdf_path is not None and pdf_path.is_file()
+    pdf_coverage = (
+        pdf_coverage_summary(pdf_path.resolve(), max_pages=args.max_pages)
+        if has_pdf
+        else pdf_coverage_summary(Path(""), max_pages=args.max_pages)
+    )
+    if has_pdf:
         try:
             section_map = extract_pdf_sections(pdf_path.resolve(), max_pages=args.max_pages)
             full_text = extract_pdf_text(pdf_path.resolve(), max_pages=args.max_pages)
@@ -506,6 +516,7 @@ def main() -> None:
     )
     pack["section_sources"] = section_sources
     pack["section_extraction_coverage"] = section_extraction_coverage
+    pack["pdf_coverage"] = pdf_coverage
     pack["section_texts"] = {
         key: normalize_whitespace(value)
         for key, value in section_map.items()
@@ -539,7 +550,8 @@ def main() -> None:
             "language_hint": pack["language_hint"],
             "section_coverage_status": section_extraction_coverage["coverage_status"],
             "fallback_sections": section_extraction_coverage["fallback_sections"],
-            "pdf_used": bool(pdf_path.exists()),
+            "pdf_coverage": pdf_coverage,
+            "pdf_used": has_pdf,
             "candidate_chunk_sections": sorted([key for key, value in candidates.items() if value]),
         },
     }

@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 from common import maybe_load_json_record, normalize_whitespace
+
+
+SECTION_TEXT_LIMIT_SECTIONS = 8
+SECTION_TEXT_MAX_CHARS = 4000
 
 
 def parser() -> argparse.ArgumentParser:
@@ -108,7 +111,12 @@ def sanitize_candidate_chunks(evidence_pack: dict, *, limit_sections: int = 8, l
     return sanitized
 
 
-def sanitize_section_texts(evidence_pack: dict, *, limit_sections: int = 8, max_chars: int = 4000) -> dict[str, str]:
+def sanitize_section_texts(
+    evidence_pack: dict,
+    *,
+    limit_sections: int = SECTION_TEXT_LIMIT_SECTIONS,
+    max_chars: int = SECTION_TEXT_MAX_CHARS,
+) -> dict[str, str]:
     sanitized: dict[str, str] = {}
     section_texts = evidence_pack.get("section_texts", {}) or {}
     if not isinstance(section_texts, dict):
@@ -121,10 +129,43 @@ def sanitize_section_texts(evidence_pack: dict, *, limit_sections: int = 8, max_
     return sanitized
 
 
+def bundle_text_budget(
+    evidence_pack: dict,
+    *,
+    limit_sections: int = SECTION_TEXT_LIMIT_SECTIONS,
+    max_chars: int = SECTION_TEXT_MAX_CHARS,
+) -> dict:
+    section_texts = evidence_pack.get("section_texts", {}) or {}
+    budget = {
+        "section_text_max_chars": max_chars,
+        "section_text_limit_sections": limit_sections,
+        "section_text_original_chars": {},
+        "section_text_included_chars": {},
+        "section_text_truncated_sections": [],
+    }
+    if not isinstance(section_texts, dict):
+        return budget
+
+    for section_name, text in list(section_texts.items())[:limit_sections]:
+        section_key = normalize_whitespace(str(section_name))
+        cleaned = normalize_whitespace(str(text))
+        if not section_key or not cleaned:
+            continue
+        original_chars = len(cleaned)
+        included_chars = min(original_chars, max_chars)
+        budget["section_text_original_chars"][section_key] = original_chars
+        budget["section_text_included_chars"][section_key] = included_chars
+        if original_chars > included_chars:
+            budget["section_text_truncated_sections"].append(section_key)
+    return budget
+
+
 def coverage_summary(evidence_pack: dict) -> dict:
     return {
         "language_hint": evidence_pack.get("language_hint", "unknown"),
         "section_extraction_coverage": evidence_pack.get("section_extraction_coverage", {}) or {},
+        "pdf_coverage": evidence_pack.get("pdf_coverage", {}) or {},
+        "bundle_text_budget": bundle_text_budget(evidence_pack),
         "extraction_failures": evidence_pack.get("extraction_failures", []) or [],
     }
 
@@ -331,7 +372,18 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             ],
             "self_review_rules": [
                 "在生成最终 Markdown 前，先自查这篇笔记是否包含关键数字、关键比较、必要时的公式或复杂度表达式",
-                "必须先查看 bundle.coverage；当 coverage 为 poor 或 partial 时，不要把 abstract fallback 当作全文证据来写深度判断",
+                (
+                    "必须先查看 bundle.coverage：当 section coverage 为 poor 或 partial 时，"
+                    "不要把 abstract fallback 当作全文证据来写深度判断"
+                ),
+                (
+                    "如果 bundle.coverage.pdf_coverage 显示 PDF 页数被 max_pages 截断，"
+                    "或存在未覆盖的 appendix/supplementary material，不要声称完成了全文级精读"
+                ),
+                (
+                    "如果 bundle.coverage.bundle_text_budget 显示某些 section_texts 被截断，"
+                    "不要把截断后的片段当作完整 section 证据"
+                ),
                 "如果方法论文里没有训练目标、推理流程、关键维度、复杂度或核心机制解释，说明写得太浅，需要重写相关小节",
                 "如果这是 method/system/framework 类型论文，检查 `方法主线` 下是否显式包含 `### 机制流程`，并且该小节是 3 到 4 步的编号列表，而不是一段泛化散文",
                 "如果 bundle 中存在 ablation_evidence，最终笔记必须至少写出一项次优、失败或不稳定设定；如果不存在，也要明确说明论文未充分报告这类负面经验",

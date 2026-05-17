@@ -116,7 +116,7 @@ For a normal single-paper note request, the pipeline below is a required executi
 7. `build_synthesis_bundle`
    Assemble a model-facing bundle from metadata, evidence, coverage, section previews, figure plan, and PDF assets.
    This is the main handoff point from scripts to the language model.
-   The model must inspect `coverage` before treating section evidence as reliable; weak coverage means abstract fallback must not be treated as full-paper evidence.
+   The model must inspect `coverage` before treating section evidence as reliable; weak section coverage, PDF page truncation, appendix detection, or bundle text truncation means the model must not present partial evidence as full-paper evidence.
    Completion condition:
    - the synthesis bundle exists and is the actual model handoff input
    Allowed on failure:
@@ -262,6 +262,7 @@ Suggested keys:
 - `language_hint`
 - `section_sources`
 - `section_extraction_coverage`
+- `pdf_coverage`
 - `figure_captions`
 - `table_captions`
 - `sections`
@@ -294,6 +295,8 @@ Suggested keys:
 - `pdf_assets`
 - `summary`
 - `writing_contract`
+
+`coverage` should include section extraction coverage, PDF page coverage, extraction failures, and bundle text budget metadata.
 
 ### `note_plan`
 
