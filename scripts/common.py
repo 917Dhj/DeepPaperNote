@@ -1021,27 +1021,120 @@ def clean_pdf_line(line: str) -> str:
         return ""
     if re.fullmatch(r"page \d+", line.lower()):
         return ""
-    if len(line) <= 2:
+    if len(line) <= 2 and not re.search(r"[\u3400-\u9fff]", line):
         return ""
     return line
 
 
 def normalize_heading(line: str) -> str:
-    line = line.strip().lower()
-    line = re.sub(r"^\d+(\.\d+)*\s*", "", line)
-    line = re.sub(r"[^a-z\s]", "", line)
+    line = normalize_pdf_text_artifacts(line or "").strip().lower()
+    line = re.sub(r"^\s*(?:section\s*)?\d+(\.\d+)*[\s.、．:：-]*", "", line)
+    line = re.sub(r"^\s*[一二三四五六七八九十百千]+[、．.:\s-]*", "", line)
+    line = re.sub(r"^\s*[ivxlcdm]+[.)\s]+", "", line)
+    line = re.sub(r"[^a-z0-9\u3400-\u9fff\s]", " ", line)
+    line = re.sub(r"(?<=[\u3400-\u9fff])\s+(?=[\u3400-\u9fff])", "", line)
     return re.sub(r"\s+", " ", line).strip()
 
 
 SECTION_ALIASES = {
-    "abstract": {"abstract"},
-    "introduction": {"introduction", "background", "preliminaries", "preliminary"},
-    "method": {"method", "methods", "approach", "approaches", "methodology", "framework", "model", "models"},
-    "experiment": {"experiment", "experiments", "evaluation", "evaluations", "results", "analysis", "ablations", "ablation"},
-    "conclusion": {"conclusion", "conclusions", "discussion", "discussions", "future work", "limitations"},
+    "abstract": {"abstract", "摘要"},
+    "introduction": {
+        "introduction",
+        "background",
+        "preliminaries",
+        "preliminary",
+        "related work",
+        "literature review",
+        "引言",
+        "绪论",
+        "背景",
+        "相关工作",
+        "文献综述",
+    },
+    "method": {
+        "method",
+        "methods",
+        "approach",
+        "approaches",
+        "methodology",
+        "framework",
+        "model",
+        "models",
+        "materials",
+        "materials and methods",
+        "study design",
+        "方法",
+        "方法学",
+        "研究方法",
+        "材料与方法",
+        "实验方法",
+        "研究设计",
+        "模型",
+        "框架",
+        "系统设计",
+    },
+    "data": {
+        "data",
+        "dataset",
+        "datasets",
+        "corpus",
+        "data and materials",
+        "数据",
+        "数据集",
+        "语料库",
+    },
+    "experiment": {
+        "experiment",
+        "experiments",
+        "evaluation",
+        "evaluations",
+        "results",
+        "experimental results",
+        "evaluation results",
+        "analysis",
+        "findings",
+        "ablations",
+        "ablation",
+        "实验",
+        "实验结果",
+        "结果",
+        "研究结果",
+        "评价",
+        "评估",
+        "分析",
+        "发现",
+        "消融",
+    },
+    "conclusion": {
+        "conclusion",
+        "conclusions",
+        "discussion",
+        "discussions",
+        "future work",
+        "limitations",
+        "limitation",
+        "结论",
+        "总结",
+        "讨论",
+        "局限",
+        "不足",
+        "未来工作",
+    },
 }
 
-STOP_SECTION_ALIASES = {"references", "appendix", "appendices", "acknowledgments", "acknowledgements"}
+STOP_SECTION_ALIASES = {
+    "references",
+    "bibliography",
+    "appendix",
+    "appendices",
+    "supplementary material",
+    "acknowledgments",
+    "acknowledgements",
+    "参考文献",
+    "附录",
+    "补充材料",
+    "致谢",
+}
 
 
 def match_section_heading(line: str) -> str | None:
@@ -1193,21 +1286,38 @@ def choose_local_pdf_corrected_title(base: dict[str, Any], candidates: list[dict
     return candidate_title
 
 
+def normalize_caption_label(label: str) -> str:
+    label = normalize_whitespace(label)
+    chinese_match = re.match(r"^(图|表)\s*(\d+[a-z]?)$", label, re.IGNORECASE)
+    if chinese_match:
+        return f"{chinese_match.group(1)} {chinese_match.group(2)}"
+    english_match = re.match(r"^(fig(?:ure)?|table)\.?\s*(\d+[a-z]?)$", label, re.IGNORECASE)
+    if english_match:
+        return f"{english_match.group(1)} {english_match.group(2)}"
+    return label
+
+
 def extract_caption_lines(pdf_text: str, kind: str) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []
     seen = set()
     lines = [clean_pdf_line(line) for line in pdf_text.splitlines()]
     if kind == "figure":
-        pattern = re.compile(r"^(fig(?:ure)?\.?\s*\d+[a-z]?)[:.\s-]*(.*)$", re.IGNORECASE)
+        pattern = re.compile(
+            r"^((?:fig(?:ure)?|图)\.?\s*\d+[a-z]?)[:：.。,\s、|—–-]*(.*)$",
+            re.IGNORECASE,
+        )
     else:
-        pattern = re.compile(r"^(table\.?\s*\d+[a-z]?)[:.\s-]*(.*)$", re.IGNORECASE)
+        pattern = re.compile(
+            r"^((?:table|表)\.?\s*\d+[a-z]?)[:：.。,\s、|—–-]*(.*)$",
+            re.IGNORECASE,
+        )
     for idx, line in enumerate(lines):
         if not line:
             continue
         match = pattern.match(line)
         if not match:
             continue
-        label = normalize_whitespace(match.group(1))
+        label = normalize_caption_label(match.group(1))
         caption = normalize_whitespace(match.group(2))
         if not caption and idx + 1 < len(lines):
             caption = normalize_whitespace(lines[idx + 1])

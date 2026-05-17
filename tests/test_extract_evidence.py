@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from build_synthesis_bundle import bundle
+from extract_evidence import evidence_quality
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -43,6 +44,98 @@ def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
     assert payload["summary"]["ablation_signals"]
     assert payload["summary"]["mechanism_signals"]
     assert payload["summary"]["paper_type"] == "AI_method"
+
+
+def test_evidence_quality_caps_abstract_fallback_chunks_at_low() -> None:
+    pack = {
+        "candidate_chunks": {
+            "introduction": [
+                {
+                    "text": "Abstract fallback.",
+                    "actual_source_section": "abstract",
+                    "is_abstract_fallback": True,
+                }
+            ],
+            "method": [
+                {
+                    "text": "Abstract fallback.",
+                    "actual_source_section": "abstract",
+                    "is_abstract_fallback": True,
+                }
+            ],
+            "experiment": [
+                {
+                    "text": "Abstract fallback.",
+                    "actual_source_section": "abstract",
+                    "is_abstract_fallback": True,
+                }
+            ],
+        },
+        "equation_candidates": [{"equation": "x = y"}],
+        "figure_captions": [{"id": "Figure 1", "caption": "Overview"}],
+        "table_captions": [{"id": "Table 1", "caption": "Results"}],
+        "section_extraction_coverage": {
+            "core_sections_found": [],
+            "fallback_sections": ["introduction", "method", "experiment", "conclusion"],
+            "coverage_status": "poor",
+        },
+    }
+
+    assert evidence_quality(pack) == "low"
+
+
+def test_evidence_quality_allows_real_core_sections_to_reach_high() -> None:
+    pack = {
+        "candidate_chunks": {
+            "introduction": [{"text": "Problem context.", "actual_source_section": "introduction"}],
+            "method": [{"text": "Method details.", "actual_source_section": "method"}],
+            "experiment": [{"text": "Result details.", "actual_source_section": "experiment"}],
+        },
+        "equation_candidates": [{"equation": "x = y"}],
+        "figure_captions": [{"id": "Figure 1", "caption": "Overview"}],
+        "table_captions": [{"id": "Table 1", "caption": "Results"}],
+        "section_extraction_coverage": {
+            "core_sections_found": ["introduction", "method", "experiment"],
+            "fallback_sections": [],
+            "coverage_status": "good",
+        },
+    }
+
+    assert evidence_quality(pack) == "high"
+
+
+def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
+    synthesis = bundle(
+        metadata={"title": "Coverage Paper"},
+        evidence_wrapper={
+            "evidence_pack": {
+                "evidence_quality": "low",
+                "language_hint": "zh",
+                "section_extraction_coverage": {
+                    "coverage_status": "poor",
+                    "core_sections_found": [],
+                    "missing_core_sections": ["introduction", "method", "experiment"],
+                    "fallback_sections": ["introduction", "method", "experiment", "conclusion"],
+                },
+                "extraction_failures": ["section_coverage_poor"],
+            }
+        },
+        figures_wrapper={},
+        assets_wrapper={},
+    )
+
+    assert synthesis["evidence_quality"] == "low"
+    assert synthesis["coverage"] == {
+        "language_hint": "zh",
+        "section_extraction_coverage": {
+            "coverage_status": "poor",
+            "core_sections_found": [],
+            "missing_core_sections": ["introduction", "method", "experiment"],
+            "fallback_sections": ["introduction", "method", "experiment", "conclusion"],
+        },
+        "extraction_failures": ["section_coverage_poor"],
+    }
+    assert any("coverage" in rule for rule in synthesis["writing_contract"]["self_review_rules"])
 
 
 def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:

@@ -97,6 +97,12 @@ def sanitize_candidate_chunks(evidence_pack: dict, *, limit_sections: int = 8, l
                     "kind_hint": normalize_whitespace(str(item.get("kind_hint", ""))),
                 }
             )
+            if item.get("actual_source_section"):
+                kept[-1]["actual_source_section"] = normalize_whitespace(
+                    str(item.get("actual_source_section", ""))
+                )
+            if item.get("is_abstract_fallback"):
+                kept[-1]["is_abstract_fallback"] = True
         if kept:
             sanitized[normalize_whitespace(str(section_name))] = kept
     return sanitized
@@ -113,6 +119,14 @@ def sanitize_section_texts(evidence_pack: dict, *, limit_sections: int = 8, max_
             continue
         sanitized[normalize_whitespace(str(section_name))] = cleaned[:max_chars]
     return sanitized
+
+
+def coverage_summary(evidence_pack: dict) -> dict:
+    return {
+        "language_hint": evidence_pack.get("language_hint", "unknown"),
+        "section_extraction_coverage": evidence_pack.get("section_extraction_coverage", {}) or {},
+        "extraction_failures": evidence_pack.get("extraction_failures", []) or [],
+    }
 
 
 def sanitize_page_assets(assets_wrapper: dict, *, limit: int = 24) -> list[dict]:
@@ -180,6 +194,7 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             "metadata_sources": metadata.get("metadata_sources", []),
         },
         "evidence_quality": evidence_pack.get("evidence_quality", "unknown"),
+        "coverage": coverage_summary(evidence_pack),
         "evidence": {
             "problem": top_items(evidence_pack, "problem_evidence"),
             "task": top_items(evidence_pack, "task_evidence"),
@@ -316,6 +331,7 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             ],
             "self_review_rules": [
                 "在生成最终 Markdown 前，先自查这篇笔记是否包含关键数字、关键比较、必要时的公式或复杂度表达式",
+                "必须先查看 bundle.coverage；当 coverage 为 poor 或 partial 时，不要把 abstract fallback 当作全文证据来写深度判断",
                 "如果方法论文里没有训练目标、推理流程、关键维度、复杂度或核心机制解释，说明写得太浅，需要重写相关小节",
                 "如果这是 method/system/framework 类型论文，检查 `方法主线` 下是否显式包含 `### 机制流程`，并且该小节是 3 到 4 步的编号列表，而不是一段泛化散文",
                 "如果 bundle 中存在 ablation_evidence，最终笔记必须至少写出一项次优、失败或不稳定设定；如果不存在，也要明确说明论文未充分报告这类负面经验",

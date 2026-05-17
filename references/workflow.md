@@ -114,8 +114,9 @@ For a normal single-paper note request, the pipeline below is a required executi
    - do not skip this stage just because image matching is slow or imperfect
 
 7. `build_synthesis_bundle`
-   Assemble a model-facing bundle from metadata, evidence, section previews, figure plan, and PDF assets.
+   Assemble a model-facing bundle from metadata, evidence, coverage, section previews, figure plan, and PDF assets.
    This is the main handoff point from scripts to the language model.
+   The model must inspect `coverage` before treating section evidence as reliable; weak coverage means abstract fallback must not be treated as full-paper evidence.
    Completion condition:
    - the synthesis bundle exists and is the actual model handoff input
    Allowed on failure:
@@ -258,6 +259,9 @@ Suggested keys:
 - `limitations_evidence`
 - `section_texts`
 - `candidate_chunks`
+- `language_hint`
+- `section_sources`
+- `section_extraction_coverage`
 - `figure_captions`
 - `table_captions`
 - `sections`
@@ -283,6 +287,7 @@ See `scripts/contracts.py` for the corresponding scaffolded JSON contract defini
 
 Suggested keys:
 - `metadata`
+- `coverage`
 - `evidence`
 - `section_previews`
 - `figure_plan`

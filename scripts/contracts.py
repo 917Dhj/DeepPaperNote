@@ -35,6 +35,8 @@ class EvidenceItem(TypedDict, total=False):
 class CandidateChunk(TypedDict, total=False):
     text: str
     source_section: str
+    actual_source_section: str
+    is_abstract_fallback: bool
     page_hint: str
     kind_hint: str
 
@@ -68,6 +70,15 @@ class FigureAssetCandidate(TypedDict, total=False):
     candidate_status: str
 
 
+class SectionExtractionCoverage(TypedDict, total=False):
+    coverage_status: str
+    recognized_sections: list[str]
+    core_sections_found: list[str]
+    missing_core_sections: list[str]
+    section_text_chars: dict[str, int]
+    fallback_sections: list[str]
+
+
 class EvidencePack(TypedDict, total=False):
     paper_id: str
     problem_evidence: list[EvidenceItem]
@@ -84,6 +95,9 @@ class EvidencePack(TypedDict, total=False):
     sections: list[dict[str, Any]]
     section_texts: dict[str, str]
     candidate_chunks: dict[str, list[CandidateChunk]]
+    language_hint: str
+    section_sources: dict[str, str]
+    section_extraction_coverage: SectionExtractionCoverage
     quotes: list[dict[str, Any]]
     evidence_quality: str
     extraction_failures: list[str]
@@ -114,6 +128,7 @@ class SynthesisBundle(TypedDict, total=False):
     title: str
     metadata: dict[str, Any]
     evidence_quality: str
+    coverage: dict[str, Any]
     evidence: dict[str, list[dict[str, Any]]]
     section_previews: list[dict[str, Any]]
     figure_plan: dict[str, Any]
@@ -152,6 +167,9 @@ def empty_evidence_pack() -> EvidencePack:
         sections=[],
         section_texts={},
         candidate_chunks={},
+        language_hint="unknown",
+        section_sources={},
+        section_extraction_coverage={},
         quotes=[],
         extraction_failures=[],
         evidence_quality="unknown",
@@ -168,6 +186,7 @@ def empty_synthesis_bundle() -> SynthesisBundle:
         title="",
         metadata={},
         evidence_quality="unknown",
+        coverage={},
         evidence={},
         section_previews=[],
         figure_plan={},

@@ -28,6 +28,9 @@ from common import (
 from contracts import empty_evidence_pack
 
 
+CORE_SECTIONS = ("introduction", "method", "experiment")
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "extract evidence")
     p.add_argument("--input", required=True, help="Metadata JSON path, fetch_pdf JSON path, JSON string, or raw paper reference.")
@@ -62,11 +65,72 @@ def build_items(sentences: list[str], section: str) -> list[dict]:
     return items
 
 
+def language_hint_for_text(text: str) -> str:
+    cjk_chars = len(re.findall(r"[\u3400-\u9fff]", text or ""))
+    latin_chars = len(re.findall(r"[A-Za-z]", text or ""))
+    total = cjk_chars + latin_chars
+    if total == 0:
+        return "unknown"
+    cjk_ratio = cjk_chars / total
+    latin_ratio = latin_chars / total
+    if cjk_ratio >= 0.6:
+        return "zh"
+    if latin_ratio >= 0.6:
+        return "en"
+    return "mixed"
+
+
+def section_text_with_source(
+    section_map: dict[str, str],
+    section: str,
+    fallback: str = "",
+) -> tuple[str, str]:
+    text = section_map.get(section, "")
+    if text:
+        return text, section
+    if fallback:
+        return fallback, "abstract"
+    return "", ""
+
+
+def build_section_extraction_coverage(
+    section_map: dict[str, str],
+    section_sources: dict[str, str],
+) -> dict:
+    core_sections_found = [section for section in CORE_SECTIONS if section_map.get(section)]
+    missing_core_sections = [section for section in CORE_SECTIONS if section not in core_sections_found]
+    fallback_sections = [
+        section
+        for section, source in section_sources.items()
+        if section != "abstract" and source == "abstract"
+    ]
+    if len(core_sections_found) >= len(CORE_SECTIONS):
+        coverage_status = "good"
+    elif core_sections_found:
+        coverage_status = "partial"
+    else:
+        coverage_status = "poor"
+    return {
+        "coverage_status": coverage_status,
+        "recognized_sections": list(section_map.keys()),
+        "core_sections_found": core_sections_found,
+        "missing_core_sections": missing_core_sections,
+        "section_text_chars": {
+            section: len(normalize_whitespace(text))
+            for section, text in section_map.items()
+            if normalize_whitespace(text)
+        },
+        "fallback_sections": fallback_sections,
+    }
+
+
 def text_chunks(
     text: str,
     *,
     section: str,
     kind_hint: str = "",
+    actual_source_section: str = "",
+    is_abstract_fallback: bool = False,
     max_chunks: int = 12,
     sentences_per_chunk: int = 2,
     max_chars: int = 520,
@@ -87,14 +151,16 @@ def text_chunks(
         if marker in seen:
             continue
         seen.add(marker)
-        chunks.append(
-            {
-                "text": chunk,
-                "source_section": section,
-                "page_hint": "",
-                "kind_hint": kind_hint,
-            }
-        )
+        item = {
+            "text": chunk,
+            "source_section": section,
+            "page_hint": "",
+            "kind_hint": kind_hint,
+            "actual_source_section": actual_source_section or section,
+        }
+        if is_abstract_fallback:
+            item["is_abstract_fallback"] = True
+        chunks.append(item)
         if len(chunks) >= max_chunks:
             break
     return chunks
@@ -113,9 +179,21 @@ def first_chunks(chunks: list[dict], limit: int) -> list[dict]:
     ]
 
 
-def keyword_chunks(text: str, keywords: list[str], *, section: str, max_chunks: int = 6) -> list[dict]:
+def keyword_chunks(
+    text: str,
+    keywords: list[str],
+    *,
+    section: str,
+    max_chunks: int = 6,
+) -> list[dict]:
     picked = pick_sentences_by_keywords(text, keywords, limit=max_chunks)
-    return text_chunks(" ".join(picked), section=section, kind_hint=section, max_chunks=max_chunks, sentences_per_chunk=1)
+    return text_chunks(
+        " ".join(picked),
+        section=section,
+        kind_hint=section,
+        max_chunks=max_chunks,
+        sentences_per_chunk=1,
+    )
 
 
 def candidate_map(
@@ -126,17 +204,68 @@ def candidate_map(
     experiment_text: str,
     conclusion_text: str,
     data_text: str,
+    section_sources: dict[str, str],
     max_chunks_per_section: int,
 ) -> dict[str, list[dict]]:
-    combined_general = " ".join(part for part in [abstract, intro_text, method_text, experiment_text, conclusion_text] if part)
+    combined_general = " ".join(
+        part
+        for part in [abstract, intro_text, method_text, experiment_text, conclusion_text]
+        if part
+    )
     return {
-        "abstract": text_chunks(abstract, section="abstract", kind_hint="abstract", max_chunks=max_chunks_per_section),
-        "introduction": text_chunks(intro_text, section="introduction", kind_hint="problem", max_chunks=max_chunks_per_section),
-        "method": text_chunks(method_text, section="method", kind_hint="method", max_chunks=max_chunks_per_section),
-        "experiment": text_chunks(experiment_text, section="experiment", kind_hint="results", max_chunks=max_chunks_per_section),
-        "conclusion": text_chunks(conclusion_text, section="conclusion", kind_hint="limitations", max_chunks=max_chunks_per_section),
-        "data": text_chunks(data_text, section="data", kind_hint="data", max_chunks=max_chunks_per_section),
-        "general": text_chunks(combined_general, section="general", kind_hint="general", max_chunks=max_chunks_per_section),
+        "abstract": text_chunks(
+            abstract,
+            section="abstract",
+            kind_hint="abstract",
+            actual_source_section="abstract",
+            max_chunks=max_chunks_per_section,
+        ),
+        "introduction": text_chunks(
+            intro_text,
+            section="introduction",
+            kind_hint="problem",
+            actual_source_section=section_sources.get("introduction", "introduction"),
+            is_abstract_fallback=section_sources.get("introduction") == "abstract",
+            max_chunks=max_chunks_per_section,
+        ),
+        "method": text_chunks(
+            method_text,
+            section="method",
+            kind_hint="method",
+            actual_source_section=section_sources.get("method", "method"),
+            is_abstract_fallback=section_sources.get("method") == "abstract",
+            max_chunks=max_chunks_per_section,
+        ),
+        "experiment": text_chunks(
+            experiment_text,
+            section="experiment",
+            kind_hint="results",
+            actual_source_section=section_sources.get("experiment", "experiment"),
+            is_abstract_fallback=section_sources.get("experiment") == "abstract",
+            max_chunks=max_chunks_per_section,
+        ),
+        "conclusion": text_chunks(
+            conclusion_text,
+            section="conclusion",
+            kind_hint="limitations",
+            actual_source_section=section_sources.get("conclusion", "conclusion"),
+            is_abstract_fallback=section_sources.get("conclusion") == "abstract",
+            max_chunks=max_chunks_per_section,
+        ),
+        "data": text_chunks(
+            data_text,
+            section="data",
+            kind_hint="data",
+            actual_source_section=section_sources.get("data", "mixed"),
+            max_chunks=max_chunks_per_section,
+        ),
+        "general": text_chunks(
+            combined_general,
+            section="general",
+            kind_hint="general",
+            actual_source_section="mixed",
+            max_chunks=max_chunks_per_section,
+        ),
     }
 
 
@@ -204,19 +333,31 @@ def extract_equation_candidates(*, full_text: str, method_text: str, experiment_
 
 def evidence_quality(pack: dict) -> str:
     score = 0
+    core_score = 0
     candidate_chunks = pack.get("candidate_chunks", {}) or {}
-    if candidate_chunks.get("method"):
-        score += 1
-    if candidate_chunks.get("experiment"):
-        score += 1
-    if candidate_chunks.get("introduction"):
-        score += 1
+    coverage = pack.get("section_extraction_coverage", {}) or {}
+    core_sections_found = coverage.get("core_sections_found", []) if isinstance(coverage, dict) else []
+    if core_sections_found:
+        core_score = len([section for section in CORE_SECTIONS if section in core_sections_found])
+    else:
+        for section in CORE_SECTIONS:
+            chunks = candidate_chunks.get(section, []) or []
+            if any(
+                isinstance(chunk, dict)
+                and not chunk.get("is_abstract_fallback")
+                and chunk.get("actual_source_section", section) != "abstract"
+                for chunk in chunks
+            ):
+                core_score += 1
+    score += core_score
     if pack.get("equation_candidates"):
         score += 1
     if pack.get("figure_captions"):
         score += 1
     if pack.get("table_captions"):
         score += 1
+    if core_score == 0:
+        return "low"
     if score >= 6:
         return "high"
     if score >= 3:
@@ -249,11 +390,20 @@ def main() -> None:
 
     paper_type, paper_type_rationale = infer_paper_type(record.get("title", ""), record.get("abstract", ""))
 
-    abstract = normalize_whitespace(str(record.get("abstract", "")).strip())
-    intro_text = section_map.get("introduction", "") or abstract
-    method_text = section_map.get("method", "") or abstract
-    experiment_text = section_map.get("experiment", "") or section_map.get("conclusion", "") or abstract
-    conclusion_text = section_map.get("conclusion", "") or abstract
+    metadata_abstract = normalize_whitespace(str(record.get("abstract", "")).strip())
+    abstract = metadata_abstract or normalize_whitespace(section_map.get("abstract", ""))
+    intro_text, intro_source = section_text_with_source(section_map, "introduction", abstract)
+    method_text, method_source = section_text_with_source(section_map, "method", abstract)
+    if section_map.get("experiment"):
+        experiment_text = section_map["experiment"]
+        experiment_source = "experiment"
+    elif section_map.get("conclusion"):
+        experiment_text = section_map["conclusion"]
+        experiment_source = "conclusion"
+    else:
+        experiment_text = abstract
+        experiment_source = "abstract" if abstract else ""
+    conclusion_text, conclusion_source = section_text_with_source(section_map, "conclusion", abstract)
     figure_captions = extract_caption_lines(full_text, "figure")[:12] if full_text else []
     mechanism_caption_text = " ".join(
         item.get("caption", "")
@@ -267,10 +417,25 @@ def main() -> None:
             section_map.get("abstract", ""),
             section_map.get("introduction", ""),
             section_map.get("method", ""),
+            section_map.get("data", ""),
             section_map.get("experiment", ""),
         ]
         if part
     )
+    section_sources = {
+        "abstract": "abstract",
+        "introduction": intro_source,
+        "method": method_source,
+        "experiment": experiment_source,
+        "conclusion": conclusion_source,
+        "data": "data" if section_map.get("data") else "mixed",
+    }
+    section_extraction_coverage = build_section_extraction_coverage(section_map, section_sources)
+    if (
+        section_extraction_coverage["coverage_status"] == "poor"
+        and "section_coverage_poor" not in extraction_failures
+    ):
+        extraction_failures.append("section_coverage_poor")
 
     candidates = candidate_map(
         abstract=abstract,
@@ -279,6 +444,7 @@ def main() -> None:
         experiment_text=experiment_text,
         conclusion_text=conclusion_text,
         data_text=data_text,
+        section_sources=section_sources,
         max_chunks_per_section=args.max_chunks_per_section,
     )
 
@@ -335,6 +501,11 @@ def main() -> None:
         conclusion_text=conclusion_text,
     )
     pack["candidate_chunks"] = candidates
+    pack["language_hint"] = language_hint_for_text(
+        " ".join(part for part in [full_text, abstract] if part)
+    )
+    pack["section_sources"] = section_sources
+    pack["section_extraction_coverage"] = section_extraction_coverage
     pack["section_texts"] = {
         key: normalize_whitespace(value)
         for key, value in section_map.items()
@@ -365,6 +536,9 @@ def main() -> None:
             "ablation_signals": ablation_sentences[:6],
             "equation_candidates": pack["equation_candidates"][:6],
             "section_keys": list(section_map.keys()),
+            "language_hint": pack["language_hint"],
+            "section_coverage_status": section_extraction_coverage["coverage_status"],
+            "fallback_sections": section_extraction_coverage["fallback_sections"],
             "pdf_used": bool(pdf_path.exists()),
             "candidate_chunk_sections": sorted([key for key, value in candidates.items() if value]),
         },

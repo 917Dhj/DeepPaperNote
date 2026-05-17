@@ -9,6 +9,8 @@ from pathlib import Path
 from common import (
     clean_local_pdf_stem,
     extract_local_pdf_hints,
+    extract_caption_lines,
+    extract_pdf_sections,
     env_config_value,
     existing_domain_dirs,
     extract_arxiv_id,
@@ -19,6 +21,7 @@ from common import (
     infer_source_type,
     fetch_arxiv_entries,
     enrich_metadata,
+    match_section_heading,
     normalize_pdf_text_artifacts,
     resolve_reference,
     resolve_domain_subdir,
@@ -87,6 +90,74 @@ def test_clean_local_pdf_stem_removes_zotero_style_noise() -> None:
 
 def test_normalize_pdf_text_artifacts_expands_ligatures() -> None:
     assert normalize_pdf_text_artifacts("Efﬁcient ﬂow oﬀers aﬃne aﬄuent") == "Efficient flow offers affine affluent"
+
+
+def test_match_section_heading_supports_chinese_and_nonstandard_english_headings() -> None:
+    assert match_section_heading("一、摘要") == "abstract"
+    assert match_section_heading("2 材料与方法") == "method"
+    assert match_section_heading("3. 实验结果") == "experiment"
+    assert match_section_heading("4 结论") == "conclusion"
+    assert match_section_heading("参考文献") == "stop"
+    assert match_section_heading("Findings") == "experiment"
+    assert match_section_heading("Materials and Methods") == "method"
+    assert match_section_heading("Study Design") == "method"
+    assert match_section_heading("Data") == "data"
+
+
+def test_extract_caption_lines_supports_chinese_figure_and_table_labels() -> None:
+    text = "\n".join(
+        [
+            "图 1：总体框架。",
+            "图2 | 消融实验流程",
+            "表 1 实验结果",
+            "Table 2. English baseline",
+        ]
+    )
+
+    figure_captions = extract_caption_lines(text, "figure")
+    table_captions = extract_caption_lines(text, "table")
+
+    assert figure_captions[:2] == [
+        {"id": "图 1", "caption": "总体框架。"},
+        {"id": "图 2", "caption": "消融实验流程"},
+    ]
+    assert table_captions[:2] == [
+        {"id": "表 1", "caption": "实验结果"},
+        {"id": "Table 2", "caption": "English baseline"},
+    ]
+
+
+def test_extract_pdf_sections_supports_chinese_headings(tmp_path: Path, monkeypatch) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    fake_doc = FakePdfDoc(
+        metadata={},
+        pages=[
+            "\n".join(
+                [
+                    "摘要",
+                    "本文提出一个证据优先的阅读流程。",
+                    "1 引言",
+                    "现有方法容易过度总结。",
+                    "2 材料与方法",
+                    "我们构建了一个分阶段处理管线。",
+                    "3 实验结果",
+                    "该方法在三个数据集上提升明显。",
+                    "参考文献",
+                    "[1] Ignored reference.",
+                ]
+            )
+        ],
+    )
+    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+
+    sections = extract_pdf_sections(pdf_path)
+
+    assert sections["abstract"] == "本文提出一个证据优先的阅读流程。"
+    assert sections["introduction"] == "现有方法容易过度总结。"
+    assert sections["method"] == "我们构建了一个分阶段处理管线。"
+    assert sections["experiment"] == "该方法在三个数据集上提升明显。"
+    assert "conclusion" not in sections
 
 
 def test_extract_local_pdf_hints_prefers_pdf_metadata_title_and_doi(tmp_path: Path, monkeypatch) -> None:
