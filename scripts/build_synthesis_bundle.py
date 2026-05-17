@@ -166,7 +166,53 @@ def coverage_summary(evidence_pack: dict) -> dict:
         "section_extraction_coverage": evidence_pack.get("section_extraction_coverage", {}) or {},
         "pdf_coverage": evidence_pack.get("pdf_coverage", {}) or {},
         "bundle_text_budget": bundle_text_budget(evidence_pack),
+        "appendix_evidence_counts": appendix_evidence_counts(evidence_pack),
         "extraction_failures": evidence_pack.get("extraction_failures", []) or [],
+    }
+
+
+def appendix_evidence_counts(evidence_pack: dict) -> dict[str, int]:
+    appendix_evidence = evidence_pack.get("appendix_evidence", {}) or {}
+    if not isinstance(appendix_evidence, dict):
+        return {}
+    return {
+        normalize_whitespace(str(category)): len(items)
+        for category, items in appendix_evidence.items()
+        if isinstance(items, list)
+    }
+
+
+def sanitize_appendix_evidence(evidence_pack: dict, *, limit_per_category: int = 4) -> dict:
+    appendix_evidence = evidence_pack.get("appendix_evidence", {}) or {}
+    if not isinstance(appendix_evidence, dict):
+        return {}
+    sanitized: dict[str, list[dict]] = {}
+    for category, items in appendix_evidence.items():
+        if not isinstance(items, list):
+            continue
+        kept: list[dict] = []
+        for item in items[:limit_per_category]:
+            if not isinstance(item, dict):
+                continue
+            evidence = normalize_whitespace(str(item.get("evidence", "")))
+            if not evidence:
+                continue
+            kept.append(
+                {
+                    "evidence": evidence,
+                    "source_section": normalize_whitespace(str(item.get("source_section", ""))),
+                    "page_hint": normalize_whitespace(str(item.get("page_hint", ""))),
+                    "kind_hint": normalize_whitespace(str(item.get("kind_hint", ""))),
+                }
+            )
+        sanitized[normalize_whitespace(str(category))] = kept
+    return sanitized
+
+
+def appendix_summary(evidence_pack: dict) -> dict:
+    return {
+        "index": evidence_pack.get("appendix_index", {}) or {},
+        "evidence": sanitize_appendix_evidence(evidence_pack),
     }
 
 
@@ -246,6 +292,7 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             "ablation": top_items(evidence_pack, "ablation_evidence"),
             "limitations": top_items(evidence_pack, "limitations_evidence"),
         },
+        "appendix": appendix_summary(evidence_pack),
         "equation_candidates": sanitize_equation_candidates(evidence_pack),
         "candidate_chunks": sanitize_candidate_chunks(evidence_pack),
         "section_texts": sanitize_section_texts(evidence_pack),
@@ -318,7 +365,8 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             ],
             "planning_rules": [
                 "先基于证据做显式 note_plan，再写最终笔记",
-                "note_plan 应该是一个简短、结构化、可检查的工件，例如 `<note_plan>...</note_plan>` 或独立 planning file",
+                "note_plan 应优先保存为简短 JSON planning file，例如 `<note>.plan.json` 或 run-scoped `*_note_plan.json`",
+                "lint 最终笔记时应通过 `scripts/lint_note.py --plan-file ...` 传入该 planning file；交互场景可以额外展示 compact `<note_plan>...</note_plan>`",
                 "不要只依赖隐式的隐藏规划步骤，也不要输出冗长的自由思维链",
                 "`核心信息` 是固定字段的 metadata 区，不要擅自增删字段，也不要把解释性 prose 塞进这里",
                 "在章节骨架上，`创新点` 应该作为独立 `##` 章节放在 `原文摘要翻译` 之后、`一句话总结` 之前",
@@ -356,7 +404,9 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
                     "real_comparisons",
                     "section_plan",
                 ],
+                "artifact_preference": "short_json_planning_file",
                 "format_preference": "compact_structured_plan",
+                "lint_hint": "pass_to_lint_note_with_plan_file",
                 "forbidden_style": "verbose_freeform_chain_of_thought",
             },
             "formula_rules": [
@@ -383,6 +433,10 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
                 (
                     "如果 bundle.coverage.bundle_text_budget 显示某些 section_texts 被截断，"
                     "不要把截断后的片段当作完整 section 证据"
+                ),
+                (
+                    "appendix evidence 只能用于补强复现细节、额外实验、局限或图表语义；"
+                    "不要用它替代主文方法主线，也不要声称已完整覆盖所有补充材料"
                 ),
                 "如果方法论文里没有训练目标、推理流程、关键维度、复杂度或核心机制解释，说明写得太浅，需要重写相关小节",
                 "如果这是 method/system/framework 类型论文，检查 `方法主线` 下是否显式包含 `### 机制流程`，并且该小节是 3 到 4 步的编号列表，而不是一段泛化散文",

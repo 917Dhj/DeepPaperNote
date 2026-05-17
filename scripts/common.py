@@ -1231,6 +1231,97 @@ def pdf_coverage_summary(pdf_path: Path, max_pages: int | None = None) -> dict[s
     return summary
 
 
+def extract_appendix_page_texts(
+    pdf_path: Path,
+    appendix_start_page: int | None,
+) -> list[dict[str, Any]]:
+    if fitz is None or not pdf_path.is_file() or not appendix_start_page:
+        return []
+
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception:
+        return []
+
+    pages: list[dict[str, Any]] = []
+    try:
+        start_index = max(int(appendix_start_page) - 1, 0)
+        for page_index in range(start_index, len(doc)):
+            text = doc[page_index].get_text("text")
+            cleaned = normalize_whitespace(text)
+            if cleaned:
+                pages.append({"page": page_index + 1, "text": text})
+    finally:
+        doc.close()
+    return pages
+
+
+def appendix_section_title(line: str) -> str:
+    cleaned = clean_pdf_line(line)
+    if not cleaned:
+        return ""
+    lower = cleaned.lower()
+    if lower in {"appendix", "appendices", "supplementary material"}:
+        return ""
+    if re.match(r"^fig(?:ure)?\.?\s*\d+", cleaned, re.IGNORECASE):
+        return ""
+    if re.match(r"^table\.?\s*\d+", cleaned, re.IGNORECASE):
+        return ""
+    if len(cleaned) > 120:
+        return ""
+    if re.match(r"^(?:appendix\s+)?[A-Z]\.?\s+.{3,}$", cleaned, re.IGNORECASE):
+        return cleaned
+    return ""
+
+
+def extract_appendix_index(
+    pdf_path: Path,
+    pdf_coverage: dict[str, Any] | None = None,
+    *,
+    max_sections: int = 20,
+    max_captions: int = 24,
+) -> dict[str, Any]:
+    pdf_coverage = pdf_coverage or {}
+    start_page = pdf_coverage.get("appendix_start_page")
+    index: dict[str, Any] = {
+        "appendix_detected": bool(pdf_coverage.get("appendix_detected")),
+        "start_page": start_page,
+        "sections": [],
+        "figure_captions": [],
+        "table_captions": [],
+    }
+    if not index["appendix_detected"] or not start_page:
+        return index
+
+    seen_sections = set()
+    seen_figure_captions = set()
+    seen_table_captions = set()
+    for page in extract_appendix_page_texts(pdf_path, int(start_page)):
+        page_number = int(page.get("page", 0) or 0)
+        text = str(page.get("text", ""))
+        for raw_line in text.splitlines():
+            title = appendix_section_title(raw_line)
+            marker = normalize_title(title)
+            if title and marker not in seen_sections and len(index["sections"]) < max_sections:
+                seen_sections.add(marker)
+                index["sections"].append({"title": title, "page": page_number})
+
+        for caption in extract_caption_lines(text, "figure"):
+            marker = f"{caption.get('id', '').lower()}::{caption.get('caption', '').lower()}"
+            if marker in seen_figure_captions or len(index["figure_captions"]) >= max_captions:
+                continue
+            seen_figure_captions.add(marker)
+            index["figure_captions"].append({**caption, "page_hint": f"p.{page_number}"})
+
+        for caption in extract_caption_lines(text, "table"):
+            marker = f"{caption.get('id', '').lower()}::{caption.get('caption', '').lower()}"
+            if marker in seen_table_captions or len(index["table_captions"]) >= max_captions:
+                continue
+            seen_table_captions.add(marker)
+            index["table_captions"].append({**caption, "page_hint": f"p.{page_number}"})
+    return index
+
+
 def extract_pdf_sections(pdf_path: Path, max_pages: int | None = None) -> dict[str, str]:
     if fitz is None:
         return {}
@@ -1370,10 +1461,14 @@ def choose_local_pdf_corrected_title(base: dict[str, Any], candidates: list[dict
 
 def normalize_caption_label(label: str) -> str:
     label = normalize_whitespace(label)
-    chinese_match = re.match(r"^(图|表)\s*(\d+[a-z]?)$", label, re.IGNORECASE)
+    chinese_match = re.match(r"^(图|表)\s*([A-Z]?\d+[a-z]?)$", label, re.IGNORECASE)
     if chinese_match:
         return f"{chinese_match.group(1)} {chinese_match.group(2)}"
-    english_match = re.match(r"^(fig(?:ure)?|table)\.?\s*(\d+[a-z]?)$", label, re.IGNORECASE)
+    english_match = re.match(
+        r"^(fig(?:ure)?|table)\.?\s*([A-Z]?\d+[a-z]?)$",
+        label,
+        re.IGNORECASE,
+    )
     if english_match:
         return f"{english_match.group(1)} {english_match.group(2)}"
     return label
@@ -1385,12 +1480,12 @@ def extract_caption_lines(pdf_text: str, kind: str) -> list[dict[str, str]]:
     lines = [clean_pdf_line(line) for line in pdf_text.splitlines()]
     if kind == "figure":
         pattern = re.compile(
-            r"^((?:fig(?:ure)?|图)\.?\s*\d+[a-z]?)[:：.。,\s、|—–-]*(.*)$",
+            r"^((?:fig(?:ure)?|图)\.?\s*[A-Z]?\d+[a-z]?)[:：.。,\s、|—–-]*(.*)$",
             re.IGNORECASE,
         )
     else:
         pattern = re.compile(
-            r"^((?:table|表)\.?\s*\d+[a-z]?)[:：.。,\s、|—–-]*(.*)$",
+            r"^((?:table|表)\.?\s*[A-Z]?\d+[a-z]?)[:：.。,\s、|—–-]*(.*)$",
             re.IGNORECASE,
         )
     for idx, line in enumerate(lines):

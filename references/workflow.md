@@ -117,6 +117,7 @@ For a normal single-paper note request, the pipeline below is a required executi
    Assemble a model-facing bundle from metadata, evidence, coverage, section previews, figure plan, and PDF assets.
    This is the main handoff point from scripts to the language model.
    The model must inspect `coverage` before treating section evidence as reliable; weak section coverage, PDF page truncation, appendix detection, or bundle text truncation means the model must not present partial evidence as full-paper evidence.
+   Appendix evidence is a supplemental layer for extra experiments, implementation details, dataset details, qualitative examples, and figure/table context; it must not redefine the main-text evidence backbone.
    Completion condition:
    - the synthesis bundle exists and is the actual model handoff input
    Allowed on failure:
@@ -131,13 +132,14 @@ For a normal single-paper note request, the pipeline below is a required executi
    - select the most important numbers, comparisons, and figure/table placeholders
    - add paper-specific subsections when the evidence supports them
    Recommended form:
-   - a compact `<note_plan>...</note_plan>` block
-   - or a temporary planning file saved before the final note
+   - a short JSON planning file such as `<note>.plan.json` or a run-scoped `*_note_plan.json`
+   - pass that file to `scripts/lint_note.py --plan-file ...` when linting the final note
+   - in interactive contexts, you may also show a compact `<note_plan>...</note_plan>` block, but keep the JSON file as the checkable artifact
    Do not rely only on an implicit hidden-planning step.
    Completion condition:
-   - an explicit `note_plan` artifact exists
+   - an explicit `note_plan` JSON artifact exists
    Allowed on failure:
-   - revise planning until a short inspectable plan exists
+   - revise planning until a short inspectable plan file exists
    - do not jump straight to prose and claim planning was basically done
 
 9. model synthesis
@@ -263,6 +265,8 @@ Suggested keys:
 - `section_sources`
 - `section_extraction_coverage`
 - `pdf_coverage`
+- `appendix_index`
+- `appendix_evidence`
 - `figure_captions`
 - `table_captions`
 - `sections`
@@ -290,15 +294,19 @@ Suggested keys:
 - `metadata`
 - `coverage`
 - `evidence`
+- `appendix`
 - `section_previews`
 - `figure_plan`
 - `pdf_assets`
 - `summary`
 - `writing_contract`
 
-`coverage` should include section extraction coverage, PDF page coverage, extraction failures, and bundle text budget metadata.
+`coverage` should include section extraction coverage, PDF page coverage, appendix evidence counts, extraction failures, and bundle text budget metadata.
 
 ### `note_plan`
+
+Prefer a short JSON file saved outside the final note body.
+When linting, pass it with `scripts/lint_note.py --plan-file ...`; if no explicit path is given, lint looks for a sibling `<note>.plan.json`.
 
 Suggested keys:
 - `paper_type`

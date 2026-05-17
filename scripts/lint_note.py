@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 from pathlib import Path
 
@@ -22,6 +23,20 @@ REQUIRED_SECTIONS = [
     "我的笔记",
     "引用",
 ]
+
+NOTE_PLAN_STRING_FIELDS = (
+    "paper_type",
+    "dominant_domain",
+)
+
+NOTE_PLAN_LIST_FIELDS = (
+    "must_cover",
+    "key_numbers",
+    "real_comparisons",
+    "section_plan",
+)
+
+NOTE_PLAN_REQUIRED_FIELDS = NOTE_PLAN_STRING_FIELDS + NOTE_PLAN_LIST_FIELDS
 
 FIGURE_TARGET_SECTIONS = {
     "研究问题",
@@ -87,9 +102,50 @@ NONSTANDARD_FIGURE_PLACEHOLDER_RE = re.compile(
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "lint note")
     p.add_argument("--input", required=True, help="Markdown note path.")
+    p.add_argument("--plan-file", default="", help="Optional note_plan JSON path. Defaults to sibling <note>.plan.json.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
     return p
+
+
+def resolve_note_plan_path(note_path: Path, plan_file: str) -> Path:
+    if plan_file:
+        return Path(plan_file).expanduser().resolve()
+    return note_path.with_suffix(".plan.json")
+
+
+def inspect_note_plan(plan_path: Path) -> tuple[bool, list[str]]:
+    if not plan_path.exists():
+        return False, ["planning_artifact_missing"]
+
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return True, ["planning_artifact_invalid_json"]
+
+    if not isinstance(plan, dict):
+        return True, ["planning_required_fields_invalid"]
+
+    issues: list[str] = []
+    missing_fields = [field for field in NOTE_PLAN_REQUIRED_FIELDS if field not in plan]
+    if missing_fields:
+        issues.append("planning_required_fields_missing")
+
+    has_invalid_fields = False
+    for field in NOTE_PLAN_STRING_FIELDS:
+        if field in plan and not isinstance(plan[field], str):
+            has_invalid_fields = True
+    for field in NOTE_PLAN_LIST_FIELDS:
+        if field in plan and not isinstance(plan[field], list):
+            has_invalid_fields = True
+    if has_invalid_fields:
+        issues.append("planning_required_fields_invalid")
+
+    section_plan = plan.get("section_plan")
+    if isinstance(section_plan, list) and not section_plan:
+        issues.append("planning_section_plan_empty")
+
+    return True, issues
 
 
 def extract_headers(text: str) -> list[str]:
@@ -832,11 +888,17 @@ def main() -> None:
     code_math_issues = suspicious_code_formatted_math(text)
     math_issues = math_render_issues(text)
     figure_issues = figure_structure_issues(text)
+    planning_artifact_found, planning_artifact_issues = inspect_note_plan(
+        resolve_note_plan_path(path, args.plan_file)
+    )
     warnings.extend(inspect_figure_callouts(text))
     for issue in figure_issues:
         reason = str(issue.get("reason", ""))
         if reason and reason not in warnings:
             warnings.append(reason)
+    for issue in planning_artifact_issues:
+        if issue not in warnings:
+            warnings.append(issue)
     warnings.extend(front_matter_order_warnings(text))
     warnings.extend(mechanism_flow_warnings(text))
     if not body_text.lstrip().startswith("# "):
@@ -873,6 +935,8 @@ def main() -> None:
         "code_math_issues": code_math_issues,
         "math_render_issues": math_issues,
         "figure_structure_issues": figure_issues,
+        "planning_artifact_found": planning_artifact_found,
+        "planning_artifact_issues": planning_artifact_issues,
         "passes_basic_structure": not missing_sections and not {"title_heading_missing", "no_level2_sections", "front_matter_order_invalid"} & set(warnings),
         "passes_style_gate": not mixed_issues and not linebreak_issues and not code_math_issues,
         "passes_math_gate": not math_issues,

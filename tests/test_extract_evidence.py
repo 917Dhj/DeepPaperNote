@@ -124,6 +124,78 @@ def test_extract_evidence_outputs_pdf_coverage_for_truncated_pdf(tmp_path: Path)
     assert payload["summary"]["pdf_coverage"] == coverage
 
 
+def test_extract_evidence_outputs_appendix_index_and_selective_evidence(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pages = [
+        "Abstract\nWe propose appendix-aware extraction.\nIntroduction\nThe paper studies coverage.",
+        "Method\nThe main method uses a compact extraction pipeline.",
+        "Experiment\nThe main experiment reports stable results.",
+    ]
+    pages.extend(f"Main content page {index}" for index in range(4, 20))
+    pages.append(
+        "\n".join(
+            [
+                "Appendix",
+                "A. Additional Experiments",
+                "Without replay, F1 drops by 4.1 points and training becomes unstable.",
+                "Additional results improve accuracy to 91.2 on the hidden split.",
+                "Table A1. Extra ablation results",
+                "B. Hyperparameters",
+                "We use learning rate 1e-4, batch size 32, and AdamW optimizer.",
+                "The dataset split uses 80/10/10 train, validation, and test partitions.",
+                "Figure A1: Qualitative examples",
+                "Case study examples show failure cases in long conversations.",
+            ]
+        )
+    )
+    pages.extend(f"Appendix tail page {index}" for index in range(21, 26))
+    write_test_pdf(pdf_path, pages)
+
+    input_payload = {
+        "paper_id": "paper:appendix",
+        "title": "Appendix Aware Paper",
+        "abstract": "We propose appendix-aware extraction.",
+        "pdf_path": str(pdf_path),
+    }
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "evidence.json"
+    input_path.write_text(json.dumps(input_payload, ensure_ascii=False), encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_EVIDENCE_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--max-pages",
+            "18",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    pack = payload["evidence_pack"]
+    assert pack["ablation_evidence"] == []
+    assert pack["appendix_index"]["sections"][:2] == [
+        {"title": "A. Additional Experiments", "page": 20},
+        {"title": "B. Hyperparameters", "page": 20},
+    ]
+    assert pack["appendix_index"]["table_captions"][:1] == [
+        {"id": "Table A1", "caption": "Extra ablation results", "page_hint": "p.20"}
+    ]
+    appendix_evidence = pack["appendix_evidence"]
+    assert "drops by 4.1 points" in appendix_evidence["ablation"][0]["evidence"]
+    assert "learning rate 1e-4" in appendix_evidence["implementation_details"][0]["evidence"]
+    assert "dataset split" in appendix_evidence["dataset_details"][0]["evidence"]
+    assert "accuracy to 91.2" in appendix_evidence["extra_results"][0]["evidence"]
+    assert "Case study examples" in appendix_evidence["qualitative_examples"][0]["evidence"]
+    assert payload["summary"]["appendix_evidence_counts"]["ablation"] == 1
+
+
 def test_evidence_quality_caps_abstract_fallback_chunks_at_low() -> None:
     pack = {
         "candidate_chunks": {
@@ -210,6 +282,29 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
                     "method": "方法" * 2500,
                     "experiment": "实验结果",
                 },
+                "appendix_index": {
+                    "appendix_detected": True,
+                    "start_page": 20,
+                    "sections": [{"title": "A. Additional Experiments", "page": 20}],
+                    "figure_captions": [],
+                    "table_captions": [
+                        {"id": "Table A1", "caption": "Extra ablation results", "page_hint": "p.20"}
+                    ],
+                },
+                "appendix_evidence": {
+                    "ablation": [
+                        {
+                            "evidence": "Without replay, F1 drops by 4.1 points.",
+                            "source_section": "A. Additional Experiments",
+                            "page_hint": "p.20",
+                            "kind_hint": "ablation",
+                        }
+                    ],
+                    "implementation_details": [],
+                    "dataset_details": [],
+                    "extra_results": [],
+                    "qualitative_examples": [],
+                },
                 "extraction_failures": ["section_coverage_poor"],
             }
         },
@@ -250,12 +345,45 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
             },
             "section_text_truncated_sections": ["method"],
         },
+        "appendix_evidence_counts": {
+            "ablation": 1,
+            "implementation_details": 0,
+            "dataset_details": 0,
+            "extra_results": 0,
+            "qualitative_examples": 0,
+        },
         "extraction_failures": ["section_coverage_poor"],
+    }
+    assert synthesis["appendix"] == {
+        "index": {
+            "appendix_detected": True,
+            "start_page": 20,
+            "sections": [{"title": "A. Additional Experiments", "page": 20}],
+            "figure_captions": [],
+            "table_captions": [
+                {"id": "Table A1", "caption": "Extra ablation results", "page_hint": "p.20"}
+            ],
+        },
+        "evidence": {
+            "ablation": [
+                {
+                    "evidence": "Without replay, F1 drops by 4.1 points.",
+                    "source_section": "A. Additional Experiments",
+                    "page_hint": "p.20",
+                    "kind_hint": "ablation",
+                }
+            ],
+            "implementation_details": [],
+            "dataset_details": [],
+            "extra_results": [],
+            "qualitative_examples": [],
+        },
     }
     review_rules = synthesis["writing_contract"]["self_review_rules"]
     assert any("bundle.coverage" in rule for rule in review_rules)
     assert any("max_pages" in rule for rule in review_rules)
     assert any("bundle_text_budget" in rule for rule in review_rules)
+    assert any("appendix evidence" in rule for rule in review_rules)
 
 
 def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:

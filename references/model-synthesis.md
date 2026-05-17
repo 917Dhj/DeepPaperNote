@@ -77,9 +77,9 @@ The rule is simple:
    - `### 量表代理特征抽取`
    - `### 为什么结果成立`
    - `### 哪些地方容易被误读`
-   Prefer a compact visible block such as:
-   - `<note_plan>...</note_plan>`
-   - or a temporary planning file saved before the final note
+   Prefer a short JSON planning file saved before the final note, such as `<note>.plan.json` or a run-scoped `*_note_plan.json`.
+   Pass that file to `scripts/lint_note.py --plan-file ...` when linting.
+   In interactive contexts, you may also show a compact `<note_plan>...</note_plan>` block, but keep the JSON file as the checkable artifact.
    The plan should be concise and structured, not a long free-form chain-of-thought dump.
    The plan should also explicitly decide:
    - whether formulas are needed
@@ -239,6 +239,8 @@ Require one explicit planning artifact per note:
 - keep it short
 - keep it structured
 - make it inspectable
+- save it as a short JSON file outside the final note body
+- pass it to `scripts/lint_note.py --plan-file ...`; if omitted, lint looks for sibling `<note>.plan.json`
 - do not turn it into a verbose hidden chain-of-thought transcript
 
 Preferred content:

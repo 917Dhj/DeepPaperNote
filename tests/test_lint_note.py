@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
+from pathlib import Path
+
 from lint_note import (
     figure_structure_issues,
     figure_structure_passes,
     find_missing_sections,
     front_matter_order_warnings,
+    inspect_note_plan,
     inspect_figure_callouts,
     math_render_issues,
     mixed_language_issues,
@@ -365,3 +371,171 @@ def test_front_matter_order_requires_innovation_after_abstract() -> None:
 """
     warnings = front_matter_order_warnings(note)
     assert "front_matter_order_invalid" in warnings
+
+
+def test_note_plan_missing_is_soft_lint_warning(tmp_path) -> None:
+    note_path = tmp_path / "Paper.md"
+    note_path.write_text(
+        """# Paper
+
+## 核心信息
+
+这是一条完整元信息占位。
+
+## 原文摘要翻译
+
+这是一段中文摘要翻译。
+
+## 创新点
+
+这里记录论文的具体创新。
+
+## 一句话总结
+
+这篇论文解决一个清晰问题。
+
+## 研究问题
+
+问题边界描述清楚。
+
+## 数据与任务定义
+
+任务输入和输出定义清楚。
+
+## 方法主线
+
+### 执行流程
+
+这里说明方法过程。
+
+> [!figure] 图一 方法概览
+> 建议位置：方法主线
+> 放置原因：帮助理解整体过程。
+> 当前状态：保留占位；未找到高置信度整图。
+
+## 关键结果
+
+结果部分记录关键发现。
+
+## 深度分析
+
+分析部分说明为什么成立。
+
+## 局限
+
+这里记录限制。
+
+## 我的笔记
+
+这里记录个人理解。
+
+## 引用
+
+这里记录引用信息。
+""",
+        encoding="utf-8",
+    )
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    result = subprocess.run(
+        [sys.executable, str(script_path), "--input", str(note_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["planning_artifact_found"] is False
+    assert payload["planning_artifact_issues"] == ["planning_artifact_missing"]
+    assert "planning_artifact_missing" in payload["warnings"]
+    assert payload["passes_basic_structure"] is True
+    assert payload["passes_style_gate"] is True
+    assert payload["passes_math_gate"] is True
+    assert payload["passes_figure_gate"] is True
+
+
+def test_inspect_note_plan_reports_missing_file(tmp_path) -> None:
+    found, issues = inspect_note_plan(tmp_path / "missing.plan.json")
+    assert found is False
+    assert issues == ["planning_artifact_missing"]
+
+
+def test_inspect_note_plan_reports_invalid_json(tmp_path) -> None:
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text("{not-json", encoding="utf-8")
+
+    found, issues = inspect_note_plan(plan_path)
+    assert found is True
+    assert issues == ["planning_artifact_invalid_json"]
+
+
+def test_inspect_note_plan_reports_missing_required_fields(tmp_path) -> None:
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(json.dumps({"paper_type": "AI_method"}), encoding="utf-8")
+
+    found, issues = inspect_note_plan(plan_path)
+    assert found is True
+    assert "planning_required_fields_missing" in issues
+
+
+def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "paper_type": "AI_method",
+                "dominant_domain": "reasoning",
+                "must_cover": "method",
+                "key_numbers": [],
+                "real_comparisons": [],
+                "section_plan": [{"section": "方法主线"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    found, issues = inspect_note_plan(plan_path)
+    assert found is True
+    assert "planning_required_fields_invalid" in issues
+
+
+def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "paper_type": "AI_method",
+                "dominant_domain": "reasoning",
+                "must_cover": [],
+                "key_numbers": [],
+                "real_comparisons": [],
+                "section_plan": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    found, issues = inspect_note_plan(plan_path)
+    assert found is True
+    assert issues == ["planning_section_plan_empty"]
+
+
+def test_inspect_note_plan_accepts_valid_plan(tmp_path) -> None:
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "paper_type": "AI_method",
+                "dominant_domain": "reasoning",
+                "must_cover": ["方法主线"],
+                "key_numbers": ["42"],
+                "real_comparisons": ["baseline"],
+                "section_plan": [{"section": "方法主线"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    found, issues = inspect_note_plan(plan_path)
+    assert found is True
+    assert issues == []

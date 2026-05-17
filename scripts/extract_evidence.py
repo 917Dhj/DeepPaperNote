@@ -10,6 +10,8 @@ from pathlib import Path
 from common import (
     emit,
     enrich_metadata,
+    extract_appendix_index,
+    extract_appendix_page_texts,
     extract_caption_lines,
     extract_dataset_candidates,
     extract_mechanism_flow_sentences,
@@ -30,6 +32,13 @@ from contracts import empty_evidence_pack
 
 
 CORE_SECTIONS = ("introduction", "method", "experiment")
+APPENDIX_EVIDENCE_CATEGORIES = (
+    "ablation",
+    "implementation_details",
+    "dataset_details",
+    "extra_results",
+    "qualitative_examples",
+)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -123,6 +132,102 @@ def build_section_extraction_coverage(
         },
         "fallback_sections": fallback_sections,
     }
+
+
+def empty_appendix_evidence() -> dict[str, list[dict]]:
+    return {category: [] for category in APPENDIX_EVIDENCE_CATEGORIES}
+
+
+def appendix_evidence_category(sentence: str) -> str:
+    lower = sentence.lower()
+    if any(token in lower for token in ["ablation", "without", "w/o", "remove", "removing"]):
+        if any(token in lower for token in ["drop", "decrease", "worse", "unstable", "fail", "%"]):
+            return "ablation"
+    if any(
+        token in lower
+        for token in [
+            "learning rate",
+            "batch size",
+            "optimizer",
+            "epoch",
+            "hardware",
+            "gpu",
+            "hyperparameter",
+            "implementation",
+            "prompt",
+            "temperature",
+        ]
+    ):
+        return "implementation_details"
+    if re.search(r"\d", sentence) and any(
+        token in lower
+        for token in ["accuracy", "f1", "auc", "auprc", "score", "result", "outperform", "improv"]
+    ):
+        return "extra_results"
+    if any(
+        token in lower
+        for token in [
+            "dataset",
+            "split",
+            "training set",
+            "validation",
+            "test set",
+            "annotation",
+            "annotator",
+            "corpus",
+            "participants",
+            "samples",
+        ]
+    ):
+        return "dataset_details"
+    if any(token in lower for token in ["case study", "qualitative", "example", "failure case"]):
+        return "qualitative_examples"
+    return ""
+
+
+def appendix_section_for_page(appendix_index: dict, page_number: int) -> str:
+    sections = appendix_index.get("sections", []) if isinstance(appendix_index, dict) else []
+    current = "appendix"
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        section_page = int(section.get("page", 0) or 0)
+        if section_page and section_page <= page_number:
+            current = normalize_whitespace(str(section.get("title", ""))) or current
+    return current
+
+
+def build_appendix_evidence(
+    appendix_pages: list[dict],
+    appendix_index: dict,
+    *,
+    limit_per_category: int = 4,
+) -> dict[str, list[dict]]:
+    evidence = empty_appendix_evidence()
+    seen = set()
+    for page in appendix_pages:
+        page_number = int(page.get("page", 0) or 0)
+        source_section = appendix_section_for_page(appendix_index, page_number)
+        for sentence in split_sentences(str(page.get("text", ""))):
+            cleaned = normalize_whitespace(sentence)
+            if not cleaned:
+                continue
+            category = appendix_evidence_category(cleaned)
+            if not category or len(evidence[category]) >= limit_per_category:
+                continue
+            marker = f"{category}::{cleaned.lower()}"
+            if marker in seen:
+                continue
+            seen.add(marker)
+            evidence[category].append(
+                {
+                    "evidence": cleaned,
+                    "source_section": source_section,
+                    "page_hint": f"p.{page_number}" if page_number else "",
+                    "kind_hint": category,
+                }
+            )
+    return evidence
 
 
 def text_chunks(
@@ -389,6 +494,17 @@ def main() -> None:
         if has_pdf
         else pdf_coverage_summary(Path(""), max_pages=args.max_pages)
     )
+    appendix_index = (
+        extract_appendix_index(pdf_path.resolve(), pdf_coverage)
+        if has_pdf and pdf_coverage.get("appendix_detected")
+        else extract_appendix_index(Path(""), pdf_coverage)
+    )
+    appendix_pages = (
+        extract_appendix_page_texts(pdf_path.resolve(), pdf_coverage.get("appendix_start_page"))
+        if has_pdf and pdf_coverage.get("appendix_detected")
+        else []
+    )
+    appendix_evidence = build_appendix_evidence(appendix_pages, appendix_index)
     if has_pdf:
         try:
             section_map = extract_pdf_sections(pdf_path.resolve(), max_pages=args.max_pages)
@@ -517,6 +633,8 @@ def main() -> None:
     pack["section_sources"] = section_sources
     pack["section_extraction_coverage"] = section_extraction_coverage
     pack["pdf_coverage"] = pdf_coverage
+    pack["appendix_index"] = appendix_index
+    pack["appendix_evidence"] = appendix_evidence
     pack["section_texts"] = {
         key: normalize_whitespace(value)
         for key, value in section_map.items()
@@ -551,6 +669,10 @@ def main() -> None:
             "section_coverage_status": section_extraction_coverage["coverage_status"],
             "fallback_sections": section_extraction_coverage["fallback_sections"],
             "pdf_coverage": pdf_coverage,
+            "appendix_evidence_counts": {
+                category: len(items)
+                for category, items in appendix_evidence.items()
+            },
             "pdf_used": has_pdf,
             "candidate_chunk_sections": sorted([key for key, value in candidates.items() if value]),
         },

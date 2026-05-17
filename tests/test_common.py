@@ -8,6 +8,7 @@ from pathlib import Path
 
 from common import (
     clean_local_pdf_stem,
+    extract_appendix_index,
     extract_local_pdf_hints,
     extract_caption_lines,
     extract_pdf_sections,
@@ -181,6 +182,42 @@ def test_pdf_coverage_reports_page_limit_and_late_appendix(tmp_path: Path, monke
     assert coverage["appendix_start_page"] == 20
     assert coverage["section_stop_reason"] == "references"
     assert coverage["section_stop_page"] == 10
+
+
+def test_extract_appendix_index_reports_sections_and_captions(tmp_path: Path, monkeypatch) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    pages = [f"Page {index}" for index in range(1, 20)]
+    pages.append(
+        "\n".join(
+            [
+                "Appendix",
+                "A. Additional Experiments",
+                "Table A1. Extra ablation results",
+                "B. Hyperparameters",
+                "Figure A1: Qualitative examples",
+            ]
+        )
+    )
+    pages.extend(f"Appendix tail page {index}" for index in range(21, 26))
+    fake_doc = FakePdfDoc(metadata={}, pages=pages)
+    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+
+    coverage = pdf_coverage_summary(pdf_path, max_pages=18)
+    index = extract_appendix_index(pdf_path, coverage)
+
+    assert index["appendix_detected"] is True
+    assert index["start_page"] == 20
+    assert index["sections"][:2] == [
+        {"title": "A. Additional Experiments", "page": 20},
+        {"title": "B. Hyperparameters", "page": 20},
+    ]
+    assert index["table_captions"][:1] == [
+        {"id": "Table A1", "caption": "Extra ablation results", "page_hint": "p.20"}
+    ]
+    assert index["figure_captions"][:1] == [
+        {"id": "Figure A1", "caption": "Qualitative examples", "page_hint": "p.20"}
+    ]
 
 
 def test_extract_local_pdf_hints_prefers_pdf_metadata_title_and_doi(tmp_path: Path, monkeypatch) -> None:

@@ -91,6 +91,21 @@ class PdfCoverage(TypedDict, total=False):
     section_stop_page: int | None
 
 
+class AppendixIndex(TypedDict, total=False):
+    appendix_detected: bool
+    start_page: int | None
+    sections: list[dict[str, Any]]
+    figure_captions: list[dict[str, Any]]
+    table_captions: list[dict[str, Any]]
+
+
+class AppendixEvidenceItem(TypedDict, total=False):
+    evidence: str
+    source_section: str
+    page_hint: str
+    kind_hint: str
+
+
 class EvidencePack(TypedDict, total=False):
     paper_id: str
     problem_evidence: list[EvidenceItem]
@@ -111,6 +126,8 @@ class EvidencePack(TypedDict, total=False):
     section_sources: dict[str, str]
     section_extraction_coverage: SectionExtractionCoverage
     pdf_coverage: PdfCoverage
+    appendix_index: AppendixIndex
+    appendix_evidence: dict[str, list[AppendixEvidenceItem]]
     quotes: list[dict[str, Any]]
     evidence_quality: str
     extraction_failures: list[str]
@@ -184,6 +201,8 @@ def empty_evidence_pack() -> EvidencePack:
         section_sources={},
         section_extraction_coverage={},
         pdf_coverage={},
+        appendix_index={},
+        appendix_evidence={},
         quotes=[],
         extraction_failures=[],
         evidence_quality="unknown",
