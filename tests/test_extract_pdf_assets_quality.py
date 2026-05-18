@@ -1,11 +1,75 @@
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+try:
+    import fitz  # type: ignore
+except ImportError:  # pragma: no cover
+    fitz = None
+
 from extract_pdf_assets import (
     _classify_visual_quality,
     _looks_like_text_table_row,
     _other_caption_labels_for_crop,
     _row_is_table_like,
 )
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+EXTRACT_PDF_ASSETS_SCRIPT = PROJECT_ROOT / "scripts" / "extract_pdf_assets.py"
+
+
+def write_test_pdf(path: Path, pages: list[str]) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for PDF asset integration tests.")
+    doc = fitz.open()
+    try:
+        for text in pages:
+            page = doc.new_page()
+            page.insert_text((72, 72), text)
+        doc.save(path)
+    finally:
+        doc.close()
+
+
+def test_extract_pdf_assets_emits_asset_coverage(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    write_test_pdf(pdf_path, ["Page 1", "Page 2", "Page 3"])
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "assets.json"
+    input_path.write_text(
+        json.dumps({"paper_id": "paper:test", "title": "Coverage Paper", "pdf_path": str(pdf_path)}),
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_PDF_ASSETS_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--assets-dir",
+            str(tmp_path / "assets"),
+            "--max-pages",
+            "2",
+        ],
+        check=True,
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["asset_coverage"] == {
+        "total_pages": 3,
+        "asset_max_pages": 2,
+        "asset_pages_scanned": 2,
+        "truncated_due_to_asset_page_limit": True,
+    }
 
 
 def test_text_table_row_accepts_explicit_column_separators() -> None:

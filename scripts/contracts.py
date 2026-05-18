@@ -39,6 +39,8 @@ class MetadataRecord(TypedDict, total=False):
     zotero_key: str
     arxiv_id: str
     metadata_sources: list[str]
+    identity_confidence: str
+    identity_confidence_reasons: list[str]
 
 
 class EvidenceItem(TypedDict, total=False):
@@ -193,6 +195,8 @@ def empty_metadata() -> MetadataRecord:
         authors=[],
         affiliations=[],
         metadata_sources=[],
+        identity_confidence="",
+        identity_confidence_reasons=[],
     )
 
 

@@ -375,13 +375,63 @@ def candidate_map(
     }
 
 
+EXPLICIT_COMPLEXITY_RE = re.compile(r"\bO\([^)]{1,80}\)")
+TEX_OR_MATH_SIGNAL_RE = re.compile(
+    r"\\(?:sum|prod|int|frac|sqrt|log|argmax|argmin)\b|(?:>=|<=)|[\^∑∏∫≤≥≈≠]"
+)
+SUBSCRIPT_SIGNAL_RE = re.compile(
+    r"(?<![A-Za-z0-9])\\?(?P<base>[A-Za-z]+)\s*_\s*(?:\{[^}]{1,30}\}|[A-Za-z0-9])"
+)
+GREEK_MATH_NAMES = {
+    "alpha",
+    "beta",
+    "gamma",
+    "delta",
+    "theta",
+    "lambda",
+    "mu",
+    "sigma",
+    "phi",
+    "psi",
+    "omega",
+}
+CONFIG_ASSIGNMENT_RE = re.compile(
+    r"^\s*(?P<lhs>[A-Za-z][A-Za-z0-9_ -]{1,40})\s*=\s*(?P<rhs>[^=]{1,80})\s*$"
+)
+CONFIG_LHS_RE = re.compile(
+    r"\b(?:model|dataset|temperature|lr|learning_rate|batch_size|optimizer|epoch|seed)\b",
+    re.IGNORECASE,
+)
+
+
+def looks_like_math_candidate(text: str, kind_hint: str = "") -> bool:
+    cleaned = normalize_whitespace(text)
+    if not cleaned:
+        return False
+    if EXPLICIT_COMPLEXITY_RE.search(cleaned):
+        return True
+    has_signal = bool(TEX_OR_MATH_SIGNAL_RE.search(cleaned))
+    if not has_signal:
+        for match in SUBSCRIPT_SIGNAL_RE.finditer(cleaned):
+            base = match.group("base").lower()
+            if len(base) <= 3 or base in GREEK_MATH_NAMES:
+                has_signal = True
+                break
+    if not has_signal:
+        return False
+    assignment_match = CONFIG_ASSIGNMENT_RE.match(cleaned.rstrip(" .;:"))
+    if assignment_match and CONFIG_LHS_RE.search(assignment_match.group("lhs")):
+        return False
+    return True
+
+
 def extract_equation_candidates(*, full_text: str, method_text: str, experiment_text: str, conclusion_text: str, limit: int = 8) -> list[dict]:
     candidates: list[dict] = []
     seen = set()
 
     def add_candidate(text: str, section: str, kind_hint: str) -> None:
         cleaned = normalize_whitespace(text)
-        if not cleaned or len(cleaned) < 6:
+        if not looks_like_math_candidate(cleaned, kind_hint):
             return
         marker = cleaned.lower()
         if marker in seen:
@@ -400,6 +450,7 @@ def extract_equation_candidates(*, full_text: str, method_text: str, experiment_
         (r"\bp\([^)]*\)\s*=\s*[^.]{1,120}", "method", "objective"),
         (r"\b(?:L|Loss|Err|ELBO|FID|IS|NLL)[A-Za-z0-9_]*\s*=\s*[^.]{1,120}", "experiment", "metric_equation"),
         (r"[A-Za-z][A-Za-z0-9_]*\s*=\s*\([^)]*\)\s*\^[^\s,.;]+", "experiment", "scaling_law"),
+        (r"[A-Za-z][A-Za-z0-9_{}()\\^\s]{0,60}\s*(?:>=|<=|≤|≥|≈|≠)\s*[A-Za-z][A-Za-z0-9_{}()\\^\s]{0,60}", "method", "comparison_equation"),
         (r"[A-Za-z][A-Za-z0-9_]*\s*=\s*[^.]{1,100}", "method", "equation"),
     ]
 

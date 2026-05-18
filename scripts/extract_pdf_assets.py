@@ -1030,8 +1030,16 @@ def main() -> None:
     page_records: list[dict] = []
     image_assets: list[dict] = []
     figure_assets: list[dict] = []
+    asset_coverage: dict = {}
     try:
-        page_limit = min(len(doc), args.max_pages)
+        total_pages = len(doc)
+        page_limit = min(total_pages, args.max_pages)
+        asset_coverage = {
+            "total_pages": total_pages,
+            "asset_max_pages": args.max_pages,
+            "asset_pages_scanned": page_limit,
+            "truncated_due_to_asset_page_limit": total_pages > args.max_pages,
+        }
         for idx in range(page_limit):
             page = doc[idx]
             page_number = idx + 1
@@ -1074,6 +1082,7 @@ def main() -> None:
         "page_assets": page_records,
         "image_assets": image_assets,
         "figure_assets": figure_assets,
+        "asset_coverage": asset_coverage,
         "ocr_available": bool(pytesseract and Image),
     }
     emit(payload, args.output)

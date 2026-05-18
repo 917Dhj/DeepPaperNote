@@ -13,7 +13,7 @@ Do not write the finished note directly from:
 Instead, use a three-stage model-first pipeline:
 
 1. build an evidence bundle
-2. make a dynamic internal note plan around that evidence
+2. create the canonical short JSON `note_plan` around that evidence
 3. let the model write the note from the evidence and plan
 
 ## Evidence Bundle
@@ -35,7 +35,9 @@ In `DeepPaperNote`, use:
 Before drafting the final note, the agent should create an explicit short planning artifact rather than silently "thinking it through" and jumping straight to the final Markdown.
 
 Do **not** require or expose a long free-form chain-of-thought block such as `<thinking>...</thinking>`.
-Instead, require a compact and inspectable planning block such as `<note_plan>...</note_plan>` or an equivalent temporary planning file.
+Instead, require a compact and inspectable JSON planning file. The canonical artifact is a short JSON file such as `<note>.plan.json` or a run-scoped `*_note_plan.json`.
+Pass that file to `scripts/lint_note.py --plan-file ...` when linting; if omitted, lint looks for a sibling `<note>.plan.json`.
+In interactive contexts, you may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file.
 
 The plan should state:
 - which sections this paper actually deserves
@@ -56,31 +58,29 @@ Good note plans often add paper-specific sections such as:
 
 Recommended shape:
 
-```xml
-<note_plan>
-paper_type: ...
-dominant_domain: ...
-must_cover:
-- ...
-key_numbers:
-- ...
-real_comparisons:
-- ...
-section_plan:
-- section: 方法主线
-  weight: high
-  subsections:
-  - ...
-  evidence_sources:
-  - ...
-</note_plan>
+```json
+{
+  "paper_type": "method",
+  "dominant_domain": "machine learning",
+  "must_cover": ["数据构建", "方法主线", "关键消融"],
+  "key_numbers": ["主结果提升 3.2 points", "训练成本降低 40%"],
+  "real_comparisons": ["against the strongest reported baseline"],
+  "section_plan": [
+    {
+      "section": "方法主线",
+      "weight": "high",
+      "subsections": ["机制流程", "训练目标"],
+      "evidence_sources": ["synthesis_bundle.evidence.method_evidence"]
+    }
+  ]
+}
 ```
 
 The plan should be short, structured, and directly useful for the final draft.
 
 ## Writing Layer
 
-Only after the evidence bundle and explicit note plan exist should the model draft the final note.
+Only after the evidence bundle and explicit JSON `note_plan` exist should the model draft the final note.
 
 Good final notes should:
 - prioritize numbers and comparisons over generic summary sentences

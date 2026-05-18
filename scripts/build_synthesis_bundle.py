@@ -161,14 +161,58 @@ def bundle_text_budget(
     return budget
 
 
-def coverage_summary(evidence_pack: dict) -> dict:
+def figure_quality_summary(assets_wrapper: dict) -> dict[str, int]:
+    summary = {"usable": 0, "review": 0, "reject": 0, "unknown": 0}
+    for item in assets_wrapper.get("figure_assets", []) or []:
+        if not isinstance(item, dict):
+            summary["unknown"] += 1
+            continue
+        quality_signals = item.get("quality_signals", {})
+        if not isinstance(quality_signals, dict):
+            summary["unknown"] += 1
+            continue
+        status = normalize_whitespace(str(quality_signals.get("visual_quality_status", ""))).lower()
+        if status == "needs_review":
+            status = "review"
+        if status not in summary:
+            status = "unknown"
+        summary[status] += 1
+    return summary
+
+
+def truncation_warnings(pdf_coverage: dict, asset_coverage: dict, text_budget: dict) -> list[str]:
+    warnings: list[str] = []
+    if pdf_coverage.get("truncated_due_to_page_limit"):
+        warnings.append("pdf_page_limit")
+    if asset_coverage.get("truncated_due_to_asset_page_limit"):
+        warnings.append("asset_page_limit")
+    if text_budget.get("section_text_truncated_sections"):
+        warnings.append("section_text_truncated")
+    return warnings
+
+
+def coverage_summary(evidence_pack: dict, metadata: dict | None = None, assets_wrapper: dict | None = None) -> dict:
+    metadata = metadata or {}
+    assets_wrapper = assets_wrapper or {}
+    pdf_coverage = evidence_pack.get("pdf_coverage", {}) or {}
+    asset_coverage = assets_wrapper.get("asset_coverage", {}) or {}
+    text_budget = bundle_text_budget(evidence_pack)
     return {
         "language_hint": evidence_pack.get("language_hint", "unknown"),
         "section_extraction_coverage": evidence_pack.get("section_extraction_coverage", {}) or {},
-        "pdf_coverage": evidence_pack.get("pdf_coverage", {}) or {},
-        "bundle_text_budget": bundle_text_budget(evidence_pack),
+        "pdf_coverage": pdf_coverage,
+        "bundle_text_budget": text_budget,
         "appendix_evidence_counts": appendix_evidence_counts(evidence_pack),
         "extraction_failures": evidence_pack.get("extraction_failures", []) or [],
+        "asset_coverage": asset_coverage if isinstance(asset_coverage, dict) else {},
+        "figure_quality_summary": figure_quality_summary(assets_wrapper),
+        "truncation_warnings": truncation_warnings(
+            pdf_coverage if isinstance(pdf_coverage, dict) else {},
+            asset_coverage if isinstance(asset_coverage, dict) else {},
+            text_budget,
+        ),
+        "identity_confidence": metadata.get("identity_confidence", ""),
+        "identity_confidence_reasons": metadata.get("identity_confidence_reasons", []) or [],
     }
 
 
@@ -280,9 +324,11 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             "arxiv_id": metadata.get("arxiv_id", ""),
             "zotero_key": metadata.get("zotero_key", ""),
             "metadata_sources": metadata.get("metadata_sources", []),
+            "identity_confidence": metadata.get("identity_confidence", ""),
+            "identity_confidence_reasons": metadata.get("identity_confidence_reasons", []) or [],
         },
         "evidence_quality": evidence_pack.get("evidence_quality", "unknown"),
-        "coverage": coverage_summary(evidence_pack),
+        "coverage": coverage_summary(evidence_pack, metadata, assets_wrapper),
         "evidence": {
             "problem": top_items(evidence_pack, "problem_evidence"),
             "task": top_items(evidence_pack, "task_evidence"),
@@ -354,7 +400,7 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             "planning_rules": [
                 "先基于证据做显式 note_plan，再写最终笔记",
                 "note_plan 应优先保存为简短 JSON planning file，例如 `<note>.plan.json` 或 run-scoped `*_note_plan.json`",
-                "lint 最终笔记时应通过 `scripts/lint_note.py --plan-file ...` 传入该 planning file；交互场景可以额外展示 compact `<note_plan>...</note_plan>`",
+                "lint 最终笔记时应通过 `scripts/lint_note.py --plan-file ...` 传入该 planning file；交互场景可以额外展示 compact `<note_plan>...</note_plan>`，但它只是 display-only context，不能替代 JSON 文件",
                 "不要只依赖隐式的隐藏规划步骤，也不要输出冗长的自由思维链",
                 "`核心信息` 是固定字段的 metadata 区，不要擅自增删字段，也不要把解释性 prose 塞进这里",
                 "在章节骨架上，`创新点` 应该作为独立 `##` 章节放在 `原文摘要翻译` 之后、`一句话总结` 之前",

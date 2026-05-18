@@ -146,7 +146,9 @@ Model-first rule:
 - scripts must not be the primary mechanism for understanding the paper
 - final paper understanding and note writing belong to the model
 - before writing the final note, create an explicit short `note_plan` artifact rather than relying on hidden planning only
-- prefer a compact structured plan such as `<note_plan>...</note_plan>` or an equivalent temporary planning file
+- save `note_plan` as the canonical short JSON file outside the final note body, such as `<note>.plan.json` or a run-scoped `*_note_plan.json`
+- pass that JSON file to `scripts/lint_note.py --plan-file ...` when linting the final note; if omitted, lint looks for sibling `<note>.plan.json`
+- interactive sessions may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file
 - do not require or expose a long free-form `<thinking>` block
 - for technical papers, prefer replication-grade explanation over high-level summary
 - if formulas, objectives, or complexity expressions are central, include the key ones in the final note

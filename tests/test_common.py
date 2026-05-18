@@ -490,6 +490,77 @@ def test_resolve_reference_title_survives_arxiv_failure(monkeypatch) -> None:
     assert resolved["status"] == "ok"
     assert resolved["title"] == "Example Paper"
     assert "semantic_scholar" in (resolved.get("metadata_sources") or [])
+    assert resolved["identity_confidence"] == "medium"
+    assert "external_metadata_title_match" in resolved["identity_confidence_reasons"]
+
+
+def test_resolve_reference_doi_sets_high_identity_confidence(monkeypatch) -> None:
+    monkeypatch.setattr("common.fetch_crossref_by_doi", lambda *args, **kwargs: None)
+
+    resolved = resolve_reference("10.1000/example")
+
+    assert resolved["identity_confidence"] == "high"
+    assert "doi_present" in resolved["identity_confidence_reasons"]
+
+
+def test_resolve_reference_arxiv_id_sets_high_identity_confidence(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "common.safe_fetch_arxiv_entries",
+        lambda *args, **kwargs: [
+            {
+                "title": "Arxiv Paper",
+                "arxiv_id": "2501.00001",
+                "metadata_sources": ["arxiv"],
+            }
+        ],
+    )
+
+    resolved = resolve_reference("2501.00001")
+
+    assert resolved["identity_confidence"] == "high"
+    assert "arxiv_id_present" in resolved["identity_confidence_reasons"]
+
+
+def test_resolve_reference_zotero_key_sets_high_identity_confidence() -> None:
+    resolved = resolve_reference("ABCDEFGH")
+
+    assert resolved["identity_confidence"] == "high"
+    assert "zotero_key_present" in resolved["identity_confidence_reasons"]
+
+
+def test_resolve_reference_local_pdf_with_extracted_doi_sets_high_identity_confidence(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    fake_doc = FakePdfDoc(
+        metadata={},
+        pages=["A Strong Enough Paper Title For Testing\nhttps://doi.org/10.1234/test"],
+    )
+    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+
+    resolved = resolve_reference(str(pdf_path))
+
+    assert resolved["identity_confidence"] == "high"
+    assert "doi_present" in resolved["identity_confidence_reasons"]
+    assert "first_page_title_used" in resolved["identity_confidence_reasons"]
+
+
+def test_resolve_reference_local_pdf_artifact_stem_sets_low_identity_confidence(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pdf_path = tmp_path / "Touvron 等 - 2023 - LLaMA Open and Efficient Foundation Language Models-824666.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    fake_doc = FakePdfDoc(metadata={}, pages=["Abstract\nshort"])
+    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+
+    resolved = resolve_reference(str(pdf_path))
+
+    assert resolved["identity_confidence"] == "low"
+    assert "local_pdf_artifact_title" in resolved["identity_confidence_reasons"]
+    assert "local_pdf_stem_used" in resolved["identity_confidence_reasons"]
 
 
 def test_enrich_metadata_survives_arxiv_failure(monkeypatch) -> None:
@@ -547,6 +618,40 @@ def test_enrich_metadata_local_pdf_corrects_artifact_title_and_fills_arxiv(monke
     assert enriched["doi"] == "10.48550/arXiv.2302.13971"
     assert enriched["arxiv_id"] == "2302.13971"
     assert "semantic_scholar" in enriched["metadata_sources"]
+    assert enriched["identity_confidence"] == "high"
+    assert "arxiv_id_present" in enriched["identity_confidence_reasons"]
+
+
+def test_enrich_metadata_local_pdf_corrected_title_sets_medium_identity_confidence(monkeypatch) -> None:
+    semantic_match = {
+        "title": "A Strong External Metadata Title For Testing",
+        "authors": ["Alice Example"],
+        "venue": "ExampleConf",
+        "year": "2025",
+        "metadata_sources": ["semantic_scholar"],
+        "source": "semantic_scholar",
+        "source_type": "semantic_scholar",
+        "source_url": "https://www.semanticscholar.org/paper/example",
+    }
+    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
+    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("common.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+
+    enriched = enrich_metadata(
+        {
+            "source_type": "local_pdf",
+            "title": "Li 等 - 2025 - A Strong External Metadata Title For Testing-123456",
+            "local_pdf_path": "/tmp/example.pdf",
+            "metadata_sources": ["local_pdf"],
+            "identity_confidence": "low",
+            "identity_confidence_reasons": ["local_pdf_artifact_title", "local_pdf_stem_used"],
+        }
+    )
+
+    assert enriched["title"] == "A Strong External Metadata Title For Testing"
+    assert enriched["identity_confidence"] == "medium"
+    assert "external_metadata_title_match" in enriched["identity_confidence_reasons"]
 
 
 def test_enrich_metadata_local_pdf_prefers_published_doi_over_preprint(monkeypatch) -> None:

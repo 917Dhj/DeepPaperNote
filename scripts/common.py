@@ -138,6 +138,74 @@ def is_probable_local_pdf_artifact_title(title: str) -> bool:
     return bool(re.search(r"\b(?:et al\.?|等)\b", normalized, flags=re.IGNORECASE) and re.search(r"\b(?:19|20)\d{2}\b", normalized))
 
 
+def _dedupe_string_list(value: Any) -> list[str]:
+    if value in ("", None, [], {}):
+        return []
+    values = value if isinstance(value, list) else [value]
+    deduped: list[str] = []
+    for item in values:
+        cleaned = normalize_whitespace(str(item))
+        if cleaned and cleaned not in deduped:
+            deduped.append(cleaned)
+    return deduped
+
+
+def _append_reason(reasons: list[str], reason: str) -> None:
+    cleaned = normalize_whitespace(reason)
+    if cleaned and cleaned not in reasons:
+        reasons.append(cleaned)
+
+
+def apply_identity_confidence(record: dict[str, Any]) -> dict[str, Any]:
+    reasons = _dedupe_string_list(record.get("identity_confidence_reasons", []))
+    confidence = normalize_whitespace(str(record.get("identity_confidence", ""))).lower()
+    if confidence not in {"low", "medium", "high"}:
+        confidence = ""
+
+    if record.get("doi"):
+        _append_reason(reasons, "doi_present")
+        confidence = "high"
+    if record.get("arxiv_id"):
+        _append_reason(reasons, "arxiv_id_present")
+        confidence = "high"
+    if record.get("zotero_key"):
+        _append_reason(reasons, "zotero_key_present")
+        confidence = "high"
+
+    source_type = normalize_whitespace(str(record.get("source_type", "")))
+    metadata_sources = set(_dedupe_string_list(record.get("metadata_sources", [])))
+    has_local_pdf = source_type == "local_pdf" or "local_pdf" in metadata_sources
+    has_title_query = source_type == "title_query" or "title_query" in metadata_sources
+    external_sources = metadata_sources - {"local_pdf", "title_query"}
+
+    title_source_reason = normalize_whitespace(str(record.get("local_pdf_title_source", "")))
+    if has_local_pdf and title_source_reason:
+        _append_reason(reasons, title_source_reason)
+    if has_local_pdf and record.get("local_pdf_artifact_title"):
+        _append_reason(reasons, "local_pdf_artifact_title")
+
+    if confidence != "high":
+        if has_local_pdf and record.get("title_corrected_from_external_metadata"):
+            _append_reason(reasons, "external_metadata_title_match")
+            confidence = "medium"
+        elif has_title_query:
+            if external_sources:
+                _append_reason(reasons, "external_metadata_title_match")
+                confidence = "medium"
+            else:
+                _append_reason(reasons, "title_query_unmatched")
+                confidence = "low"
+        elif has_local_pdf:
+            if is_probable_local_pdf_artifact_title(str(record.get("title", ""))):
+                _append_reason(reasons, "local_pdf_artifact_title")
+            confidence = "low"
+
+    if confidence:
+        record["identity_confidence"] = confidence
+        record["identity_confidence_reasons"] = reasons
+    return record
+
+
 def normalize_pdf_text_artifacts(text: str) -> str:
     normalized = text or ""
     for original, replacement in PDF_LIGATURE_MAP.items():
@@ -605,7 +673,7 @@ def search_openalex_by_title(title: str, *, limit: int = 5) -> list[dict[str, An
 def merge_metadata_records(*records: dict[str, Any]) -> dict[str, Any]:
     merged: dict[str, Any] = {}
     metadata_sources: list[str] = []
-    additive_list_fields = {"affiliations", "metadata_sources"}
+    additive_list_fields = {"affiliations", "metadata_sources", "identity_confidence_reasons"}
     for record in records:
         if not isinstance(record, dict):
             continue
@@ -686,6 +754,10 @@ def resolve_reference(value: str) -> dict[str, Any]:
             "title": normalize_whitespace(str(hints.get("title", ""))) or clean_local_pdf_stem(path.stem) or path.stem.replace("_", " "),
             "metadata_sources": ["local_pdf"],
         }
+        if hints.get("local_pdf_title_source"):
+            paper["local_pdf_title_source"] = hints["local_pdf_title_source"]
+        if hints.get("local_pdf_artifact_title"):
+            paper["local_pdf_artifact_title"] = True
         doi = normalize_whitespace(str(hints.get("doi", "")))
         arxiv_id = normalize_whitespace(str(hints.get("arxiv_id", "")))
         if doi:
@@ -693,21 +765,21 @@ def resolve_reference(value: str) -> dict[str, Any]:
         if arxiv_id:
             paper["arxiv_id"] = arxiv_id
         paper["paper_id"] = paper_id_for_record(paper)
-        return paper
+        return apply_identity_confidence(paper)
     if source_type == "arxiv_id":
         papers = safe_fetch_arxiv_entries(id_list=extract_arxiv_id(stripped) or "", max_results=1)
         if papers:
             paper = papers[0]
             paper["paper_id"] = paper_id_for_record(paper)
             paper["status"] = "ok"
-            return paper
+            return apply_identity_confidence(paper)
     if source_type == "arxiv_url":
         papers = safe_fetch_arxiv_entries(id_list=extract_arxiv_id(stripped) or "", max_results=1)
         if papers:
             paper = papers[0]
             paper["paper_id"] = paper_id_for_record(paper)
             paper["status"] = "ok"
-            return paper
+            return apply_identity_confidence(paper)
     if source_type in {"doi", "doi_url"}:
         doi = extract_doi(stripped) or ""
         paper = fetch_crossref_by_doi(doi) or {"doi": doi, "source_url": f"https://doi.org/{doi}"}
@@ -715,7 +787,7 @@ def resolve_reference(value: str) -> dict[str, Any]:
         paper["source_url"] = paper.get("source_url") or f"https://doi.org/{doi}"
         paper["status"] = "ok"
         paper["paper_id"] = paper_id_for_record(paper)
-        return paper
+        return apply_identity_confidence(paper)
     if source_type == "pdf_url":
         filename = Path(urllib.parse.urlparse(stripped).path).stem or "paper"
         paper = {
@@ -727,7 +799,7 @@ def resolve_reference(value: str) -> dict[str, Any]:
             "metadata_sources": ["pdf_url"],
         }
         paper["paper_id"] = paper_id_for_record(paper)
-        return paper
+        return apply_identity_confidence(paper)
     if source_type == "url":
         doi = extract_doi(stripped)
         if doi:
@@ -739,7 +811,7 @@ def resolve_reference(value: str) -> dict[str, Any]:
             "metadata_sources": ["url"],
         }
         paper["paper_id"] = paper_id_for_record(paper)
-        return paper
+        return apply_identity_confidence(paper)
     if source_type == "zotero_key":
         paper = {
             "status": "ok",
@@ -749,7 +821,7 @@ def resolve_reference(value: str) -> dict[str, Any]:
             "metadata_sources": ["zotero_key"],
         }
         paper["paper_id"] = paper_id_for_record(paper)
-        return paper
+        return apply_identity_confidence(paper)
 
     title = stripped
     candidates = (
@@ -762,7 +834,7 @@ def resolve_reference(value: str) -> dict[str, Any]:
     if best:
         best = merge_metadata_records({"title": title, "source_type": "title_query", "source_url": "", "metadata_sources": ["title_query"]}, best)
         best["status"] = "ok"
-        return best
+        return apply_identity_confidence(best)
     paper = {
         "status": "ok",
         "source_type": "title_query",
@@ -771,7 +843,7 @@ def resolve_reference(value: str) -> dict[str, Any]:
         "metadata_sources": ["title_query"],
     }
     paper["paper_id"] = paper_id_for_record(paper)
-    return paper
+    return apply_identity_confidence(paper)
 
 
 def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
@@ -821,11 +893,18 @@ def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
     if merged.get("arxiv_id") and not merged.get("doi"):
         merged["doi"] = f"10.48550/arXiv.{merged['arxiv_id']}"
     if base.get("source_type") == "local_pdf":
+        if base.get("local_pdf_title_source"):
+            merged["local_pdf_title_source"] = base["local_pdf_title_source"]
+        elif is_probable_local_pdf_artifact_title(str(base.get("title", ""))):
+            merged["local_pdf_title_source"] = "local_pdf_stem_used"
+        if base.get("local_pdf_artifact_title") or is_probable_local_pdf_artifact_title(str(base.get("title", ""))):
+            merged["local_pdf_artifact_title"] = True
         corrected_title = choose_local_pdf_corrected_title(base, candidates[1:])
         if corrected_title:
             merged["title"] = corrected_title
+            merged["title_corrected_from_external_metadata"] = True
     merged["paper_id"] = paper_id_for_record(merged)
-    return merged
+    return apply_identity_confidence(merged)
 
 
 def runtime_config() -> dict[str, Any]:
@@ -1401,7 +1480,12 @@ def first_page_title_candidate(first_page_text: str) -> str:
 def extract_local_pdf_hints(pdf_path: Path) -> dict[str, Any]:
     raw_title = normalize_whitespace(pdf_path.stem.replace("_", " "))
     cleaned_title = clean_local_pdf_stem(pdf_path.stem)
-    hints: dict[str, Any] = {"title": cleaned_title or raw_title}
+    hints: dict[str, Any] = {
+        "title": cleaned_title or raw_title,
+        "local_pdf_title_source": "local_pdf_stem_used",
+    }
+    if is_probable_local_pdf_artifact_title(raw_title):
+        hints["local_pdf_artifact_title"] = True
     if fitz is None:
         return hints
 
@@ -1425,10 +1509,12 @@ def extract_local_pdf_hints(pdf_path: Path) -> dict[str, Any]:
 
     if metadata_title:
         hints["title"] = metadata_title
+        hints["local_pdf_title_source"] = "pdf_metadata_title_used"
     else:
         page_title = first_page_title_candidate(first_page_text)
         if page_title:
             hints["title"] = page_title
+            hints["local_pdf_title_source"] = "first_page_title_used"
 
     searchable = "\n".join(part for part in [metadata_subject, metadata_title, first_page_text] if part)
     doi = extract_doi(searchable)

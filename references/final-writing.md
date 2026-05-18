@@ -129,7 +129,10 @@ The final Chinese note must also pass a language-cleanliness check:
 For non-trivial papers, the note should usually not stop at only broad `##` sections.
 It should use meaningful `###` subheadings where they improve technical clarity.
 
-Before the final draft exists, there should already be a compact structured planning artifact such as `<note_plan>...</note_plan>` or an equivalent temporary planning file.
+Before the final draft exists, there should already be a compact structured planning artifact.
+The canonical artifact is a short JSON file such as `<note>.plan.json` or a run-scoped `*_note_plan.json`.
+Pass that file to `scripts/lint_note.py --plan-file ...` when linting; if omitted, lint looks for a sibling `<note>.plan.json`.
+In interactive contexts, you may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file.
 This plan should be short and inspectable.
 Do not require or expose a long free-form `<thinking>` block.
 

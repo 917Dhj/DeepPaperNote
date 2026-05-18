@@ -13,8 +13,7 @@ except ImportError:  # pragma: no cover
     fitz = None
 
 from build_synthesis_bundle import bundle
-from extract_evidence import evidence_quality
-
+from extract_evidence import evidence_quality, extract_equation_candidates
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXTRACT_EVIDENCE_SCRIPT = PROJECT_ROOT / "scripts" / "extract_evidence.py"
@@ -221,7 +220,7 @@ def test_evidence_quality_caps_abstract_fallback_chunks_at_low() -> None:
                 }
             ],
         },
-        "equation_candidates": [{"equation": "x = y"}],
+        "equation_candidates": [{"equation": r"L_i = -\log p_i"}],
         "figure_captions": [{"id": "Figure 1", "caption": "Overview"}],
         "table_captions": [{"id": "Table 1", "caption": "Results"}],
         "section_extraction_coverage": {
@@ -241,7 +240,7 @@ def test_evidence_quality_allows_real_core_sections_to_reach_high() -> None:
             "method": [{"text": "Method details.", "actual_source_section": "method"}],
             "experiment": [{"text": "Result details.", "actual_source_section": "experiment"}],
         },
-        "equation_candidates": [{"equation": "x = y"}],
+        "equation_candidates": [{"equation": r"L_i = -\log p_i"}],
         "figure_captions": [{"id": "Figure 1", "caption": "Overview"}],
         "table_captions": [{"id": "Table 1", "caption": "Results"}],
         "section_extraction_coverage": {
@@ -252,6 +251,57 @@ def test_evidence_quality_allows_real_core_sections_to_reach_high() -> None:
     }
 
     assert evidence_quality(pack) == "high"
+
+
+def test_extract_equation_candidates_filters_config_assignments() -> None:
+    full_text = (
+        "model = transformer. temperature = 0.7. lr = 1e-4. "
+        "dataset = ImageNet. hidden_size = 768."
+    )
+
+    candidates = extract_equation_candidates(
+        full_text=full_text,
+        method_text=full_text,
+        experiment_text="",
+        conclusion_text="",
+    )
+
+    assert candidates == []
+
+
+def test_extract_equation_candidates_requires_math_signal_for_objective_text() -> None:
+    full_text = "The objective p(class) = baseline label. Loss = reported value."
+
+    candidates = extract_equation_candidates(
+        full_text=full_text,
+        method_text=full_text,
+        experiment_text=full_text,
+        conclusion_text="",
+    )
+
+    assert candidates == []
+
+
+def test_extract_equation_candidates_keeps_complexity_and_tex_math() -> None:
+    full_text = (
+        r"The method runs in O(n log n). "
+        r"We model p(y_i|x_i) = \frac{\exp s_i}{\sum_j \exp s_j}. "
+        r"The objective is L_i = -\log p_i. "
+        r"The policy is R_t^{(c)} >= R_t^{(w)}."
+    )
+
+    candidates = extract_equation_candidates(
+        full_text=full_text,
+        method_text=full_text,
+        experiment_text=full_text,
+        conclusion_text="",
+    )
+    equations = [item["equation"] for item in candidates]
+
+    assert "O(n log n)" in equations
+    assert any(r"\frac" in equation and r"\sum" in equation for equation in equations)
+    assert any(r"L_i" in equation and r"\log" in equation for equation in equations)
+    assert any("R_t" in equation and ">=" in equation for equation in equations)
 
 
 def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
@@ -353,6 +403,16 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
             "qualitative_examples": 0,
         },
         "extraction_failures": ["section_coverage_poor"],
+        "asset_coverage": {},
+        "figure_quality_summary": {
+            "usable": 0,
+            "review": 0,
+            "reject": 0,
+            "unknown": 0,
+        },
+        "truncation_warnings": ["pdf_page_limit", "section_text_truncated"],
+        "identity_confidence": "",
+        "identity_confidence_reasons": [],
     }
     assert synthesis["appendix"] == {
         "index": {
@@ -384,6 +444,55 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
     assert any("max_pages" in rule for rule in review_rules)
     assert any("bundle_text_budget" in rule for rule in review_rules)
     assert any("appendix evidence" in rule for rule in review_rules)
+
+
+def test_bundle_coverage_exposes_asset_quality_truncation_and_identity() -> None:
+    synthesis = bundle(
+        metadata={
+            "title": "Coverage Paper",
+            "identity_confidence": "high",
+            "identity_confidence_reasons": ["doi_present"],
+        },
+        evidence_wrapper={
+            "evidence_pack": {
+                "pdf_coverage": {"truncated_due_to_page_limit": False},
+                "section_texts": {"method": "short"},
+            }
+        },
+        figures_wrapper={},
+        assets_wrapper={
+            "asset_coverage": {
+                "total_pages": 30,
+                "asset_max_pages": 24,
+                "asset_pages_scanned": 24,
+                "truncated_due_to_asset_page_limit": True,
+            },
+            "figure_assets": [
+                {"quality_signals": {"visual_quality_status": "usable"}},
+                {"quality_signals": {"visual_quality_status": "needs_review"}},
+                {"quality_signals": {"visual_quality_status": "mystery"}},
+                {},
+            ],
+        },
+    )
+
+    assert synthesis["metadata"]["identity_confidence"] == "high"
+    assert synthesis["metadata"]["identity_confidence_reasons"] == ["doi_present"]
+    assert synthesis["coverage"]["asset_coverage"] == {
+        "total_pages": 30,
+        "asset_max_pages": 24,
+        "asset_pages_scanned": 24,
+        "truncated_due_to_asset_page_limit": True,
+    }
+    assert synthesis["coverage"]["figure_quality_summary"] == {
+        "usable": 1,
+        "review": 1,
+        "reject": 0,
+        "unknown": 2,
+    }
+    assert synthesis["coverage"]["truncation_warnings"] == ["asset_page_limit"]
+    assert synthesis["coverage"]["identity_confidence"] == "high"
+    assert synthesis["coverage"]["identity_confidence_reasons"] == ["doi_present"]
 
 
 def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:

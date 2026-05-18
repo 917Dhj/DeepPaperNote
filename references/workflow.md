@@ -131,10 +131,10 @@ For a normal single-paper note request, the pipeline below is a required executi
    - decide which sections need `###` subheadings
    - select the most important numbers, comparisons, and figure/table placeholders
    - add paper-specific subsections when the evidence supports them
-   Recommended form:
+   Canonical artifact:
    - a short JSON planning file such as `<note>.plan.json` or a run-scoped `*_note_plan.json`
    - pass that file to `scripts/lint_note.py --plan-file ...` when linting the final note
-   - in interactive contexts, you may also show a compact `<note_plan>...</note_plan>` block, but keep the JSON file as the checkable artifact
+   - in interactive contexts, you may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file
    Do not rely only on an implicit hidden-planning step.
    Completion condition:
    - an explicit `note_plan` JSON artifact exists
@@ -305,10 +305,11 @@ Suggested keys:
 
 ### `note_plan`
 
-Prefer a short JSON file saved outside the final note body.
+The canonical `note_plan` artifact is a short JSON file saved outside the final note body, such as `<note>.plan.json` or a run-scoped `*_note_plan.json`.
 When linting, pass it with `scripts/lint_note.py --plan-file ...`; if no explicit path is given, lint looks for a sibling `<note>.plan.json`.
+In interactive contexts, a compact `<note_plan>...</note_plan>` block may additionally be shown as display-only context, but it does not replace the JSON file.
 
-Suggested keys:
+Required JSON keys:
 - `paper_type`
 - `dominant_domain`
 - `must_cover`
