@@ -1,10 +1,20 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DeepPaperNote Clean Demo Draft</title>
   <link rel="icon" href="data:,">
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      const lang = params.get("lang") === "zh" ? "zh" : "en";
+      const theme = params.get("theme") === "light" ? "light" : "dark";
+      document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+      document.documentElement.dataset.theme = theme;
+      window.__demoSettings = { lang, theme };
+    })();
+  </script>
   <style>
     :root {
       --bg: #181715;
@@ -908,10 +918,274 @@
     .final-rule {
       background: linear-gradient(90deg, transparent, rgba(204,120,92,0.72), transparent);
     }
+
+    html[data-theme="light"] {
+      --bg: #f4f0e7;
+      --bg-deep: #e5d9c8;
+      --surface: #fffdf7;
+      --surface-soft: #f5efe5;
+      --cream: #faf9f5;
+      --cream-soft: #e6dfd8;
+      --ink: #202824;
+      --muted: #6f6b60;
+      --muted-soft: #827d70;
+      --faint: rgba(32, 40, 36, 0.08);
+      --hair: rgba(32, 40, 36, 0.13);
+      --paper: rgba(255, 253, 247, 0.94);
+      --paper-solid: #fffdf7;
+      --green: #56786c;
+      --green-soft: rgba(86, 120, 108, 0.16);
+      --gold: #b08a4d;
+      --gold-soft: rgba(176, 138, 77, 0.18);
+      --red: #b84242;
+      --shadow: 0 24px 80px rgba(55, 58, 48, 0.12);
+    }
+
+    html[data-theme="light"],
+    html[data-theme="light"] body {
+      background: #e9e0d2;
+      color: var(--ink);
+    }
+
+    html[data-theme="light"] .stage {
+      background:
+        radial-gradient(circle at 18% 18%, rgba(255,255,255,0.72), transparent 29%),
+        radial-gradient(circle at 78% 80%, rgba(177,151,103,0.12), transparent 30%),
+        linear-gradient(135deg, var(--bg), var(--bg-deep));
+    }
+
+    html[data-theme="light"] .stage::before {
+      background:
+        linear-gradient(rgba(38,48,43,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(38,48,43,0.028) 1px, transparent 1px);
+      opacity: 1;
+    }
+
+    html[data-theme="light"] .stage::after {
+      background:
+        linear-gradient(90deg, rgba(244,240,231,0.92), transparent 13%, transparent 87%, rgba(244,240,231,0.92)),
+        linear-gradient(rgba(244,240,231,0.68), transparent 18%, transparent 82%, rgba(244,240,231,0.72));
+    }
+
+    html[data-theme="light"] .noise {
+      opacity: 0.18;
+      background-image:
+        radial-gradient(circle at 20% 10%, rgba(32,40,36,0.08) 0 1px, transparent 1.8px),
+        radial-gradient(circle at 60% 90%, rgba(32,40,36,0.05) 0 1px, transparent 1.8px);
+    }
+
+    html[data-theme="light"] .brand,
+    html[data-theme="light"] .final h1 {
+      color: var(--green);
+      text-shadow: none;
+    }
+
+    html[data-theme="light"] .kicker,
+    html[data-theme="light"] .watermark {
+      color: rgba(32,40,36,0.48);
+    }
+
+    html[data-theme="light"] .sheet {
+      border-color: rgba(35,45,39,0.13);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    html[data-theme="light"] .sheet.back-1,
+    html[data-theme="light"] .sheet.back-2 {
+      border-color: rgba(35,45,39,0.08);
+      background: var(--paper);
+    }
+
+    html[data-theme="light"] .paper-title,
+    html[data-theme="light"] .note-title {
+      color: rgba(32,40,36,0.9);
+    }
+
+    html[data-theme="light"] .paper-authors,
+    html[data-theme="light"] .paper-line,
+    html[data-theme="light"] .paper-column-line {
+      background: rgba(32,40,36,0.11);
+    }
+
+    html[data-theme="light"] .paper-algo {
+      border-color: rgba(32,40,36,0.11);
+      background: rgba(32,40,36,0.035);
+      color: rgba(32,40,36,0.44);
+    }
+
+    html[data-theme="light"] .paper-algo-line {
+      background: rgba(86,120,108,0.17);
+    }
+
+    html[data-theme="light"] .formula-box,
+    html[data-theme="light"] .chart-box,
+    html[data-theme="light"] .table-box,
+    html[data-theme="light"] .matrix-box {
+      border-color: rgba(32,40,36,0.13);
+      background: rgba(255,253,247,0.92);
+      box-shadow: 0 18px 46px rgba(55,58,48,0.12);
+      color: rgba(32,40,36,0.86);
+    }
+
+    html[data-theme="light"] .formula-line.secondary,
+    html[data-theme="light"] .formula-sub {
+      color: rgba(32,40,36,0.45);
+    }
+
+    html[data-theme="light"] .bars span {
+      background: rgba(86,120,108,0.34);
+    }
+
+    html[data-theme="light"] .mini-grid span {
+      background: rgba(176,138,77,0.22);
+    }
+
+    html[data-theme="light"] .attention-grid span {
+      background: rgba(86,120,108,0.12);
+    }
+
+    html[data-theme="light"] .attention-grid span.hot {
+      background: rgba(86,120,108,0.38);
+    }
+
+    html[data-theme="light"] .attention-grid span.mid {
+      background: rgba(176,138,77,0.25);
+    }
+
+    html[data-theme="light"] .axis-line {
+      background: linear-gradient(transparent, rgba(86,120,108,0.72), transparent);
+    }
+
+    html[data-theme="light"] .axis-node {
+      border-color: rgba(86,120,108,0.32);
+      background: var(--bg);
+      box-shadow: 0 0 0 0 rgba(86,120,108,0);
+    }
+
+    html[data-theme="light"] .axis-node.active {
+      border-color: var(--green);
+      background: var(--green);
+      box-shadow: 0 0 0 8px rgba(86,120,108,0.11);
+    }
+
+    html[data-theme="light"] .axis-label {
+      color: rgba(86,120,108,0.46);
+    }
+
+    html[data-theme="light"] .axis-label.active {
+      color: var(--green);
+    }
+
+    html[data-theme="light"] .note-sheet {
+      background: rgba(255,253,247,0.96);
+    }
+
+    html[data-theme="light"] .frontmatter {
+      border-bottom-color: rgba(32,40,36,0.11);
+      color: rgba(32,40,36,0.54);
+    }
+
+    html[data-theme="light"] .fm-value {
+      background: rgba(86,120,108,0.18);
+    }
+
+    html[data-theme="light"] .section-row {
+      color: rgba(32,40,36,0.78);
+    }
+
+    html[data-theme="light"] .section-dot,
+    html[data-theme="light"] .plot-dot {
+      background: var(--green);
+      box-shadow: 0 0 0 6px rgba(86,120,108,0.08);
+    }
+
+    html[data-theme="light"] .section-rule {
+      background: rgba(32,40,36,0.08);
+    }
+
+    html[data-theme="light"] .note-figure,
+    html[data-theme="light"] .note-equation {
+      border-color: rgba(32,40,36,0.11);
+      background: rgba(250,247,239,0.78);
+    }
+
+    html[data-theme="light"] .figure-caption,
+    html[data-theme="light"] .equation-caption {
+      color: rgba(32,40,36,0.42);
+    }
+
+    html[data-theme="light"] .plot-area {
+      border-left-color: rgba(32,40,36,0.18);
+      border-bottom-color: rgba(32,40,36,0.18);
+    }
+
+    html[data-theme="light"] .curve {
+      background: var(--green);
+    }
+
+    html[data-theme="light"] .curve.b {
+      background: var(--gold);
+    }
+
+    html[data-theme="light"] .curve.c {
+      background: rgba(32,40,36,0.28);
+    }
+
+    html[data-theme="light"] .note-equation {
+      color: rgba(32,40,36,0.74);
+    }
+
+    html[data-theme="light"] .images-chip,
+    html[data-theme="light"] .phrase {
+      border-color: rgba(86,120,108,0.18);
+      background: rgba(255,253,247,0.84);
+      color: var(--green);
+      box-shadow: 0 18px 44px rgba(55,58,48,0.12);
+    }
+
+    html[data-theme="light"] .images-chip {
+      background: rgba(86,120,108,0.07);
+    }
+
+    html[data-theme="light"] .final p {
+      color: rgba(32,40,36,0.7);
+    }
+
+    html[data-theme="light"] .final-rule {
+      background: linear-gradient(90deg, transparent, rgba(86,120,108,0.64), transparent);
+    }
+
+    html[data-theme="light"] .replay-button {
+      border-color: rgba(32,40,36,0.14);
+      background: rgba(255,253,247,0.88);
+      color: rgba(32,40,36,0.86);
+      box-shadow: 0 18px 44px rgba(55,58,48,0.14), inset 0 1px 0 rgba(255,255,255,0.55);
+    }
+
+    html[data-theme="light"] .replay-button:not(:disabled):hover,
+    html[data-theme="light"] .replay-button:not(:disabled):focus-visible {
+      border-color: rgba(86,120,108,0.38);
+      background: rgba(255,253,247,0.96);
+    }
+
+    html[lang="zh-CN"] .kicker,
+    html[lang="zh-CN"] .axis-label,
+    html[lang="zh-CN"] .phrase,
+    html[lang="zh-CN"] .formula-sub,
+    html[lang="zh-CN"] .figure-caption,
+    html[lang="zh-CN"] .equation-caption {
+      letter-spacing: 0.08em;
+    }
+
+    html[lang="zh-CN"] .paper-title {
+      font-size: clamp(15px, 1.16vw, 24px);
+      line-height: 1.12;
+    }
   </style>
 </head>
 <body>
-  <main class="stage" aria-label="DeepPaperNote clean README demo animation">
+  <main class="stage" id="stage" aria-label="DeepPaperNote README demo animation">
     <div class="noise" aria-hidden="true"></div>
     <div class="brand" id="brand">DeepPaperNote</div>
     <div class="kicker" id="kicker">single-paper deep reading workflow</div>
@@ -920,7 +1194,7 @@
       <div class="sheet back-2"></div>
       <div class="sheet back-1"></div>
       <div class="sheet main">
-        <div class="paper-title">A dense AI paper with objectives, attention maps, ablations, and claims</div>
+        <div class="paper-title" id="paperTitle">A dense AI paper with objectives, attention maps, ablations, and claims</div>
         <div class="paper-authors"></div>
         <div class="paper-line long"></div>
         <div class="paper-line mid"></div>
@@ -943,7 +1217,7 @@
           </div>
         </div>
         <div class="paper-algo">
-          ALGORITHM · POLICY UPDATE
+          <span id="algorithmLabel">ALGORITHM · POLICY UPDATE</span>
           <div class="paper-algo-line" style="width: 92%"></div>
           <div class="paper-algo-line" style="width: 74%"></div>
           <div class="paper-algo-line" style="width: 84%"></div>
@@ -965,7 +1239,7 @@
           𝓛(θ)=−∑<sub>t=1</sub><sup>T</sup>log p<sub>θ</sub>(y<sub>t</sub>|x,y<sub>&lt;t</sub>)+λ KL(π<sub>θ</sub>||π<sub>ref</sub>)
         </div>
       </div>
-      <div class="formula-sub">sequence objective · policy gradient · regularized alignment</div>
+      <div class="formula-sub" id="formulaSub">sequence objective · policy gradient · regularized alignment</div>
     </div>
     <div class="chart-box" id="chart">
       <div class="bars">
@@ -1012,23 +1286,23 @@
       <div class="sheet back-1"></div>
       <div class="sheet main note-sheet">
         <div class="frontmatter">
-          <div>domain</div><div class="fm-value" style="width: 62%"></div>
-          <div>paper</div><div class="fm-value" style="width: 82%"></div>
-          <div>status</div><div class="fm-value" style="width: 48%"></div>
+          <div id="fmDomain">domain</div><div class="fm-value" style="width: 62%"></div>
+          <div id="fmPaper">paper</div><div class="fm-value" style="width: 82%"></div>
+          <div id="fmStatus">status</div><div class="fm-value" style="width: 48%"></div>
         </div>
-        <div class="note-title">A structured Obsidian note</div>
-        <div class="section-row"><span class="section-dot"></span><span>核心信息</span></div>
+        <div class="note-title" id="noteTitle">A structured Obsidian note</div>
+        <div class="section-row"><span class="section-dot"></span><span id="sectionCore">Core metadata</span></div>
         <div class="section-rule"></div>
-        <div class="section-row"><span class="section-dot"></span><span>原文摘要翻译</span></div>
+        <div class="section-row"><span class="section-dot"></span><span id="sectionAbstract">Abstract translation</span></div>
         <div class="section-rule"></div>
-        <div class="section-row"><span class="section-dot"></span><span>创新点</span></div>
+        <div class="section-row"><span class="section-dot"></span><span id="sectionContributions">Contributions</span></div>
         <div class="section-rule"></div>
-        <div class="section-row"><span class="section-dot"></span><span>方法主线</span></div>
+        <div class="section-row"><span class="section-dot"></span><span id="sectionMethod">Method spine</span></div>
         <div class="section-rule"></div>
-        <div class="section-row"><span class="section-dot"></span><span>关键结果</span></div>
+        <div class="section-row"><span class="section-dot"></span><span id="sectionResults">Key results</span></div>
         <div class="note-artifact-row">
           <div class="note-figure">
-            <div class="figure-caption">Fig. 2 · training dynamics</div>
+            <div class="figure-caption" id="figureCaption">Fig. 2 · training dynamics</div>
             <div class="plot-area">
               <div class="curve a"></div>
               <div class="curve b"></div>
@@ -1039,7 +1313,7 @@
             </div>
           </div>
           <div class="note-equation">
-            <div class="equation-caption">Key formula</div>
+            <div class="equation-caption" id="equationCaption">Key formula</div>
             <div class="eq-small">Â<sub>i</sub> = r<sub>i</sub> - mean(r)<br>∇<sub>θ</sub>J = 𝔼[Â<sub>i</sub>∇logπ<sub>θ</sub>]</div>
           </div>
         </div>
@@ -1049,7 +1323,7 @@
 
     <section class="final" id="final">
       <h1>DeepPaperNote</h1>
-      <p>Turn a complex paper into an Obsidian note you will actually want to keep.</p>
+      <p id="finalParagraph">Turn a complex paper into an Obsidian note you will actually want to keep.</p>
       <div class="final-rule"></div>
     </section>
 
@@ -1070,8 +1344,98 @@
     let animationFrameId = 0;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const $ = (id) => document.getElementById(id);
+    const demoSettings = window.__demoSettings || { lang: "en", theme: "dark" };
+
+    const copy = {
+      en: {
+        htmlLang: "en",
+        title: "DeepPaperNote Demo",
+        kicker: "single-paper deep reading workflow",
+        paperTitle: "A dense AI paper with objectives, attention maps, ablations, and claims",
+        algorithmLabel: "ALGORITHM · POLICY UPDATE",
+        formulaSub: "sequence objective · policy gradient · regularized alignment",
+        axis: ["resolve", "evidence", "figures", "synthesis", "lint"],
+        phrases: ["Evidence before writing", "Figure status stays explicit", "Quality gates before save"],
+        frontmatter: ["domain", "paper", "status"],
+        noteTitle: "A structured Obsidian note",
+        sections: ["Core metadata", "Abstract translation", "Contributions", "Method spine", "Key results"],
+        figureCaption: "Fig. 2 · training dynamics",
+        equationCaption: "Key formula",
+        finalParagraph: "Turn a complex paper into an Obsidian note you will actually want to keep.",
+        aria: {
+          main: "DeepPaperNote README demo animation",
+          paperStack: "Unstructured paper input",
+          axis: "Evidence pipeline",
+          noteStack: "Structured Obsidian note",
+          replay: "Replay demo"
+        }
+      },
+      zh: {
+        htmlLang: "zh-CN",
+        title: "DeepPaperNote 演示",
+        kicker: "单篇论文深度阅读工作流",
+        paperTitle: "高密度 AI 论文",
+        algorithmLabel: "算法 · 策略更新",
+        formulaSub: "序列目标 · 策略梯度 · 正则化对齐",
+        axis: ["解析", "证据", "图表", "综合", "校验"],
+        phrases: ["先证据，后写作", "图表状态保持显式", "保存前通过质量门"],
+        frontmatter: ["领域", "论文", "状态"],
+        noteTitle: "结构化 Obsidian 笔记",
+        sections: ["核心信息", "原文摘要翻译", "创新点", "方法主线", "关键结果"],
+        figureCaption: "图 2 · 训练动态",
+        equationCaption: "关键公式",
+        finalParagraph: "将复杂论文转成一份你真的愿意保留的 Obsidian 笔记。",
+        aria: {
+          main: "DeepPaperNote README 演示动画",
+          paperStack: "非结构化论文输入",
+          axis: "证据工作流",
+          noteStack: "结构化 Obsidian 笔记",
+          replay: "重新播放演示"
+        }
+      }
+    };
+
+    function setText(id, value) {
+      const el = $(id);
+      if (el) el.textContent = value;
+    }
+
+    function applyLocalizedCopy() {
+      const t = copy[demoSettings.lang] || copy.en;
+      document.documentElement.lang = t.htmlLang;
+      document.documentElement.dataset.theme = demoSettings.theme === "light" ? "light" : "dark";
+      document.title = t.title;
+
+      setText("kicker", t.kicker);
+      setText("paperTitle", t.paperTitle);
+      setText("algorithmLabel", t.algorithmLabel);
+      setText("formulaSub", t.formulaSub);
+      t.axis.forEach((label, index) => setText(`label${index}`, label));
+      setText("phraseOne", t.phrases[0]);
+      setText("phraseTwo", t.phrases[1]);
+      setText("phraseThree", t.phrases[2]);
+      setText("fmDomain", t.frontmatter[0]);
+      setText("fmPaper", t.frontmatter[1]);
+      setText("fmStatus", t.frontmatter[2]);
+      setText("noteTitle", t.noteTitle);
+      setText("sectionCore", t.sections[0]);
+      setText("sectionAbstract", t.sections[1]);
+      setText("sectionContributions", t.sections[2]);
+      setText("sectionMethod", t.sections[3]);
+      setText("sectionResults", t.sections[4]);
+      setText("figureCaption", t.figureCaption);
+      setText("equationCaption", t.equationCaption);
+      setText("finalParagraph", t.finalParagraph);
+
+      $("stage").setAttribute("aria-label", t.aria.main);
+      $("paperStack").setAttribute("aria-label", t.aria.paperStack);
+      $("axis").setAttribute("aria-label", t.aria.axis);
+      $("noteStack").setAttribute("aria-label", t.aria.noteStack);
+      $("replayButton").setAttribute("aria-label", t.aria.replay);
+    }
 
     const els = {
+      stage: $("stage"),
       brand: $("brand"),
       kicker: $("kicker"),
       paperStack: $("paperStack"),
@@ -1089,6 +1453,8 @@
       nodes: [$("node0"), $("node1"), $("node2"), $("node3"), $("node4")],
       labels: [$("label0"), $("label1"), $("label2"), $("label3"), $("label4")]
     };
+
+    applyLocalizedCopy();
 
     const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
     const mix = (a, b, p) => a + (b - a) * p;
