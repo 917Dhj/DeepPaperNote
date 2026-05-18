@@ -13,6 +13,8 @@ except ImportError:  # pragma: no cover
     fitz = None
 
 from extract_pdf_assets import (
+    CAPTION_RE,
+    _classify_caption_kind,
     _classify_visual_quality,
     _looks_like_text_table_row,
     _other_caption_labels_for_crop,
@@ -74,6 +76,29 @@ def test_extract_pdf_assets_emits_asset_coverage(tmp_path: Path) -> None:
 
 def test_text_table_row_accepts_explicit_column_separators() -> None:
     assert _looks_like_text_table_row("Method | Strengths | Weaknesses") is True
+
+
+def test_caption_re_supports_conservative_appendix_labels() -> None:
+    assert CAPTION_RE.match("Fig. S1. Supplemental ablation.")
+    assert CAPTION_RE.match("Figure A2: Appendix pipeline.")
+    assert CAPTION_RE.match("Table S3 Extended results.")
+
+
+def test_caption_re_rejects_caption_like_prose() -> None:
+    assert CAPTION_RE.match("Figure out whether the method generalizes.") is None
+    assert CAPTION_RE.match("Table stakes for evaluation are high.") is None
+    assert CAPTION_RE.match("Figuratively speaking, this is not a caption.") is None
+
+
+def test_caption_re_keeps_this_rounds_unsupported_forms_out() -> None:
+    assert CAPTION_RE.match("Extended Data Fig. 1. Extra examples.") is None
+    assert CAPTION_RE.match("Figure 2.1. Hierarchical result.") is None
+    assert CAPTION_RE.match("Figure 3(a). Subpanel detail.") is None
+
+
+def test_supplementary_table_caption_classifies_as_table() -> None:
+    assert _classify_caption_kind("Supplementary Table 2") == "table"
+    assert _classify_caption_kind("Supplementary Figure 1") == "figure"
 
 
 def test_text_table_row_accepts_compact_text_comparison_row() -> None:

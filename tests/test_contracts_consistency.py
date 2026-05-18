@@ -25,6 +25,25 @@ NOTE_PLAN_REQUIRED_FIELDS = (
     "real_comparisons",
     "section_plan",
 )
+PDF_CONTRACT_DOCS = (
+    "SKILL.md",
+    "README.md",
+    "README.zh-CN.md",
+)
+PDF_FAIL_CLOSED_BANNED_PHRASES = (
+    "clearly labeled degraded",
+    "degraded note",
+    "provisional rather than finished",
+    "abstract only, as the weakest fallback",
+    "trustworthy full-text substitute",
+)
+PDF_FAIL_CLOSED_NEGATIONS = (
+    "do not",
+    "does not",
+    "must not",
+    "rather than",
+    "instead of",
+)
 
 
 def note_quality_structural_sections() -> tuple[str, ...]:
@@ -37,6 +56,30 @@ def note_quality_structural_sections() -> tuple[str, ...]:
         if line.startswith("- `") and line.endswith("`"):
             sections.append(line.removeprefix("- `").removesuffix("`"))
     return tuple(sections)
+
+
+def pdf_contract_docs() -> dict[str, str]:
+    docs = {
+        doc_name: (PROJECT_ROOT / doc_name).read_text(encoding="utf-8")
+        for doc_name in PDF_CONTRACT_DOCS
+    }
+    docs.update(
+        {
+            f"references/{path.name}": path.read_text(encoding="utf-8")
+            for path in sorted((PROJECT_ROOT / "references").glob("*.md"))
+        }
+    )
+    return docs
+
+
+def allows_banned_pdf_fallback(text: str, phrase: str) -> bool:
+    start = text.find(phrase)
+    while start != -1:
+        context = text[max(0, start - 80) : start]
+        if not any(negation in context for negation in PDF_FAIL_CLOSED_NEGATIONS):
+            return True
+        start = text.find(phrase, start + len(phrase))
+    return False
 
 
 def test_lint_required_sections_use_canonical_contract() -> None:
@@ -107,3 +150,49 @@ def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
     assert all(isinstance(example[field], str) for field in NOTE_PLAN_REQUIRED_FIELDS[:2])
     assert all(isinstance(example[field], list) for field in NOTE_PLAN_REQUIRED_FIELDS[2:])
     assert example["section_plan"]
+
+
+def test_pdf_contract_docs_do_not_allow_degraded_finished_notes() -> None:
+    offending: list[str] = []
+    for doc_name, text in pdf_contract_docs().items():
+        normalized = text.lower()
+        for phrase in PDF_FAIL_CLOSED_BANNED_PHRASES:
+            if allows_banned_pdf_fallback(normalized, phrase):
+                offending.append(f"{doc_name}: {phrase}")
+
+    assert offending == []
+
+
+def test_pdf_contract_banned_phrase_matcher_catches_allowed_fallbacks() -> None:
+    for phrase in PDF_FAIL_CLOSED_BANNED_PHRASES:
+        assert allows_banned_pdf_fallback(f"you may produce a {phrase}.", phrase)
+
+    assert not allows_banned_pdf_fallback(
+        "ask for OCR or a better source rather than finishing a degraded note.",
+        "degraded note",
+    )
+
+
+def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
+    skill_text = (PROJECT_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    workflow_text = (PROJECT_ROOT / "references" / "workflow.md").read_text(encoding="utf-8")
+    readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    readme_zh_text = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+
+    source_priority = skill_text.index("## Tool and Source Priority")
+    stop_policy = skill_text.index("If PDF or evidence quality is insufficient")
+    assert source_priority < stop_policy
+
+    for required_source in (
+        "local PDF path given by the user",
+        "local Zotero item and local Zotero attachment if available",
+        "DOI and publisher metadata",
+        "arXiv or open-access PDF sources",
+    ):
+        assert required_source in skill_text[source_priority:stop_policy]
+
+    assert "Accepted inputs: title, DOI, URL, arXiv ID, local PDF path, Zotero item key." in workflow_text
+    assert "Acquire the best available PDF" in workflow_text
+    assert "stop and report the blocked stage honestly" in workflow_text
+    assert "A title, DOI, URL, arXiv ID, or local PDF all work." in readme_text
+    assert "标题、DOI、URL、本地 PDF 都可以" in readme_zh_text

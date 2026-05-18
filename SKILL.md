@@ -46,7 +46,7 @@ The note must adapt to the paper type. Use the same base structure, but shift em
 Follow this order:
 1. resolve the paper identity
 2. collect metadata
-3. acquire the PDF or full text
+3. acquire the best available PDF
 4. extract evidence
 5. extract PDF image assets
 6. plan figure placement
@@ -139,7 +139,7 @@ Local-library-first rule (applies only when the Zotero check above succeeds):
 - Figure captions in the note must preserve the original paper numbering such as `Fig. 1` or `Table 2`.
 - The note must pass a style gate: no mixed Chinese-English prose lines except stable proper nouns or citation metadata.
 - Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, fix the reported issues and re-run lint. Keep fixing and re-running until lint passes — multiple rounds are normal and expected. Do not decide that any failure is an acceptable exception — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only escalate to the user if the same failures appear unchanged across multiple rounds with no reduction, indicating the model is unable to make further progress independently.
-- If PDF or evidence quality is insufficient for a real deep note, fail closed or clearly label the output as degraded.
+- If PDF or evidence quality is insufficient for a real deep note, fail closed: stop, report the blocked stage, and ask for the better PDF, OCR/source material, or other input needed to continue.
 
 Model-first rule:
 - scripts may gather and structure evidence
@@ -217,5 +217,5 @@ Current status:
 ## Limits
 
 - If the paper identity is ambiguous, confirm before writing.
-- If the PDF is unavailable and full-text evidence is too thin, do not present a note as if it were a full deep read.
+- If the PDF is unavailable after all supported acquisition paths have been tried, stop and report what input is needed; do not produce a degraded, provisional, or abstract-only note as the finished output. Supported acquisition paths include local PDF, Zotero attachment, metadata `pdf_url`, direct PDF URL, arXiv/open-access sources, publisher PDF if accessible, DOI enrichment, and any other current fetch path implemented by the workflow.
 - Placeholder-first figure planning is required; image extraction is optional and must never reduce textual coverage.

@@ -61,17 +61,20 @@ For a normal single-paper note request, the pipeline below is a required executi
    - do not pretend metadata collection happened if no canonical record was produced
 
 3. `fetch_pdf`
-   Acquire the best available PDF or equivalent full text.
+   Acquire the best available PDF.
    Preferred order:
    - local PDF
    - Zotero attachment
+   - metadata `pdf_url`
+   - direct PDF URL supplied by the user
    - arXiv or open-access PDF
    - publisher PDF if accessible
+   - DOI enrichment and other currently supported acquisition paths
    Completion condition:
-   - a usable PDF or trustworthy full-text substitute is available for downstream extraction
+   - a usable PDF is available for downstream extraction
    Allowed on failure:
-   - stop or produce a clearly labeled degraded path
-   - do not continue as if this were a full deep read when only thin metadata exists
+   - stop and report which acquisition paths were tried and what input is needed
+   - do not continue as a degraded, provisional, abstract-only, or full-text-substitute note when no usable PDF exists
 
 4. `extract_evidence`
    Produce an evidence pack rather than a finished note.
@@ -86,7 +89,7 @@ For a normal single-paper note request, the pipeline below is a required executi
    Completion condition:
    - an evidence pack exists with section-level or candidate-level evidence for the paper
    Allowed on failure:
-   - retry extraction or clearly mark evidence quality as degraded
+   - retry extraction, ask for a better PDF/OCR/source material, or stop
    - do not replace this stage with "I read some of the PDF myself so it is probably fine"
 
 5. `extract_pdf_assets`
@@ -295,6 +298,7 @@ Suggested keys:
 - `coverage`
 - `evidence`
 - `appendix`
+- `references`
 - `section_previews`
 - `figure_plan`
 - `pdf_assets`
@@ -302,6 +306,8 @@ Suggested keys:
 - `writing_contract`
 
 `coverage` should include section extraction coverage, PDF page coverage, appendix evidence counts, extraction failures, and bundle text budget metadata.
+
+`references.candidates` contains model-facing candidates extracted from the paper's references section. Each candidate may include a confirmed `wikilink` when an existing vault note matched by basename or alias; otherwise use `display_text` as the plain-text fallback.
 
 ### `note_plan`
 
@@ -324,7 +330,8 @@ Do not silently downgrade.
 If the PDF or evidence is insufficient:
 - report which stage failed
 - explain why a full deep note is not trustworthy
-- optionally produce a clearly labeled degraded note
+- stop or ask for the better PDF, OCR, or source material needed to continue
+- do not produce a degraded, provisional, or abstract-only note as the finished output
 
 ## Portability Rule
 

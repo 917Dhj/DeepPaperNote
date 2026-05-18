@@ -122,6 +122,12 @@ def test_label_normalization_matches_common_figure_spellings() -> None:
     assert _normalize_label_for_match("Figure. 1") == "fig 1"
 
 
+def test_label_normalization_matches_appendix_figure_spellings() -> None:
+    assert _normalize_label_for_match("Fig. S1") == "fig s1"
+    assert _normalize_label_for_match("Figure A2") == "fig a2"
+    assert _normalize_label_for_match("Table S3") == "table s3"
+
+
 def test_legacy_image_assets_still_populate_candidate_page_images() -> None:
     planned = attach_candidate_images(
         [

@@ -129,6 +129,37 @@ def test_extract_caption_lines_supports_chinese_figure_and_table_labels() -> Non
     ]
 
 
+def test_extract_caption_lines_supports_conservative_appendix_labels() -> None:
+    text = "\n".join(
+        [
+            "Fig. S1. Supplemental ablation.",
+            "Figure A2: Appendix pipeline.",
+            "Table S3 Extended results.",
+        ]
+    )
+
+    assert extract_caption_lines(text, "figure") == [
+        {"id": "Fig S1", "caption": "Supplemental ablation."},
+        {"id": "Figure A2", "caption": "Appendix pipeline."},
+    ]
+    assert extract_caption_lines(text, "table") == [
+        {"id": "Table S3", "caption": "Extended results."},
+    ]
+
+
+def test_extract_caption_lines_rejects_caption_like_prose() -> None:
+    text = "\n".join(
+        [
+            "Figure out whether the method generalizes before drawing conclusions.",
+            "Table stakes for a good benchmark include held-out evaluation.",
+            "Figuratively speaking, the result is not a Figure caption.",
+        ]
+    )
+
+    assert extract_caption_lines(text, "figure") == []
+    assert extract_caption_lines(text, "table") == []
+
+
 def test_extract_pdf_sections_supports_chinese_headings(tmp_path: Path, monkeypatch) -> None:
     pdf_path = tmp_path / "paper.pdf"
     pdf_path.write_bytes(b"%PDF-1.4")

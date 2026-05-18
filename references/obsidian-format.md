@@ -140,6 +140,7 @@ When the paper is complex, add `###` subsections such as:
 ## 引用 Section Format
 
 Entries in `## 引用` should link to existing notes in the vault where possible.
+If the synthesis bundle includes `references.candidates`, use confirmed candidate `wikilink` values when present. When `wikilink` is empty, treat `display_text` as the plain-text fallback.
 Follow this priority order for each reference:
 
 1. **Vault lookup first**: check whether the cited paper already has a note in the vault.
@@ -153,6 +154,7 @@ Follow this priority order for each reference:
    ```
    - Vaswani et al. (2017). Attention Is All You Need.
    ```
+   Use the candidate `display_text` as the plain fallback when available.
 
 Rules:
 - Never use a raw English paper title as the wikilink target; it will not match vault filenames.

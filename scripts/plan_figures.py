@@ -171,9 +171,17 @@ def _normalize_label_for_match(label: str) -> str:
     'Table 2' / 'table. 2' / 'Table. 2' all become 'table 2'.
     """
     text = normalize_whitespace(label).lower()
-    text = re.sub(r"^figure\.?\s*", "fig ", text)
-    text = re.sub(r"^fig\.?\s*", "fig ", text)
-    text = re.sub(r"^table\.?\s*", "table ", text)
+    supplementary_match = re.match(
+        r"^supplementary\s+(fig(?:ure)?|table)\.?\s*(\d+[a-z]?)$",
+        text,
+    )
+    if supplementary_match:
+        prefix = "table" if supplementary_match.group(1) == "table" else "fig"
+        return f"{prefix} s{supplementary_match.group(2)}"
+    label_match = re.match(r"^(fig(?:ure)?|table)\.?\s*([as]?\d+[a-z]?)$", text)
+    if label_match:
+        prefix = "table" if label_match.group(1) == "table" else "fig"
+        return f"{prefix} {label_match.group(2)}"
     return normalize_whitespace(text)
 
 

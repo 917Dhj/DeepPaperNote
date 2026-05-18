@@ -283,7 +283,7 @@ Why it matters:
 Important note:
 
 - DeepPaperNote does **not** require one specific Zotero integration
-- for DeepPaperNote, the key capability is that the agent can search Zotero items, inspect metadata, and ideally read local full text
+- for DeepPaperNote, the key capability is that the agent can search Zotero items, inspect metadata, and ideally read local PDF attachments
 - the two routes above are **not** always plug-and-play, so stable use may still require some adaptation on your side
 
 ### Optional: Semantic Scholar API key
@@ -331,7 +331,7 @@ Important scope note:
 - it is **not** used as a replacement for model-side understanding
 - it is **not** used to understand images directly
 
-Without OCR, DeepPaperNote still works well on normal digital PDFs, but scanned or low-quality PDFs may produce weaker evidence.
+Without OCR, DeepPaperNote still works well on normal digital PDFs. For scanned or low-quality PDFs, if extracted evidence is too weak for a real deep note, the workflow should ask for OCR or a better source rather than finishing a lower-quality output.
 
 Required software and packages for OCR:
 
@@ -379,7 +379,7 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 | --- | --- | --- |
 | v1.1.1 | ✅ Released | Patch release tightening figure placeholder validation and table crop quality checks |
 | v1.1.0 | ✅ Released | Major figure/table extraction upgrade with caption-anchored crops, visual quality gates, and placeholder-first figure asset candidates |
-| v1.0.1 | ✅ Released | Patch release for Obsidian-native frontmatter and wikilink support, lint compatibility fixes, and cleaner README assets |
+| v1.0.1 | ✅ Released | Patch release for Obsidian-native frontmatter formatting, lint compatibility fixes, and cleaner README assets |
 | v1.0.0 | ✅ Released | First stable release: pure cross-agent skill structure for Claude Code, Codex, Cursor, Copilot, Gemini CLI, and other Agent Skills-compatible environments |
 | v0.3.1-alpha | ✅ Released | Default Obsidian paper root changed to `Research/Papers`, with runtime path resolution and save behavior aligned to the new location |
 | v0.3.0-alpha | ✅ Released | Major quality upgrade: dedicated innovation section, explicit mechanism flow, stronger workflow discipline, final readability review, math syntax gate, and the new `Original Abstract Translation` front-matter block |
@@ -393,7 +393,7 @@ The default path is:
 
 1. resolve the paper identity
 2. collect metadata
-3. fetch a PDF or enough full-text evidence
+3. fetch the best available PDF
 4. extract evidence
 5. extract PDF image assets
 6. plan figure positions

@@ -274,7 +274,7 @@ DeepPaperNote 不依赖 Zotero 才能工作。
 ⚠️需要特别说明的是：
 
 - DeepPaperNote **不强依赖某一个固定的 Zotero 集成仓库**
-- 对 DeepPaperNote 来说，需要的关键能力是：让 agent 能搜索 Zotero 条目、查看元数据、最好还能读取本地全文
+- 对 DeepPaperNote 来说，需要的关键能力是：让 agent 能搜索 Zotero 条目、查看元数据、最好还能读取本地 PDF 附件
 - 上面提到的两条路线目前都**不一定是即插即用方案**，如果你想稳定使用，通常还需要自己做一层适配或改造
 
 ### 可选：Semantic Scholar API Key
@@ -316,7 +316,7 @@ DeepPaperNote 当前的 OCR 使用逻辑是：
 - 它 **不会** 代替模型去理解论文
 - 它 **不会** 直接负责“理解图片内容”
 
-如果没有 OCR，DeepPaperNote 处理普通数字版 PDF 依然没问题，但面对扫描版或低质量 PDF 时，证据质量会更弱一些。
+如果没有 OCR，DeepPaperNote 处理普通数字版 PDF 依然没问题。面对扫描版或低质量 PDF 时，如果抽取到的证据不足以支撑真正的深度笔记，流程应该要求补充 OCR 或更好的来源，而不是完成一篇低质量输出。
 
 OCR 需要的依赖如下：
 
@@ -364,7 +364,7 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 | --- | --- | --- |
 | v1.1.1 | ✅ 已发布 | Patch 小更新：收紧图表占位格式校验和表格裁图质量检查 |
 | v1.1.0 | ✅ 已发布 | 图表提取质量升级：新增基于图注的整页区域裁剪、视觉质量门禁，并保持图像候选占位优先 |
-| v1.0.1 | ✅ 已发布 | 一个 patch 版本：补充 Obsidian 原生 frontmatter 和 wikilink 支持，修复 lint 兼容性问题，并清理 README 中未使用的资源图片 |
+| v1.0.1 | ✅ 已发布 | 一个 patch 版本：补充 Obsidian 原生 frontmatter 格式支持，修复 lint 兼容性问题，并清理 README 中未使用的资源图片 |
 | v1.0.0 | ✅ 已发布 | 第一个稳定版：采用纯 skill 结构，支持 Claude Code、Codex、Cursor、Copilot、Gemini CLI 以及其他兼容 Agent Skills 的环境 |
 | v0.3.1-alpha | ✅ 已发布 | 默认 Obsidian 论文根目录改为 `Research/Papers`，运行时路径解析和写入行为也同步对齐到这个新位置 |
 | v0.3.0-alpha | ✅ 已发布 | 一次较大的质量升级：新增固定创新点章节、显式机制流程、更强的整条 workflow 约束、最终可读性质检、公式语法检查，以及新的 `原文摘要翻译` 前置区块 |
@@ -378,7 +378,7 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 1. 解析论文身份
 2. 收集元数据
-3. 获取 PDF 或足够强的全文证据
+3. 获取最佳可用 PDF
 4. 抽取证据
 5. 提取 PDF 图像资产
 6. 规划图表位置

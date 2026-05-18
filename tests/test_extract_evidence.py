@@ -63,6 +63,7 @@ def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
     assert payload["summary"]["ablation_signals"]
     assert payload["summary"]["mechanism_signals"]
     assert payload["summary"]["paper_type"] == "AI_method"
+    assert payload["evidence_pack"]["reference_candidates"] == []
 
 
 def test_extract_evidence_outputs_pdf_coverage_for_truncated_pdf(tmp_path: Path) -> None:
@@ -118,6 +119,19 @@ def test_extract_evidence_outputs_pdf_coverage_for_truncated_pdf(tmp_path: Path)
     assert coverage["references_start_page"] == 10
     assert coverage["appendix_detected"] is True
     assert coverage["appendix_start_page"] == 20
+    assert payload["evidence_pack"]["reference_candidates"][:1] == [
+        {
+            "raw_text": "[1] Ignored reference.",
+            "display_text": "Ignored reference.",
+            "page_hint": "p. 10",
+            "doi": "",
+            "arxiv_id": "",
+            "wikilink": "",
+            "vault_target": "",
+            "match_status": "no_vault_match",
+            "match_reason": "none",
+        }
+    ]
     assert coverage["section_stop_reason"] == "references"
     assert coverage["section_stop_page"] == 10
     assert payload["summary"]["pdf_coverage"] == coverage

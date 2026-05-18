@@ -31,11 +31,11 @@ Use sources in this order:
 1. synthesis bundle metadata
 2. evidence extracted from the full PDF
 3. figure/table captions and candidate assets
-4. abstract only, as the weakest fallback
+4. abstract metadata only for identity and context, not as a substitute for a finished deep note
 
-For a finished long-term note, prefer the complete PDF over the abstract.
+For a finished long-term note, require a usable PDF-backed evidence path.
 
-If you only have the abstract, say so clearly and treat the note as provisional rather than finished.
+If you only have the abstract after the supported PDF acquisition paths have failed, stop and ask for a usable PDF, OCR, or source material rather than writing a provisional or abstract-only note.
 
 ## Recommended Workflow
 

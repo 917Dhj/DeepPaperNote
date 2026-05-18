@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import argparse
 
-from common import maybe_load_json_record, normalize_whitespace
+from common import maybe_load_json_record, normalize_whitespace, runtime_config
 from contracts import NOTE_REQUIRED_SECTIONS
+from citation_links import resolve_reference_links
 
 
 SECTION_TEXT_LIMIT_SECTIONS = 8
@@ -73,6 +74,49 @@ def sanitize_equation_candidates(evidence_pack: dict, *, limit: int = 8) -> list
                 "equation": equation,
                 "source_section": normalize_whitespace(str(item.get("source_section", ""))),
                 "kind_hint": normalize_whitespace(str(item.get("kind_hint", ""))),
+            }
+        )
+    return sanitized
+
+
+def sanitize_reference_candidates(evidence_pack: dict, *, limit: int = 20) -> list[dict]:
+    candidates = evidence_pack.get("reference_candidates", []) or []
+    if not isinstance(candidates, list):
+        return []
+    try:
+        matched_candidates = resolve_reference_links(candidates[:limit], runtime_config())
+    except Exception:
+        matched_candidates = [
+            {
+                **candidate,
+                "wikilink": "",
+                "vault_target": "",
+                "match_status": "vault_unavailable",
+                "match_reason": "none",
+            }
+            for candidate in candidates[:limit]
+            if isinstance(candidate, dict)
+        ]
+
+    sanitized: list[dict] = []
+    for item in matched_candidates:
+        if not isinstance(item, dict):
+            continue
+        raw_text = normalize_whitespace(str(item.get("raw_text", "")))
+        display_text = normalize_whitespace(str(item.get("display_text", "")))
+        if not raw_text and not display_text:
+            continue
+        sanitized.append(
+            {
+                "raw_text": raw_text,
+                "display_text": display_text,
+                "page_hint": normalize_whitespace(str(item.get("page_hint", ""))),
+                "doi": normalize_whitespace(str(item.get("doi", ""))),
+                "arxiv_id": normalize_whitespace(str(item.get("arxiv_id", ""))),
+                "wikilink": normalize_whitespace(str(item.get("wikilink", ""))),
+                "vault_target": normalize_whitespace(str(item.get("vault_target", ""))),
+                "match_status": normalize_whitespace(str(item.get("match_status", "no_vault_match"))),
+                "match_reason": normalize_whitespace(str(item.get("match_reason", "none"))),
             }
         )
     return sanitized
@@ -341,6 +385,7 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
         },
         "appendix": appendix_summary(evidence_pack),
         "equation_candidates": sanitize_equation_candidates(evidence_pack),
+        "references": {"candidates": sanitize_reference_candidates(evidence_pack)},
         "candidate_chunks": sanitize_candidate_chunks(evidence_pack),
         "section_texts": sanitize_section_texts(evidence_pack),
         "section_previews": section_previews(evidence_pack),

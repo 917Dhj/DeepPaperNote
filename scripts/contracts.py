@@ -65,6 +65,18 @@ class EquationCandidate(TypedDict, total=False):
     kind_hint: str
 
 
+class ReferenceCandidate(TypedDict, total=False):
+    raw_text: str
+    display_text: str
+    page_hint: str
+    doi: str
+    arxiv_id: str
+    wikilink: str
+    vault_target: str
+    match_status: str
+    match_reason: str
+
+
 class FigureQualitySignals(TypedDict, total=False):
     visual_quality_status: str
     quality_reason_codes: list[str]
@@ -135,6 +147,7 @@ class EvidencePack(TypedDict, total=False):
     ablation_evidence: list[EvidenceItem]
     limitations_evidence: list[EvidenceItem]
     equation_candidates: list[EquationCandidate]
+    reference_candidates: list[ReferenceCandidate]
     figure_captions: list[dict[str, Any]]
     table_captions: list[dict[str, Any]]
     sections: list[dict[str, Any]]
@@ -179,6 +192,7 @@ class SynthesisBundle(TypedDict, total=False):
     coverage: dict[str, Any]
     evidence: dict[str, list[dict[str, Any]]]
     section_previews: list[dict[str, Any]]
+    references: dict[str, Any]
     figure_plan: dict[str, Any]
     pdf_assets: dict[str, Any]
     summary: dict[str, Any]
@@ -212,6 +226,7 @@ def empty_evidence_pack() -> EvidencePack:
         ablation_evidence=[],
         limitations_evidence=[],
         equation_candidates=[],
+        reference_candidates=[],
         figure_captions=[],
         table_captions=[],
         sections=[],
@@ -242,6 +257,7 @@ def empty_synthesis_bundle() -> SynthesisBundle:
         coverage={},
         evidence={},
         section_previews=[],
+        references={},
         figure_plan={},
         pdf_assets={},
         summary={},

@@ -29,6 +29,7 @@ from common import (
     split_sentences,
 )
 from contracts import empty_evidence_pack
+from citation_links import extract_reference_candidates_from_pdf
 
 
 CORE_SECTIONS = ("introduction", "method", "experiment")
@@ -677,6 +678,12 @@ def main() -> None:
         experiment_text=experiment_text,
         conclusion_text=conclusion_text,
     )
+    pack["reference_candidates"] = []
+    if has_pdf and pdf_coverage.get("references_start_page"):
+        pack["reference_candidates"] = extract_reference_candidates_from_pdf(
+            pdf_path.resolve(),
+            pdf_coverage.get("references_start_page"),
+        )
     pack["candidate_chunks"] = candidates
     pack["language_hint"] = language_hint_for_text(
         " ".join(part for part in [full_text, abstract] if part)

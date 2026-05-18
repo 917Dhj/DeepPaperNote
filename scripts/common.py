@@ -1550,8 +1550,15 @@ def normalize_caption_label(label: str) -> str:
     chinese_match = re.match(r"^(图|表)\s*([A-Z]?\d+[a-z]?)$", label, re.IGNORECASE)
     if chinese_match:
         return f"{chinese_match.group(1)} {chinese_match.group(2)}"
+    supplementary_match = re.match(
+        r"^(supplementary)\s+(fig(?:ure)?|table)\.?\s*(\d+[a-z]?)$",
+        label,
+        re.IGNORECASE,
+    )
+    if supplementary_match:
+        return f"{supplementary_match.group(1)} {supplementary_match.group(2)} {supplementary_match.group(3)}"
     english_match = re.match(
-        r"^(fig(?:ure)?|table)\.?\s*([A-Z]?\d+[a-z]?)$",
+        r"^(fig(?:ure)?|table)\.?\s*([AS]?\d+[a-z]?)$",
         label,
         re.IGNORECASE,
     )
@@ -1566,12 +1573,20 @@ def extract_caption_lines(pdf_text: str, kind: str) -> list[dict[str, str]]:
     lines = [clean_pdf_line(line) for line in pdf_text.splitlines()]
     if kind == "figure":
         pattern = re.compile(
-            r"^((?:fig(?:ure)?|图)\.?\s*[A-Z]?\d+[a-z]?)[:：.。,\s、|—–-]*(.*)$",
+            r"^((?:"
+            r"supplementary\s+fig(?:ure)?\.?\s*\d+[a-z]?"
+            r"|fig(?:ure)?\.?\s*[AS]?\d+[a-z]?"
+            r"|图\.?\s*[A-Z]?\d+[a-z]?"
+            r"))(?!\.\d)(?:[:：.。,\s、|—–-]+|$)(.*)$",
             re.IGNORECASE,
         )
     else:
         pattern = re.compile(
-            r"^((?:table|表)\.?\s*[A-Z]?\d+[a-z]?)[:：.。,\s、|—–-]*(.*)$",
+            r"^((?:"
+            r"supplementary\s+table\.?\s*\d+[a-z]?"
+            r"|table\.?\s*[AS]?\d+[a-z]?"
+            r"|表\.?\s*[A-Z]?\d+[a-z]?"
+            r"))(?!\.\d)(?:[:：.。,\s、|—–-]+|$)(.*)$",
             re.IGNORECASE,
         )
     for idx, line in enumerate(lines):
