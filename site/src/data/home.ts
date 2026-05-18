@@ -213,12 +213,12 @@ export const homePages: Record<Locale, HomePageContent> = {
     },
     install: {
       title: "Install the skill. Hand it one paper.",
-      body: "Keep the website out of the skill package. Keep the workflow focused on the note.",
+      body: "A title, DOI, URL, arXiv link, or local PDF is enough to start a deep-reading note.",
       commandsLabel: "Install commands",
       commands: [
         "npx skills add 917Dhj/DeepPaperNote",
         "python3 -m pip install PyMuPDF",
-        "Use DeepPaperNote on this paper: https://arxiv.org/abs/1706.03762",
+        "Turn this paper into an Obsidian note: https://arxiv.org/abs/1706.03762",
       ],
     },
     footer: {
@@ -232,7 +232,7 @@ export const homePages: Record<Locale, HomePageContent> = {
     lang: "zh-CN",
     title: "DeepPaperNote｜为 Obsidian 打造的证据型论文精读笔记",
     description:
-      "DeepPaperNote 把一篇难啃的论文，整理成一份你愿意长期保留的 Obsidian 深度笔记。",
+      "DeepPaperNote 把一篇复杂的论文，整理成一份你愿意长期保留的 Obsidian 精读笔记。",
     brandHomeLabel: "DeepPaperNote 首页",
     navLabel: "页面导航",
     headerActionsLabel: "页头操作",
@@ -260,9 +260,9 @@ export const homePages: Record<Locale, HomePageContent> = {
       darkLabel: "切换为暗色",
     },
     hero: {
-      title: "把一篇难读的论文，整理成一份真正值得保留的 Obsidian 深度笔记。",
+      title: "把一篇复杂的论文，整理成一份真正值得保留的 Obsidian 精读笔记",
       body:
-        "DeepPaperNote 是给研究者用的论文深读工作流——先取证、再写作，不只是把摘要复述一遍。",
+        "DeepPaperNote 是给研究者用的论文精读工作流——先取证、再写作，不只是把摘要复述一遍。",
       actionsLabel: "主要操作",
       install: "使用 npx 安装",
       github: "查看 GitHub",
@@ -276,7 +276,7 @@ export const homePages: Record<Locale, HomePageContent> = {
       cards: [
         {
           tag: "结果",
-          title: "是深读笔记，不是摘要复述",
+          title: "是精读笔记，不是摘要复述",
           body:
             "笔记会保留论文的问题意识、方法主线、关键结果、真实局限，以及可以复用的研究上下文。",
           className: "card-yellow",
@@ -292,14 +292,14 @@ export const homePages: Record<Locale, HomePageContent> = {
           tag: "图表",
           title: "天然重视图表证据",
           body:
-            "关键图、表格和公式会留在它们所支撑的论证旁边，让视觉证据真正参与深读。",
+            "关键图、表格和公式会留在它们所支撑的论证旁边，让视觉证据真正参与精读。",
           className: "card-rose",
         },
       ],
       noteOutlineLabel: "生成笔记大纲示例",
       noteOutlinePanel: "输出结构",
       noteOutlineTitle: "DeepPaperNote 输出",
-      noteOutlineItems: ["原文摘要翻译", "创新点", "方法主线", "关键结果", "深度分析"],
+      noteOutlineItems: ["原文摘要翻译", "创新点", "方法主线", "关键结果", "精读分析"],
       visualPanel: "视觉证据",
       visualTitle: "图、表与公式，始终留在它们支撑的论断旁。",
       visualBody:
@@ -326,26 +326,26 @@ export const homePages: Record<Locale, HomePageContent> = {
       ],
     },
     pipeline: {
-      title: "从论文到笔记，走一条克制的流程。",
+      title: "从论文到笔记，走一条严谨的流程。",
       body:
-        "脚本负责取证，模型负责深读；最终笔记会经过 lint 校验和可读性复核，再写进你的研究知识库。",
+        "脚本负责取证，模型负责精读；最终笔记会经过 lint 校验和可读性复核，再写进你的研究知识库。",
       steps: [
         { title: "解析", body: "锁定这篇论文的唯一身份。" },
         { title: "证据", body: "提取章节、图注、指标和上下文。" },
         { title: "图表", body: "先把关键图、表格的位置占下来。" },
-        { title: "综合", body: "把证据包写成深读笔记。" },
+        { title: "综合", body: "把证据包写成精读笔记。" },
         { title: "校验", body: "校对结构、风格与笔记完整度。" },
         { title: "保存", body: "按 Obsidian 的习惯，归档到对应的论文文件夹。" },
       ],
     },
     install: {
       title: "装好这个 Skill，丢给它一篇论文就行。",
-      body: "网站本身不会被打进 Skill 包里，工作流始终围绕最终那份笔记。",
+      body: "论文标题、DOI、URL、arXiv 链接或本地 PDF 都可以，交给 agent 就能开始生成精读笔记。",
       commandsLabel: "安装命令",
       commands: [
         "npx skills add 917Dhj/DeepPaperNote",
         "python3 -m pip install PyMuPDF",
-        "用 DeepPaperNote 精读这篇论文：https://arxiv.org/abs/1706.03762",
+        "把这篇文章整理成 Obsidian 笔记：https://arxiv.org/abs/1706.03762",
       ],
     },
     footer: {
