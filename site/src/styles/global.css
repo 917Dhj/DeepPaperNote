@@ -313,8 +313,8 @@ a {
 }
 
 .theme-button {
-  min-width: auto;
-  padding: 0 9px;
+  padding: 0;
+  width: 28px;
 }
 
 .locale-switch a:hover,
@@ -349,8 +349,13 @@ a {
 
 .theme-button svg {
   display: block;
-  height: 15px;
-  width: 15px;
+  fill: none;
+  height: 16px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 16px;
 }
 
 .button {
@@ -1114,8 +1119,8 @@ a {
   }
 
   .theme-button {
-    min-width: auto;
-    padding: 0 7px;
+    padding: 0;
+    width: 26px;
   }
 
   .demo-frame {
