@@ -15,5 +15,6 @@ dist/
 build/
 *.egg-info/
 .agent-work/
+tmp/
 DESIGN.md
 .claude/

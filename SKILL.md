@@ -80,12 +80,31 @@ Completion-language rule:
 - if the workflow stopped early, name the current stage and the still-missing required stages instead of using completion language
 - lint is a floor, not the writing objective
 
-Read [references/workflow.md](references/workflow.md) for the full pipeline and data contracts.
-Read [references/architecture.md](references/architecture.md) for the separation between the reusable core workflow and the platform-adapter layer.
-Read [references/evidence-first.md](references/evidence-first.md) before drafting a high-quality note so that the note is planned around evidence rather than headings alone.
-Read [references/deep-analysis.md](references/deep-analysis.md) before writing the final note body.
-Read [references/final-writing.md](references/final-writing.md) before turning the structured artifacts into the final user-facing note.
-Read [references/model-synthesis.md](references/model-synthesis.md) for the preferred model-first execution loop after the synthesis bundle is ready.
+## Core Execution Contract
+
+`SKILL.md` plus the generated `synthesis_bundle.json` must be enough to complete a normal note-generation run.
+Files under `references/` are optional stage-specific deep dives, not a default reading checklist.
+
+Non-negotiable rules:
+- evidence-first: draft only from the synthesis bundle, coverage metadata, explicit `note_plan`, and inspected paper evidence; never finish from title/abstract/headings alone
+- fail-closed: if a usable PDF or sufficient evidence cannot be obtained after supported acquisition paths, stop and ask for better source material rather than producing a finished degraded note
+- model-first: scripts structure evidence, but the model must decide emphasis, contribution, mechanism, limitations, and final Chinese prose
+- explicit planning: before drafting, save a compact JSON `note_plan` such as `<note>.plan.json` or `*_note_plan.json`; pass it to `scripts/lint_note.py --plan-file ...`
+- required structure: include the canonical required sections, with `原文摘要翻译` before `一句话总结` and a dedicated `创新点` section immediately after `原文摘要翻译`
+- abstract translation: when abstract metadata exists, `原文摘要翻译` is a faithful Chinese translation of the original abstract, not a bilingual block and not the model's own summary
+- mechanism depth: method, framework, and system papers should include `### 机制流程` under `方法主线`, normally as a 3 to 4 step numbered flow with input, operation, and output destination
+- placeholder-first figures: plan major figure/table placeholders first; replace one only when identity match and visual usability are both strong; otherwise keep the placeholder
+- final quality gates: lint is a floor; after lint passes, reread the whole note for final readability, and rerun lint if that review edits the note
+- Obsidian-first save: if a vault is configured, treat it as the required target, create the paper-local `images/` directory, and never present a fallback/workspace write as a successful vault save
+
+Reference usage policy:
+- do not load every reference file by default
+- consult `references/workflow.md` only for detailed data contracts or pipeline debugging
+- consult `references/evidence-first.md`, `references/deep-analysis.md`, or `references/final-writing.md` only when the paper is complex or the draft is too shallow
+- consult `references/figure-placement.md` only for ambiguous figure/table placement or image replacement decisions
+- consult `references/obsidian-format.md` only for Markdown, vault, frontmatter, or reference-link formatting details
+- consult `references/note-quality.md` or `references/paper-types.md` only for final review or domain adaptation
+- consult `references/metadata-sources.md` only when metadata is incomplete, and `references/architecture.md` only for repository maintenance decisions
 
 ## Tool and Source Priority
 
@@ -158,15 +177,7 @@ Model-first rule:
 - in that final readability review, ordinary English phrase leftovers should usually be rewritten into natural Chinese, while stable proper nouns may remain in English
 - do not use the final readability review to invent new facts, empty filler text, or shallower but safer wording just to satisfy lint
 
-Use [references/note-quality.md](references/note-quality.md) for quality checks.
-Use [references/paper-types.md](references/paper-types.md) for domain adaptation.
-Use [references/obsidian-format.md](references/obsidian-format.md) for Markdown and vault conventions.
-Use [references/figure-placement.md](references/figure-placement.md) for figure placeholder rules.
-Use [references/evidence-first.md](references/evidence-first.md) when deciding how to turn bundle evidence into an actual note plan.
-Use [references/deep-analysis.md](references/deep-analysis.md) when the user expects a note that feels like a real long-term research note.
-Use [references/metadata-sources.md](references/metadata-sources.md) when metadata is incomplete.
-Use [references/architecture.md](references/architecture.md) when deciding whether a change belongs in the reusable core or only in the platform-adapter layer.
-Use [references/final-writing.md](references/final-writing.md) when drafting the final note in natural language.
+The topic references above can improve difficult runs, but the normal execution path should not depend on reading all of them.
 
 ## Scripts
 

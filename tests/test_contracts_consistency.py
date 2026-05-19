@@ -25,6 +25,10 @@ NOTE_PLAN_REQUIRED_FIELDS = (
     "real_comparisons",
     "section_plan",
 )
+REFERENCE_ROUTING_DOCS = (
+    "SKILL.md",
+    "references/model-synthesis.md",
+)
 PDF_CONTRACT_DOCS = (
     "SKILL.md",
     "README.md",
@@ -136,6 +140,20 @@ def test_note_plan_docs_do_not_offer_xml_or_temporary_files_as_alternatives() ->
     )
     for phrase in banned_phrases:
         assert phrase not in combined
+
+
+def test_normal_execution_docs_do_not_force_broad_reference_reads() -> None:
+    for doc_name in REFERENCE_ROUTING_DOCS:
+        text = (PROJECT_ROOT / doc_name).read_text(encoding="utf-8")
+
+        assert "Read [references/" not in text
+        assert "Use [references/" not in text
+
+    skill_text = (PROJECT_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    model_synthesis_text = (PROJECT_ROOT / "references" / "model-synthesis.md").read_text(encoding="utf-8")
+
+    assert "not a default reading checklist" in skill_text
+    assert "not a second router" in model_synthesis_text
 
 
 def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
