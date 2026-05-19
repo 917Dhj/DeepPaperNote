@@ -217,6 +217,8 @@ If the bundle contains candidate figure pages or candidate image files:
 - reject caption-only crops, missing table bodies, table crops contaminated by running prose or another Figure/Table caption, large text/title/abstract crops, and crops with very low visual body ratio
 - if visual quality is missing, ambiguous, or failed, keep the placeholder
 - still make the final decision yourself rather than trusting the candidate ranking blindly
+- if a candidate is usable, resolve it explicitly as inserted, kept for a concrete visual defect, kept as lower-priority because a more central related figure is already inserted, or kept because materialization/copy/write failed
+- do not keep a usable candidate as a placeholder only because the note should stay light, the values were transcribed, the figure can be checked later, or it is convenient as a back-reference
 
 Final-note figure rules:
 - keep the original paper numbering, such as `Fig. 1`, `Fig. 3`, `Table 2`

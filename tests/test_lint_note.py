@@ -223,6 +223,70 @@ def test_flashattention_style_embed_with_italic_caption_passes() -> None:
     assert has_figure_marker(note) is True
 
 
+def test_usable_candidate_soft_placeholder_reasons_fail_figure_structure_gate() -> None:
+    statuses = [
+        "图像裁剪可读，但最终笔记采用占位以保持轻量。",
+        "图像匹配度高，但最终笔记不插入真实图片。",
+        "表格裁剪清晰，但正文已摘录核心数值。",
+        "虽然有可用候选图，但表格内容在正文中更适合直接转写关键数值。",
+    ]
+    for status in statuses:
+        note = f"""# Title
+
+## 方法主线
+
+> [!figure] Fig. 2 候选图
+> 建议位置：方法主线
+> 放置原因：帮助理解执行链。
+> 当前状态：{status}
+"""
+        issues = figure_structure_issues(note)
+        assert any(issue["reason"] == "usable_candidate_unresolved_decision" for issue in issues)
+        assert figure_structure_passes(note) is False
+
+
+def test_usable_candidate_visual_defect_placeholder_reason_passes() -> None:
+    note = """# Title
+
+## 方法主线
+
+> [!figure] Table 5 评测表
+> 建议位置：方法主线
+> 放置原因：帮助理解评测协议。
+> 当前状态：候选裁剪可用，但混入相邻 Table 6。
+"""
+    assert figure_structure_issues(note) == []
+    assert figure_structure_passes(note) is True
+
+
+def test_usable_candidate_lower_priority_placeholder_reason_passes() -> None:
+    note = """# Title
+
+## 方法主线
+
+> [!figure] Fig. 3 补充机制图
+> 建议位置：方法主线
+> 放置原因：帮助理解补充机制。
+> 当前状态：候选裁剪可用；已插入 Figure 2 作为同一机制更核心图，因此本图低优先级。
+"""
+    assert figure_structure_issues(note) == []
+    assert figure_structure_passes(note) is True
+
+
+def test_usable_candidate_materialization_blocked_reason_passes() -> None:
+    note = """# Title
+
+## 方法主线
+
+> [!figure] Fig. 4 工具链图
+> 建议位置：方法主线
+> 放置原因：帮助理解工具链。
+> 当前状态：候选可用但 materialize_figure_asset.py 复制失败/权限不足。
+"""
+    assert figure_structure_issues(note) == []
+    assert figure_structure_passes(note) is True
+
+
 def test_chinese_placeholder_policy_prose_is_not_flagged_as_nonstandard_placeholder() -> None:
     note = """# Title
 

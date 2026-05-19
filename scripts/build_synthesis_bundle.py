@@ -505,6 +505,8 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
                 "Every kept placeholder must appear directly under the most relevant analytical section; never collect them in catch-all sections.",
                 "Every kept placeholder must use the standard `> [!figure]` callout with `建议位置`, `放置原因`, and `当前状态`; never use plain markers such as `[图表占位 | Fig. 1]`.",
                 "`reject_visual_quality` means the candidate image is unsafe to insert; it does not require keeping a final-note placeholder for every rejected candidate.",
+                "For each usable candidate, resolve the final note as inserted, visual-defect placeholder, lower-priority placeholder because a more central related figure is already inserted, or materialization-blocked placeholder.",
+                "Do not keep a usable candidate as a placeholder only because the note should stay light, key values were transcribed, the figure can be checked later, or it is convenient as a back-reference.",
                 "When inserting a real image, prefer the `obsidian_embed` returned by materialize_figure_asset.py and preserve the original Fig./Table id.",
             ],
         },

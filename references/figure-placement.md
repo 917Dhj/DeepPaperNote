@@ -45,6 +45,17 @@ Do not let scripts make the final semantic choice; scripts should only prepare c
 - Do not produce a text-only note first and then ask the user in a follow-up whether figures should be inserted.
 - If no figure can be confidently replaced, finish the note with placeholders and explain that outcome in the final response.
 
+## Usable Candidate Decision Contract
+
+`usable_candidate` means the candidate is eligible for final judgment; it is not an automatic insertion command.
+For every usable figure/table candidate, resolve the final note into one of these states:
+- `inserted`: materialize the image and replace the placeholder with the real image plus one italic caption line
+- `kept_placeholder_visual_defect`: keep the placeholder because manual review found a concrete visual defect, such as contamination, truncation, missing table body, partial subfigure, or caption loss
+- `kept_placeholder_lower_priority`: keep the placeholder because a more central or more direct related figure/table is already inserted
+- `kept_placeholder_materialization_blocked`: keep the placeholder because `materialize_figure_asset.py` or file copy/write permission failed
+
+Do not use soft reasons such as keeping the note light, values already transcribed, future lookup, or convenient back-reference as the standalone reason for keeping a usable candidate as a placeholder.
+
 ## Integrated Placement Rule
 
 Every kept placeholder must be placed directly under the most relevant substantive section named by its `建议位置`.

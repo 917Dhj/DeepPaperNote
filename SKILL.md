@@ -158,6 +158,8 @@ Local-library-first rule (applies only when the Zotero check above succeeds):
 - When a real image is inserted, render it as the Obsidian embed or Markdown image embed followed immediately by one italic caption line.
 - Do not keep a redundant `> [!figure]` placeholder callout for the same inserted real figure.
 - Figure captions in the note must preserve the original paper numbering such as `Fig. 1` or `Table 2`.
+- If a figure/table candidate is marked usable, resolve it explicitly: insert the real image, keep the placeholder because of a concrete visual defect, keep it as lower-priority because a more central related figure is already inserted, or keep it because materialization failed.
+- Do not use soft reasons such as keeping the note light, values already transcribed, future lookup, or convenient back-reference as the standalone `当前状态` for a usable candidate.
 - The note must pass a style gate: no mixed Chinese-English prose lines except stable proper nouns or citation metadata.
 - Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, fix the reported issues and re-run lint. Keep fixing and re-running until lint passes — multiple rounds are normal and expected. Do not decide that any failure is an acceptable exception — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only escalate to the user if the same failures appear unchanged across multiple rounds with no reduction, indicating the model is unable to make further progress independently.
 - If PDF or evidence quality is insufficient for a real deep note, fail closed: stop, report the blocked stage, and ask for the better PDF, OCR/source material, or other input needed to continue.

@@ -99,6 +99,81 @@ REAL_IMAGE_STATUS_RE = re.compile(
     flags=re.IGNORECASE | re.VERBOSE,
 )
 
+USABLE_CANDIDATE_STATUS_RE = re.compile(
+    r"""
+    (?:
+        候选[^。；，\n>]{0,24}(?<!不)(?:可用|可读|清晰)
+        |
+        (?<!不)可用[^。；，\n>]{0,12}候选
+        |
+        (?:图像|图片|表格|图|表)?\s*裁剪[^。；，\n>]{0,12}(?<!不)(?:可用|可读|清晰)
+        |
+        匹配度\s*高
+        |
+        高\s*置信(?:度)?[^。；，\n>]{0,12}候选
+        |
+        usable\s+candidate
+        |
+        readable\s+crop
+        |
+        clear\s+crop
+        |
+        high[-\s]*(?:confidence|match)
+    )
+    """,
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+
+USABLE_CANDIDATE_VISUAL_DEFECT_RE = re.compile(
+    r"""
+    (?:
+        混入|污染|相邻|裁切|截断|切断|缺失|缺少|表体不完整|表格主体缺失|正文污染
+        |
+        只拿到|局部(?:子图|面板|截图|区域)|部分(?:子图|裁剪)
+        |
+        无法稳定|不可独立解释|质量门|reject_visual_quality
+        |
+        partial|subpanel|contaminat|truncat|incomplete|missing
+        |
+        caption\s*(?:missing|cut|truncated)
+    )
+    """,
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+
+USABLE_CANDIDATE_LOWER_PRIORITY_RE = re.compile(
+    r"""
+    (?:
+        低优先级|优先级较低|次要|补充性
+        |
+        (?:已插入|已有|already\s+inserted)[^。；\n]{0,40}
+        (?:更核心|更直接|低优先级|同一(?:机制|概念|结论|任务|流程))
+        |
+        (?:Fig(?:ure)?|Table|图|表)\s*[\w.-]*[^。；\n]{0,40}(?:更核心|更直接)
+        |
+        lower[-\s]*priority
+        |
+        more\s+(?:central|direct|core)
+    )
+    """,
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+
+USABLE_CANDIDATE_MATERIALIZATION_BLOCKED_RE = re.compile(
+    r"""
+    (?:
+        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|工具|copy)
+        [^。；\n]{0,40}
+        (?:失败|不足|拒绝|denied|blocked|error|报错)
+        |
+        (?:失败|不足|拒绝|denied|blocked|error|报错)
+        [^。；\n]{0,40}
+        (?:materialize|物化|复制|拷贝|写入|权限|permission|copy)
+    )
+    """,
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+
 MARKDOWN_IMAGE_EMBED_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*$")
 FIGURE_CALLOUT_TITLE_RE = re.compile(r"^>\s*\[!figure\][+-]?\s*(.*)$")
 
@@ -414,6 +489,32 @@ def figure_callout_title(line: str) -> str:
     return match.group(1).strip()
 
 
+def figure_status_text(line: str) -> str:
+    stripped = line.strip()
+    if not stripped.startswith("> 当前状态："):
+        return ""
+    return stripped.removeprefix("> 当前状态：").strip()
+
+
+def has_lower_priority_placeholder_reason(status_text: str) -> bool:
+    return bool(USABLE_CANDIDATE_LOWER_PRIORITY_RE.search(status_text))
+
+
+def has_accepted_usable_placeholder_reason(status_text: str) -> bool:
+    return bool(
+        USABLE_CANDIDATE_VISUAL_DEFECT_RE.search(status_text)
+        or USABLE_CANDIDATE_LOWER_PRIORITY_RE.search(status_text)
+        or USABLE_CANDIDATE_MATERIALIZATION_BLOCKED_RE.search(status_text)
+    )
+
+
+def usable_candidate_decision_is_unresolved(status_text: str) -> bool:
+    return bool(
+        USABLE_CANDIDATE_STATUS_RE.search(status_text)
+        and not has_accepted_usable_placeholder_reason(status_text)
+    )
+
+
 def is_figure_bucket_heading(title: str) -> bool:
     normalized = title.strip().lower()
     has_chinese_residue = any(token in normalized for token in FIGURE_BUCKET_RESIDUE_TOKENS)
@@ -542,12 +643,39 @@ def figure_callout_real_image_status_issues(text: str) -> list[dict[str, object]
             nxt = lines[j].strip()
             if not nxt.startswith(">"):
                 break
-            if nxt.startswith("> 当前状态：") and REAL_IMAGE_STATUS_RE.search(nxt):
+            status_text = figure_status_text(nxt)
+            if status_text and REAL_IMAGE_STATUS_RE.search(nxt) and not has_lower_priority_placeholder_reason(status_text):
                 issues.append(
                     {
                         "line_number": j + 1,
                         "line": nxt,
                         "reason": "inserted_figure_redundant_callout",
+                    }
+                )
+                break
+            j += 1
+    return issues
+
+
+def figure_callout_usable_candidate_status_issues(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("> [!figure]"):
+            continue
+        j = idx + 1
+        while j < len(lines):
+            nxt = lines[j].strip()
+            if not nxt.startswith(">"):
+                break
+            status_text = figure_status_text(nxt)
+            if status_text and usable_candidate_decision_is_unresolved(status_text):
+                issues.append(
+                    {
+                        "line_number": j + 1,
+                        "line": nxt,
+                        "reason": "usable_candidate_unresolved_decision",
                     }
                 )
                 break
@@ -602,6 +730,7 @@ def figure_structure_issues(text: str) -> list[dict[str, object]]:
         + nonstandard_figure_placeholder_issues(text)
         + figure_callout_placement_issues(text)
         + figure_callout_real_image_status_issues(text)
+        + figure_callout_usable_candidate_status_issues(text)
         + image_embed_caption_issues(text)
     )
 
