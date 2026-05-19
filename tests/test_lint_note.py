@@ -155,6 +155,23 @@ def test_figure_callout_missing_location_fails_figure_structure_gate() -> None:
     assert figure_structure_passes(note) is False
 
 
+def test_figure_callout_missing_title_fails_figure_structure_gate() -> None:
+    note = """# Title
+
+## 方法主线
+
+> [!figure]
+> 建议位置：方法主线
+> 放置原因：帮助理解整体流程。
+> 当前状态：保留占位；未找到高置信度整图。
+"""
+    warnings = inspect_figure_callouts(note)
+    issues = figure_structure_issues(note)
+    assert "figure_callout_missing_title" in warnings
+    assert any(issue["reason"] == "figure_callout_missing_title" for issue in issues)
+    assert figure_structure_passes(note) is False
+
+
 def test_nonstandard_bracket_figure_placeholder_fails_figure_structure_gate() -> None:
     note = """# Title
 

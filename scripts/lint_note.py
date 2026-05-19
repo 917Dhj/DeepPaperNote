@@ -100,6 +100,7 @@ REAL_IMAGE_STATUS_RE = re.compile(
 )
 
 MARKDOWN_IMAGE_EMBED_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*$")
+FIGURE_CALLOUT_TITLE_RE = re.compile(r"^>\s*\[!figure\][+-]?\s*(.*)$")
 
 
 def parser() -> argparse.ArgumentParser:
@@ -377,6 +378,8 @@ def inspect_figure_callouts(text: str) -> list[str]:
         if not stripped.startswith("> [!figure]"):
             i += 1
             continue
+        if not figure_callout_title(stripped):
+            warnings.append("figure_callout_missing_title")
         has_location = False
         has_reason = False
         has_status = False
@@ -402,6 +405,13 @@ def inspect_figure_callouts(text: str) -> list[str]:
     if saw_legacy_block:
         warnings.append("legacy_figure_placeholder_block_used")
     return warnings
+
+
+def figure_callout_title(line: str) -> str:
+    match = FIGURE_CALLOUT_TITLE_RE.match(line.strip())
+    if not match:
+        return ""
+    return match.group(1).strip()
 
 
 def is_figure_bucket_heading(title: str) -> bool:
@@ -466,6 +476,16 @@ def figure_callout_placement_issues(text: str) -> list[dict[str, object]]:
             continue
         if not stripped.startswith("> [!figure]"):
             continue
+
+        title = figure_callout_title(stripped)
+        if not title:
+            issues.append(
+                {
+                    "line_number": idx + 1,
+                    "callout": stripped,
+                    "reason": "figure_callout_missing_title",
+                }
+            )
 
         current_section = section_name_for_line(lines, idx)
         current_subsection = subsection_name_for_line(lines, idx)
