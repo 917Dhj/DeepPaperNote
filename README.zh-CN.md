@@ -246,6 +246,8 @@ setx DEEPPAPERNOTE_PAPERS_DIR "Research/Papers"
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   如果你希望中间产物统一落在一个固定位置，方便调试、清理或做实验，这个配置会比较有用。
 
+领域路由由 `references/domain_rules.yaml` 中的可编辑分类表控制。DeepPaperNote 会先判断应用领域，再回退到方法领域；只有标题或摘要能提供相对保守的证据时，才会复用已有的 Obsidian 一级领域目录。
+
 ### 可选：用于本地文献库优先工作流的 Zotero
 
 DeepPaperNote 不依赖 Zotero 才能工作。

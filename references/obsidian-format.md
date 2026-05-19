@@ -17,6 +17,8 @@ Default file name:
   - `<领域>/<paper_slug>/<paper_slug>.md`
   - `<领域>/<paper_slug>/images/...`
 - when deciding `<领域>`, prefer matching an existing first-level domain folder under the user's papers directory
+- domain routing uses the editable taxonomy in `references/domain_rules.yaml`: application domains are checked before fallback method domains
+- reuse existing first-level folders conservatively; method-only evidence should not force reuse of an unrelated application folder
 - only create a new domain folder when no existing domain is a reasonable fit
 - do not save new papers directly into the bare papers root
 - always create the paper-local `images/` directory during final save, even if no real image is inserted

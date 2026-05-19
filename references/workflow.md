@@ -193,6 +193,8 @@ For a normal single-paper note request, the pipeline below is a required executi
     - do not reinterpret "vault configured but not currently writable" as a workspace-fallback case
     Resolve a domain folder before writing:
     - prefer an existing first-level domain folder when there is a reasonable match
+    - use `references/domain_rules.yaml` for application-first domain routing, with fallback method domains only when no application domain fits
+    - keep existing-folder reuse conservative; method-only evidence is not enough to force reuse of an unrelated application folder
     - create a new domain only when no existing domain fits well
     - do not save directly into the bare papers root
     Complete the figure decision before this step:

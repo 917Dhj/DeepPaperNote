@@ -257,6 +257,8 @@ Why the optional path settings can help:
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   Useful if you want all intermediate artifacts in a predictable location for debugging, cleanup, or experimentation.
 
+Domain routing is controlled by the editable taxonomy in `references/domain_rules.yaml`. DeepPaperNote checks application domains before fallback method domains, and it only reuses an existing first-level Obsidian folder when the title or abstract provides conservative evidence for that folder.
+
 ### Optional: Zotero for local-library-first workflows
 
 DeepPaperNote can work without Zotero.
