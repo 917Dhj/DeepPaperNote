@@ -10,6 +10,7 @@ from lint_note import (
     figure_structure_passes,
     find_missing_sections,
     front_matter_order_warnings,
+    has_figure_marker,
     inspect_note_plan,
     inspect_figure_callouts,
     math_render_issues,
@@ -96,6 +97,38 @@ def test_figure_callout_inside_declared_section_passes() -> None:
     assert figure_structure_passes(note) is True
 
 
+def test_figure_callout_with_inserted_image_status_fails_figure_structure_gate() -> None:
+    note = """# Title
+
+## 方法主线
+
+> [!figure] Fig. 2 总体流程
+> 建议位置：方法主线
+> 放置原因：帮助理解执行链。
+> 当前状态：已替换为真实图片；当前插入的是论文原图的局部面板。
+"""
+    issues = figure_structure_issues(note)
+    assert any(issue["reason"] == "inserted_figure_redundant_callout" for issue in issues)
+    assert figure_structure_passes(note) is False
+
+
+def test_dqn_style_callout_plus_embed_fails_figure_structure_gate() -> None:
+    note = """# Title
+
+## 方法主线
+
+> [!figure] Fig. 1 Agent-environment loop
+> 建议位置：方法主线
+> 放置原因：帮助理解强化学习交互闭环。
+> 当前状态：已复制到 images/figure_1.png，并插入为真实图片。
+![[Research/Papers/DQN/images/figure_1.png]]
+*论文原图编号：Fig. 1。Agent-environment loop。*
+"""
+    issues = figure_structure_issues(note)
+    assert any(issue["reason"] == "inserted_figure_redundant_callout" for issue in issues)
+    assert figure_structure_passes(note) is False
+
+
 def test_non_figure_remaining_heading_is_not_flagged() -> None:
     note = """# Title
 
@@ -148,15 +181,29 @@ Figure Placeholder | Fig. 3 reasoning example.
     assert figure_structure_passes(note) is False
 
 
-def test_real_image_only_note_does_not_fail_figure_structure_gate() -> None:
+def test_image_embed_without_italic_caption_fails_figure_structure_gate() -> None:
     note = """# Title
 
 ## 方法主线
 
 ![Fig. 2 Architecture](images/page_005_fig_figure_2.png)
 """
+    issues = figure_structure_issues(note)
+    assert any(issue["reason"] == "inserted_figure_missing_caption" for issue in issues)
+    assert figure_structure_passes(note) is False
+
+
+def test_flashattention_style_embed_with_italic_caption_passes() -> None:
+    note = """# Title
+
+## 方法主线
+
+![[Research/Papers/FlashAttention/images/page_005_fig_figure_2.png]]
+*论文原图编号：Fig. 2。FlashAttention 的分块计算流程图。这里插入是因为它最能帮助理解方法主线。*
+"""
     assert figure_structure_issues(note) == []
     assert figure_structure_passes(note) is True
+    assert has_figure_marker(note) is True
 
 
 def test_chinese_placeholder_policy_prose_is_not_flagged_as_nonstandard_placeholder() -> None:
@@ -451,6 +498,80 @@ def test_note_plan_missing_is_soft_lint_warning(tmp_path) -> None:
     assert payload["passes_basic_structure"] is True
     assert payload["passes_style_gate"] is True
     assert payload["passes_math_gate"] is True
+    assert payload["passes_figure_gate"] is True
+
+
+def test_real_image_embed_counts_as_figure_marker_in_full_lint(tmp_path) -> None:
+    note_path = tmp_path / "Paper.md"
+    note_path.write_text(
+        """# Paper
+
+## 核心信息
+
+这是一条完整元信息占位。
+
+## 原文摘要翻译
+
+这是一段中文摘要翻译。
+
+## 创新点
+
+这里记录论文的具体创新。
+
+## 一句话总结
+
+这篇论文解决一个清晰问题。
+
+## 研究问题
+
+问题边界描述清楚。
+
+## 数据与任务定义
+
+任务输入和输出定义清楚。
+
+## 方法主线
+
+### 执行流程
+
+这里说明方法过程。
+
+![[Research/Papers/Paper/images/page_001_fig_figure_1.png]]
+*论文原图编号：Fig. 1。方法流程图。*
+
+## 关键结果
+
+结果部分记录关键发现。
+
+## 深度分析
+
+分析部分说明为什么成立。
+
+## 局限
+
+这里记录限制。
+
+## 我的笔记
+
+这里记录个人理解。
+
+## 引用
+
+这里记录引用信息。
+""",
+        encoding="utf-8",
+    )
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    result = subprocess.run(
+        [sys.executable, str(script_path), "--input", str(note_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert "no_figure_markers" not in payload["warnings"]
     assert payload["passes_figure_gate"] is True
 
 

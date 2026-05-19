@@ -155,6 +155,8 @@ Local-library-first rule (applies only when the Zotero check above succeeds):
 - Every kept figure/table placeholder must use the standard `> [!figure]` callout format with `建议位置`, `放置原因`, and `当前状态`; do not use ordinary paragraph markers such as `[图表占位 | Fig. 1]`, `图表占位：Table 2`, or `Figure Placeholder | Fig. 3`.
 - Real images may replace some placeholders, but only if they clearly match the corresponding paper figure/table.
 - When inserting a real image, prefer the `obsidian_embed` returned by `scripts/materialize_figure_asset.py`.
+- When a real image is inserted, render it as the Obsidian embed or Markdown image embed followed immediately by one italic caption line.
+- Do not keep a redundant `> [!figure]` placeholder callout for the same inserted real figure.
 - Figure captions in the note must preserve the original paper numbering such as `Fig. 1` or `Table 2`.
 - The note must pass a style gate: no mixed Chinese-English prose lines except stable proper nouns or citation metadata.
 - Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, fix the reported issues and re-run lint. Keep fixing and re-running until lint passes — multiple rounds are normal and expected. Do not decide that any failure is an acceptable exception — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only escalate to the user if the same failures appear unchanged across multiple rounds with no reduction, indicating the model is unable to make further progress independently.

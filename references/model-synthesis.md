@@ -34,6 +34,7 @@ For normal runs, `SKILL.md` plus the generated `synthesis_bundle.json` is the re
    Start from semantic placeholders.
    Insert a real image only when identity match and visual usability are both strong; otherwise keep the placeholder.
    If a real image is selected, materialize it before the final save and prefer the returned Obsidian embed.
+   In the final note, inserted real images must be an embed followed by one italic caption line, without a redundant `[!figure]` callout for the same figure.
 
 6. Run `scripts/lint_note.py`.
    If lint fails, revise and rerun it before saving.

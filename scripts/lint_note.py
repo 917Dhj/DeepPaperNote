@@ -86,6 +86,21 @@ NONSTANDARD_FIGURE_PLACEHOLDER_RE = re.compile(
     """
 )
 
+REAL_IMAGE_STATUS_RE = re.compile(
+    r"""
+    (?:
+        已\s*(?:替换|插入|复制|拷贝|物化|写入)
+        |
+        (?:替换|插入)\s*为\s*真实图片
+        |
+        \b(?:inserted|replaced|copied|materialized)\b
+    )
+    """,
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+
+MARKDOWN_IMAGE_EMBED_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*$")
+
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "lint note")
@@ -495,11 +510,79 @@ def figure_callout_placement_issues(text: str) -> list[dict[str, object]]:
     return issues
 
 
+def figure_callout_real_image_status_issues(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("> [!figure]"):
+            continue
+        j = idx + 1
+        while j < len(lines):
+            nxt = lines[j].strip()
+            if not nxt.startswith(">"):
+                break
+            if nxt.startswith("> 当前状态：") and REAL_IMAGE_STATUS_RE.search(nxt):
+                issues.append(
+                    {
+                        "line_number": j + 1,
+                        "line": nxt,
+                        "reason": "inserted_figure_redundant_callout",
+                    }
+                )
+                break
+            j += 1
+    return issues
+
+
+def is_image_embed_line(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.startswith("![[") or bool(MARKDOWN_IMAGE_EMBED_RE.match(stripped))
+
+
+def has_figure_marker(text: str) -> bool:
+    return (
+        "[!figure]" in text
+        or "[FIGURE_PLACEHOLDER]" in text
+        or any(is_image_embed_line(line) for line in text.splitlines())
+    )
+
+
+def is_italic_caption_line(line: str) -> bool:
+    stripped = line.strip()
+    if len(stripped) < 3:
+        return False
+    if stripped.startswith("*") and stripped.endswith("*") and not stripped.startswith("**"):
+        return True
+    return stripped.startswith("_") and stripped.endswith("_") and not stripped.startswith("__")
+
+
+def image_embed_caption_issues(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if not is_image_embed_line(stripped):
+            continue
+        if idx + 1 < len(lines) and is_italic_caption_line(lines[idx + 1]):
+            continue
+        issues.append(
+            {
+                "line_number": idx + 1,
+                "line": stripped,
+                "reason": "inserted_figure_missing_caption",
+            }
+        )
+    return issues
+
+
 def figure_structure_issues(text: str) -> list[dict[str, object]]:
     return (
         figure_bucket_heading_issues(text)
         + nonstandard_figure_placeholder_issues(text)
         + figure_callout_placement_issues(text)
+        + figure_callout_real_image_status_issues(text)
+        + image_embed_caption_issues(text)
     )
 
 
@@ -897,7 +980,7 @@ def main() -> None:
         warnings.append("no_level3_headings")
     if len(headers) < 5:
         warnings.append("too_few_headings")
-    if "[!figure]" not in text and "[FIGURE_PLACEHOLDER]" not in text:
+    if not has_figure_marker(text):
         warnings.append("no_figure_markers")
     if len(text.splitlines()) < 20:
         warnings.append("note_too_short")

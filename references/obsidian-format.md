@@ -81,7 +81,7 @@ Rules:
 
 ## Figure Placeholder Style
 
-Use this callout format as the default and preferred placeholder style:
+Use this callout format only for placeholders that remain unresolved in the final note:
 
 ```md
 > [!figure] Fig. 3 数据分布与质量评估
@@ -100,12 +100,13 @@ Formatting rules:
 `当前状态` should be explicit, for example:
 - `保留占位；未找到高置信度整图。`
 - `保留占位；当前只匹配到疑似局部子图，不足以稳定替换。`
-- `已替换为真实图片；当前插入的是论文原图的局部面板，不是完整复合图。`
 
 The structured `[FIGURE_PLACEHOLDER] ... [/FIGURE_PLACEHOLDER]` block is legacy/internal only.
 Do not use it in the final user-facing note unless you are debugging the pipeline.
 
-If a real image has been selected and materialized into the vault, prefer an Obsidian embed:
+If a real image has been selected and materialized into the vault, do not keep the `[!figure]` callout for that same figure.
+Prefer an Obsidian embed, or use a Markdown image embed when that is the available path.
+The embed must be followed immediately by exactly one italic caption line:
 
 ```md
 ![[Research/Papers/DeepPaperNote/paper_slug/images/page_003_img_01.png]]

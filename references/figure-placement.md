@@ -78,6 +78,7 @@ Reject candidates that are:
 ## Placeholder Requirements
 
 Every kept placeholder in the final note must use the standard `[!figure]` callout format.
+This callout is only valid for figures or tables that remain placeholders.
 Do not use ordinary paragraph markers such as `[图表占位 | Fig. 1]`, `图表占位：Table 2`, or `Figure Placeholder | Fig. 3`.
 
 Each placeholder should include:
@@ -100,14 +101,23 @@ Preferred final-note format:
 The placeholder text should be stable and explicit:
 - `建议位置` says where the figure belongs in the note
 - `放置原因` says why the figure matters for understanding the paper
-- `当前状态` says whether the note keeps a placeholder or has replaced it with a real image
+- `当前状态` says why the note keeps this placeholder
 - `当前状态` must preserve truth over neatness; if extraction is uncertain, say so plainly
 
 If a real image is inserted:
 - keep the original paper identifier, for example `Fig. 2` or `Table 1`
 - do not renumber it according to note order
 - prefer the `obsidian_embed` returned by `scripts/materialize_figure_asset.py`
+- render the embed followed immediately by one italic caption line
+- do not keep a redundant `[!figure]` callout for that same inserted figure
 - if the extracted image is only a subpanel or partial crop, say so explicitly
+
+Preferred final-note format for inserted real images:
+
+```md
+![[Research/Papers/DeepPaperNote/paper_slug/images/page_003_img_01.png]]
+*论文原图编号：Fig. 2。数据生成流程图。这里插入是因为它最能帮助理解方法主线。*
+```
 
 ## When to Skip
 

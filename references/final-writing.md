@@ -223,9 +223,11 @@ Final-note figure rules:
 - do not rename them to `图 1`, `图 2` just because of note order
 - if you replace a placeholder with a real image, keep the same paper figure id in the caption
 - if you replace a placeholder with a real image, prefer the `obsidian_embed` returned by `scripts/materialize_figure_asset.py`
+- if you replace a placeholder with a real image, render only the embed plus one italic caption line; do not keep a redundant `[!figure]` callout for that same figure
 - if an important figure cannot be confidently extracted, keep a placeholder with a short explanation
 - every kept placeholder must appear directly under its most relevant analytical section; do not create catch-all sections such as `剩余图表占位`, `未放置图表`, `Remaining figures`, or `Leftover figures`
 - every kept placeholder must use the standard `[!figure]` callout format; never use ordinary paragraph markers such as `[图表占位 | Fig. 1]`, `图表占位：Table 2`, or `Figure Placeholder | Fig. 3`
+- `[!figure]` callouts are only valid for kept placeholders, not for real images already inserted into the note
 - `reject_visual_quality` means the candidate image is unsafe to insert, not that the final note must keep a placeholder for that rejected candidate
 - for survey papers, summarize repetitive representative-work figures or appendix tables in prose when they do not materially help the reader as standalone callouts
 - text may be complete even when figures are partial; do not let missing images erase textual coverage
@@ -236,6 +238,9 @@ Final-note figure rules:
   - `> 建议位置：...`
   - `> 放置原因：...`
   - `> 当前状态：...`
+- prefer a stable inserted-image format in the final note:
+  - `![[.../images/page_003_img_01.png]]` or `![Fig. 2 ...](images/page_003_img_01.png)`
+  - `*论文原图编号：Fig. 2。...*`
 
 ## Final Self-Review
 
