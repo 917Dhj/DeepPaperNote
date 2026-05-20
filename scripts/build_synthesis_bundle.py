@@ -11,7 +11,47 @@ from citation_links import resolve_reference_links
 
 
 SECTION_TEXT_LIMIT_SECTIONS = 8
-SECTION_TEXT_MAX_CHARS = 4000
+SECTION_TEXT_DEFAULT_MAX_CHARS = 4000
+SECTION_TEXT_METHOD_MAX_CHARS = 12000
+SECTION_TEXT_EXPERIMENT_MAX_CHARS = 12000
+SECTION_TEXT_DATA_MAX_CHARS = 8000
+SECTION_TEXT_INTRO_CONCLUSION_MAX_CHARS = 6000
+
+SECTION_TEXT_METHOD_KEYWORDS = (
+    "method",
+    "methods",
+    "model",
+    "framework",
+    "approach",
+    "方法",
+    "模型",
+    "框架",
+)
+SECTION_TEXT_EXPERIMENT_KEYWORDS = (
+    "experiment",
+    "result",
+    "results",
+    "evaluation",
+    "实验",
+    "结果",
+    "评测",
+)
+SECTION_TEXT_DATA_KEYWORDS = (
+    "data",
+    "dataset",
+    "task",
+    "benchmark",
+    "数据",
+    "任务",
+)
+SECTION_TEXT_INTRO_CONCLUSION_KEYWORDS = (
+    "introduction",
+    "conclusion",
+    "discussion",
+    "引言",
+    "结论",
+    "讨论",
+)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -156,21 +196,37 @@ def sanitize_candidate_chunks(evidence_pack: dict, *, limit_sections: int = 8, l
     return sanitized
 
 
+def section_text_max_chars(section_name: str, override: int | None = None) -> int:
+    if override is not None:
+        return override
+    normalized = normalize_whitespace(str(section_name)).lower()
+    if any(keyword in normalized for keyword in SECTION_TEXT_METHOD_KEYWORDS):
+        return SECTION_TEXT_METHOD_MAX_CHARS
+    if any(keyword in normalized for keyword in SECTION_TEXT_EXPERIMENT_KEYWORDS):
+        return SECTION_TEXT_EXPERIMENT_MAX_CHARS
+    if any(keyword in normalized for keyword in SECTION_TEXT_DATA_KEYWORDS):
+        return SECTION_TEXT_DATA_MAX_CHARS
+    if any(keyword in normalized for keyword in SECTION_TEXT_INTRO_CONCLUSION_KEYWORDS):
+        return SECTION_TEXT_INTRO_CONCLUSION_MAX_CHARS
+    return SECTION_TEXT_DEFAULT_MAX_CHARS
+
+
 def sanitize_section_texts(
     evidence_pack: dict,
     *,
     limit_sections: int = SECTION_TEXT_LIMIT_SECTIONS,
-    max_chars: int = SECTION_TEXT_MAX_CHARS,
+    max_chars: int | None = None,
 ) -> dict[str, str]:
     sanitized: dict[str, str] = {}
     section_texts = evidence_pack.get("section_texts", {}) or {}
     if not isinstance(section_texts, dict):
         return sanitized
     for section_name, text in list(section_texts.items())[:limit_sections]:
+        section_key = normalize_whitespace(str(section_name))
         cleaned = normalize_whitespace(str(text))
-        if not cleaned:
+        if not section_key or not cleaned:
             continue
-        sanitized[normalize_whitespace(str(section_name))] = cleaned[:max_chars]
+        sanitized[section_key] = cleaned[: section_text_max_chars(section_key, max_chars)]
     return sanitized
 
 
@@ -178,12 +234,13 @@ def bundle_text_budget(
     evidence_pack: dict,
     *,
     limit_sections: int = SECTION_TEXT_LIMIT_SECTIONS,
-    max_chars: int = SECTION_TEXT_MAX_CHARS,
+    max_chars: int | None = None,
 ) -> dict:
     section_texts = evidence_pack.get("section_texts", {}) or {}
     budget = {
-        "section_text_max_chars": max_chars,
+        "section_text_default_max_chars": max_chars or SECTION_TEXT_DEFAULT_MAX_CHARS,
         "section_text_limit_sections": limit_sections,
+        "section_text_limits": {},
         "section_text_original_chars": {},
         "section_text_included_chars": {},
         "section_text_truncated_sections": [],
@@ -197,7 +254,9 @@ def bundle_text_budget(
         if not section_key or not cleaned:
             continue
         original_chars = len(cleaned)
-        included_chars = min(original_chars, max_chars)
+        section_limit = section_text_max_chars(section_key, max_chars)
+        included_chars = min(original_chars, section_limit)
+        budget["section_text_limits"][section_key] = section_limit
         budget["section_text_original_chars"][section_key] = original_chars
         budget["section_text_included_chars"][section_key] = included_chars
         if original_chars > included_chars:
@@ -271,7 +330,7 @@ def appendix_evidence_counts(evidence_pack: dict) -> dict[str, int]:
     }
 
 
-def sanitize_appendix_evidence(evidence_pack: dict, *, limit_per_category: int = 4) -> dict:
+def sanitize_appendix_evidence(evidence_pack: dict, *, limit_per_category: int = 8) -> dict:
     appendix_evidence = evidence_pack.get("appendix_evidence", {}) or {}
     if not isinstance(appendix_evidence, dict):
         return {}

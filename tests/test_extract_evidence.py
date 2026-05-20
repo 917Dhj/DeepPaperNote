@@ -13,7 +13,7 @@ except ImportError:  # pragma: no cover
     fitz = None
 
 from build_synthesis_bundle import bundle
-from extract_evidence import evidence_quality, extract_equation_candidates
+from extract_evidence import build_appendix_evidence, evidence_quality, extract_equation_candidates
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXTRACT_EVIDENCE_SCRIPT = PROJECT_ROOT / "scripts" / "extract_evidence.py"
@@ -137,6 +137,98 @@ def test_extract_evidence_outputs_pdf_coverage_for_truncated_pdf(tmp_path: Path)
     assert payload["summary"]["pdf_coverage"] == coverage
 
 
+def test_extract_evidence_default_scans_short_pdf_without_truncation(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pages = [
+        "Abstract\nWe propose a coverage-aware extraction test.",
+        "Introduction\nThis paper studies evidence coverage.",
+        "Method\nThe method scans bounded PDF pages and records transparent coverage.",
+        "Experiment\nThe experiment reports a useful result.",
+    ]
+    pages.extend(f"Main content page {index}" for index in range(5, 26))
+    write_test_pdf(pdf_path, pages)
+
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "evidence.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "paper_id": "paper:default-coverage",
+                "title": "Default Coverage Paper",
+                "abstract": "We propose a coverage-aware extraction test.",
+                "pdf_path": str(pdf_path),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_EVIDENCE_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ],
+        check=True,
+    )
+
+    coverage = json.loads(output_path.read_text(encoding="utf-8"))["evidence_pack"]["pdf_coverage"]
+
+    assert coverage["total_pages"] == 25
+    assert coverage["text_max_pages"] == 32
+    assert coverage["text_pages_scanned"] == 25
+    assert coverage["truncated_due_to_page_limit"] is False
+
+
+def test_extract_evidence_default_truncates_after_32_pages(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pages = [
+        "Abstract\nWe propose a coverage-aware extraction test.",
+        "Introduction\nThis paper studies evidence coverage.",
+        "Method\nThe method scans bounded PDF pages and records transparent coverage.",
+        "Experiment\nThe experiment reports a useful result.",
+    ]
+    pages.extend(f"Main content page {index}" for index in range(5, 34))
+    write_test_pdf(pdf_path, pages)
+
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "evidence.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "paper_id": "paper:default-truncated",
+                "title": "Default Truncated Paper",
+                "abstract": "We propose a coverage-aware extraction test.",
+                "pdf_path": str(pdf_path),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_EVIDENCE_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ],
+        check=True,
+    )
+
+    coverage = json.loads(output_path.read_text(encoding="utf-8"))["evidence_pack"]["pdf_coverage"]
+
+    assert coverage["total_pages"] == 33
+    assert coverage["text_max_pages"] == 32
+    assert coverage["text_pages_scanned"] == 32
+    assert coverage["truncated_due_to_page_limit"] is True
+
+
 def test_extract_evidence_outputs_appendix_index_and_selective_evidence(tmp_path: Path) -> None:
     pdf_path = tmp_path / "paper.pdf"
     pages = [
@@ -207,6 +299,26 @@ def test_extract_evidence_outputs_appendix_index_and_selective_evidence(tmp_path
     assert "accuracy to 91.2" in appendix_evidence["extra_results"][0]["evidence"]
     assert "Case study examples" in appendix_evidence["qualitative_examples"][0]["evidence"]
     assert payload["summary"]["appendix_evidence_counts"]["ablation"] == 1
+
+
+def test_appendix_evidence_default_keeps_eight_items_per_category() -> None:
+    appendix_pages = [
+        {
+            "page": 20,
+            "text": " ".join(
+                f"Ablation setting {index} drops by {index} points."
+                for index in range(10)
+            ),
+        }
+    ]
+
+    evidence = build_appendix_evidence(
+        appendix_pages,
+        {"sections": [{"title": "A. Additional Experiments", "page": 20}]},
+    )
+
+    assert len(evidence["ablation"]) == 8
+    assert evidence["ablation"][0]["source_section"] == "A. Additional Experiments"
 
 
 def test_evidence_quality_caps_abstract_fallback_chunks_at_low() -> None:
@@ -333,9 +445,9 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
                 },
                 "pdf_coverage": {
                     "total_pages": 25,
-                    "text_max_pages": 18,
-                    "text_pages_scanned": 18,
-                    "truncated_due_to_page_limit": True,
+                    "text_max_pages": 32,
+                    "text_pages_scanned": 25,
+                    "truncated_due_to_page_limit": False,
                     "appendix_detected": True,
                     "appendix_start_page": 20,
                     "references_start_page": 10,
@@ -343,7 +455,7 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
                     "section_stop_page": 10,
                 },
                 "section_texts": {
-                    "method": "方法" * 2500,
+                    "method": "方法" * 6500,
                     "experiment": "实验结果",
                 },
                 "appendix_index": {
@@ -387,9 +499,9 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
         },
         "pdf_coverage": {
             "total_pages": 25,
-            "text_max_pages": 18,
-            "text_pages_scanned": 18,
-            "truncated_due_to_page_limit": True,
+            "text_max_pages": 32,
+            "text_pages_scanned": 25,
+            "truncated_due_to_page_limit": False,
             "appendix_detected": True,
             "appendix_start_page": 20,
             "references_start_page": 10,
@@ -397,14 +509,18 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
             "section_stop_page": 10,
         },
         "bundle_text_budget": {
-            "section_text_max_chars": 4000,
+            "section_text_default_max_chars": 4000,
             "section_text_limit_sections": 8,
+            "section_text_limits": {
+                "method": 12000,
+                "experiment": 12000,
+            },
             "section_text_original_chars": {
-                "method": 5000,
+                "method": 13000,
                 "experiment": 4,
             },
             "section_text_included_chars": {
-                "method": 4000,
+                "method": 12000,
                 "experiment": 4,
             },
             "section_text_truncated_sections": ["method"],
@@ -424,7 +540,7 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
             "reject": 0,
             "unknown": 0,
         },
-        "truncation_warnings": ["pdf_page_limit", "section_text_truncated"],
+        "truncation_warnings": ["section_text_truncated"],
         "identity_confidence": "",
         "identity_confidence_reasons": [],
     }
@@ -476,9 +592,9 @@ def test_bundle_coverage_exposes_asset_quality_truncation_and_identity() -> None
         figures_wrapper={},
         assets_wrapper={
             "asset_coverage": {
-                "total_pages": 30,
-                "asset_max_pages": 24,
-                "asset_pages_scanned": 24,
+                "total_pages": 45,
+                "asset_max_pages": 40,
+                "asset_pages_scanned": 40,
                 "truncated_due_to_asset_page_limit": True,
             },
             "figure_assets": [
@@ -493,9 +609,9 @@ def test_bundle_coverage_exposes_asset_quality_truncation_and_identity() -> None
     assert synthesis["metadata"]["identity_confidence"] == "high"
     assert synthesis["metadata"]["identity_confidence_reasons"] == ["doi_present"]
     assert synthesis["coverage"]["asset_coverage"] == {
-        "total_pages": 30,
-        "asset_max_pages": 24,
-        "asset_pages_scanned": 24,
+        "total_pages": 45,
+        "asset_max_pages": 40,
+        "asset_pages_scanned": 40,
         "truncated_due_to_asset_page_limit": True,
     }
     assert synthesis["coverage"]["figure_quality_summary"] == {
@@ -507,6 +623,66 @@ def test_bundle_coverage_exposes_asset_quality_truncation_and_identity() -> None
     assert synthesis["coverage"]["truncation_warnings"] == ["asset_page_limit"]
     assert synthesis["coverage"]["identity_confidence"] == "high"
     assert synthesis["coverage"]["identity_confidence_reasons"] == ["doi_present"]
+
+
+def test_bundle_uses_section_aware_text_budget() -> None:
+    synthesis = bundle(
+        metadata={"title": "Long Paper"},
+        evidence_wrapper={
+            "evidence_pack": {
+                "section_texts": {
+                    "method": "m" * 10000,
+                    "introduction": "i" * 7000,
+                    "data": "d" * 9000,
+                    "general": "g" * 5000,
+                }
+            }
+        },
+        figures_wrapper={},
+        assets_wrapper={},
+    )
+
+    section_texts = synthesis["section_texts"]
+    assert len(section_texts["method"]) == 10000
+    assert len(section_texts["introduction"]) == 6000
+    assert len(section_texts["data"]) == 8000
+    assert len(section_texts["general"]) == 4000
+    assert synthesis["coverage"]["bundle_text_budget"]["section_text_limits"] == {
+        "method": 12000,
+        "introduction": 6000,
+        "data": 8000,
+        "general": 4000,
+    }
+    assert synthesis["coverage"]["bundle_text_budget"]["section_text_truncated_sections"] == [
+        "introduction",
+        "data",
+        "general",
+    ]
+
+
+def test_bundle_appendix_summary_keeps_eight_items_per_category() -> None:
+    synthesis = bundle(
+        metadata={"title": "Appendix Paper"},
+        evidence_wrapper={
+            "evidence_pack": {
+                "appendix_evidence": {
+                    "ablation": [
+                        {
+                            "evidence": f"Ablation setting {index} drops by {index} points.",
+                            "source_section": "A. Additional Experiments",
+                            "page_hint": "p.20",
+                            "kind_hint": "ablation",
+                        }
+                        for index in range(10)
+                    ]
+                }
+            }
+        },
+        figures_wrapper={},
+        assets_wrapper={},
+    )
+
+    assert len(synthesis["appendix"]["evidence"]["ablation"]) == 8
 
 
 def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:

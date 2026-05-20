@@ -207,7 +207,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--input", required=True, help="Fetch JSON path, metadata JSON path, JSON string, or raw paper reference.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--assets-dir", default="", help="Optional explicit assets directory.")
-    p.add_argument("--max-pages", type=int, default=24, help="Maximum pages to scan.")
+    p.add_argument("--max-pages", type=int, default=40, help="Maximum pages to scan.")
     p.add_argument("--min-searchable-chars", type=int, default=100, help="Minimum characters for a page to count as searchable text.")
     p.add_argument("--ocr-dpi", type=int, default=300, help="DPI used when OCR fallback is needed.")
     p.add_argument("--figure-dpi", type=int, default=FIGURE_RENDER_DPI, help="DPI for figure-level page rendering.")

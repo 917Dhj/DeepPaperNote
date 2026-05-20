@@ -47,7 +47,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--input", required=True, help="Metadata JSON path, fetch_pdf JSON path, JSON string, or raw paper reference.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id if already known.")
-    p.add_argument("--max-pages", type=int, default=18, help="Maximum number of PDF pages to scan.")
+    p.add_argument("--max-pages", type=int, default=32, help="Maximum number of PDF pages to scan.")
     p.add_argument("--max-chunks-per-section", type=int, default=12, help="Maximum number of candidate chunks to keep per section.")
     return p
 
@@ -202,7 +202,7 @@ def build_appendix_evidence(
     appendix_pages: list[dict],
     appendix_index: dict,
     *,
-    limit_per_category: int = 4,
+    limit_per_category: int = 8,
 ) -> dict[str, list[dict]]:
     evidence = empty_appendix_evidence()
     seen = set()

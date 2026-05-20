@@ -74,6 +74,72 @@ def test_extract_pdf_assets_emits_asset_coverage(tmp_path: Path) -> None:
     }
 
 
+def test_extract_pdf_assets_default_scans_short_pdf_without_truncation(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    write_test_pdf(pdf_path, ["Page 1", "Page 2", "Page 3"])
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "assets.json"
+    input_path.write_text(
+        json.dumps({"paper_id": "paper:test", "title": "Coverage Paper", "pdf_path": str(pdf_path)}),
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_PDF_ASSETS_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--assets-dir",
+            str(tmp_path / "assets"),
+        ],
+        check=True,
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["asset_coverage"] == {
+        "total_pages": 3,
+        "asset_max_pages": 40,
+        "asset_pages_scanned": 3,
+        "truncated_due_to_asset_page_limit": False,
+    }
+
+
+def test_extract_pdf_assets_default_truncates_after_40_pages(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    write_test_pdf(pdf_path, [f"Page {index}" for index in range(1, 42)])
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "assets.json"
+    input_path.write_text(
+        json.dumps({"paper_id": "paper:test", "title": "Long Coverage Paper", "pdf_path": str(pdf_path)}),
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_PDF_ASSETS_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--assets-dir",
+            str(tmp_path / "assets"),
+        ],
+        check=True,
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["asset_coverage"] == {
+        "total_pages": 41,
+        "asset_max_pages": 40,
+        "asset_pages_scanned": 40,
+        "truncated_due_to_asset_page_limit": True,
+    }
+
+
 def test_text_table_row_accepts_explicit_column_separators() -> None:
     assert _looks_like_text_table_row("Method | Strengths | Weaknesses") is True
 
