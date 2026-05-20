@@ -13,7 +13,7 @@ from common import configured_obsidian_vault, extract_arxiv_id, extract_doi, fit
 NUMBERED_REF_RE = re.compile(r"^(?:\[(\d{1,4})\]|(\d{1,4})\.)\s+(.+)$")
 YEAR_RE = re.compile(r"\b(?:19|20)\d{2}[a-z]?\b", flags=re.IGNORECASE)
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*", flags=re.DOTALL)
-ALIASES_KEY_RE = re.compile(r"^aliases\s*:\s*(.*)$", flags=re.IGNORECASE)
+FRONTMATTER_KEY_RE = re.compile(r"^([A-Za-z_][\w-]*)\s*:\s*(.*)$")
 
 
 def _empty_candidate(raw_text: str, page_hint: str = "") -> dict[str, Any]:
@@ -146,38 +146,125 @@ def _parse_inline_aliases(value: str) -> list[str]:
     return [alias] if alias else []
 
 
-def _frontmatter_aliases(text: str) -> list[str]:
+def _frontmatter_fields(text: str) -> dict[str, Any] | None:
     match = FRONTMATTER_RE.match(text)
     if not match:
-        return []
+        return None
 
-    aliases: list[str] = []
+    fields: dict[str, Any] = {"aliases": []}
     lines = match.group(1).splitlines()
     index = 0
     while index < len(lines):
         line = lines[index]
-        key_match = ALIASES_KEY_RE.match(line.strip())
+        stripped = line.strip()
+        key_match = FRONTMATTER_KEY_RE.match(stripped)
         if not key_match:
             index += 1
             continue
 
-        inline_value = key_match.group(1).strip()
-        if inline_value:
-            aliases.extend(_parse_inline_aliases(inline_value))
-            break
+        key = key_match.group(1).strip().lower().replace("-", "_")
+        inline_value = key_match.group(2).strip()
+        if key == "aliases":
+            if inline_value:
+                fields["aliases"] = _parse_inline_aliases(inline_value)
+                index += 1
+                continue
 
-        index += 1
-        while index < len(lines):
-            item = lines[index].strip()
-            if not item.startswith("- "):
-                break
-            alias = _strip_wrapping_quotes(item[2:])
-            if alias:
-                aliases.append(alias)
+            aliases: list[str] = []
             index += 1
-        break
+            while index < len(lines):
+                item = lines[index].strip()
+                if not item.startswith("- "):
+                    break
+                alias = _strip_wrapping_quotes(item[2:])
+                if alias:
+                    aliases.append(alias)
+                index += 1
+            fields["aliases"] = aliases
+            continue
 
-    return aliases
+        if key in {"doi", "arxiv", "arxiv_id", "title"} and inline_value:
+            fields[key] = _strip_wrapping_quotes(inline_value)
+        index += 1
+
+    return fields
+
+
+def _h1_title(text: str) -> str:
+    match = FRONTMATTER_RE.match(text)
+    body = text[match.end() :] if match else text
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# ") and not stripped.startswith("## "):
+            return normalize_whitespace(stripped[2:].strip().strip("#"))
+    return ""
+
+
+def _normalize_doi(value: str) -> str:
+    doi = extract_doi(value) or ""
+    doi = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", doi, flags=re.IGNORECASE)
+    return doi.strip().lower()
+
+
+def _normalize_arxiv_id(value: str) -> str:
+    arxiv_id = extract_arxiv_id(value) or ""
+    return re.sub(r"^arxiv:\s*", "", arxiv_id, flags=re.IGNORECASE).strip().lower()
+
+
+def _short_acronym_like(value: str) -> bool:
+    compact = re.sub(r"[^A-Za-z0-9]", "", value)
+    if len(compact) > 6:
+        return False
+    key = _match_key(value)
+    return bool(compact and " " not in key)
+
+
+def _safe_text_key(value: str) -> str:
+    key = normalize_whitespace(value)
+    if not key or _short_acronym_like(key):
+        return ""
+    if len(re.sub(r"\s+", "", _match_key(key))) < 8:
+        return ""
+    return key
+
+
+def _dedupe_values(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        cleaned = normalize_whitespace(value)
+        if not cleaned:
+            continue
+        folded = cleaned.casefold()
+        if folded in seen:
+            continue
+        seen.add(folded)
+        deduped.append(cleaned)
+    return deduped
+
+
+def _note_text_keys(note: dict[str, Any]) -> list[str]:
+    values = [
+        str(note.get("stem", "")),
+        str(note.get("frontmatter_title", "")),
+        str(note.get("h1_title", "")),
+    ]
+    values.extend(str(alias) for alias in note.get("aliases", []) or [])
+    keys = [_safe_text_key(value) for value in values]
+    return _dedupe_values([key for key in keys if key])
+
+
+def _candidate_doi(candidate: dict[str, Any], candidate_text: str) -> str:
+    return _normalize_doi(str(candidate.get("doi", "")) or candidate_text)
+
+
+def _candidate_arxiv_ids(candidate: dict[str, Any], candidate_text: str) -> set[str]:
+    values = [
+        str(candidate.get("arxiv_id", "")),
+        str(candidate.get("doi", "")),
+        candidate_text,
+    ]
+    return {_normalize_arxiv_id(value) for value in values if _normalize_arxiv_id(value)}
 
 
 def _match_key(value: str) -> str:
@@ -232,15 +319,35 @@ def build_vault_note_index(config: dict[str, Any]) -> dict[str, Any]:
             text = path.read_text(encoding="utf-8", errors="ignore")[:4096]
         except OSError:
             text = ""
+        frontmatter = _frontmatter_fields(text)
+        if frontmatter is None:
+            continue
+        aliases = frontmatter.get("aliases", [])
+        doi = normalize_whitespace(str(frontmatter.get("doi", "")))
+        arxiv_id = normalize_whitespace(
+            str(frontmatter.get("arxiv_id", "") or frontmatter.get("arxiv", ""))
+        )
+        normalized_arxiv_ids = {
+            _normalize_arxiv_id(value)
+            for value in [arxiv_id, doi]
+            if _normalize_arxiv_id(value)
+        }
         notes.append(
             {
                 "stem": path.stem,
-                "basename": path.name,
-                "aliases": _frontmatter_aliases(text),
+                "aliases": aliases if isinstance(aliases, list) else [],
+                "frontmatter_title": normalize_whitespace(str(frontmatter.get("title", ""))),
+                "h1_title": _h1_title(text),
+                "doi": doi,
+                "doi_norm": _normalize_doi(doi) if doi else "",
+                "arxiv_id": arxiv_id,
+                "arxiv_ids": sorted(normalized_arxiv_ids),
+                "text_keys": [],
                 "vault_target": path.stem,
                 "vault_relative_path": str(relative_path),
             }
         )
+        notes[-1]["text_keys"] = _note_text_keys(notes[-1])
     return {"status": "ok", "notes": notes}
 
 
@@ -261,12 +368,6 @@ def resolve_reference_links(candidates: list[dict[str, Any]], config: dict[str, 
         ]
 
     notes = [note for note in index.get("notes", []) if isinstance(note, dict)]
-    by_name = sorted(notes, key=lambda note: len(str(note.get("stem", ""))), reverse=True)
-    by_alias = sorted(
-        notes,
-        key=lambda note: max((len(str(alias)) for alias in note.get("aliases", []) or []), default=0),
-        reverse=True,
-    )
 
     matched: list[dict[str, Any]] = []
     for candidate in candidates:
@@ -274,37 +375,72 @@ def resolve_reference_links(candidates: list[dict[str, Any]], config: dict[str, 
             continue
         raw_text = str(candidate.get("raw_text", "") or candidate.get("display_text", ""))
         display_text = normalize_whitespace(str(candidate.get("display_text", ""))) or raw_text
+        candidate_text = normalize_whitespace(f"{raw_text} {display_text}")
         resolved = dict(candidate)
         resolved.setdefault("match_status", "no_vault_match")
         resolved.setdefault("match_reason", "none")
         resolved.setdefault("wikilink", "")
         resolved.setdefault("vault_target", "")
 
-        for note in by_name:
-            for key_name in ("stem", "basename"):
-                key = str(note.get(key_name, ""))
-                if _contains_key(raw_text, key):
-                    target = normalize_whitespace(str(note.get("vault_target", "")))
-                    resolved["wikilink"] = _note_wikilink(target, display_text)
-                    resolved["vault_target"] = target
-                    resolved["match_status"] = "vault_match"
-                    resolved["match_reason"] = "basename"
-                    break
-            if resolved["match_status"] == "vault_match":
-                break
+        priority_matches: list[tuple[str, list[dict[str, Any]]]] = []
+        doi = _candidate_doi(candidate, candidate_text)
+        if doi:
+            priority_matches.append(
+                ("doi", [note for note in notes if doi and doi == str(note.get("doi_norm", ""))])
+            )
+        arxiv_ids = _candidate_arxiv_ids(candidate, candidate_text)
+        if arxiv_ids:
+            priority_matches.append(
+                (
+                    "arxiv_id",
+                    [
+                        note
+                        for note in notes
+                        if arxiv_ids.intersection(set(note.get("arxiv_ids", []) or []))
+                    ],
+                )
+            )
+        priority_matches.append(
+            (
+                "basename_or_title_or_alias",
+                [
+                    note
+                    for note in notes
+                    if any(
+                        _contains_key(candidate_text, key)
+                        for key in note.get("text_keys", []) or []
+                    )
+                ],
+            )
+        )
 
-        if resolved["match_status"] != "vault_match":
-            for note in by_alias:
-                for alias in note.get("aliases", []) or []:
-                    if _contains_key(raw_text, str(alias)):
-                        target = normalize_whitespace(str(note.get("vault_target", "")))
-                        resolved["wikilink"] = _note_wikilink(target, display_text)
-                        resolved["vault_target"] = target
-                        resolved["match_status"] = "vault_match"
-                        resolved["match_reason"] = "alias"
-                        break
-                if resolved["match_status"] == "vault_match":
-                    break
+        for reason, matches in priority_matches:
+            if not matches:
+                continue
+            if len(matches) == 1:
+                target = normalize_whitespace(str(matches[0].get("vault_target", "")))
+                resolved["wikilink"] = _note_wikilink(target, display_text)
+                resolved["vault_target"] = target
+                resolved["match_status"] = "vault_match"
+                resolved["match_reason"] = reason
+            else:
+                resolved["wikilink"] = ""
+                resolved["vault_target"] = ""
+                resolved["match_status"] = "ambiguous_match"
+                resolved["match_reason"] = reason
+                resolved["match_candidates"] = [
+                    {
+                        "wikilink": _note_wikilink(
+                            normalize_whitespace(str(note.get("vault_target", ""))),
+                            display_text,
+                        ),
+                        "vault_target": normalize_whitespace(str(note.get("vault_target", ""))),
+                        "match_status": "vault_match",
+                        "match_reason": reason,
+                    }
+                    for note in matches
+                ]
+            break
 
         matched.append(resolved)
     return matched

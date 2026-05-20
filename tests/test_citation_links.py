@@ -88,7 +88,7 @@ def test_extract_reference_candidates_from_pdf_parses_references_section(
     ]
 
 
-def test_resolve_reference_links_matches_vault_basename_and_alias(tmp_path: Path) -> None:
+def test_resolve_reference_links_matches_vault_stem_title_and_alias(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     papers = vault / "Research" / "Papers"
     papers.mkdir(parents=True)
@@ -113,7 +113,144 @@ def test_resolve_reference_links_matches_vault_basename_and_alias(tmp_path: Path
     ]
     assert [item["vault_target"] for item in resolved] == ["bert_pretraining", "attention_transformer"]
     assert [item["match_status"] for item in resolved] == ["vault_match", "vault_match"]
-    assert [item["match_reason"] for item in resolved] == ["basename", "alias"]
+    assert [item["match_reason"] for item in resolved] == [
+        "basename_or_title_or_alias",
+        "basename_or_title_or_alias",
+    ]
+
+
+def test_resolve_reference_links_indexes_only_yaml_frontmatter_notes(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    papers = vault / "Research" / "Papers"
+    papers.mkdir(parents=True)
+    (papers / "attention_without_frontmatter.md").write_text(
+        "# Attention Is All You Need\n",
+        encoding="utf-8",
+    )
+    candidates = [{"display_text": "Vaswani et al. (2017). Attention Is All You Need."}]
+
+    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
+
+    assert resolved[0]["match_status"] == "no_vault_match"
+    assert resolved[0]["match_reason"] == "none"
+    assert resolved[0]["wikilink"] == ""
+    assert resolved[0]["vault_target"] == ""
+
+
+def test_resolve_reference_links_prioritizes_doi_over_text(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    papers = vault / "Research" / "Papers"
+    papers.mkdir(parents=True)
+    (papers / "doi_target.md").write_text(
+        "---\ndoi: 10.5555/example.doi\naliases: []\n---\n# DOI Target\n",
+        encoding="utf-8",
+    )
+    (papers / "text_target.md").write_text(
+        "---\naliases:\n  - Confusing Text Match\n---\n# Text Target\n",
+        encoding="utf-8",
+    )
+    candidates = [
+        {
+            "display_text": "Confusing Text Match. doi:10.5555/example.doi",
+            "doi": "10.5555/example.doi",
+        }
+    ]
+
+    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
+
+    assert resolved[0]["match_status"] == "vault_match"
+    assert resolved[0]["match_reason"] == "doi"
+    assert resolved[0]["vault_target"] == "doi_target"
+    assert resolved[0]["wikilink"] == "[[doi_target|Confusing Text Match. doi:10.5555/example.doi]]"
+
+
+def test_resolve_reference_links_matches_arxiv_from_note_doi(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    papers = vault / "Research" / "Papers"
+    papers.mkdir(parents=True)
+    (papers / "arxiv_doi_note.md").write_text(
+        "---\ndoi: 10.48550/arXiv.2406.11161\naliases: []\n---\n# Arxiv DOI Note\n",
+        encoding="utf-8",
+    )
+    candidates = [{"display_text": "Some paper. arXiv:2406.11161"}]
+
+    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
+
+    assert resolved[0]["match_status"] == "vault_match"
+    assert resolved[0]["match_reason"] == "arxiv_id"
+    assert resolved[0]["vault_target"] == "arxiv_doi_note"
+
+
+def test_resolve_reference_links_reports_ambiguous_text_match(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    papers = vault / "Research" / "Papers"
+    papers.mkdir(parents=True)
+    (papers / "first_transformer.md").write_text(
+        "---\ntitle: Shared Transformer Paper\naliases: []\n---\n# First\n",
+        encoding="utf-8",
+    )
+    (papers / "second_transformer.md").write_text(
+        "---\naliases:\n  - Shared Transformer Paper\n---\n# Second\n",
+        encoding="utf-8",
+    )
+    candidates = [{"display_text": "A citation to Shared Transformer Paper."}]
+
+    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
+
+    assert resolved[0]["match_status"] == "ambiguous_match"
+    assert resolved[0]["match_reason"] == "basename_or_title_or_alias"
+    assert resolved[0]["wikilink"] == ""
+    assert resolved[0]["vault_target"] == ""
+    assert [item["vault_target"] for item in resolved[0]["match_candidates"]] == [
+        "first_transformer",
+        "second_transformer",
+    ]
+
+
+def test_resolve_reference_links_reports_ambiguous_doi_match(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    papers = vault / "Research" / "Papers"
+    papers.mkdir(parents=True)
+    (papers / "first_doi_note.md").write_text(
+        "---\ndoi: 10.5555/duplicate\naliases: []\n---\n# First DOI Note\n",
+        encoding="utf-8",
+    )
+    (papers / "second_doi_note.md").write_text(
+        "---\ndoi: 10.5555/duplicate\naliases: []\n---\n# Second DOI Note\n",
+        encoding="utf-8",
+    )
+    candidates = [{"display_text": "Duplicate DOI reference.", "doi": "10.5555/duplicate"}]
+
+    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
+
+    assert resolved[0]["match_status"] == "ambiguous_match"
+    assert resolved[0]["match_reason"] == "doi"
+    assert resolved[0]["wikilink"] == ""
+    assert resolved[0]["vault_target"] == ""
+    assert [item["vault_target"] for item in resolved[0]["match_candidates"]] == [
+        "first_doi_note",
+        "second_doi_note",
+    ]
+
+
+def test_resolve_reference_links_ignores_short_acronym_aliases(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    papers = vault / "Research" / "Papers"
+    papers.mkdir(parents=True)
+    (papers / "retrieval_augmented_generation.md").write_text(
+        "---\naliases:\n  - RAG\n  - GSPO\n  - LoRA\n---\n# Retrieval Augmented Generation\n",
+        encoding="utf-8",
+    )
+    candidates = [
+        {"display_text": "RAG improves answers."},
+        {"display_text": "GSPO is cited here."},
+        {"display_text": "LoRA is cited here."},
+    ]
+
+    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
+
+    assert [item["match_status"] for item in resolved] == ["no_vault_match"] * 3
+    assert [item["wikilink"] for item in resolved] == [""] * 3
 
 
 def test_resolve_reference_links_uses_plain_text_when_no_vault_match(tmp_path: Path) -> None:
