@@ -25,6 +25,7 @@ For normal runs, `SKILL.md` plus the generated `synthesis_bundle.json` is the re
    Pass it to `scripts/lint_note.py --plan-file ...` when linting.
    In interactive contexts, a compact `<note_plan>...</note_plan>` block may additionally be shown as display-only context, but it does not replace the JSON file.
    Keep the plan short, structured, and inspectable; do not expose a verbose chain-of-thought transcript.
+   Choose `note_plan.paper_type` from `writing_contract.paper_type_selection.allowed_paper_types` before drafting; `summary.paper_type` is only a hint.
 
 4. Draft the note in Chinese from the bundle and the explicit plan.
    The model must decide emphasis, contribution, mechanism, limitations, formula needs, figure semantics, and natural Chinese phrasing.
@@ -53,6 +54,7 @@ For normal runs, `SKILL.md` plus the generated `synthesis_bundle.json` is the re
 
 Required JSON keys:
 - `paper_type`
+- `paper_type_rationale`
 - `dominant_domain`
 - `must_cover`
 - `key_numbers`

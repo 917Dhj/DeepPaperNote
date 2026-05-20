@@ -319,11 +319,14 @@ In interactive contexts, a compact `<note_plan>...</note_plan>` block may additi
 
 Required JSON keys:
 - `paper_type`
+- `paper_type_rationale`
 - `dominant_domain`
 - `must_cover`
 - `key_numbers`
 - `real_comparisons`
 - `section_plan`
+
+Choose `paper_type` from `writing_contract.paper_type_selection.allowed_paper_types`; the script's suggested paper type is a hint only, not the authority. Use `paper_type_rationale` to explain the model's selection.
 
 ## Failure Policy
 

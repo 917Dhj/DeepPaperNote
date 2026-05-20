@@ -699,6 +699,7 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
         json.dumps(
             {
                 "paper_type": "",
+                "paper_type_rationale": "",
                 "dominant_domain": "   ",
                 "must_cover": [],
                 "key_numbers": [],
@@ -722,6 +723,7 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
     assert payload["passes_plan_gate"] is False
     assert payload["planning_artifact_issues"] == [
         "planning_paper_type_empty",
+        "planning_paper_type_rationale_empty",
         "planning_dominant_domain_empty",
         "planning_must_cover_empty",
         "planning_key_numbers_empty",
@@ -738,6 +740,7 @@ def test_note_plan_explicit_not_reported_entries_pass_plan_gate(tmp_path) -> Non
         json.dumps(
             {
                 "paper_type": "AI_method",
+                "paper_type_rationale": "The paper proposes a model mechanism and evaluates it experimentally.",
                 "dominant_domain": "reasoning",
                 "must_cover": ["方法主线"],
                 "key_numbers": ["论文未报告明确核心数字"],
@@ -939,12 +942,35 @@ def test_inspect_note_plan_reports_missing_required_fields(tmp_path) -> None:
     assert "planning_required_fields_missing" in issues
 
 
+def test_inspect_note_plan_rejects_invalid_paper_type(tmp_path) -> None:
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "paper_type": "method",
+                "paper_type_rationale": "The model-facing plan should use the shared paper type enum.",
+                "dominant_domain": "reasoning",
+                "must_cover": ["方法主线"],
+                "key_numbers": ["42"],
+                "real_comparisons": ["baseline"],
+                "section_plan": [{"section": "方法主线"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    found, issues = inspect_note_plan(plan_path)
+    assert found is True
+    assert "planning_paper_type_invalid" in issues
+
+
 def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
     plan_path = tmp_path / "note.plan.json"
     plan_path.write_text(
         json.dumps(
             {
                 "paper_type": "AI_method",
+                "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": "method",
                 "key_numbers": [],
@@ -966,6 +992,7 @@ def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
         json.dumps(
             {
                 "paper_type": "AI_method",
+                "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": [],
                 "key_numbers": [],
@@ -992,6 +1019,7 @@ def test_inspect_note_plan_accepts_valid_plan(tmp_path) -> None:
         json.dumps(
             {
                 "paper_type": "AI_method",
+                "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": ["方法主线"],
                 "key_numbers": ["42"],

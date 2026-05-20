@@ -170,6 +170,7 @@ Model-first rule:
 - final paper understanding and note writing belong to the model
 - before writing the final note, create an explicit short `note_plan` artifact rather than relying on hidden planning only
 - save `note_plan` as the canonical short JSON file outside the final note body, such as `<note>.plan.json` or a run-scoped `*_note_plan.json`
+- choose `note_plan.paper_type` from the synthesis bundle's allowed paper types before drafting; script-provided paper-type suggestions are hint-only and must not override the model's selection
 - pass that JSON file to `scripts/lint_note.py --plan-file ...` when linting the final note; if omitted, lint looks for sibling `<note>.plan.json`
 - interactive sessions may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file
 - do not require or expose a long free-form `<thinking>` block

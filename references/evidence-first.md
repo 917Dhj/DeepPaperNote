@@ -60,7 +60,8 @@ Recommended shape:
 
 ```json
 {
-  "paper_type": "method",
+  "paper_type": "AI_method",
+  "paper_type_rationale": "The paper proposes a model mechanism and evaluates it against baselines; the script suggestion was treated only as a hint.",
   "dominant_domain": "machine learning",
   "must_cover": ["数据构建", "方法主线", "关键消融"],
   "key_numbers": ["主结果提升 3.2 points", "训练成本降低 40%"],

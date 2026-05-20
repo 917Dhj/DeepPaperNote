@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 
 from common import maybe_load_json_record, normalize_whitespace, runtime_config
-from contracts import NOTE_REQUIRED_SECTIONS
+from contracts import NOTE_REQUIRED_SECTIONS, PAPER_TYPE_VALUES
 from citation_links import resolve_reference_links
 
 
@@ -223,6 +223,10 @@ def paper_type_writing_contract(paper_type: str) -> dict:
     if selected["paper_type"] != "AI_method":
         selected["avoid_rules"].append("不要强行写 `### 机制流程` 或把论文改写成模型架构流程")
     return selected
+
+
+def paper_type_writing_contracts() -> dict[str, dict]:
+    return {paper_type: paper_type_writing_contract(paper_type) for paper_type in PAPER_TYPE_VALUES}
 
 
 def top_items(evidence_pack: dict, key: str, *, limit: int = 6) -> list[dict]:
@@ -566,7 +570,8 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
     evidence_pack = evidence_wrapper.get("evidence_pack", {}) if isinstance(evidence_wrapper.get("evidence_pack"), dict) else {}
     figure_plan = figures_wrapper.get("figure_plan", {}) if isinstance(figures_wrapper.get("figure_plan"), dict) else {}
     summary = evidence_wrapper.get("summary", {}) if isinstance(evidence_wrapper.get("summary"), dict) else {}
-    active_paper_type_contract = paper_type_writing_contract(summary.get("paper_type", ""))
+    paper_type_contracts = paper_type_writing_contracts()
+    suggested_paper_type = normalize_whitespace(str(summary.get("paper_type", "")))
 
     return {
         "status": "ok",
@@ -621,8 +626,14 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             "language": "zh-CN",
             "contract_role": "minimal_generation_contract",
             "canonical_source": "SKILL.md carries the required workflow; references are optional topic deep dives.",
-            "paper_type_adaptation_rule": "Keep the 12 required sections unchanged, but adapt emphasis, formulas, subsection choices, and self-review checks through active_paper_type_contract.",
-            "active_paper_type_contract": active_paper_type_contract,
+            "paper_type_adaptation_rule": "Keep the 12 required sections unchanged. First choose note_plan.paper_type from allowed_paper_types, then adapt emphasis, formulas, subsection choices, and self-review checks through paper_type_contracts[note_plan.paper_type].",
+            "paper_type_selection": {
+                "source_of_truth": "note_plan.paper_type",
+                "suggested_paper_type": suggested_paper_type,
+                "suggested_paper_type_role": "hint_only",
+                "allowed_paper_types": list(PAPER_TYPE_VALUES),
+            },
+            "paper_type_contracts": paper_type_contracts,
             "must_distinguish": [
                 "研究问题 vs 任务定义",
                 "真实贡献 vs 标题包装",
@@ -650,24 +661,22 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             ],
             "writer_persona": [
                 "复现级中文研究笔记",
-                active_paper_type_contract["writer_persona"],
+                "根据 note_plan.paper_type 采用 paper_type_contracts[note_plan.paper_type] 中的 reader_lens 和 writer_persona",
             ],
             "planning_rules": [
                 "先基于 bundle evidence/coverage/candidate_chunks/section_texts 做显式 note_plan，再写最终笔记",
+                "先从 writing_contract.paper_type_selection.allowed_paper_types 中选择 note_plan.paper_type；summary.paper_type/suggested_paper_type 只能作为 hint_only 线索，不能替代模型判断",
+                "确定 note_plan.paper_type 后，应用 paper_type_contracts[note_plan.paper_type] 的 reader_lens、section_focus、planning_rules、formula_rules 和 self_review_rules",
                 "note_plan 是简短 JSON planning file，例如 `<note>.plan.json` 或 `*_note_plan.json`；lint 时传给 `scripts/lint_note.py --plan-file ...`",
                 "`核心信息` 是固定 metadata 区；`创新点` 是独立 `##` 章节，位于 `原文摘要翻译` 之后、`一句话总结` 之前",
                 "metadata.abstract 可用时，`原文摘要翻译` 必须是原 abstract 的中文翻译，不要写成英文原文+中文翻译或全文 summary",
-                "复杂论文需要 paper-specific `###` 子标题；具体重心按 active_paper_type_contract 调整",
+                "复杂论文需要 paper-specific `###` 子标题；具体重心按 paper_type_contracts[note_plan.paper_type] 调整",
                 "优先选择关键数字、真实比较、论文特有洞察和必要公式，不要机械复述所有抽取项",
-            ] + active_paper_type_contract["planning_rules"],
-            **(
-                {"mechanism_flow_contract": active_paper_type_contract["mechanism_flow_contract"]}
-                if active_paper_type_contract["paper_type"] == "AI_method"
-                else {}
-            ),
+            ],
             "note_plan_contract": {
                 "required_fields": [
                     "paper_type",
+                    "paper_type_rationale",
                     "dominant_domain",
                     "must_cover",
                     "key_numbers",
@@ -679,16 +688,16 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
                 "lint_hint": "pass_to_lint_note_with_plan_file",
                 "forbidden_style": "verbose_freeform_chain_of_thought",
             },
-            "formula_rules": active_paper_type_contract["formula_rules"],
             "self_review_rules": [
                 "生成最终 Markdown 前，检查是否包含关键数字、真实比较、必要公式和 paper-specific insight",
+                "检查 note_plan.paper_type 是否来自 allowed_paper_types，并确认正文已应用 paper_type_contracts[note_plan.paper_type]；若 note_plan.paper_type 为 AI_method，也要执行其中关于 ablation_evidence 和 `### 机制流程` 的检查",
                 "必须先查看 bundle.coverage：section coverage 为 poor 或 partial 时，不要把 abstract fallback 当作全文证据来写深度判断",
                 "如果 bundle.coverage.pdf_coverage 显示 PDF 被 max_pages 截断，不要声称完成了全文级精读",
                 "如果 bundle.coverage.bundle_text_budget 显示 section_texts 被截断，不要把截断片段当作完整 section 证据",
                 "appendix evidence 只能补强复现细节、额外实验、局限或图表语义，不能替代主文方法主线",
                 "清理 PDF 折行、句中异常换行和明显写给 lint 看的空壳句子",
                 "脚本 lint 通过后仍必须做 final_readability_review；该阶段只修表达，不新增事实、不改变核心数字和结论",
-            ] + active_paper_type_contract["self_review_rules"],
+            ],
             "readability_review_contract": {
                 "stage_name": "final_readability_review",
                 "position_in_workflow": "after_lint_before_save",

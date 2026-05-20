@@ -21,6 +21,14 @@ NOTE_REQUIRED_SECTIONS: tuple[str, ...] = (
     "引用",
 )
 
+PAPER_TYPE_VALUES: tuple[str, ...] = (
+    "AI_method",
+    "benchmark_or_dataset",
+    "clinical_or_psychology_empirical",
+    "humanities_or_social_science",
+    "survey_or_review",
+)
+
 
 class MetadataRecord(TypedDict, total=False):
     title: str

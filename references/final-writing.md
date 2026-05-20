@@ -133,6 +133,7 @@ Before the final draft exists, there should already be a compact structured plan
 The canonical artifact is a short JSON file such as `<note>.plan.json` or a run-scoped `*_note_plan.json`.
 Pass that file to `scripts/lint_note.py --plan-file ...` when linting; if omitted, lint looks for a sibling `<note>.plan.json`.
 In interactive contexts, you may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file.
+The plan's `paper_type` is the authoritative paper-type selection; choose it from the allowed values in the synthesis bundle and treat any script suggestion as hint-only.
 This plan should be short and inspectable.
 Do not require or expose a long free-form `<thinking>` block.
 

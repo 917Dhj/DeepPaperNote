@@ -8,12 +8,13 @@ import json
 import re
 from pathlib import Path
 
-from contracts import NOTE_REQUIRED_SECTIONS
+from contracts import NOTE_REQUIRED_SECTIONS, PAPER_TYPE_VALUES
 
 REQUIRED_SECTIONS = NOTE_REQUIRED_SECTIONS
 
 NOTE_PLAN_STRING_FIELDS = (
     "paper_type",
+    "paper_type_rationale",
     "dominant_domain",
 )
 
@@ -216,6 +217,9 @@ def inspect_note_plan(plan_path: Path) -> tuple[bool, list[str]]:
             has_invalid_fields = True
         elif field in plan and not plan[field].strip():
             issues.append(f"planning_{field}_empty")
+    if isinstance(plan.get("paper_type"), str) and plan["paper_type"].strip():
+        if plan["paper_type"].strip() not in PAPER_TYPE_VALUES:
+            issues.append("planning_paper_type_invalid")
     for field in NOTE_PLAN_LIST_FIELDS:
         if field in plan and not isinstance(plan[field], list):
             has_invalid_fields = True

@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from build_synthesis_bundle import bundle
-from contracts import NOTE_REQUIRED_SECTIONS
+from contracts import NOTE_REQUIRED_SECTIONS, PAPER_TYPE_VALUES
 from lint_note import REQUIRED_SECTIONS
 
 
@@ -19,6 +19,7 @@ NOTE_PLAN_REFERENCE_DOCS = (
 )
 NOTE_PLAN_REQUIRED_FIELDS = (
     "paper_type",
+    "paper_type_rationale",
     "dominant_domain",
     "must_cover",
     "key_numbers",
@@ -96,6 +97,21 @@ def test_bundle_required_sections_use_canonical_contract() -> None:
     assert tuple(synthesis["writing_contract"]["must_include_sections"]) == NOTE_REQUIRED_SECTIONS
 
 
+def test_bundle_paper_type_contracts_use_canonical_enum() -> None:
+    synthesis = bundle(
+        metadata={},
+        evidence_wrapper={"summary": {"paper_type": "benchmark_or_dataset"}},
+        figures_wrapper={},
+        assets_wrapper={},
+    )
+    writing_contract = synthesis["writing_contract"]
+
+    assert tuple(writing_contract["paper_type_contracts"]) == PAPER_TYPE_VALUES
+    assert tuple(writing_contract["paper_type_selection"]["allowed_paper_types"]) == PAPER_TYPE_VALUES
+    assert writing_contract["paper_type_selection"]["source_of_truth"] == "note_plan.paper_type"
+    assert writing_contract["paper_type_selection"]["suggested_paper_type_role"] == "hint_only"
+
+
 def test_note_quality_structural_sections_match_canonical_contract() -> None:
     assert note_quality_structural_sections() == NOTE_REQUIRED_SECTIONS
 
@@ -165,8 +181,9 @@ def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
     example = json.loads(match.group(1))
 
     assert tuple(example.keys()) == NOTE_PLAN_REQUIRED_FIELDS
-    assert all(isinstance(example[field], str) for field in NOTE_PLAN_REQUIRED_FIELDS[:2])
-    assert all(isinstance(example[field], list) for field in NOTE_PLAN_REQUIRED_FIELDS[2:])
+    assert all(isinstance(example[field], str) for field in NOTE_PLAN_REQUIRED_FIELDS[:3])
+    assert all(isinstance(example[field], list) for field in NOTE_PLAN_REQUIRED_FIELDS[3:])
+    assert example["paper_type"] in PAPER_TYPE_VALUES
     assert example["section_plan"]
 
 
