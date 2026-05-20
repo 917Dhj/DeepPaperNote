@@ -68,6 +68,163 @@ def load_record(value: str) -> dict:
     return maybe_load_json_record(value) or {}
 
 
+def paper_type_writing_contract(paper_type: str) -> dict:
+    mechanism_flow_contract = {
+        "title": "机制流程",
+        "apply_when_paper_type_in": ["AI_method"],
+        "required_step_count": "3_to_4",
+        "required_step_fields": ["input", "operation", "output_destination"],
+        "figure_policy": "If a high-confidence pipeline or architecture figure matches the core execution chain, place it in this subsection first.",
+        "fallback_policy": "If no high-confidence figure exists, keep the subsection as text-only and do not lower the figure-matching threshold.",
+    }
+    contracts = {
+        "AI_method": {
+            "paper_type": "AI_method",
+            "writer_persona": "面向能复现方法机制的技术读者",
+            "emphasis": [
+                "问题设置",
+                "方法机制",
+                "训练/推理流程",
+                "关键公式",
+                "比较基线",
+                "消融与失败边界",
+            ],
+            "planning_rules": [
+                "AI_method 论文默认在 `方法主线` 下写 `### 机制流程`，用 3 到 4 步编号列表说明输入、操作和输出去向",
+                "围绕机制、公式、训练目标、实验设计和 ablation_evidence 排布深度，而不是停留在摘要级贡献列表",
+            ],
+            "self_review_rules": [
+                "如果 bundle 中存在 ablation_evidence，最终笔记必须至少写出一项次优、失败或不稳定设定；如果不存在，也要明确说明论文未充分报告这类负面经验",
+                "AI_method 论文应检查 `### 机制流程` 是否是 3 到 4 步编号列表，而不是泛化散文",
+                "如果正文不能让熟悉 Python 和深度学习框架的开发者看懂方法主线，说明仍停留在总结层面，需要继续下钻",
+            ],
+            "formula_rules": [
+                "如果公式、概率分解、优化目标或复杂度表达式是理解方法的核心，保留 1 到 3 个关键 LaTeX 公式",
+                "优先从 equation_candidates、candidate_chunks 和 section_texts 中重建关键公式语境",
+                "每个保留公式后补一句工程解释，说明它对应什么操作、训练目标或状态更新",
+                "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
+            ],
+            "mechanism_flow_contract": mechanism_flow_contract,
+        },
+        "benchmark_or_dataset": {
+            "paper_type": "benchmark_or_dataset",
+            "writer_persona": "面向要判断 benchmark/dataset 可用性和偏差边界的研究者",
+            "emphasis": [
+                "任务拆分",
+                "数据来源与构建流程",
+                "标注协议",
+                "评测指标",
+                "覆盖范围与偏差",
+                "benchmark 真正测到什么",
+            ],
+            "planning_rules": [
+                "围绕数据/任务定义、构建流程、评测维度、基线和适用边界组织 note_plan",
+                "在 `方法主线` 中写清 benchmark/dataset 的设计逻辑，不要强行改写成模型架构流程",
+            ],
+            "self_review_rules": [
+                "检查是否说明数据来源、样本/题目规模、标注或筛选流程、评测指标和潜在偏差",
+                "如果论文没有证明 benchmark 能代表真实能力边界，要在局限中明确写出",
+            ],
+            "formula_rules": [
+                "如果评测指标、标注一致性、采样规则或划分规则是理解 benchmark/dataset 的核心，保留 1 到 3 个关键公式或定义",
+                "优先从 equation_candidates、candidate_chunks 和 section_texts 中重建指标或数据构建语境",
+                "每个保留公式后补一句解释，说明它对应什么指标、采样过程或评价边界",
+                "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
+            ],
+        },
+        "clinical_or_psychology_empirical": {
+            "paper_type": "clinical_or_psychology_empirical",
+            "writer_persona": "面向关注临床/心理学样本、变量关系和外推边界的研究读者",
+            "emphasis": [
+                "样本来源",
+                "纳排标准",
+                "变量或量表",
+                "分析管线",
+                "效应量与不确定性",
+                "临床或心理学意义",
+            ],
+            "planning_rules": [
+                "围绕样本、变量/量表、任务定义、统计分析和外推边界组织 note_plan",
+                "在 `方法主线` 中写清研究设计和分析路径，不要强行改写成模型架构流程",
+            ],
+            "self_review_rules": [
+                "检查是否说明样本来源、样本量、变量/量表、主要统计关系和临床/心理学解释边界",
+                "不要把相关性、预测性能或组间差异写成未经证明的因果结论",
+            ],
+            "formula_rules": [
+                "如果统计模型、量表计分、效应量、置信区间或显著性检验是理解论文的核心，保留 1 到 3 个关键公式或定义",
+                "优先从 equation_candidates、candidate_chunks 和 section_texts 中重建变量、估计量和统计语境",
+                "每个保留公式后补一句解释，说明它对应什么变量关系、估计量或临床/心理学含义",
+                "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
+            ],
+        },
+        "humanities_or_social_science": {
+            "paper_type": "humanities_or_social_science",
+            "writer_persona": "面向关注理论框架、材料解释和论证结构的研究读者",
+            "emphasis": [
+                "研究对象",
+                "材料来源",
+                "理论框架",
+                "论证路径",
+                "概念贡献",
+                "解释边界",
+            ],
+            "planning_rules": [
+                "围绕研究对象、材料、理论框架、论证路径和概念贡献组织 note_plan",
+                "在 `方法主线` 中写清材料如何支撑论证，不要强行改写成模型架构流程",
+            ],
+            "self_review_rules": [
+                "检查是否说明理论框架、材料来源、论证结构、概念贡献和解释性局限",
+                "不要把作者的规范性判断、文本解释或案例分析写成实验事实",
+            ],
+            "formula_rules": [
+                "此类论文通常不需要强行保留公式；只有作者使用形式化定义、编码规则或分类框架且它们是理解论证的核心时才保留",
+                "优先从 candidate_chunks 和 section_texts 中重建概念、分类轴或编码规则的语境",
+                "每个保留公式或形式化定义后补一句解释，说明它如何支撑理论框架或论证路径",
+                "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
+            ],
+        },
+        "survey_or_review": {
+            "paper_type": "survey_or_review",
+            "writer_persona": "面向需要梳理综述脉络、分类体系和证据边界的研究读者",
+            "emphasis": [
+                "综述范围",
+                "纳入排除标准",
+                "主题分类",
+                "方法谱系",
+                "共识与分歧",
+                "开放问题",
+            ],
+            "planning_rules": [
+                "围绕综述范围、分类轴、代表性方向、证据强弱和开放问题组织 note_plan",
+                "在 `方法主线` 中写清分类体系或综述方法，不要强行改写成单篇方法架构流程",
+            ],
+            "self_review_rules": [
+                "检查是否说明综述范围、文献选择或纳入标准、分类体系、共识/分歧和开放问题",
+                "不要把综述中的代表性结论写成作者自己完成的单项实验结果",
+            ],
+            "formula_rules": [
+                "如果分类轴、纳入排除准则、证据汇总规则或 meta-analysis 统计量是理解综述的核心，保留 1 到 3 个关键公式或定义",
+                "优先从 equation_candidates、candidate_chunks 和 section_texts 中重建综述方法或证据聚合语境",
+                "每个保留公式或定义后补一句解释，说明它如何影响文献归类、证据权重或结论边界",
+                "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
+            ],
+        },
+    }
+    normalized = normalize_whitespace(str(paper_type or "")) or "AI_method"
+    selected = dict(contracts.get(normalized, contracts["AI_method"]))
+    selected["reader_lens"] = selected["writer_persona"]
+    selected["section_focus"] = list(selected["emphasis"])
+    selected["required_checks"] = list(selected["self_review_rules"])
+    selected["avoid_rules"] = [
+        "不要移除或重命名 12 个 required sections",
+        "不要为了套用论文类型而编造证据、数字、公式、实验或理论框架",
+    ]
+    if selected["paper_type"] != "AI_method":
+        selected["avoid_rules"].append("不要强行写 `### 机制流程` 或把论文改写成模型架构流程")
+    return selected
+
+
 def top_items(evidence_pack: dict, key: str, *, limit: int = 6) -> list[dict]:
     results: list[dict] = []
     for item in (evidence_pack.get(key, []) or [])[:limit]:
@@ -408,6 +565,8 @@ def sanitize_figure_assets(assets_wrapper: dict, *, limit: int = 48) -> list[dic
 def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets_wrapper: dict) -> dict:
     evidence_pack = evidence_wrapper.get("evidence_pack", {}) if isinstance(evidence_wrapper.get("evidence_pack"), dict) else {}
     figure_plan = figures_wrapper.get("figure_plan", {}) if isinstance(figures_wrapper.get("figure_plan"), dict) else {}
+    summary = evidence_wrapper.get("summary", {}) if isinstance(evidence_wrapper.get("summary"), dict) else {}
+    active_paper_type_contract = paper_type_writing_contract(summary.get("paper_type", ""))
 
     return {
         "status": "ok",
@@ -457,11 +616,13 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             "figure_assets": sanitize_figure_assets(assets_wrapper),
             "ocr_available": assets_wrapper.get("ocr_available", False),
         },
-        "summary": evidence_wrapper.get("summary", {}),
+        "summary": summary,
         "writing_contract": {
             "language": "zh-CN",
             "contract_role": "minimal_generation_contract",
             "canonical_source": "SKILL.md carries the required workflow; references are optional topic deep dives.",
+            "paper_type_adaptation_rule": "Keep the 12 required sections unchanged, but adapt emphasis, formulas, subsection choices, and self-review checks through active_paper_type_contract.",
+            "active_paper_type_contract": active_paper_type_contract,
             "must_distinguish": [
                 "研究问题 vs 任务定义",
                 "真实贡献 vs 标题包装",
@@ -489,24 +650,21 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             ],
             "writer_persona": [
                 "复现级中文研究笔记",
-                "读者默认熟悉 Python、PyTorch、训练流程和实验设计",
+                active_paper_type_contract["writer_persona"],
             ],
             "planning_rules": [
                 "先基于 bundle evidence/coverage/candidate_chunks/section_texts 做显式 note_plan，再写最终笔记",
                 "note_plan 是简短 JSON planning file，例如 `<note>.plan.json` 或 `*_note_plan.json`；lint 时传给 `scripts/lint_note.py --plan-file ...`",
                 "`核心信息` 是固定 metadata 区；`创新点` 是独立 `##` 章节，位于 `原文摘要翻译` 之后、`一句话总结` 之前",
                 "metadata.abstract 可用时，`原文摘要翻译` 必须是原 abstract 的中文翻译，不要写成英文原文+中文翻译或全文 summary",
-                "复杂论文需要 paper-specific `###` 子标题；method/system/framework 论文默认在 `方法主线` 下写 `### 机制流程`",
+                "复杂论文需要 paper-specific `###` 子标题；具体重心按 active_paper_type_contract 调整",
                 "优先选择关键数字、真实比较、论文特有洞察和必要公式，不要机械复述所有抽取项",
-            ],
-            "mechanism_flow_contract": {
-                "title": "机制流程",
-                "apply_when_paper_type_in": ["AI_method", "system", "framework"],
-                "required_step_count": "3_to_4",
-                "required_step_fields": ["input", "operation", "output_destination"],
-                "figure_policy": "If a high-confidence pipeline or architecture figure matches the core execution chain, place it in this subsection first.",
-                "fallback_policy": "If no high-confidence figure exists, keep the subsection as text-only and do not lower the figure-matching threshold.",
-            },
+            ] + active_paper_type_contract["planning_rules"],
+            **(
+                {"mechanism_flow_contract": active_paper_type_contract["mechanism_flow_contract"]}
+                if active_paper_type_contract["paper_type"] == "AI_method"
+                else {}
+            ),
             "note_plan_contract": {
                 "required_fields": [
                     "paper_type",
@@ -521,24 +679,16 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
                 "lint_hint": "pass_to_lint_note_with_plan_file",
                 "forbidden_style": "verbose_freeform_chain_of_thought",
             },
-            "formula_rules": [
-                "如果公式、概率分解、优化目标或复杂度表达式是理解方法的核心，保留 1 到 3 个关键 LaTeX 公式",
-                "优先从 equation_candidates、candidate_chunks 和 section_texts 中重建关键公式语境",
-                "每个保留公式后补一句工程解释，说明它对应什么操作、训练目标或状态更新",
-                "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
-            ],
+            "formula_rules": active_paper_type_contract["formula_rules"],
             "self_review_rules": [
                 "生成最终 Markdown 前，检查是否包含关键数字、真实比较、必要公式和 paper-specific insight",
                 "必须先查看 bundle.coverage：section coverage 为 poor 或 partial 时，不要把 abstract fallback 当作全文证据来写深度判断",
                 "如果 bundle.coverage.pdf_coverage 显示 PDF 被 max_pages 截断，不要声称完成了全文级精读",
                 "如果 bundle.coverage.bundle_text_budget 显示 section_texts 被截断，不要把截断片段当作完整 section 证据",
                 "appendix evidence 只能补强复现细节、额外实验、局限或图表语义，不能替代主文方法主线",
-                "如果 bundle 中存在 ablation_evidence，最终笔记必须至少写出一项次优、失败或不稳定设定；如果不存在，也要明确说明论文未充分报告这类负面经验",
-                "method/system/framework 论文应检查 `### 机制流程` 是否是 3 到 4 步编号列表，而不是泛化散文",
-                "如果正文不能让熟悉 Python 和深度学习框架的开发者看懂方法主线，说明仍停留在总结层面，需要继续下钻",
                 "清理 PDF 折行、句中异常换行和明显写给 lint 看的空壳句子",
                 "脚本 lint 通过后仍必须做 final_readability_review；该阶段只修表达，不新增事实、不改变核心数字和结论",
-            ],
+            ] + active_paper_type_contract["self_review_rules"],
             "readability_review_contract": {
                 "stage_name": "final_readability_review",
                 "position_in_workflow": "after_lint_before_save",

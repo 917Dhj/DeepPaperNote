@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 import common
 from common import (
     clean_local_pdf_stem,
@@ -21,6 +23,7 @@ from common import (
     extract_mechanism_flow_sentences,
     extract_negative_claims,
     infer_domain_label,
+    infer_paper_type,
     infer_source_type,
     fetch_arxiv_entries,
     enrich_metadata,
@@ -566,6 +569,52 @@ def test_incidental_application_keyword_does_not_reuse_unrelated_folder(tmp_path
     assert infer_domain_label(title, abstract) == "医疗健康"
     assert domain_name_score("金融", "医疗健康", title, abstract) == 0
     assert resolve_domain_subdir(config, title=title, abstract=abstract) == "医疗健康"
+
+
+@pytest.mark.parametrize(
+    ("title", "abstract", "expected"),
+    [
+        (
+            "Sparse Transformers for Long Context Modeling",
+            "We propose a new attention mechanism and evaluate ablations.",
+            "AI_method",
+        ),
+        (
+            "A Benchmark for Multimodal Reasoning",
+            "The paper introduces a dataset, leaderboard, and evaluation suite.",
+            "benchmark_or_dataset",
+        ),
+        (
+            "Patient Anxiety Screening with Mobile Signals",
+            "A clinical patient study measures depression and anxiety symptoms.",
+            "clinical_or_psychology_empirical",
+        ),
+        (
+            "Digital Labor and Platform Governance",
+            "This paper develops a theoretical framing for a social science corpus.",
+            "humanities_or_social_science",
+        ),
+        (
+            "A Systematic Review of Retrieval-Augmented Generation",
+            "We synthesize literature review evidence and summarize open problems.",
+            "survey_or_review",
+        ),
+        (
+            "A Review-Aware Optimizer for Neural Networks",
+            "We propose a training method with ablation studies.",
+            "AI_method",
+        ),
+        (
+            "A Review of Optimizer Stability",
+            "We propose a training method with ablation studies.",
+            "AI_method",
+        ),
+    ],
+)
+def test_infer_paper_type_distinguishes_supported_types(title: str, abstract: str, expected: str) -> None:
+    paper_type, _ = infer_paper_type(title, abstract)
+
+    assert paper_type == expected
 
 
 def test_resolve_domain_subdir_keeps_explicit_subdir_highest_priority(tmp_path: Path) -> None:

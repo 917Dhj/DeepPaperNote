@@ -689,6 +689,7 @@ def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:
     synthesis = bundle(
         metadata={"title": "Mechanism Paper"},
         evidence_wrapper={
+            "summary": {"paper_type": "AI_method"},
             "evidence_pack": {
                 "mechanism_evidence": [
                     {
@@ -722,6 +723,49 @@ def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:
     assert any("工程解释" in rule for rule in formula_rules)
     assert any("ablation_evidence" in rule for rule in self_review_rules)
     assert mechanism_flow_contract["title"] == "机制流程"
+
+
+@pytest.mark.parametrize(
+    ("paper_type", "expected_token", "expects_mechanism_flow"),
+    [
+        ("AI_method", "方法机制", True),
+        ("benchmark_or_dataset", "benchmark", False),
+        ("clinical_or_psychology_empirical", "临床", False),
+        ("humanities_or_social_science", "理论", False),
+        ("survey_or_review", "综述", False),
+    ],
+)
+def test_bundle_writing_contract_is_paper_type_aware(
+    paper_type: str,
+    expected_token: str,
+    expects_mechanism_flow: bool,
+) -> None:
+    synthesis = bundle(
+        metadata={"title": "Typed Paper"},
+        evidence_wrapper={"summary": {"paper_type": paper_type}, "evidence_pack": {}},
+        figures_wrapper={},
+        assets_wrapper={},
+    )
+
+    contract = synthesis["writing_contract"]
+    active_contract = contract["active_paper_type_contract"]
+    active_text = json.dumps(active_contract, ensure_ascii=False)
+
+    assert active_contract["paper_type"] == paper_type
+    assert {"paper_type", "reader_lens", "section_focus", "required_checks", "avoid_rules"} <= set(active_contract)
+    assert active_contract["reader_lens"] in "\n".join(contract["writer_persona"])
+    assert active_contract["section_focus"]
+    assert active_contract["required_checks"]
+    assert active_contract["avoid_rules"]
+    assert expected_token in active_text
+    assert active_contract["writer_persona"] in "\n".join(contract["writer_persona"])
+    assert contract["formula_rules"] == active_contract["formula_rules"]
+    assert "paper_type_adaptation_rule" in contract
+    assert ("mechanism_flow_contract" in contract) is expects_mechanism_flow
+
+    if paper_type != "AI_method":
+        assert "### 机制流程" not in "\n".join(contract["planning_rules"])
+        assert "开发者看懂方法主线" not in "\n".join(contract["self_review_rules"])
 
 
 def test_bundle_exposes_sanitized_figure_asset_quality_and_hard_gate_rules() -> None:

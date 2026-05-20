@@ -2102,12 +2102,24 @@ def extract_caption_lines(pdf_text: str, kind: str) -> list[dict[str, str]]:
 
 def infer_paper_type(title: str, abstract: str) -> tuple[str, str]:
     lower = f"{title} {abstract}".lower()
-    if any(token in lower for token in ["survey", "overview", "tutorial"]):
-        return "humanities_or_social_science", "The paper is survey-like or overview-oriented rather than a single empirical method report."
-    if any(token in lower for token in ["benchmark", "leaderboard", "evaluation suite", "dataset", "corpus"]):
-        return "benchmark_or_dataset", "The paper emphasizes benchmark, dataset, or evaluation design."
+    survey_terms = [
+        "survey",
+        "tutorial",
+        "overview",
+        "systematic review",
+        "literature review",
+        "scoping review",
+        "meta-analysis",
+        "meta analysis",
+    ]
+    if any(re.search(rf"(?<![a-z0-9]){re.escape(token)}(?![a-z0-9])", lower) for token in survey_terms):
+        return "survey_or_review", "The paper is an explicit survey, review, tutorial, overview, or meta-analysis."
     if any(token in lower for token in ["depression", "anxiety", "mental health", "clinical", "patient", "psychiatric", "psychological", "hospital"]):
         return "clinical_or_psychology_empirical", "The paper is closer to an empirical clinical or psychology study."
+    if any(token in lower for token in ["humanities", "social science", "theoretical framing", "ethnographic", "interpretive", "conceptual", "argument structure"]):
+        return "humanities_or_social_science", "The paper emphasizes theoretical framing, interpretation, or social-science argument structure."
+    if any(token in lower for token in ["benchmark", "leaderboard", "evaluation suite", "dataset", "corpus"]):
+        return "benchmark_or_dataset", "The paper emphasizes benchmark, dataset, or evaluation design."
     return "AI_method", "The paper is best treated as a method-focused technical paper."
 
 

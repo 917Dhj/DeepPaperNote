@@ -65,8 +65,22 @@ Common subheadings:
 - `论证路径`
 - `概念贡献`
 
+## `survey_or_review`
+
+Emphasize:
+- review scope
+- inclusion or exclusion criteria
+- taxonomy or topic structure
+- representative methods or findings
+- consensus, disagreements, and open problems
+
+Common subheadings:
+- `综述范围`
+- `分类体系`
+- `代表性方向`
+- `共识与分歧`
+
 ## Selection Rule
 
 Choose one primary type, then adapt details within the note.
 Do not remove the base note skeleton unless a section truly does not apply.
-
