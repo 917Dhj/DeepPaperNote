@@ -25,6 +25,7 @@ from common import (
     fetch_arxiv_entries,
     enrich_metadata,
     match_section_heading,
+    normalize_caption_label,
     normalize_pdf_text_artifacts,
     pdf_coverage_summary,
     resolve_reference,
@@ -149,12 +150,44 @@ def test_extract_caption_lines_supports_conservative_appendix_labels() -> None:
     ]
 
 
+def test_extract_caption_lines_supports_extended_scheme_algorithm_labels() -> None:
+    text = "\n".join(
+        [
+            "Extended Data Fig. 1. Extra examples.",
+            "Extended Data Figure 2: Extra overview.",
+            "Extended Data Table 1. Extra results.",
+            "Scheme 2. Synthetic route.",
+            "Algorithm 1 Training loop.",
+        ]
+    )
+
+    assert extract_caption_lines(text, "figure") == [
+        {"id": "Extended Data Fig 1", "caption": "Extra examples."},
+        {"id": "Extended Data Fig 2", "caption": "Extra overview."},
+        {"id": "Scheme 2", "caption": "Synthetic route."},
+        {"id": "Algorithm 1", "caption": "Training loop."},
+    ]
+    assert extract_caption_lines(text, "table") == [
+        {"id": "Extended Data Table 1", "caption": "Extra results."},
+    ]
+
+
+def test_normalize_caption_label_supports_extended_scheme_algorithm_labels() -> None:
+    assert normalize_caption_label("Extended Data Fig. 1") == "Extended Data Fig 1"
+    assert normalize_caption_label("Extended Data Figure 1") == "Extended Data Fig 1"
+    assert normalize_caption_label("Extended Data Table 1") == "Extended Data Table 1"
+    assert normalize_caption_label("Scheme 2") == "Scheme 2"
+    assert normalize_caption_label("Algorithm 1") == "Algorithm 1"
+
+
 def test_extract_caption_lines_rejects_caption_like_prose() -> None:
     text = "\n".join(
         [
             "Figure out whether the method generalizes before drawing conclusions.",
             "Table stakes for a good benchmark include held-out evaluation.",
             "Figuratively speaking, the result is not a Figure caption.",
+            "Figure 2.1. Hierarchical result.",
+            "Figure 3(a). Subpanel detail.",
         ]
     )
 

@@ -131,6 +131,23 @@ def label_variants(label: str) -> list[str]:
     variants = {normalized}
     short = normalized.replace("figure", "fig").replace("table.", "table").replace("fig.", "fig")
     variants.add(short)
+    extended_match = re.match(r"^extended data (fig(?:ure)?|table)\.?\s*(\d+[a-z]?)$", normalized)
+    if extended_match:
+        prefix = "extended data table" if extended_match.group(1) == "table" else "extended data fig"
+        variants.update(
+            {
+                f"{prefix} {extended_match.group(2)}",
+                f"{prefix}. {extended_match.group(2)}",
+            }
+        )
+    scheme_match = re.match(r"^(scheme|algorithm)\.?\s*(\d+[a-z]?)$", normalized)
+    if scheme_match:
+        variants.update(
+            {
+                f"{scheme_match.group(1)} {scheme_match.group(2)}",
+                f"{scheme_match.group(1)}. {scheme_match.group(2)}",
+            }
+        )
     digits = re.findall(r"\d+[a-z]?", normalized)
     if digits:
         number = digits[0]
@@ -171,6 +188,21 @@ def _normalize_label_for_match(label: str) -> str:
     'Table 2' / 'table. 2' / 'Table. 2' all become 'table 2'.
     """
     text = normalize_whitespace(label).lower()
+    extended_figure_match = re.match(
+        r"^extended\s+data\s+fig(?:ure)?\.?\s*(\d+[a-z]?)$",
+        text,
+    )
+    if extended_figure_match:
+        return f"extended data fig {extended_figure_match.group(1)}"
+    extended_table_match = re.match(
+        r"^extended\s+data\s+table\.?\s*(\d+[a-z]?)$",
+        text,
+    )
+    if extended_table_match:
+        return f"extended data table {extended_table_match.group(1)}"
+    scheme_match = re.match(r"^(scheme|algorithm)\.?\s*(\d+[a-z]?)$", text)
+    if scheme_match:
+        return f"{scheme_match.group(1)} {scheme_match.group(2)}"
     supplementary_match = re.match(
         r"^supplementary\s+(fig(?:ure)?|table)\.?\s*(\d+[a-z]?)$",
         text,

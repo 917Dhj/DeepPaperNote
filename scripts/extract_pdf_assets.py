@@ -39,6 +39,9 @@ MIN_FIGURE_WIDTH_PT = 100
 CAPTION_RE = re.compile(
     r"^((?:"
     r"supplementary\s+(?:fig(?:ure)?|table)\.?\s*\d+[a-z]?"
+    r"|extended\s+data\s+(?:fig(?:ure)?|table)\.?\s*\d+[a-z]?"
+    r"|scheme\.?\s*\d+[a-z]?"
+    r"|algorithm\.?\s*\d+[a-z]?"
     r"|(?:fig(?:ure)?|table)\.?\s*[AS]?\d+[a-z]?"
     r"))(?!\.\d)(?=$|[\s:：.。,\、|—–-])",
     re.IGNORECASE,
@@ -194,7 +197,7 @@ def _classify_caption_kind(label: str) -> str:
     """Return 'table' if the caption label starts with 'Table', else 'figure'."""
     return (
         "table"
-        if re.match(r"^(?:supplementary\s+)?table\b", label.strip(), re.IGNORECASE)
+        if re.match(r"^(?:(?:supplementary|extended\s+data)\s+)?table\b", label.strip(), re.IGNORECASE)
         else "figure"
     )
 

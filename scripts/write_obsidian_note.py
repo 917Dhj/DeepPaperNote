@@ -54,6 +54,10 @@ def main() -> None:
             raise SystemExit("write_obsidian_note.py refused to write note because math gate failed.")
         if "passes_figure_gate" in lint and not lint.get("passes_figure_gate", False):
             raise SystemExit("write_obsidian_note.py refused to write note because figure gate failed.")
+        if "passes_plan_gate" in lint and not lint.get("passes_plan_gate", False):
+            raise SystemExit("write_obsidian_note.py refused to write note because plan gate failed.")
+        if "passes_substantive_content" in lint and not lint.get("passes_substantive_content", False):
+            raise SystemExit("write_obsidian_note.py refused to write note because substantive content gate failed.")
 
     if args.content_file:
         note_text = Path(args.content_file).expanduser().resolve().read_text(encoding="utf-8")

@@ -214,15 +214,15 @@ def inspect_note_plan(plan_path: Path) -> tuple[bool, list[str]]:
     for field in NOTE_PLAN_STRING_FIELDS:
         if field in plan and not isinstance(plan[field], str):
             has_invalid_fields = True
+        elif field in plan and not plan[field].strip():
+            issues.append(f"planning_{field}_empty")
     for field in NOTE_PLAN_LIST_FIELDS:
         if field in plan and not isinstance(plan[field], list):
             has_invalid_fields = True
+        elif field in plan and not plan[field]:
+            issues.append(f"planning_{field}_empty")
     if has_invalid_fields:
         issues.append("planning_required_fields_invalid")
-
-    section_plan = plan.get("section_plan")
-    if isinstance(section_plan, list) and not section_plan:
-        issues.append("planning_section_plan_empty")
 
     return True, issues
 
@@ -326,6 +326,42 @@ ENGLISH_FUNCTION_WORDS = {
     "with",
 }
 
+PLACEHOLDER_ONLY_PATTERNS = [
+    r"^待补充[。.!！]*$",
+    r"^todo[。.!！]*$",
+    r"^暂无[。.!！]*$",
+    r"^略[。.!！]*$",
+    r"^参见原论文[。.!！]*$",
+    r"^这里记录.*[。.!！]*$",
+    r"^本节记录.*[。.!！]*$",
+]
+
+GENERIC_INNOVATION_PATTERNS = [
+    r"本文提出(?:了)?一种新方法",
+    r"具有创新性",
+    r"novel approach",
+    r"首次实现",
+]
+
+GENERIC_KEY_RESULT_PATTERNS = [
+    r"实验结果表明方法有效",
+    r"结果表明.*有效",
+    r"取得(?:了)?较好效果",
+    r"性能.*优越",
+]
+
+GENERIC_LIMITATION_PATTERNS = [
+    r"未来工作.*更多数据",
+    r"需要更多数据",
+    r"future work can",
+    r"more data",
+    r"后续.*扩展",
+]
+
+HONEST_MISSING_TOKENS = ("本文未给出", "论文未给出", "未报告", "没有报告", "未提供")
+HONEST_MISSING_BASIS_TOKENS = ("依据", "正文", "附录", "表格", "coverage", "作者")
+HONEST_MISSING_IMPACT_TOKENS = ("影响", "限制", "受限", "不能", "无法", "结论强度")
+
 DOUBLE_ESCAPED_TEX_COMMANDS = {
     "alpha",
     "bar",
@@ -376,7 +412,8 @@ def is_exempt_line(line: str) -> bool:
     if is_metadata_line(stripped):
         return True
     if (
-        stripped.startswith("> 建议位置：")
+        stripped.startswith("> [!figure]")
+        or stripped.startswith("> 建议位置：")
         or stripped.startswith("> 放置原因：")
         or stripped.startswith("> 当前状态：")
     ):
@@ -1052,6 +1089,188 @@ def subsection_body(text: str, section_heading: str, subsection_heading: str) ->
     return body[start : start + next_match.start()]
 
 
+def cleaned_section_lines(body: str) -> list[str]:
+    lines: list[str] = []
+    for raw_line in body.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        if (
+            stripped.startswith("> [!figure]")
+            or stripped.startswith("> 建议位置：")
+            or stripped.startswith("> 放置原因：")
+            or stripped.startswith("> 当前状态：")
+        ):
+            continue
+        if stripped.startswith("!["):
+            continue
+        if stripped.startswith("*论文原图编号：") and stripped.endswith("*"):
+            continue
+        if stripped.startswith("> "):
+            stripped = stripped[2:].strip()
+        lines.append(stripped)
+    return lines
+
+
+def normalized_section_content(body: str) -> str:
+    return normalize_lint_whitespace(" ".join(cleaned_section_lines(body)))
+
+
+def normalize_lint_whitespace(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def matches_any_pattern(text: str, patterns: list[str]) -> bool:
+    normalized = normalize_lint_whitespace(text)
+    return any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def is_placeholder_like(text: str) -> bool:
+    normalized = normalize_lint_whitespace(text)
+    if not normalized:
+        return True
+    return matches_any_pattern(normalized, PLACEHOLDER_ONLY_PATTERNS)
+
+
+def issue(section: str, reason: str, severity: str, snippet: str) -> dict[str, object]:
+    return {
+        "section": section,
+        "reason": reason,
+        "severity": severity,
+        "snippet": normalize_lint_whitespace(snippet)[:160],
+    }
+
+
+def text_units(body: str) -> list[str]:
+    units: list[str] = []
+    for line in cleaned_section_lines(body):
+        stripped = re.sub(r"^(?:[-*+]|\d+[.)、])\s*", "", line).strip()
+        if stripped:
+            units.append(stripped)
+    if units:
+        return units
+    return [
+        part.strip()
+        for part in re.split(r"[。！？!?]\s*", normalized_section_content(body))
+        if part.strip()
+    ]
+
+
+def meaningful_units(body: str, generic_patterns: list[str] | None = None) -> list[str]:
+    generic_patterns = generic_patterns or []
+    kept: list[str] = []
+    for unit in text_units(body):
+        if is_placeholder_like(unit):
+            continue
+        if generic_patterns and matches_any_pattern(unit, generic_patterns):
+            continue
+        compact = re.sub(r"[\s，。,.；;：:、\-*+()（）【】\[\]]+", "", unit)
+        if len(compact) < 12:
+            continue
+        kept.append(unit)
+    return kept
+
+
+def has_number_token(text: str) -> bool:
+    return bool(re.search(r"\d+(?:\.\d+)?\s*(?:%|％|[A-Za-z\u4e00-\u9fff]{0,8})", text))
+
+
+def is_honest_missing_declaration(text: str) -> bool:
+    normalized = normalize_lint_whitespace(text)
+    if not any(token in normalized for token in HONEST_MISSING_TOKENS):
+        return False
+    if not any(token in normalized for token in HONEST_MISSING_BASIS_TOKENS):
+        return False
+    if not any(token in normalized for token in HONEST_MISSING_IMPACT_TOKENS):
+        return False
+    return len(normalized) >= 30
+
+
+def has_reference_entry(text: str) -> bool:
+    normalized = normalize_lint_whitespace(text)
+    if re.search(r"10\.\d{4,9}/\S+", normalized):
+        return True
+    if re.search(r"\barXiv[:：]?\s*\d{4}\.\d{4,5}", normalized, flags=re.IGNORECASE):
+        return True
+    if re.search(r"\[\[[^\]]+\]\]", normalized):
+        return True
+    if re.search(r"\[[0-9]+\]", normalized):
+        return True
+    if re.search(r"\b[A-Z][A-Za-z-]+ et al\.?\s*,?\s*(?:19|20)\d{2}\b", normalized):
+        return True
+    if re.search(r"(?:19|20)\d{2}.*(?:DOI|doi|会议|期刊|arXiv)", normalized):
+        return True
+    return False
+
+
+def inspect_substantive_content(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    for section in REQUIRED_SECTIONS:
+        body = section_body(text, section)
+        content = normalized_section_content(body)
+        if is_placeholder_like(content):
+            issues.append(issue(section, "section_empty_shell", "error", content or section))
+
+    innovation = section_body(text, "创新点")
+    innovation_content = normalized_section_content(innovation)
+    innovation_units = meaningful_units(innovation, GENERIC_INNOVATION_PATTERNS)
+    if not innovation_units:
+        issues.append(issue("创新点", "innovation_empty_shell", "error", innovation_content))
+    elif len(innovation_units) < 2:
+        issues.append(issue("创新点", "innovation_too_few_specific_points", "warning", innovation_content))
+
+    key_results = section_body(text, "关键结果")
+    key_results_content = normalized_section_content(key_results)
+    if is_honest_missing_declaration(key_results_content):
+        issues.append(
+            issue(
+                "关键结果",
+                "key_results_quantitative_result_missing",
+                "warning",
+                key_results_content,
+            )
+        )
+    elif not meaningful_units(key_results, GENERIC_KEY_RESULT_PATTERNS):
+        issues.append(issue("关键结果", "key_results_empty_shell", "error", key_results_content))
+    elif not has_number_token(key_results_content):
+        issues.append(
+            issue(
+                "关键结果",
+                "key_results_quantitative_result_missing",
+                "warning",
+                key_results_content,
+            )
+        )
+
+    references = section_body(text, "引用")
+    references_content = normalized_section_content(references)
+    if is_honest_missing_declaration(references_content):
+        issues.append(issue("引用", "references_unavailable_declared", "warning", references_content))
+    elif is_placeholder_like(references_content) or not has_reference_entry(references_content):
+        issues.append(issue("引用", "references_placeholder", "error", references_content))
+
+    limitations = section_body(text, "局限")
+    limitations_content = normalized_section_content(limitations)
+    if not meaningful_units(limitations, GENERIC_LIMITATION_PATTERNS):
+        issues.append(issue("局限", "limitations_empty_shell", "error", limitations_content))
+
+    for section in ("方法主线", "深度分析"):
+        body = section_body(text, section)
+        content = normalized_section_content(body)
+        if not meaningful_units(body):
+            issues.append(issue(section, "section_empty_shell", "error", content or section))
+
+    deduped: list[dict[str, object]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for item in issues:
+        key = (str(item["section"]), str(item["reason"]), str(item["severity"]))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
 def method_section_requires_mechanism_flow(text: str) -> bool:
     body = section_body(text, "方法主线")
     if not body:
@@ -1108,6 +1327,7 @@ def main() -> None:
     code_math_issues = suspicious_code_formatted_math(text)
     math_issues = math_render_issues(text)
     figure_issues = figure_structure_issues(text)
+    substantive_issues = inspect_substantive_content(text)
     planning_artifact_found, planning_artifact_issues = inspect_note_plan(
         resolve_note_plan_path(path, args.plan_file)
     )
@@ -1119,6 +1339,10 @@ def main() -> None:
     for issue in planning_artifact_issues:
         if issue not in warnings:
             warnings.append(issue)
+    for issue in substantive_issues:
+        reason = str(issue.get("reason", ""))
+        if reason and reason not in warnings:
+            warnings.append(reason)
     warnings.extend(front_matter_order_warnings(text))
     warnings.extend(mechanism_flow_warnings(text))
     if not body_text.lstrip().startswith("# "):
@@ -1155,12 +1379,17 @@ def main() -> None:
         "code_math_issues": code_math_issues,
         "math_render_issues": math_issues,
         "figure_structure_issues": figure_issues,
+        "substantive_content_issues": substantive_issues,
         "planning_artifact_found": planning_artifact_found,
         "planning_artifact_issues": planning_artifact_issues,
         "passes_basic_structure": not missing_sections and not {"title_heading_missing", "no_level2_sections", "front_matter_order_invalid"} & set(warnings),
         "passes_style_gate": not mixed_issues and not linebreak_issues and not code_math_issues,
         "passes_math_gate": not math_issues,
         "passes_figure_gate": not figure_issues,
+        "passes_plan_gate": planning_artifact_found and not planning_artifact_issues,
+        "passes_substantive_content": not any(
+            str(issue.get("severity", "")) == "error" for issue in substantive_issues
+        ),
     }
     emit(payload, args.output)
 

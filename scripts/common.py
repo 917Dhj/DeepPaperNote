@@ -2022,6 +2022,23 @@ def normalize_caption_label(label: str) -> str:
     chinese_match = re.match(r"^(图|表)\s*([A-Z]?\d+[a-z]?)$", label, re.IGNORECASE)
     if chinese_match:
         return f"{chinese_match.group(1)} {chinese_match.group(2)}"
+    extended_figure_match = re.match(
+        r"^extended\s+data\s+fig(?:ure)?\.?\s*(\d+[a-z]?)$",
+        label,
+        re.IGNORECASE,
+    )
+    if extended_figure_match:
+        return f"Extended Data Fig {extended_figure_match.group(1)}"
+    extended_table_match = re.match(
+        r"^extended\s+data\s+table\.?\s*(\d+[a-z]?)$",
+        label,
+        re.IGNORECASE,
+    )
+    if extended_table_match:
+        return f"Extended Data Table {extended_table_match.group(1)}"
+    scheme_match = re.match(r"^(scheme|algorithm)\.?\s*(\d+[a-z]?)$", label, re.IGNORECASE)
+    if scheme_match:
+        return f"{scheme_match.group(1).capitalize()} {scheme_match.group(2)}"
     supplementary_match = re.match(
         r"^(supplementary)\s+(fig(?:ure)?|table)\.?\s*(\d+[a-z]?)$",
         label,
@@ -2047,6 +2064,9 @@ def extract_caption_lines(pdf_text: str, kind: str) -> list[dict[str, str]]:
         pattern = re.compile(
             r"^((?:"
             r"supplementary\s+fig(?:ure)?\.?\s*\d+[a-z]?"
+            r"|extended\s+data\s+fig(?:ure)?\.?\s*\d+[a-z]?"
+            r"|scheme\.?\s*\d+[a-z]?"
+            r"|algorithm\.?\s*\d+[a-z]?"
             r"|fig(?:ure)?\.?\s*[AS]?\d+[a-z]?"
             r"|图\.?\s*[A-Z]?\d+[a-z]?"
             r"))(?!\.\d)(?:[:：.。,\s、|—–-]+|$)(.*)$",
@@ -2056,6 +2076,7 @@ def extract_caption_lines(pdf_text: str, kind: str) -> list[dict[str, str]]:
         pattern = re.compile(
             r"^((?:"
             r"supplementary\s+table\.?\s*\d+[a-z]?"
+            r"|extended\s+data\s+table\.?\s*\d+[a-z]?"
             r"|table\.?\s*[AS]?\d+[a-z]?"
             r"|表\.?\s*[A-Z]?\d+[a-z]?"
             r"))(?!\.\d)(?:[:：.。,\s、|—–-]+|$)(.*)$",

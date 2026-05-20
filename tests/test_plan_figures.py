@@ -128,6 +128,50 @@ def test_label_normalization_matches_appendix_figure_spellings() -> None:
     assert _normalize_label_for_match("Table S3") == "table s3"
 
 
+def test_label_normalization_matches_extended_scheme_algorithm_spellings() -> None:
+    assert _normalize_label_for_match("Extended Data Fig. 1") == "extended data fig 1"
+    assert _normalize_label_for_match("Extended Data Figure 1") == "extended data fig 1"
+    assert _normalize_label_for_match("Extended Data Table 1") == "extended data table 1"
+    assert _normalize_label_for_match("Scheme 2") == "scheme 2"
+    assert _normalize_label_for_match("Algorithm 1") == "algorithm 1"
+
+
+def test_extended_data_figure_asset_matches_figure_spelling() -> None:
+    planned = attach_candidate_images(
+        [
+            {
+                "id": "Extended Data Figure 1",
+                "caption": "Extra examples.",
+                "insert_mode": "placeholder",
+            }
+        ],
+        page_assets=[
+            {
+                "page_number": 8,
+                "image_count": 0,
+                "figure_count": 1,
+                "page_text": "Extended Data Fig. 1. Extra examples.",
+            }
+        ],
+        image_assets=[],
+        figure_assets=[
+            {
+                "page_number": 8,
+                "label": "Extended Data Fig. 1",
+                "filename": "page_008_fig_extended_data_fig_1.png",
+                "path": "/tmp/images/page_008_fig_extended_data_fig_1.png",
+                "width": 640,
+                "height": 320,
+                "size_bytes": 1200,
+                "extraction_level": "figure",
+            }
+        ],
+    )
+
+    assert planned[0]["figure_asset_candidate"]["label"] == "Extended Data Fig. 1"
+    assert planned[0]["candidate_pages"][0]["page_number"] == 8
+
+
 def test_legacy_image_assets_still_populate_candidate_page_images() -> None:
     planned = attach_candidate_images(
         [

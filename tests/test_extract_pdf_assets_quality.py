@@ -84,21 +84,32 @@ def test_caption_re_supports_conservative_appendix_labels() -> None:
     assert CAPTION_RE.match("Table S3 Extended results.")
 
 
+def test_caption_re_supports_extended_scheme_algorithm_labels() -> None:
+    assert CAPTION_RE.match("Extended Data Fig. 1. Extra examples.")
+    assert CAPTION_RE.match("Extended Data Figure 1. Extra examples.")
+    assert CAPTION_RE.match("Extended Data Table 1. Extra results.")
+    assert CAPTION_RE.match("Scheme 2. Synthetic route.")
+    assert CAPTION_RE.match("Algorithm 1 Training loop.")
+
+
 def test_caption_re_rejects_caption_like_prose() -> None:
     assert CAPTION_RE.match("Figure out whether the method generalizes.") is None
     assert CAPTION_RE.match("Table stakes for evaluation are high.") is None
     assert CAPTION_RE.match("Figuratively speaking, this is not a caption.") is None
 
 
-def test_caption_re_keeps_this_rounds_unsupported_forms_out() -> None:
-    assert CAPTION_RE.match("Extended Data Fig. 1. Extra examples.") is None
+def test_caption_re_keeps_ambiguous_forms_out() -> None:
     assert CAPTION_RE.match("Figure 2.1. Hierarchical result.") is None
     assert CAPTION_RE.match("Figure 3(a). Subpanel detail.") is None
 
 
-def test_supplementary_table_caption_classifies_as_table() -> None:
+def test_supported_table_captions_classify_as_table() -> None:
     assert _classify_caption_kind("Supplementary Table 2") == "table"
+    assert _classify_caption_kind("Extended Data Table 1") == "table"
     assert _classify_caption_kind("Supplementary Figure 1") == "figure"
+    assert _classify_caption_kind("Extended Data Fig. 1") == "figure"
+    assert _classify_caption_kind("Scheme 2") == "figure"
+    assert _classify_caption_kind("Algorithm 1") == "figure"
 
 
 def test_text_table_row_accepts_compact_text_comparison_row() -> None:
