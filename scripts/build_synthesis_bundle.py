@@ -104,6 +104,18 @@ def paper_type_writing_contract(paper_type: str) -> dict:
                 "每个保留公式后补一句工程解释，说明它对应什么操作、训练目标或状态更新",
                 "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
             ],
+            "section_semantics": {
+                "研究问题": "方法要解决的具体技术问题和现有方法短板。",
+                "数据与任务定义": "数据集、输入输出、评测任务和实验设置。",
+                "方法主线": "模型、算法、训练或推理机制。",
+                "关键结果": "主结果、强基线、消融和关键数字。",
+                "深度分析": "方法为什么有效、何处脆弱、复现和扩展代价。",
+            },
+            "recommended_subsections": {
+                "方法主线": ["机制流程", "模型结构", "训练目标", "推理与采样链路", "关键实现细节"],
+                "关键结果": ["主结果与强基线", "消融到底说明了什么", "失败或不稳定设置"],
+                "深度分析": ["为什么有效", "复杂度与扩展性", "复现注意点"],
+            },
             "mechanism_flow_contract": mechanism_flow_contract,
         },
         "benchmark_or_dataset": {
@@ -131,6 +143,19 @@ def paper_type_writing_contract(paper_type: str) -> dict:
                 "每个保留公式后补一句解释，说明它对应什么指标、采样过程或评价边界",
                 "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
             ],
+            "section_semantics": {
+                "研究问题": "这个 benchmark/dataset 想补足的评测或数据缺口。",
+                "数据与任务定义": "数据来源、任务拆分、标签/题目定义、样本范围。",
+                "方法主线": "数据构建、筛选、标注和评测协议，不写成模型 pipeline。",
+                "关键结果": "基线表现、难度分布、覆盖范围和偏差。",
+                "深度分析": "它真正测到了什么，以及不能代表什么。",
+            },
+            "recommended_subsections": {
+                "数据与任务定义": ["数据来源", "任务拆分", "标注/筛选协议"],
+                "方法主线": ["构建流程", "评测协议", "Baseline 设置"],
+                "关键结果": ["基线表现", "难度分布", "覆盖与偏差"],
+                "深度分析": ["benchmark 真正测到了什么", "适用边界"],
+            },
         },
         "clinical_or_psychology_empirical": {
             "paper_type": "clinical_or_psychology_empirical",
@@ -157,6 +182,19 @@ def paper_type_writing_contract(paper_type: str) -> dict:
                 "每个保留公式后补一句解释，说明它对应什么变量关系、估计量或临床/心理学含义",
                 "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
             ],
+            "section_semantics": {
+                "研究问题": "临床、心理学或行为科学中的研究问题、假设或变量关系。",
+                "数据与任务定义": "样本来源、纳排标准、变量/量表、测量方式。",
+                "方法主线": "研究设计、分组、测量流程和统计分析路径。",
+                "关键结果": "主要效应、相关性、组间差异、不确定性或显著性。",
+                "深度分析": "结果解释、因果边界、临床/心理学意义和外推限制。",
+            },
+            "recommended_subsections": {
+                "数据与任务定义": ["样本与纳排标准", "变量与量表", "测量流程"],
+                "方法主线": ["研究设计", "分析模型", "主要比较"],
+                "关键结果": ["主要效应", "不确定性与显著性", "临床或心理学解释"],
+                "深度分析": ["因果解释边界", "外推限制"],
+            },
         },
         "humanities_or_social_science": {
             "paper_type": "humanities_or_social_science",
@@ -183,6 +221,19 @@ def paper_type_writing_contract(paper_type: str) -> dict:
                 "每个保留公式或形式化定义后补一句解释，说明它如何支撑理论框架或论证路径",
                 "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
             ],
+            "section_semantics": {
+                "研究问题": "作者要解释的社会、文化、历史、制度或理论问题。",
+                "数据与任务定义": "材料、案例、文本、访谈、档案或语料范围，不写成 ML task。",
+                "方法主线": "理论框架、概念区分和论证路径。",
+                "关键结果": "核心解释性发现、概念贡献或对既有观点的修正。",
+                "深度分析": "论证强度、材料边界、解释替代性和可迁移性。",
+            },
+            "recommended_subsections": {
+                "数据与任务定义": ["材料范围", "选择标准", "案例或语料边界"],
+                "方法主线": ["理论框架", "概念区分", "论证路径"],
+                "关键结果": ["核心解释性发现", "概念贡献"],
+                "深度分析": ["论证强度", "替代解释", "材料边界"],
+            },
         },
         "survey_or_review": {
             "paper_type": "survey_or_review",
@@ -209,6 +260,19 @@ def paper_type_writing_contract(paper_type: str) -> dict:
                 "每个保留公式或定义后补一句解释，说明它如何影响文献归类、证据权重或结论边界",
                 "最终 Markdown 使用 Obsidian/MathJax 可渲染的 `$...$` 或 `$$...$$`，不要写成代码块或双反斜杠转义文本",
             ],
+            "section_semantics": {
+                "研究问题": "综述试图整理的领域问题、争议或知识缺口。",
+                "数据与任务定义": "纳入文献范围、检索/筛选标准和综述对象。",
+                "方法主线": "分类体系、综述组织方式和证据综合逻辑，不写成单篇方法架构。",
+                "关键结果": "领域共识、分歧、趋势、代表性方向和开放问题。",
+                "深度分析": "综述覆盖的盲区、分类体系的解释力和未来研究机会。",
+            },
+            "recommended_subsections": {
+                "数据与任务定义": ["综述范围", "纳入/排除标准", "文献覆盖"],
+                "方法主线": ["分类体系", "方法谱系", "证据组织方式"],
+                "关键结果": ["代表性方向", "共识与分歧", "开放问题"],
+                "深度分析": ["分类体系的局限", "未覆盖区域", "后续研究机会"],
+            },
         },
     }
     normalized = normalize_whitespace(str(paper_type or "")) or "AI_method"
@@ -626,7 +690,7 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             "language": "zh-CN",
             "contract_role": "minimal_generation_contract",
             "canonical_source": "SKILL.md carries the required workflow; references are optional topic deep dives.",
-            "paper_type_adaptation_rule": "Keep the 12 required sections unchanged. First choose note_plan.paper_type from allowed_paper_types, then adapt emphasis, formulas, subsection choices, and self-review checks through paper_type_contracts[note_plan.paper_type].",
+            "paper_type_adaptation_rule": "Keep the 12 required sections unchanged. First choose note_plan.paper_type from allowed_paper_types, then write note_plan.section_plan with paper_type_contracts[note_plan.paper_type].section_semantics and .recommended_subsections, and adapt emphasis, formulas, and self-review checks through the same contract.",
             "paper_type_selection": {
                 "source_of_truth": "note_plan.paper_type",
                 "suggested_paper_type": suggested_paper_type,
@@ -666,11 +730,12 @@ def bundle(metadata: dict, evidence_wrapper: dict, figures_wrapper: dict, assets
             "planning_rules": [
                 "先基于 bundle evidence/coverage/candidate_chunks/section_texts 做显式 note_plan，再写最终笔记",
                 "先从 writing_contract.paper_type_selection.allowed_paper_types 中选择 note_plan.paper_type；summary.paper_type/suggested_paper_type 只能作为 hint_only 线索，不能替代模型判断",
-                "确定 note_plan.paper_type 后，应用 paper_type_contracts[note_plan.paper_type] 的 reader_lens、section_focus、planning_rules、formula_rules 和 self_review_rules",
+                "确定 note_plan.paper_type 后，先用 paper_type_contracts[note_plan.paper_type].section_semantics 理解固定顶层章节的类型化含义，再用 paper_type_contracts[note_plan.paper_type].recommended_subsections 为 note_plan.section_plan 选择 paper-specific `###` 子标题",
+                "随后应用 paper_type_contracts[note_plan.paper_type] 的 reader_lens、section_focus、planning_rules、formula_rules 和 self_review_rules",
                 "note_plan 是简短 JSON planning file，例如 `<note>.plan.json` 或 `*_note_plan.json`；lint 时传给 `scripts/lint_note.py --plan-file ...`",
                 "`核心信息` 是固定 metadata 区；`创新点` 是独立 `##` 章节，位于 `原文摘要翻译` 之后、`一句话总结` 之前",
                 "metadata.abstract 可用时，`原文摘要翻译` 必须是原 abstract 的中文翻译，不要写成英文原文+中文翻译或全文 summary",
-                "复杂论文需要 paper-specific `###` 子标题；具体重心按 paper_type_contracts[note_plan.paper_type] 调整",
+                "复杂论文需要 paper-specific `###` 子标题；具体子标题从 paper_type_contracts[note_plan.paper_type].recommended_subsections 中按证据取舍，不要机械照抄为空壳结构",
                 "优先选择关键数字、真实比较、论文特有洞察和必要公式，不要机械复述所有抽取项",
             ],
             "note_plan_contract": {

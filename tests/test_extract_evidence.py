@@ -13,6 +13,7 @@ except ImportError:  # pragma: no cover
     fitz = None
 
 from build_synthesis_bundle import bundle
+from contracts import NOTE_REQUIRED_SECTIONS
 from extract_evidence import build_appendix_evidence, evidence_quality, extract_equation_candidates
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -721,8 +722,18 @@ def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:
     mechanism_flow_contract = method_contract["mechanism_flow_contract"]
 
     assert any("note_plan.paper_type" in rule for rule in planning_rules)
+    assert any("section_semantics" in rule and "note_plan.section_plan" in rule for rule in planning_rules)
+    assert any("recommended_subsections" in rule and "note_plan.section_plan" in rule for rule in planning_rules)
     assert any("工程解释" in rule for rule in formula_rules)
     assert any("ablation_evidence" in rule for rule in self_review_rules)
+    assert method_contract["section_semantics"]["方法主线"] == "模型、算法、训练或推理机制。"
+    assert method_contract["recommended_subsections"]["方法主线"] == [
+        "机制流程",
+        "模型结构",
+        "训练目标",
+        "推理与采样链路",
+        "关键实现细节",
+    ]
     assert mechanism_flow_contract["title"] == "机制流程"
 
 
@@ -749,10 +760,21 @@ def test_bundle_exposes_all_paper_type_contracts_for_model_selection(paper_type:
     typed_text = json.dumps(typed_contract, ensure_ascii=False)
 
     assert typed_contract["paper_type"] == paper_type
-    assert {"paper_type", "reader_lens", "section_focus", "required_checks", "avoid_rules"} <= set(typed_contract)
+    assert {
+        "paper_type",
+        "reader_lens",
+        "section_focus",
+        "required_checks",
+        "avoid_rules",
+        "section_semantics",
+        "recommended_subsections",
+    } <= set(typed_contract)
     assert typed_contract["section_focus"]
     assert typed_contract["required_checks"]
     assert typed_contract["avoid_rules"]
+    assert typed_contract["section_semantics"]
+    assert typed_contract["recommended_subsections"]
+    assert set(typed_contract["recommended_subsections"]) <= set(NOTE_REQUIRED_SECTIONS)
     assert expected_token in typed_text
     assert "active_paper_type_contract" not in contract
     assert contract["paper_type_selection"] == {
@@ -763,6 +785,9 @@ def test_bundle_exposes_all_paper_type_contracts_for_model_selection(paper_type:
     }
     assert "note_plan.paper_type" in "\n".join(contract["planning_rules"])
     assert "paper_type_contracts[note_plan.paper_type]" in "\n".join(contract["planning_rules"])
+    assert "section_semantics" in "\n".join(contract["planning_rules"])
+    assert "recommended_subsections" in "\n".join(contract["planning_rules"])
+    assert "note_plan.section_plan" in "\n".join(contract["planning_rules"])
     assert "paper_type_contracts[note_plan.paper_type]" in "\n".join(contract["self_review_rules"])
 
     if paper_type != "AI_method":
