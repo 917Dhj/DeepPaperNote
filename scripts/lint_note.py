@@ -1214,6 +1214,8 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
         content = normalized_section_content(body)
         if is_placeholder_like(content):
             issues.append(issue(section, "section_empty_shell", "error", content or section))
+        if section not in {"关键结果", "引用"} and is_honest_missing_declaration(content):
+            issues.append(issue(section, "section_honest_missing_not_allowed", "error", content))
 
     innovation = section_body(text, "创新点")
     innovation_content = normalized_section_content(innovation)
@@ -1229,8 +1231,8 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
         issues.append(
             issue(
                 "关键结果",
-                "key_results_quantitative_result_missing",
-                "warning",
+                "key_results_honest_missing_not_allowed",
+                "error",
                 key_results_content,
             )
         )

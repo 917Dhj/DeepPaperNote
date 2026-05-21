@@ -581,7 +581,7 @@ def test_substantive_gate_rejects_generic_key_results() -> None:
     assert any(issue["severity"] == "error" for issue in issues)
 
 
-def test_substantive_gate_allows_honest_missing_quantitative_result() -> None:
+def test_substantive_gate_rejects_honest_missing_in_key_results() -> None:
     note = _valid_note_text().replace(
         "在三个多步问答数据集上，方法把答案准确率从 71.2% 提升到 78.5%，并将不可追溯错误比例从 18% 降到 9%。",
         "本文未给出可复现的定量 benchmark；依据是正文和附录都只报告案例分析，没有指标表或 baseline 对比，因此这里不能伪造数值结论，只能说明结论强度受限。",
@@ -589,8 +589,21 @@ def test_substantive_gate_allows_honest_missing_quantitative_result() -> None:
 
     issues = inspect_substantive_content(note)
 
-    assert not any(issue["severity"] == "error" for issue in issues)
-    assert any(issue["reason"] == "key_results_quantitative_result_missing" for issue in issues)
+    assert any(issue["reason"] == "key_results_honest_missing_not_allowed" for issue in issues)
+    assert any(issue["severity"] == "error" for issue in issues)
+
+
+def test_substantive_gate_rejects_honest_missing_outside_references() -> None:
+    note = _valid_note_text().replace(
+        "输入问题先进入证据筛选模块，随后工具规划器选择下一步调用，最后由答案生成器结合状态日志输出可追溯结论。",
+        "本文未给出可复现的方法流程；依据是正文和附录都没有展开模块输入输出，因此这里不能补写机制细节，只能说明方法理解受限。",
+    )
+
+    issues = inspect_substantive_content(note)
+
+    assert any(issue["reason"] == "section_honest_missing_not_allowed" for issue in issues)
+    assert any(issue["section"] == "方法主线" for issue in issues)
+    assert any(issue["severity"] == "error" for issue in issues)
 
 
 def test_substantive_gate_rejects_placeholder_references() -> None:
@@ -614,6 +627,18 @@ def test_substantive_gate_accepts_real_reference_entry() -> None:
     issues = inspect_substantive_content(note)
 
     assert not any(issue["section"] == "引用" for issue in issues)
+
+
+def test_substantive_gate_allows_honest_missing_in_references() -> None:
+    note = _valid_note_text().replace(
+        "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
+        "本文未给出可解析的参考文献条目；依据是正文和附录未提供 DOI、arXiv 或编号引用，因此引用完整性受限。",
+    )
+
+    issues = inspect_substantive_content(note)
+
+    assert not any(issue["severity"] == "error" for issue in issues)
+    assert any(issue["reason"] == "references_unavailable_declared" for issue in issues)
 
 
 def test_substantive_gate_rejects_generic_limitation() -> None:
