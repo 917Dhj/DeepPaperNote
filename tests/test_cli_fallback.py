@@ -15,7 +15,6 @@ ENV_SCRIPT = PROJECT_ROOT / "scripts" / "check_environment.py"
 def test_write_note_falls_back_to_workspace(tmp_path: Path) -> None:
     env = os.environ.copy()
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
-    env.pop("READ_ARXIV_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
 
@@ -48,7 +47,6 @@ def test_write_note_falls_back_to_workspace(tmp_path: Path) -> None:
 def test_check_environment_reports_workspace_fallback(tmp_path: Path) -> None:
     env = os.environ.copy()
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
-    env.pop("READ_ARXIV_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
 
@@ -70,7 +68,6 @@ def test_write_note_in_vault_mode_does_not_duplicate_paper_slug(tmp_path: Path) 
     vault.mkdir()
     env = os.environ.copy()
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
-    env.pop("READ_ARXIV_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
 
     result = subprocess.run(
@@ -148,7 +145,6 @@ def test_write_note_accepts_legacy_lint_json_without_figure_gate(tmp_path: Path)
     )
     env = os.environ.copy()
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
-    env.pop("READ_ARXIV_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
 

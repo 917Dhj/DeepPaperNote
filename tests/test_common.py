@@ -376,6 +376,22 @@ def test_resolve_note_output_mode_falls_back_to_workspace(tmp_path: Path, monkey
     assert root == tmp_path / "DeepPaperNote_output"
 
 
+def test_runtime_config_ignores_read_arxiv_obsidian_vault(tmp_path: Path, monkeypatch) -> None:
+    legacy_vault = tmp_path / "legacy_vault"
+    legacy_vault.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DEEPPAPERNOTE_OBSIDIAN_VAULT", raising=False)
+    monkeypatch.setenv("READ_ARXIV_OBSIDIAN_VAULT", str(legacy_vault))
+    monkeypatch.setenv("DEEPPAPERNOTE_DISABLE_SHELL_CONFIG", "1")
+
+    config = common.runtime_config()
+    mode, root = resolve_note_output_mode(config)
+
+    assert config["obsidian_vault"] == ""
+    assert mode == "workspace"
+    assert root == tmp_path / "DeepPaperNote_output"
+
+
 def test_resolve_obsidian_note_path_in_workspace_mode(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     config = {

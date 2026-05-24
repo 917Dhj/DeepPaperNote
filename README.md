@@ -65,8 +65,9 @@ DeepPaperNote does not achieve higher note quality by simply rewriting the abstr
 | 🗂️ Evidence first | It gathers evidence from PDFs, metadata sources, and optional Zotero workflows before writing. The note captures the full evidence chain: what the paper proves, what remains unproven, which experiments matter, where negative or limiting results appear, and how conclusions are bounded. |
 | 🧪 Technical detail first | For technical papers, it tries to preserve key numbers, formulas, implementation logic, and real boundary conditions rather than stopping at high-level paraphrase. |
 | 📄 Paper-type-aware writing | Different paper types receive different reading strategies. Method papers, benchmark and dataset papers, survey papers, and empirical papers each receive focused treatment of the aspects that matter most for that type. |
+| 📊 Clear result tables | When a paper compares multiple models, datasets, tasks, settings, or metrics, DeepPaperNote turns the central comparison into compact Markdown tables and follows them with interpretation of what the numbers actually mean. |
 | 🖼️ Image-first figures | When a figure candidate is usable and has a valid image path, it is inserted as a real image. Placeholders are reserved for real failures: missing candidates, visual defects, contamination, truncation, or identity mismatch. |
-| 🔗 Native knowledge-base output | It first routes the paper into a domain-appropriate place in your existing knowledge-base structure, then gives each paper its own folder, Markdown note, and `images/` directory. |
+| 🔗 Native knowledge-base output | It first routes the paper into a domain-appropriate place in your existing knowledge-base structure, then creates a paper folder with YAML properties, a fixed core metadata block, a stable `images/` directory, and clean figure/table embeds. |
 | 📚 Local-library-first resolution | If the paper already exists in Zotero, it can reuse local items and attachments, which is often both more reliable and faster. |
 
 ## 👀 Who It Is For
@@ -168,7 +169,7 @@ By default, DeepPaperNote will:
 - gather metadata and PDF evidence
 - insert figures directly when usable; keep placeholders only for real failures such as missing candidates, visual defects, or copy errors
 - generate the final Markdown note
-- save it into Obsidian when configured, or ask for your vault path before falling back to the current directory
+- save it into Obsidian when configured, or ask for your vault path before falling back to the current workspace's output folder
 
 ### 4) You do not need perfect setup on day one
 
@@ -177,7 +178,7 @@ You can try DeepPaperNote even if you have not finished configuring Obsidian, Zo
 If you want the Python dependencies for local development:
 
 ```bash
-python3 -m pip install -e .
+python3 -m pip install -e '.[dev]'
 ```
 
 If you want to check the environment first, you can also ask the agent with short requests such as:
@@ -190,7 +191,7 @@ If you want to check the environment first, you can also ask the agent with shor
 
 Once you have PyMuPDF installed, you're ready to start generating notes with DeepPaperNote right away. The configurations outlined below are extensions of the core features, designed to help you seamlessly integrate the generated notes into your actual research workflow.
 
-- if no Obsidian vault is configured, it can still save notes into the current working directory
+- if no Obsidian vault is configured, it can still save notes under the current workspace's fallback output folder, `DeepPaperNote_output` by default
 - if you want an Obsidian-native long-term workflow, you should configure your vault path
 - everything else in this section is optional and improves specific workflows
 
@@ -533,7 +534,7 @@ DeepPaperNote/
 | Claude Code / Codex | Recommended | Supported agent environments |
 | Python 3.10+ | Required | Runs the helper scripts |
 | PyMuPDF | Required | Core PDF dependency; install it with `python3 -m pip install PyMuPDF` |
-| Local Obsidian vault | Recommended | Writes directly into a long-term note system; otherwise falls back to the current working directory |
+| Local Obsidian vault | Recommended | Writes directly into a long-term note system; otherwise uses the current workspace's fallback output folder |
 | Zotero integration | Optional | Helpful for local-library-first paper workflows |
 | OCR tools | Optional | Improves handling of scanned PDFs |
 

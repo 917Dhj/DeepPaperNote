@@ -932,10 +932,7 @@ def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
 
 def runtime_config() -> dict[str, Any]:
     return {
-        "obsidian_vault": env_config_value(
-            "DEEPPAPERNOTE_OBSIDIAN_VAULT",
-            "READ_ARXIV_OBSIDIAN_VAULT",
-        ),
+        "obsidian_vault": env_config_value("DEEPPAPERNOTE_OBSIDIAN_VAULT"),
         "papers_dir": env_config_value("DEEPPAPERNOTE_PAPERS_DIR", default="Research/Papers"),
         "output_dir": env_config_value("DEEPPAPERNOTE_OUTPUT_DIR", default="tmp/DeepPaperNote"),
         "workspace_output_dir": env_config_value(
