@@ -12,7 +12,7 @@
 [![许可证](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
 [![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./SKILL.md)
 [![输出](https://img.shields.io/badge/output-Obsidian-16a34a)](./references/obsidian-format.md)
-[![图表](https://img.shields.io/badge/figures-placeholder--first-f59e0b)](./references/figure-placement.md)
+[![图表](https://img.shields.io/badge/figures-image--first-f59e0b)](./references/figure-placement.md)
 [![写作](https://img.shields.io/badge/writing-model--first-7c3aed)](./references/model-synthesis.md)
 [![更新日志](https://img.shields.io/badge/changelog-latest-0f766e)](./CHANGELOG.md)
 
@@ -58,9 +58,10 @@ DeepPaperNote 不是靠“把摘要重新措辞一遍”来显得更完整，而
 | 🧭 核心原则 | 📝 具体体现 |
 | --- | --- |
 | 🤖 模型主导理解 | 真正负责机制拆解、方法主线、关键比较和局限分析的是模型，而不是模板化摘要。 |
-| 🗂️ 证据优先 | 先从 PDF、元数据和可选的 Zotero 工作流里取证，再基于证据写作，而不是先写结论再去找依据。 |
+| 🗂️ 证据优先 | 先从 PDF、元数据和可选的 Zotero 工作流里取证，再基于证据写作。笔记会梳理完整的证据链：论文证明了什么、什么尚未被证明、哪些实验最重要、负面或限制性结果在哪里、结论的边界在哪里。 |
 | 🧪 技术细节优先 | 对技术论文，会尽量保留关键数字、公式、实现逻辑和真实边界条件，而不是停在高层概括。 |
-| 🖼️ 图表占位优先 | 图像提取不稳时，也先保留图表位置、说明和上下文，避免笔记结构断掉。 |
+| 📄 按论文类型自适应写作 | 不同类型的论文有不同的阅读策略。方法论文、基准测试论文、数据集论文、综述论文和实证论文，各自会针对该类型最关键的方面做重点处理。 |
+| 🖼️ 图像优先插入 | 当图表候选可用、路径有效时，直接插入为真实图片。占位符只保留给真实问题：候选缺失、视觉缺陷、污染、截断或身份不符。 |
 | 🔗 原生沉淀到知识库 | 会先按论文领域归档到现有知识库结构，再为每篇论文生成独立文件夹、Markdown 笔记和 `images/` 目录，更适合长期积累。 |
 | 📚 本地文献优先 | 如果论文已经在 Zotero 里，优先复用本地条目和附件，通常更稳，也往往更快。 |
 
@@ -95,13 +96,13 @@ DeepPaperNote 同时支持 Claude Code 和 Codex。
 
 #### npx Skills（推荐）
 
-大多数情况下，可以直接从npx安装：
+大多数情况下，可以直接用 npx 安装：
 
 ```bash
 npx skills add 917Dhj/DeepPaperNote
 ```
 
-此命令会默认安装到共享的`.agent/skills`目录，这个目录中的 skill 可以被 Codex 等大部分 agent 识别并使用。如果你也想在 Claude Code 里使用，在 **Additional agents** 提示中选择 Claude Code即可。
+此命令会默认安装到共享的`.agents/skills`目录，这个目录中的 skill 可以被 Codex 等大部分 agent 识别并使用。如果你也想在 Claude Code 里使用，在 **Additional agents** 提示中选择 Claude Code即可。
 
 你也可以直接指定安装给某个 agent：
 
@@ -407,15 +408,18 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 ## 🖼️ 图表策略
 
-对于论文笔记工具，一旦图表处理不顺利，整份笔记质量就会明显下降。
+DeepPaperNote 把”图片是否插入”和”是否保留占位”当作两个独立问题来处理。
 
-这就是为什么 DeepPaperNote 采用了一种更偏向“结构优先”的图像占位策略：
+当图表候选可用时——裁图视觉质量合格、能确认是目标图表、图片路径有效——直接插入为真实图片嵌入。
 
-- 尽量保留图表在笔记中的语义位置
-- 即使图表抽取不理想，也尽量不破坏整体阅读流
-- 让你知道某个位置原本对应什么图，为什么值得看。这样你后续读文章的时候可以自己截图，将图片放在笔记中标记好的位置。
+占位符只保留给真实问题：
 
-笔记中的图像占位格式如下：
+- 没有可用的图表候选
+- 裁图有视觉缺陷、截断或污染
+- 无法确认图片与目标图表匹配
+- 文件复制或写入失败
+
+当确实需要占位时，DeepPaperNote 会保留语义位置、说明和上下文，让笔记结构不断掉，也让你知道这个位置原本对应什么图：
 
 ```md
 > [!figure] Fig. 3 数据分布与质量评估
@@ -423,10 +427,6 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 > 放置原因：这张图同时展示样本构成、对话长度统计和专家质检结果，是理解 `PsyInterview` 数据边界最重要的图之一。
 > 当前状态：保留占位；当前提取结果只拿到局部子图，无法稳定恢复成可独立解释的完整原图。
 ```
-
-也就是说，我们更重视：
-
-> 笔记的完整性和可读性，而不是为了追求“图全部自动抽取出来”，而降低笔记的质量。
 
 详见 [图表放置规则](./references/figure-placement.md)。
 
@@ -439,8 +439,11 @@ DeepPaperNote 对“什么算一篇合格笔记”有明确门槛。
 - 区分研究问题和任务定义
 - 讲清楚真正的方法或分析流程
 - 抓住真正重要的关键数字
+- 覆盖关键的实验设置和条件
+- 区分证据实际证明了什么和尚未证明什么
 - 指出哪些地方最容易被误读
-- 至少写出一个真实局限
+- 至少写出一个真实局限，并给出边界约束
+- 至少包含一个可复用的研究或工程 takeaway
 - 使用真实标题层级：`#`、`##`、`###`
 - 避免正文出现半中半英的句子
 

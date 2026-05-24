@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
 [![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a)](./references/obsidian-format.md)
-[![Figures](https://img.shields.io/badge/figures-placeholder--first-f59e0b)](./references/figure-placement.md)
+[![Figures](https://img.shields.io/badge/figures-image--first-f59e0b)](./references/figure-placement.md)
 [![Writing](https://img.shields.io/badge/writing-model--first-7c3aed)](./references/model-synthesis.md)
 [![Changelog](https://img.shields.io/badge/changelog-latest-0f766e)](./CHANGELOG.md)
 
@@ -62,9 +62,10 @@ DeepPaperNote does not achieve higher note quality by simply rewriting the abstr
 | 🧭 Core principle | 📝 What it means in practice |
 | --- | --- |
 | 🤖 Model-led understanding | The model is responsible for mechanism breakdown, method structure, key comparisons, and limitations instead of template-like summary writing. |
-| 🗂️ Evidence first | It gathers evidence from PDFs, metadata sources, and optional Zotero workflows before writing, instead of producing claims first and looking for support later. |
+| 🗂️ Evidence first | It gathers evidence from PDFs, metadata sources, and optional Zotero workflows before writing. The note captures the full evidence chain: what the paper proves, what remains unproven, which experiments matter, where negative or limiting results appear, and how conclusions are bounded. |
 | 🧪 Technical detail first | For technical papers, it tries to preserve key numbers, formulas, implementation logic, and real boundary conditions rather than stopping at high-level paraphrase. |
-| 🖼️ Placeholder-first figures | When image extraction is unstable, it still keeps figure position, explanation, and context so the note structure does not break. |
+| 📄 Paper-type-aware writing | Different paper types receive different reading strategies. Method papers, benchmark and dataset papers, survey papers, and empirical papers each receive focused treatment of the aspects that matter most for that type. |
+| 🖼️ Image-first figures | When a figure candidate is usable and has a valid image path, it is inserted as a real image. Placeholders are reserved for real failures: missing candidates, visual defects, contamination, truncation, or identity mismatch. |
 | 🔗 Native knowledge-base output | It first routes the paper into a domain-appropriate place in your existing knowledge-base structure, then gives each paper its own folder, Markdown note, and `images/` directory. |
 | 📚 Local-library-first resolution | If the paper already exists in Zotero, it can reuse local items and attachments, which is often both more reliable and faster. |
 
@@ -422,15 +423,18 @@ Related docs:
 
 ## 🖼️ Figure Strategy
 
-When figure handling breaks down, the quality of the whole note usually drops with it.
+DeepPaperNote treats figure insertion and placeholder decisions as two separate questions.
 
-That is why DeepPaperNote uses a more structure-first, placeholder-first figure strategy:
+When a figure or table candidate is usable — the crop is visually clean, it matches the intended figure, and the image path is valid — it is inserted into the note as a real image embed.
 
-- keep the semantic place of important figures inside the note
-- avoid breaking the reading flow when extraction is incomplete
-- show which figure belonged there and why it matters, so you can later revisit the paper and add the image yourself if needed
+Placeholders are reserved for real problems:
 
-Recommended placeholder format:
+- no usable candidate was found
+- the crop has visual defects, truncation, or contamination
+- the image cannot be confirmed to match the intended figure
+- the file copy or write step failed
+
+When a placeholder is needed, DeepPaperNote keeps the semantic position, explanation, and context so the note structure stays intact and you know which figure belonged there:
 
 ```md
 > [!figure] Fig. 3 Data Distribution and Quality Evaluation
@@ -438,10 +442,6 @@ Recommended placeholder format:
 > Why here: This figure combines sample composition, conversation-length statistics, and expert quality checks, making it one of the most important figures for understanding the data boundaries.
 > Current status: Placeholder kept; current extraction only recovered partial subpanels and cannot yet reconstruct the full original figure reliably.
 ```
-
-In other words, DeepPaperNote prioritizes:
-
-> note completeness and readability over forcing every figure to be extracted automatically at any cost
 
 See [figure placement rules](./references/figure-placement.md).
 
@@ -454,8 +454,11 @@ The final note should:
 - clearly separate the research question and the task definition
 - explain the real method or analytical pipeline
 - capture the numbers that actually matter
+- cover key experimental settings and conditions
+- distinguish what the evidence proves from what it does not prove
 - point out where the paper is easiest to misread
-- include at least one honest limitation
+- include at least one honest limitation with bounded conclusions
+- include at least one reusable research or engineering takeaway
 - use real heading structure: `#`, `##`, `###`
 - avoid mixed Chinese-English prose in the body
 
