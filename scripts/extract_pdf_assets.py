@@ -154,13 +154,19 @@ def _classify_visual_quality(
     reasons: list[str] = []
 
     if normalized_kind == "table":
+        text_per_table_row = paragraph_text_chars / max(1, table_body_rows)
         if table_body_rows <= 0:
             reasons.append("table_body_missing")
         if table_body_rows <= 1 and visual_body_ratio < 0.03 and caption_text_chars >= 40:
             reasons.append("caption_only_suspected")
         # Dense tables naturally contain many text spans. Treat prose-like text
-        # as contamination only when table structure is too weak to explain it.
-        if paragraph_text_chars >= 450 and table_body_rows <= 2:
+        # as contamination when table structure is weak or the text density is
+        # far higher than the detected table body can explain.
+        if paragraph_text_chars >= 450 and (
+            table_body_rows <= 2
+            or (paragraph_text_chars >= 900 and visual_body_ratio <= 0.03 and text_per_table_row > 90)
+            or text_per_table_row > 140
+        ):
             reasons.append("table_text_contamination_suspected")
         if other_caption_labels:
             reasons.append("multiple_caption_regions_suspected")
@@ -168,7 +174,8 @@ def _classify_visual_quality(
     else:
         if other_caption_labels:
             reasons.append("multiple_caption_regions_suspected")
-        if paragraph_text_chars >= 450:
+        visual_dominant = visual_rect_count >= 3 and visual_body_ratio >= 0.18
+        if paragraph_text_chars >= 450 and not visual_dominant:
             reasons.append("large_text_block_suspected")
         if page_coverage_ratio >= 0.70 and paragraph_text_chars >= 250:
             reasons.append("oversized_page_crop")
@@ -316,7 +323,7 @@ def _find_caption_blocks(page) -> list[dict]:
                 continue
             line_text = "".join(s.get("text", "") for s in spans).strip()
             match = CAPTION_RE.match(line_text)
-            if not match:
+            if not match or _caption_match_is_inline_reference(line_text, match):
                 continue
             label = normalize_whitespace(match.group(1))
             kind = _classify_caption_kind(label)
@@ -359,6 +366,18 @@ def _find_caption_blocks(page) -> list[dict]:
             })
     anchors.sort(key=lambda a: a["bbox"][1])
     return anchors
+
+
+def _caption_match_is_inline_reference(line_text: str, match: re.Match[str]) -> bool:
+    """Reject prose references such as "Table 8 summarizes ..."."""
+    tail = line_text[match.end():]
+    if not tail or not tail[0].isspace():
+        return False
+    rest = tail.strip()
+    if not rest:
+        return False
+    first_word = re.match(r"[A-Za-z]+", rest)
+    return bool(first_word and first_word.group(0)[0].islower())
 
 
 def _collect_xref_rects(page) -> list[tuple[float, float, float, float]]:
@@ -616,12 +635,15 @@ def _estimate_figure_bbox_above_caption(
     for r in all_rects:
         ry_mid = (r[1] + r[3]) / 2.0
         if upper_bound <= ry_mid <= caption_y_top + 5:
-            relevant.append(r)
+            clipped_y1 = min(r[3], caption_y_top - 2.0)
+            if clipped_y1 > r[1]:
+                relevant.append((r[0], r[1], r[2], clipped_y1))
 
     if relevant:
-        x0 = min(r[0] for r in relevant)
+        caption_x0, _, caption_x1, _ = caption_anchor["bbox"]
+        x0 = min([r[0] for r in relevant] + [caption_x0])
         y0 = min(r[1] for r in relevant)
-        x1 = max(r[2] for r in relevant)
+        x1 = max([r[2] for r in relevant] + [caption_x1])
         y1 = max(r[3] for r in relevant)
     else:
         body_blocks = _find_body_text_blocks(page)
@@ -737,6 +759,68 @@ def _row_is_table_like(row: dict) -> bool:
     return _looks_like_data_row(text) or _looks_like_text_table_row(text)
 
 
+def _restrict_row_to_caption_column(row: dict, caption_bbox: tuple[float, float, float, float], page_rect) -> dict | None:
+    """Keep only row cells in the same page column as a narrow caption.
+
+    In two-column papers, unrelated left/right column tables often share the
+    same y bands. Row clustering can merge them unless we trim by caption side.
+    """
+    members = list(row.get("members", []) or [])
+    if not members:
+        return row
+
+    page_x0 = float(getattr(page_rect, "x0", 0.0))
+    page_x1 = float(getattr(page_rect, "x1", 0.0))
+    page_width = max(1.0, page_x1 - page_x0)
+    page_mid = (page_x0 + page_x1) / 2.0
+    cx0, _, cx1, _ = caption_bbox
+    caption_width = cx1 - cx0
+    if caption_width >= page_width * 0.45:
+        return row
+
+    caption_mid = (cx0 + cx1) / 2.0
+    caption_is_left = caption_mid < page_mid
+    expanded_caption_x0 = cx0 - 24.0
+    expanded_caption_x1 = cx1 + 24.0
+
+    def overlaps_caption_band(x0: float, x1: float) -> bool:
+        overlap = max(0.0, min(x1, expanded_caption_x1) - max(x0, expanded_caption_x0))
+        width = max(1.0, x1 - x0)
+        return overlap >= min(16.0, width * 0.25)
+
+    rx0, _, rx1, _ = row["bbox"]
+    row_mid = (rx0 + rx1) / 2.0
+    row_same_side = (row_mid < page_mid) == caption_is_left
+    row_overlaps_caption_band = overlaps_caption_band(rx0, rx1)
+    if not (rx0 < page_mid - 10.0 and rx1 > page_mid + 10.0):
+        return row if row_same_side or row_overlaps_caption_band else None
+
+    filtered = []
+    for member in members:
+        mx0, _, mx1, _ = member["bbox"]
+        member_mid = (mx0 + mx1) / 2.0
+        same_side = (member_mid < page_mid) == caption_is_left
+        if same_side or overlaps_caption_band(mx0, mx1):
+            filtered.append(member)
+
+    if not filtered:
+        return None
+    if len(filtered) == len(members):
+        return row
+
+    x0 = min(member["bbox"][0] for member in filtered)
+    y0 = min(member["bbox"][1] for member in filtered)
+    x1 = max(member["bbox"][2] for member in filtered)
+    y1 = max(member["bbox"][3] for member in filtered)
+    tokens = [member["text"] for member in sorted(filtered, key=lambda m: m["bbox"][0])]
+    return {
+        "bbox": (x0, y0, x1, y1),
+        "members": sorted(filtered, key=lambda m: m["bbox"][0]),
+        "tokens": tokens,
+        "text": " ".join(tokens),
+    }
+
+
 def _line_is_inside_any_block(
     line_bbox: tuple[float, float, float, float],
     blocks: list[tuple[float, float, float, float, str]],
@@ -776,6 +860,7 @@ def _grow_table_region(
     data_row_count = 0
     consecutive_non_data = 0
     seen_data = False
+    last_accepted_edge = caption_y1 if direction == "down" else caption_y0
 
     if direction == "down":
         candidates = [r for r in rows if r["bbox"][1] > caption_y1 + 0.5]
@@ -787,12 +872,27 @@ def _grow_table_region(
         boundary_check = lambda ly0, ly1: ly0 <= upper_bound
 
     for row in candidates:
+        restricted_row = _restrict_row_to_caption_column(row, caption_anchor["bbox"], page.rect)
+        if restricted_row is None:
+            continue
+        row = restricted_row
         rx0, ry0, rx1, ry1 = row["bbox"]
         if boundary_check(ry0, ry1):
             break
         text = row["text"]
         is_table_row = _row_is_table_like(row)
         in_paragraph_block = _line_is_inside_any_block(row["bbox"], paragraph_blocks)
+        row_gap = ry0 - last_accepted_edge if direction == "down" else last_accepted_edge - ry1
+        row_height = max(ry1 - ry0, 1.0)
+        if seen_data and row_gap > max(12.0, row_height * 1.8) and not is_table_row:
+            break
+        if (
+            seen_data
+            and len(row.get("members", []) or []) <= 1
+            and in_paragraph_block
+            and not _looks_like_data_row(text)
+        ):
+            break
         # If this row sits entirely inside a real prose paragraph and does not
         # look table-shaped, we have walked out of the table.
         if not is_table_row and (in_paragraph_block or len(text) > 200):
@@ -810,6 +910,7 @@ def _grow_table_region(
             if consecutive_non_data > 8:
                 break
         accepted.append(row["bbox"])
+        last_accepted_edge = ry1 if direction == "down" else ry0
 
     return accepted, data_row_count
 
@@ -829,13 +930,15 @@ def _finalize_table_bbox(
 
     y0 = min(b[1] for b in accepted)
     y1 = max(b[3] for b in accepted)
+    initial_x0 = min(b[0] for b in accepted)
+    initial_x1 = max(b[2] for b in accepted)
     for r in _collect_drawing_rects(page):
         ry_mid = (r[1] + r[3]) / 2.0
-        if y0 - 4.0 <= ry_mid <= y1 + 4.0:
+        if y0 - 4.0 <= ry_mid <= y1 + 4.0 and r[2] >= initial_x0 - 12.0 and r[0] <= initial_x1 + 12.0:
             accepted.append(r)
     for r in _collect_xref_rects(page):
         ry_mid = (r[1] + r[3]) / 2.0
-        if y0 - 4.0 <= ry_mid <= y1 + 4.0:
+        if y0 - 4.0 <= ry_mid <= y1 + 4.0 and r[2] >= initial_x0 - 12.0 and r[0] <= initial_x1 + 12.0:
             accepted.append(r)
 
     x0 = min(b[0] for b in accepted)

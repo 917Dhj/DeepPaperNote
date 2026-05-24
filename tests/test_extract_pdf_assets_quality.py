@@ -14,10 +14,15 @@ except ImportError:  # pragma: no cover
 
 from extract_pdf_assets import (
     CAPTION_RE,
+    _caption_match_is_inline_reference,
     _classify_caption_kind,
     _classify_visual_quality,
+    _estimate_figure_bbox_above_caption,
+    _find_caption_blocks,
+    _grow_table_region,
     _looks_like_text_table_row,
     _other_caption_labels_for_crop,
+    _restrict_row_to_caption_column,
     _row_is_table_like,
     _unique_figure_asset_filename,
 )
@@ -165,6 +170,30 @@ def test_caption_re_rejects_caption_like_prose() -> None:
     assert CAPTION_RE.match("Figuratively speaking, this is not a caption.") is None
 
 
+def test_caption_match_rejects_inline_table_reference() -> None:
+    text = "Table 8 summarizes the results from this ablation study."
+    match = CAPTION_RE.match(text)
+
+    assert match is not None
+    assert _caption_match_is_inline_reference(text, match) is True
+
+
+def test_caption_match_accepts_title_style_caption_without_separator() -> None:
+    text = "Figure 1 Model overview"
+    match = CAPTION_RE.match(text)
+
+    assert match is not None
+    assert _caption_match_is_inline_reference(text, match) is False
+
+
+def test_caption_match_accepts_punctuated_caption() -> None:
+    text = "Table 8. Results from the ablation study."
+    match = CAPTION_RE.match(text)
+
+    assert match is not None
+    assert _caption_match_is_inline_reference(text, match) is False
+
+
 def test_caption_re_keeps_ambiguous_forms_out() -> None:
     assert CAPTION_RE.match("Figure 2.1. Hierarchical result.") is None
     assert CAPTION_RE.match("Figure 3(a). Subpanel detail.") is None
@@ -193,6 +222,203 @@ def test_row_is_table_like_accepts_single_line_text_table_row() -> None:
     row = {"members": [{"text": "Method | Strengths | Weaknesses"}], "text": "Method | Strengths | Weaknesses"}
 
     assert _row_is_table_like(row) is True
+
+
+def test_restrict_row_to_caption_column_removes_opposite_column_cells() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for page rect construction.")
+    row = {
+        "bbox": (70.0, 80.0, 550.0, 92.0),
+        "members": [
+            {"bbox": (70.0, 80.0, 210.0, 92.0), "text": "optimizer AdamW"},
+            {"bbox": (330.0, 80.0, 410.0, 92.0), "text": "MAE"},
+            {"bbox": (440.0, 80.0, 550.0, 92.0), "text": "ViT-H 76.6"},
+        ],
+        "text": "optimizer AdamW MAE ViT-H 76.6",
+    }
+    page_rect = fitz.Rect(0.0, 0.0, 600.0, 800.0)
+
+    restricted = _restrict_row_to_caption_column(row, (320.0, 120.0, 560.0, 150.0), page_rect)
+
+    assert restricted is not None
+    assert restricted["text"] == "MAE ViT-H 76.6"
+    assert restricted["bbox"] == (330.0, 80.0, 550.0, 92.0)
+
+
+def test_restrict_row_to_caption_column_ignores_tiny_midline_overlap() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for page rect construction.")
+    row = {
+        "bbox": (50.0, 80.0, 530.0, 92.0),
+        "members": [
+            {"bbox": (50.0, 80.0, 286.0, 92.0), "text": "left-column prose barely touches band"},
+            {"bbox": (330.0, 80.0, 410.0, 92.0), "text": "iNat 2017"},
+            {"bbox": (440.0, 80.0, 530.0, 92.0), "text": "83.4 [55]"},
+        ],
+        "text": "left-column prose barely touches band iNat 2017 83.4 [55]",
+    }
+    page_rect = fitz.Rect(0.0, 0.0, 600.0, 800.0)
+
+    restricted = _restrict_row_to_caption_column(row, (308.0, 120.0, 545.0, 150.0), page_rect)
+
+    assert restricted is not None
+    assert restricted["text"] == "iNat 2017 83.4 [55]"
+    assert restricted["bbox"] == (330.0, 80.0, 530.0, 92.0)
+
+
+def test_restrict_row_to_caption_column_skips_opposite_column_row() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for page rect construction.")
+    row = {
+        "bbox": (70.0, 80.0, 240.0, 92.0),
+        "members": [
+            {"bbox": (70.0, 80.0, 160.0, 92.0), "text": "optimizer"},
+            {"bbox": (180.0, 80.0, 240.0, 92.0), "text": "AdamW"},
+        ],
+        "text": "optimizer AdamW",
+    }
+    page_rect = fitz.Rect(0.0, 0.0, 600.0, 800.0)
+
+    restricted = _restrict_row_to_caption_column(row, (320.0, 120.0, 560.0, 150.0), page_rect)
+
+    assert restricted is None
+
+
+def test_restrict_row_to_caption_column_skips_near_mid_opposite_row() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for page rect construction.")
+    row = {
+        "bbox": (50.0, 80.0, 286.0, 92.0),
+        "members": [
+            {"bbox": (50.0, 80.0, 286.0, 92.0), "text": "left-column prose barely touches band"},
+        ],
+        "text": "left-column prose barely touches band",
+    }
+    page_rect = fitz.Rect(0.0, 0.0, 600.0, 800.0)
+
+    restricted = _restrict_row_to_caption_column(row, (308.0, 120.0, 545.0, 150.0), page_rect)
+
+    assert restricted is None
+
+
+def test_figure_bbox_uses_caption_width_for_narrow_vector_figure() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.draw_rect(fitz.Rect(115.0, 86.0, 175.0, 118.0))
+        page.insert_text(
+            (86.0, 154.0),
+            "Figure 2. Residual learning: a building block.",
+            fontsize=10,
+        )
+        page.insert_textbox(
+            fitz.Rect(330.0, 80.0, 555.0, 220.0),
+            "ImageNet test set results are described here in a nearby body paragraph.",
+            fontsize=11,
+        )
+        anchor = [item for item in _find_caption_blocks(page) if item["label"] == "Figure 2"][0]
+
+        bbox = _estimate_figure_bbox_above_caption(page, anchor, None, page.rect)
+
+        assert bbox is not None
+        assert bbox[0] <= anchor["bbox"][0]
+        assert bbox[2] >= anchor["bbox"][2]
+        assert bbox[2] < 300.0
+    finally:
+        doc.close()
+
+
+def test_figure_bbox_clamps_visual_rects_below_caption() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.draw_rect(fitz.Rect(0.0, -40.0, 600.0, 250.0))
+        page.insert_text(
+            (86.0, 154.0),
+            "Figure 3. Model comparison.",
+            fontsize=10,
+        )
+        anchor = [item for item in _find_caption_blocks(page) if item["label"] == "Figure 3"][0]
+
+        bbox = _estimate_figure_bbox_above_caption(page, anchor, None, page.rect)
+
+        assert bbox is not None
+        assert bbox[3] < 190.0
+    finally:
+        doc.close()
+
+
+def test_grow_table_region_allows_gap_between_header_and_data_rows() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for page rect construction.")
+    page = type("Page", (), {"rect": fitz.Rect(0.0, 0.0, 600.0, 800.0)})()
+    caption = {"bbox": (312.0, 74.0, 540.0, 114.0)}
+    rows = [
+        {
+            "bbox": (316.0, 121.0, 534.0, 128.0),
+            "members": [{"bbox": (316.0 + i * 40.0, 121.0, 346.0 + i * 40.0, 128.0), "text": str(i)} for i in range(5)],
+            "text": "Source Target A B C D",
+        },
+        {
+            "bbox": (316.0, 148.0, 520.0, 155.0),
+            "members": [{"bbox": (316.0 + i * 40.0, 148.0, 346.0 + i * 40.0, 155.0), "text": str(i)} for i in range(5)],
+            "text": "CREMA-D 91.1 79.9 30.7 25.8",
+        },
+    ]
+
+    accepted, data_rows = _grow_table_region(
+        page,
+        caption,
+        rows,
+        [],
+        direction="down",
+        upper_bound=0.0,
+        lower_bound=400.0,
+    )
+
+    assert len(accepted) == 2
+    assert data_rows == 2
+
+
+def test_grow_table_region_stops_at_single_member_prose_after_data() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for page rect construction.")
+    page = type("Page", (), {"rect": fitz.Rect(0.0, 0.0, 600.0, 800.0)})()
+    caption = {"bbox": (312.0, 74.0, 540.0, 114.0)}
+    rows = [
+        {
+            "bbox": (316.0, 121.0, 534.0, 128.0),
+            "members": [{"bbox": (316.0 + i * 40.0, 121.0, 346.0 + i * 40.0, 128.0), "text": str(i)} for i in range(5)],
+            "text": "Source Target A B C D",
+        },
+        {
+            "bbox": (316.0, 132.0, 520.0, 139.0),
+            "members": [{"bbox": (316.0 + i * 40.0, 132.0, 346.0 + i * 40.0, 139.0), "text": str(i)} for i in range(5)],
+            "text": "CREMA-D 91.1 79.9 30.7 25.8",
+        },
+        {
+            "bbox": (312.0, 150.0, 540.0, 159.0),
+            "members": [{"bbox": (312.0, 150.0, 540.0, 159.0), "text": "on CREMA-D, 86.6. The other corpus improves"}],
+            "text": "on CREMA-D, 86.6. The other corpus improves",
+        },
+    ]
+
+    accepted, data_rows = _grow_table_region(
+        page,
+        caption,
+        rows,
+        [(312.0, 150.0, 540.0, 220.0, "on CREMA-D, 86.6. The other corpus improves")],
+        direction="down",
+        upper_bound=0.0,
+        lower_bound=400.0,
+    )
+
+    assert len(accepted) == 2
+    assert data_rows == 2
 
 
 def test_quality_classification_rejects_table_without_body_rows() -> None:
@@ -229,10 +455,10 @@ def test_quality_classification_accepts_dense_table_text_as_table_body() -> None
     signals = _classify_visual_quality(
         kind="table",
         page_coverage_ratio=0.14,
-        visual_rect_count=4,
-        visual_body_ratio=0.18,
-        paragraph_text_chars=620,
-        table_body_rows=6,
+        visual_rect_count=11,
+        visual_body_ratio=0.029,
+        paragraph_text_chars=1058,
+        table_body_rows=22,
         caption_text_chars=80,
     )
 
@@ -253,6 +479,51 @@ def test_quality_classification_rejects_weak_table_with_paragraph_text_contamina
 
     assert signals["visual_quality_status"] == "reject"
     assert "table_text_contamination_suspected" in signals["quality_reason_codes"]
+
+
+def test_quality_classification_rejects_table_with_dense_prose_contamination() -> None:
+    signals = _classify_visual_quality(
+        kind="table",
+        page_coverage_ratio=0.09,
+        visual_rect_count=0,
+        visual_body_ratio=0.0,
+        paragraph_text_chars=1074,
+        table_body_rows=3,
+        caption_text_chars=182,
+    )
+
+    assert signals["visual_quality_status"] == "reject"
+    assert "table_text_contamination_suspected" in signals["quality_reason_codes"]
+
+
+def test_quality_classification_accepts_structured_table_with_long_cell_text() -> None:
+    signals = _classify_visual_quality(
+        kind="table",
+        page_coverage_ratio=0.14,
+        visual_rect_count=4,
+        visual_body_ratio=0.18,
+        paragraph_text_chars=620,
+        table_body_rows=6,
+        caption_text_chars=80,
+    )
+
+    assert signals["visual_quality_status"] == "usable"
+    assert "table_text_contamination_suspected" not in signals["quality_reason_codes"]
+
+
+def test_quality_classification_accepts_clean_wide_table_without_vector_lines() -> None:
+    signals = _classify_visual_quality(
+        kind="table",
+        page_coverage_ratio=0.09,
+        visual_rect_count=0,
+        visual_body_ratio=0.0,
+        paragraph_text_chars=523,
+        table_body_rows=4,
+        caption_text_chars=281,
+    )
+
+    assert signals["visual_quality_status"] == "usable"
+    assert "table_text_contamination_suspected" not in signals["quality_reason_codes"]
 
 
 def test_quality_classification_rejects_table_covering_other_caption() -> None:
@@ -373,3 +644,18 @@ def test_quality_classification_accepts_normal_chart_crop() -> None:
 
     assert signals["visual_quality_status"] == "usable"
     assert signals["quality_reason_codes"] == []
+
+
+def test_quality_classification_accepts_visual_dense_figure_with_embedded_text() -> None:
+    signals = _classify_visual_quality(
+        kind="figure",
+        page_coverage_ratio=0.24,
+        visual_rect_count=27,
+        visual_body_ratio=0.8,
+        paragraph_text_chars=760,
+        table_body_rows=0,
+        caption_text_chars=460,
+    )
+
+    assert signals["visual_quality_status"] == "usable"
+    assert "large_text_block_suspected" not in signals["quality_reason_codes"]
