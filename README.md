@@ -166,7 +166,7 @@ By default, DeepPaperNote will:
 
 - resolve the paper identity
 - gather metadata and PDF evidence
-- plan figure placeholders and attempt high-confidence figure replacement
+- insert figures directly when usable; keep placeholders only for real failures such as missing candidates, visual defects, or copy errors
 - generate the final Markdown note
 - save it into Obsidian when configured, or ask for your vault path before falling back to the current directory
 
@@ -400,14 +400,16 @@ The default path is:
 3. fetch the best available PDF
 4. extract canonical raw source text and a source manifest
 5. extract structural indexes and PDF image assets
-6. plan figure positions and the full figure/table decision table
-7. build a manifest synthesis bundle
-8. let the model read the raw source records and plan the note
-9. run grounding lint on the plan
-10. let the model write the note
-11. lint the final note
-12. perform the final analytical quality review
-13. perform the final readability review and write it into Obsidian
+6. plan figure placement
+7. build the full figure/table decision table
+8. build a manifest synthesis bundle
+9. let the model read the raw source records and plan the note
+10. run grounding lint on the plan
+11. let the model write the note
+12. lint the final note
+13. perform the final analytical quality review
+14. perform the final readability review
+15. write into Obsidian
 
 Core principle:
 
@@ -491,6 +493,7 @@ DeepPaperNote/
 ├── references/
 │   ├── architecture.md
 │   ├── deep-analysis.md
+│   ├── domain_rules.yaml
 │   ├── evidence-first.md
 │   ├── figure-placement.md
 │   ├── final-writing.md
@@ -503,6 +506,7 @@ DeepPaperNote/
 └── scripts/
     ├── build_synthesis_bundle.py
     ├── check_environment.py
+    ├── citation_links.py
     ├── collect_metadata.py
     ├── common.py
     ├── contracts.py

@@ -164,7 +164,7 @@ python3 -m pip install PyMuPDF
 
 - 精准识别论文身份
 - 获取 PDF、元数据和正文证据
-- 规划图表占位并尝试高置信度图片替换
+- 图表候选可用时直接插入真实图片；只有候选缺失、视觉缺陷或写入失败等真实问题才保留占位符
 - 生成最终 Markdown 笔记
 - 自动写入 Obsidian；如果没有配置 Obsidian，则会先询问你是否有库路径，再决定是否降级输出到当前目录
 
@@ -385,14 +385,16 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 3. 获取最佳可用 PDF
 4. 抽取完整原文与 source manifest
 5. 抽取结构化索引和 PDF 图像资产
-6. 规划图表位置和全量图表决策表
-7. 构建 manifest synthesis bundle
-8. 让模型读取 raw sections 并规划笔记
-9. 对 note_plan 运行 grounding lint
-10. 让模型写笔记
-11. 校验最终笔记
-12. 做最终内容质量复核
-13. 做最终可读性复核并写入 Obsidian
+6. 规划图表位置
+7. 构建全量图表决策表
+8. 构建 manifest synthesis bundle
+9. 让模型读取 raw sections 并规划笔记
+10. 对 note_plan 运行 grounding lint
+11. 让模型写笔记
+12. 校验最终笔记
+13. 做最终内容质量复核
+14. 做最终可读性复核
+15. 写入 Obsidian
 
 核心原则：
 
@@ -475,6 +477,7 @@ DeepPaperNote/
 ├── references/
 │   ├── architecture.md
 │   ├── deep-analysis.md
+│   ├── domain_rules.yaml
 │   ├── evidence-first.md
 │   ├── figure-placement.md
 │   ├── final-writing.md
@@ -487,6 +490,7 @@ DeepPaperNote/
 └── scripts/
     ├── build_synthesis_bundle.py
     ├── check_environment.py
+    ├── citation_links.py
     ├── collect_metadata.py
     ├── common.py
     ├── contracts.py
