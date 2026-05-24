@@ -55,6 +55,13 @@ def test_bundle_compact_writing_contract_keeps_depth_rules_without_old_bundle_fi
         ],
         "plan_kinds": list(WRITING_CONTRACT_RULES["usable_insert_candidate"]["plan_kinds"]),
     }
+    assert contract["figure_table_contract"]["manual_visual_review_required_statuses"] == list(
+        WRITING_CONTRACT_RULES["manual_visual_review_required_statuses"]
+    )
+    assert contract["figure_table_contract"]["automatic_fail_closed_visual_statuses"] == list(
+        WRITING_CONTRACT_RULES["automatic_fail_closed_visual_statuses"]
+    )
+    assert contract["figure_table_contract"]["manual_review_claim_requires_image_inspection"] is True
     assert contract["note_plan_contract"]["analysis_coverage_field"] == "central_claims[*]"
     assert contract["analysis_coverage_contract"]["required_plan_fields"] == list(
         WRITING_CONTRACT_RULES["analysis_coverage_contract"]["required_plan_fields"]

@@ -327,6 +327,13 @@ def compact_writing_contract() -> dict:
             "allowed_usable_placeholder_reasons": list(
                 WRITING_CONTRACT_RULES["allowed_usable_placeholder_reasons"]
             ),
+            "manual_visual_review_required_statuses": list(
+                WRITING_CONTRACT_RULES["manual_visual_review_required_statuses"]
+            ),
+            "automatic_fail_closed_visual_statuses": list(
+                WRITING_CONTRACT_RULES["automatic_fail_closed_visual_statuses"]
+            ),
+            "manual_review_claim_requires_image_inspection": True,
         },
         "analysis_coverage_contract": analysis_coverage,
     }

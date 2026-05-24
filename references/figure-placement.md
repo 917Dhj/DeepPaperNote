@@ -54,6 +54,10 @@ For every usable figure/table candidate, resolve the final note into one of thes
 - `kept_placeholder_lower_priority`: keep the placeholder because a more central or more direct related figure/table is already inserted
 - `kept_placeholder_materialization_blocked`: keep the placeholder because `materialize_figure_asset.py` or file copy/write permission failed
 
+For `usable_candidate` and `needs_visual_quality_check` / `review` candidates, final visual judgment requires opening and inspecting the actual candidate image file.
+Do not write that manual visual review found no reliable insertable candidate unless that inspection actually happened.
+If no manual inspection happened, name the state as an unresolved visual review requirement or an automatic script outcome, not as a reviewed visual defect.
+
 Keep missing-candidate cases separate from materialization failures:
 - if `source_image_path` is empty, `skip_reason` is `asset_candidate_missing`, or no independent matching crop exists, write `当前状态` as missing/unavailable candidate, not as copy/materialization blocked
 - reserve `materialization blocked` only for a real chosen image asset that failed during `materialize_figure_asset.py`, final copy, permission, or `write_obsidian_note.py`
@@ -72,6 +76,7 @@ Do not collect unresolved placeholders into a catch-all section such as `剩余�
 `reject_visual_quality` means the candidate image must not be inserted.
 It does not by itself require a final-note placeholder.
 The final placeholder set should come from semantic importance to the note, not from the number of failed extraction candidates.
+`reject_visual_quality` and `asset_candidate_missing` are automatic fail-closed script outcomes and do not require manual visual review.
 
 For survey papers with many representative project figures, appendix tables, or repetitive supplemental visuals:
 - keep a callout only when the visual materially helps the reader understand the argument
@@ -90,7 +95,7 @@ Fail closed when visual usability is weak: keep the placeholder instead of inser
 Reject candidates that are:
 - caption-only crops
 - tables with no visible table body
-- table crops contaminated by running prose or another Figure/Table caption
+- table crops contaminated by running prose outside the table body or another Figure/Table caption
 - figure crops contaminated by another Figure/Table caption or by a second figure body
 - large text, title-page, or abstract crops masquerading as figures
 - crops where the visual body is tiny relative to the crop

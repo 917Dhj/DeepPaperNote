@@ -237,9 +237,11 @@ If the bundle contains candidate figure pages or candidate image files:
 - prefer the candidate with the strongest caption/page-context agreement
 - treat identity match and visual usability as separate gates
 - never treat a matching label or caption as sufficient approval to insert an image
-- reject caption-only crops, missing table bodies, table crops contaminated by running prose or another Figure/Table caption, large text/title/abstract crops, and crops with very low visual body ratio
+- reject caption-only crops, missing table bodies, table crops contaminated by running prose outside the table body or another Figure/Table caption, large text/title/abstract crops, and crops with very low visual body ratio
 - if visual quality is missing, ambiguous, or failed, keep the placeholder
 - still make the final decision yourself rather than trusting the candidate ranking blindly
+- for `usable_candidate` or `needs_visual_quality_check` / `review`, make that final decision only after opening and inspecting the actual candidate image file; do not say manual visual review found no reliable candidate unless that inspection actually happened
+- treat `reject_visual_quality` and `asset_candidate_missing` as automatic fail-closed script outcomes that do not require manual visual review
 - if a candidate is usable, resolve it explicitly as inserted, kept for a concrete visual defect, kept as lower-priority because a more central related figure is already inserted, or kept because materialization/copy/write failed
 - never describe a missing image asset, empty `source_image_path`, `asset_candidate_missing`, or absent independent crop as a materialization/copy failure
 - if the crop contains a different Figure/Table caption or another figure body, describe that as contamination/visual defect or lack of an independent crop, not as a usable clean candidate

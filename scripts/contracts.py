@@ -288,6 +288,15 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
         "lower_priority_related_inserted",
         "materialization_blocked",
     ),
+    "manual_visual_review_required_statuses": (
+        "usable_candidate",
+        "needs_visual_quality_check",
+        "review",
+    ),
+    "automatic_fail_closed_visual_statuses": (
+        "reject_visual_quality",
+        "asset_candidate_missing",
+    ),
     "note_plan_depth_requirements": {
         "required_section_focus_min_chars": 20,
         "required_section_focus_fields": ("focus", "reading_goal", "purpose"),

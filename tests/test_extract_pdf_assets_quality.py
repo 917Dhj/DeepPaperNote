@@ -19,6 +19,7 @@ from extract_pdf_assets import (
     _looks_like_text_table_row,
     _other_caption_labels_for_crop,
     _row_is_table_like,
+    _unique_figure_asset_filename,
 )
 
 
@@ -224,7 +225,7 @@ def test_quality_classification_rejects_caption_only_crop() -> None:
     assert "caption_only_suspected" in signals["quality_reason_codes"]
 
 
-def test_quality_classification_rejects_table_with_paragraph_text_contamination() -> None:
+def test_quality_classification_accepts_dense_table_text_as_table_body() -> None:
     signals = _classify_visual_quality(
         kind="table",
         page_coverage_ratio=0.14,
@@ -233,6 +234,21 @@ def test_quality_classification_rejects_table_with_paragraph_text_contamination(
         paragraph_text_chars=620,
         table_body_rows=6,
         caption_text_chars=80,
+    )
+
+    assert signals["visual_quality_status"] == "usable"
+    assert "table_text_contamination_suspected" not in signals["quality_reason_codes"]
+
+
+def test_quality_classification_rejects_weak_table_with_paragraph_text_contamination() -> None:
+    signals = _classify_visual_quality(
+        kind="table",
+        page_coverage_ratio=0.14,
+        visual_rect_count=2,
+        visual_body_ratio=0.05,
+        paragraph_text_chars=620,
+        table_body_rows=1,
+        caption_text_chars=30,
     )
 
     assert signals["visual_quality_status"] == "reject"
@@ -271,6 +287,19 @@ def test_quality_classification_rejects_figure_covering_other_caption() -> None:
     assert signals["visual_quality_status"] == "reject"
     assert signals["other_caption_labels"] == ["Figure 4"]
     assert "multiple_caption_regions_suspected" in signals["quality_reason_codes"]
+
+
+def test_unique_figure_asset_filename_prevents_same_label_overwrite() -> None:
+    used: set[str] = set()
+
+    first = _unique_figure_asset_filename(5, "Figure 3", used)
+    second = _unique_figure_asset_filename(5, "Figure 3", used)
+    third = _unique_figure_asset_filename(5, "Figure 3", used)
+
+    assert first == "page_005_fig_figure_3.png"
+    assert second == "page_005_fig_figure_3_2.png"
+    assert third == "page_005_fig_figure_3_3.png"
+    assert used == {first, second, third}
 
 
 def test_other_caption_labels_for_crop_detects_substantial_overlap() -> None:

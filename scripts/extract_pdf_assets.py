@@ -158,7 +158,9 @@ def _classify_visual_quality(
             reasons.append("table_body_missing")
         if table_body_rows <= 1 and visual_body_ratio < 0.03 and caption_text_chars >= 40:
             reasons.append("caption_only_suspected")
-        if paragraph_text_chars >= 450:
+        # Dense tables naturally contain many text spans. Treat prose-like text
+        # as contamination only when table structure is too weak to explain it.
+        if paragraph_text_chars >= 450 and table_body_rows <= 2:
             reasons.append("table_text_contamination_suspected")
         if other_caption_labels:
             reasons.append("multiple_caption_regions_suspected")
@@ -947,6 +949,23 @@ def _render_crop(page, bbox: tuple[float, float, float, float], dpi: int) -> byt
     return pix.tobytes("png")
 
 
+def _unique_figure_asset_filename(page_number: int, label: str, used_filenames: set[str]) -> str:
+    safe_label = re.sub(r"[^a-zA-Z0-9]+", "_", label.lower()).strip("_") or "unlabeled"
+    base = f"page_{page_number:03d}_fig_{safe_label}.png"
+    if base not in used_filenames:
+        used_filenames.add(base)
+        return base
+
+    stem = base.removesuffix(".png")
+    suffix = 2
+    while True:
+        candidate = f"{stem}_{suffix}.png"
+        if candidate not in used_filenames:
+            used_filenames.add(candidate)
+            return candidate
+        suffix += 1
+
+
 def extract_figure_regions(
     page, page_number: int, images_dir: Path, *, dpi: int = FIGURE_RENDER_DPI
 ) -> list[dict]:
@@ -960,6 +979,7 @@ def extract_figure_regions(
 
     page_rect = page.rect
     assets: list[dict] = []
+    used_filenames: set[str] = set()
 
     for idx, anchor in enumerate(anchors):
         prev_anchor = anchors[idx - 1] if idx > 0 else None
@@ -987,8 +1007,7 @@ def extract_figure_regions(
             continue
 
         label = anchor["label"]
-        safe_label = re.sub(r"[^a-zA-Z0-9]+", "_", label.lower()).strip("_")
-        filename = f"page_{page_number:03d}_fig_{safe_label}.png"
+        filename = _unique_figure_asset_filename(page_number, label, used_filenames)
         output_path = images_dir / filename
 
         try:
