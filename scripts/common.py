@@ -310,9 +310,10 @@ def extract_arxiv_id(paper_ref: str) -> str | None:
     paper_ref = (paper_ref or "").strip()
     patterns = [
         r"arxiv:(\d{4}\.\d{4,5})(?:v\d+)?",
+        r"arxiv[./]\s*(\d{4}\.\d{4,5})(?:v\d+)?",
         r"abs/(\d{4}\.\d{4,5})(?:v\d+)?",
         r"pdf/(\d{4}\.\d{4,5})(?:v\d+)?(?:\.pdf)?",
-        r"\b(\d{4}\.\d{4,5})(?:v\d+)?\b",
+        r"(?<![A-Za-z0-9./-])(\d{4}\.\d{4,5})(?:v\d+)?(?![A-Za-z0-9./-])",
     ]
     for pattern in patterns:
         match = re.search(pattern, paper_ref, flags=re.IGNORECASE)
@@ -346,17 +347,17 @@ def infer_source_type(value: str) -> str:
     if path.exists() and path.is_file() and path.suffix.lower() == ".pdf":
         return "local_pdf"
     if is_probable_url(stripped):
-        if extract_arxiv_id(stripped):
+        if "arxiv.org" in stripped.lower() and extract_arxiv_id(stripped):
             return "arxiv_url"
         if extract_doi(stripped):
             return "doi_url"
         if stripped.lower().endswith(".pdf"):
             return "pdf_url"
         return "url"
-    if extract_arxiv_id(stripped):
-        return "arxiv_id"
     if extract_doi(stripped):
         return "doi"
+    if extract_arxiv_id(stripped):
+        return "arxiv_id"
     if is_probable_zotero_key(stripped):
         return "zotero_key"
     return "title"
@@ -377,6 +378,19 @@ def paper_id_for_record(record: dict[str, Any]) -> str:
     source = str(record.get("source_url") or record.get("local_pdf_path") or "unknown")
     digest = hashlib.sha1(source.encode("utf-8")).hexdigest()[:12]
     return f"paper:{digest}"
+
+
+def fallback_arxiv_record(arxiv_id: str, source_type: str, source_url: str = "") -> dict[str, Any]:
+    paper = {
+        "status": "ok",
+        "source_type": source_type,
+        "source_url": source_url or f"https://arxiv.org/abs/{arxiv_id}",
+        "arxiv_id": arxiv_id,
+        "pdf_url": f"https://arxiv.org/pdf/{arxiv_id}.pdf",
+        "metadata_sources": [source_type],
+    }
+    paper["paper_id"] = paper_id_for_record(paper)
+    return apply_identity_confidence(paper)
 
 
 def http_get_text(url: str, *, timeout: int = 30, headers: dict[str, str] | None = None) -> str:
@@ -628,9 +642,12 @@ def normalize_openalex_work(item: dict[str, Any]) -> dict[str, Any]:
     doi = extract_doi(doi_url or normalize_whitespace(str(item.get("doi", "")))) or ""
     primary_location = item.get("primary_location", {}) or {}
     pdf_url = normalize_whitespace(str((primary_location.get("pdf_url") or "")))
+    landing_page_url = normalize_whitespace(str(primary_location.get("landing_page_url") or ""))
+    best_oa = item.get("best_oa_location", {}) or {}
     if not pdf_url:
-        best_oa = item.get("best_oa_location", {}) or {}
-        pdf_url = normalize_whitespace(str(best_oa.get("pdf_url") or best_oa.get("landing_page_url") or ""))
+        pdf_url = normalize_whitespace(str(best_oa.get("pdf_url") or ""))
+    if not landing_page_url:
+        landing_page_url = normalize_whitespace(str(best_oa.get("landing_page_url") or ""))
     venue = normalize_whitespace(str((primary_location.get("source", {}) or {}).get("display_name", "")))
     year = normalize_whitespace(str(item.get("publication_year", "")))
     return {
@@ -642,7 +659,7 @@ def normalize_openalex_work(item: dict[str, Any]) -> dict[str, Any]:
         "doi": doi,
         "source": "openalex",
         "source_type": "openalex",
-        "source_url": normalize_whitespace(str(item.get("id", ""))),
+        "source_url": landing_page_url or normalize_whitespace(str(item.get("id", ""))),
         "pdf_url": pdf_url,
         "abstract": "",
         "metadata_sources": ["openalex"],
@@ -767,19 +784,25 @@ def resolve_reference(value: str) -> dict[str, Any]:
         paper["paper_id"] = paper_id_for_record(paper)
         return apply_identity_confidence(paper)
     if source_type == "arxiv_id":
-        papers = safe_fetch_arxiv_entries(id_list=extract_arxiv_id(stripped) or "", max_results=1)
+        arxiv_id = extract_arxiv_id(stripped) or ""
+        papers = safe_fetch_arxiv_entries(id_list=arxiv_id, max_results=1)
         if papers:
             paper = papers[0]
             paper["paper_id"] = paper_id_for_record(paper)
             paper["status"] = "ok"
             return apply_identity_confidence(paper)
+        if arxiv_id:
+            return fallback_arxiv_record(arxiv_id, "arxiv_id")
     if source_type == "arxiv_url":
-        papers = safe_fetch_arxiv_entries(id_list=extract_arxiv_id(stripped) or "", max_results=1)
+        arxiv_id = extract_arxiv_id(stripped) or ""
+        papers = safe_fetch_arxiv_entries(id_list=arxiv_id, max_results=1)
         if papers:
             paper = papers[0]
             paper["paper_id"] = paper_id_for_record(paper)
             paper["status"] = "ok"
             return apply_identity_confidence(paper)
+        if arxiv_id:
+            return fallback_arxiv_record(arxiv_id, "arxiv_url", source_url=stripped)
     if source_type in {"doi", "doi_url"}:
         doi = extract_doi(stripped) or ""
         paper = fetch_crossref_by_doi(doi) or {"doi": doi, "source_url": f"https://doi.org/{doi}"}
@@ -1534,7 +1557,9 @@ def resolve_obsidian_note_path(
     note_slug = slugify_filename(title)
     target_name = filename or f"{note_slug}.md"
     folder_name = Path(target_name).stem or note_slug
-    if relative_dir.name == folder_name:
+    folder_aliases = {folder_name, note_slug, slugify_filename(folder_name)}
+    normalized_folder_aliases = {alias.lower() for alias in folder_aliases if alias}
+    if relative_dir.name.lower() in normalized_folder_aliases:
         return root_path / relative_dir / target_name
     return root_path / relative_dir / folder_name / target_name
 
@@ -2056,9 +2081,55 @@ def normalize_caption_label(label: str) -> str:
     return label
 
 
+CAPTION_REFERENCE_VERBS = {
+    "show",
+    "shows",
+    "illustrate",
+    "illustrates",
+    "plot",
+    "plots",
+    "present",
+    "presents",
+    "report",
+    "reports",
+    "depict",
+    "depicts",
+    "compare",
+    "compares",
+    "summarize",
+    "summarizes",
+    "demonstrate",
+    "demonstrates",
+}
+
+
+def caption_label_key(label: str) -> str:
+    normalized = normalize_caption_label(label).lower()
+    normalized = re.sub(r"\bfigure\b", "fig", normalized)
+    normalized = re.sub(r"\bfig\.\s*", "fig ", normalized)
+    normalized = re.sub(r"\btable\.\s*", "table ", normalized)
+    return normalize_whitespace(normalized)
+
+
+def caption_preference_score(label: str, caption: str) -> int:
+    cleaned_caption = normalize_whitespace(caption)
+    lowered_label = normalize_whitespace(label).lower()
+    first_word_match = re.match(r"^([A-Za-z][A-Za-z-]*)\b", cleaned_caption)
+    first_word = first_word_match.group(1).lower() if first_word_match else ""
+    score = len(cleaned_caption)
+    if lowered_label.startswith(("figure", "table")):
+        score += 25
+    if first_word in CAPTION_REFERENCE_VERBS:
+        score -= 80
+    if len(cleaned_caption) < 12:
+        score -= 20
+    return score
+
+
 def extract_caption_lines(pdf_text: str, kind: str) -> list[dict[str, str]]:
-    results: list[dict[str, str]] = []
-    seen = set()
+    grouped: dict[str, dict[str, str]] = {}
+    scores: dict[str, int] = {}
+    order: list[str] = []
     lines = [clean_pdf_line(line) for line in pdf_text.splitlines()]
     if kind == "figure":
         pattern = re.compile(
@@ -2092,12 +2163,20 @@ def extract_caption_lines(pdf_text: str, kind: str) -> list[dict[str, str]]:
         caption = normalize_whitespace(match.group(2))
         if not caption and idx + 1 < len(lines):
             caption = normalize_whitespace(lines[idx + 1])
-        marker = f"{label.lower()}::{caption.lower()}"
-        if marker in seen:
+        key = caption_label_key(label)
+        if not key:
             continue
-        seen.add(marker)
-        results.append({"id": label, "caption": caption})
-    return results
+        candidate = {"id": label, "caption": caption}
+        score = caption_preference_score(label, caption)
+        if key not in grouped:
+            grouped[key] = candidate
+            scores[key] = score
+            order.append(key)
+            continue
+        if score > scores[key]:
+            grouped[key] = candidate
+            scores[key] = score
+    return [grouped[key] for key in order]
 
 
 def infer_paper_type(title: str, abstract: str) -> tuple[str, str]:

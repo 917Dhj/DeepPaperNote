@@ -381,19 +381,22 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 1. 解析论文身份
 2. 收集元数据
 3. 获取最佳可用 PDF
-4. 抽取证据
-5. 提取 PDF 图像资产
-6. 规划图表位置
-7. 构建综合证据包
-8. 让模型写笔记
-9. 校验最终笔记
-10. 做最终可读性复核并写入 Obsidian
+4. 抽取完整原文与 source manifest
+5. 抽取结构化索引和 PDF 图像资产
+6. 规划图表位置和全量图表决策表
+7. 构建 manifest synthesis bundle
+8. 让模型读取 raw sections 并规划笔记
+9. 对 note_plan 运行 grounding lint
+10. 让模型写笔记
+11. 校验最终笔记
+12. 做最终内容质量复核
+13. 做最终可读性复核并写入 Obsidian
 
 核心原则：
 
-- 脚本负责取证
+- 脚本负责原文、元数据、资产和质量信号
 - 模型负责写作
-- 格式校验和最终可读性复核在写入前兜底
+- 格式校验、最终内容质量复核和最终可读性复核在写入前兜底
 
 相关文档：
 
@@ -486,10 +489,13 @@ DeepPaperNote/
     ├── create_input_record.py
     ├── extract_evidence.py
     ├── extract_pdf_assets.py
+    ├── extract_source_text.py
     ├── fetch_pdf.py
+    ├── lint_grounding.py
     ├── lint_note.py
     ├── locate_zotero_attachment.py
     ├── materialize_figure_asset.py
+    ├── plan_figure_table_decisions.py
     ├── plan_figures.py
     ├── resolve_paper.py
     ├── run_pipeline.py

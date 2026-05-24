@@ -8,24 +8,32 @@ import json
 import re
 from pathlib import Path
 
-from contracts import NOTE_REQUIRED_SECTIONS, PAPER_TYPE_VALUES
+from contracts import (
+    NOTE_PLAN_LIST_FIELDS,
+    NOTE_PLAN_REQUIRED_FIELDS,
+    NOTE_PLAN_STRING_FIELDS,
+    NOTE_REQUIRED_SECTIONS,
+    PAPER_TYPE_VALUES,
+)
 
 REQUIRED_SECTIONS = NOTE_REQUIRED_SECTIONS
 
-NOTE_PLAN_STRING_FIELDS = (
-    "paper_type",
-    "paper_type_rationale",
-    "dominant_domain",
-)
+CORE_INFO_FIELDS = [
+    "标题",
+    "标题翻译",
+    "作者",
+    "机构",
+    "发表时间",
+    "发表渠道",
+    "DOI",
+    "arXiv",
+    "论文链接",
+    "代码 / 项目",
+    "数据 / 资源",
+    "论文类型",
+]
 
-NOTE_PLAN_LIST_FIELDS = (
-    "must_cover",
-    "key_numbers",
-    "real_comparisons",
-    "section_plan",
-)
-
-NOTE_PLAN_REQUIRED_FIELDS = NOTE_PLAN_STRING_FIELDS + NOTE_PLAN_LIST_FIELDS
+CORE_INFO_FIELD_INDEX = {field: idx for idx, field in enumerate(CORE_INFO_FIELDS)}
 
 FIGURE_TARGET_SECTIONS = {
     "研究问题",
@@ -175,8 +183,44 @@ USABLE_CANDIDATE_MATERIALIZATION_BLOCKED_RE = re.compile(
     flags=re.IGNORECASE | re.VERBOSE,
 )
 
+MISSING_ASSET_MATERIALIZATION_RE = re.compile(
+    r"""
+    (?:
+        (?:资产缺失|未找到|没有|缺少|asset_candidate_missing|candidate\s+missing)
+        [^。；\n]{0,50}
+        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|copy|blocked)
+        |
+        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|copy|blocked)
+        [^。；\n]{0,50}
+        (?:资产缺失|未找到|没有|缺少|asset_candidate_missing|candidate\s+missing)
+    )
+    """,
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+
 MARKDOWN_IMAGE_EMBED_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*$")
 FIGURE_CALLOUT_TITLE_RE = re.compile(r"^>\s*\[!figure\][+-]?\s*(.*)$")
+
+MECHANICAL_TRANSLATION_ARTIFACT_RE = re.compile(
+    r"""
+    (?:
+        [\u4e00-\u9fff]+(?:ing|ed|s)\b
+        |
+        \b[A-Za-z]{2,}相关\b
+        |
+        [\u4e00-\u9fff](?:缓存|块)?\s+(?:of|with|for|on|in|from|and)\b
+        |
+        \b(?:of|with|for|on|in|from|and)\s+[\u4e00-\u9fff]
+        |
+        [\u4e00-\u9fff]\s+(?:table|translation|example|candidate|caption|slot|query|block|token|input|layout|serving|memory|management|overhead|latency|dependent|preemption)\b
+        |
+        \b(?:block|caption|slot|query|input|layout|serving|memory|management|overhead|latency|dependent|preemption)\s+[\u4e00-\u9fff]
+        |
+        \b(?:Single|Shared|Performance|Storing|Illustration)\b[^\n。；]{0,60}[\u4e00-\u9fff]
+    )
+    """,
+    flags=re.IGNORECASE | re.VERBOSE,
+)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -227,8 +271,42 @@ def inspect_note_plan(plan_path: Path) -> tuple[bool, list[str]]:
             issues.append(f"planning_{field}_empty")
     if has_invalid_fields:
         issues.append("planning_required_fields_invalid")
+    issues.extend(inspect_central_claims_plan(plan.get("central_claims")))
 
     return True, issues
+
+
+def inspect_central_claims_plan(value: object) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return ["planning_central_claims_invalid"]
+
+    issues: list[str] = []
+    required_fields = (
+        "claim",
+        "supporting_evidence",
+        "what_it_actually_proves",
+        "what_it_does_not_prove",
+    )
+    for item in value:
+        if not isinstance(item, dict):
+            if "planning_central_claims_invalid" not in issues:
+                issues.append("planning_central_claims_invalid")
+            continue
+        for field in required_fields:
+            field_value = item.get(field)
+            if field == "supporting_evidence":
+                if not isinstance(field_value, list) or not field_value:
+                    code = "planning_central_claims_supporting_evidence_missing"
+                    if code not in issues:
+                        issues.append(code)
+                continue
+            if not isinstance(field_value, str) or not field_value.strip():
+                code = f"planning_central_claims_{field}_missing"
+                if code not in issues:
+                    issues.append(code)
+    return issues
 
 
 def extract_headers(text: str) -> list[str]:
@@ -392,18 +470,7 @@ DOUBLE_ESCAPED_TEX_COMMANDS = {
 
 def is_metadata_line(line: str) -> bool:
     stripped = line.strip()
-    prefixes = [
-        "- 标题:",
-        "- 标题翻译:",
-        "- 作者:",
-        "- 机构:",
-        "- 发表时间:",
-        "- 会议 / 期刊:",
-        "- DOI:",
-        "- 论文链接:",
-        "- 论文类型:",
-        "- 链接:",
-    ]
+    prefixes = [f"- {field}:" for field in CORE_INFO_FIELDS]
     return any(stripped.startswith(prefix) for prefix in prefixes)
 
 
@@ -477,6 +544,27 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
                 "line": stripped,
                 "english_word_count": len(english_words),
                 "function_word_hits": function_hits[:6],
+            }
+        )
+    return issues
+
+
+def mechanical_translation_artifact_issues(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    for idx, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped in {"---"} or re.search(r"https?://", stripped):
+            continue
+        match = MECHANICAL_TRANSLATION_ARTIFACT_RE.search(stripped)
+        if not match:
+            continue
+        issues.append(
+            {
+                "line_number": idx,
+                "line": stripped,
+                "artifact": match.group(0),
             }
         )
     return issues
@@ -724,6 +812,32 @@ def figure_callout_usable_candidate_status_issues(text: str) -> list[dict[str, o
     return issues
 
 
+def figure_callout_missing_asset_materialization_issues(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("> [!figure]"):
+            continue
+        j = idx + 1
+        while j < len(lines):
+            nxt = lines[j].strip()
+            if not nxt.startswith(">"):
+                break
+            status_text = figure_status_text(nxt)
+            if status_text and MISSING_ASSET_MATERIALIZATION_RE.search(status_text):
+                issues.append(
+                    {
+                        "line_number": j + 1,
+                        "line": nxt,
+                        "reason": "missing_asset_misreported_as_materialization_blocked",
+                    }
+                )
+                break
+            j += 1
+    return issues
+
+
 def is_image_embed_line(line: str) -> bool:
     stripped = line.strip()
     return stripped.startswith("![[") or bool(MARKDOWN_IMAGE_EMBED_RE.match(stripped))
@@ -772,12 +886,78 @@ def figure_structure_issues(text: str) -> list[dict[str, object]]:
         + figure_callout_placement_issues(text)
         + figure_callout_real_image_status_issues(text)
         + figure_callout_usable_candidate_status_issues(text)
+        + figure_callout_missing_asset_materialization_issues(text)
         + image_embed_caption_issues(text)
     )
 
 
 def figure_structure_passes(text: str) -> bool:
     return not figure_structure_issues(text)
+
+
+def core_info_structure_issues(text: str) -> list[dict[str, object]]:
+    body = section_body(text, "核心信息")
+    if not body:
+        return []
+
+    issues: list[dict[str, object]] = []
+    seen_fields: set[str] = set()
+    last_known_index = -1
+    base_line = _line_number_from_offset(text, text.find("## 核心信息"))
+
+    for offset, raw_line in enumerate(body.splitlines(), start=1):
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        line_number = base_line + offset
+        match = re.match(r"^-\s*([^:：]+)\s*[:：]\s*(.*)$", stripped)
+        if not match:
+            issues.append(
+                {
+                    "line_number": line_number,
+                    "line": stripped,
+                    "reason": "core_info_non_metadata_line",
+                }
+            )
+            continue
+
+        field = match.group(1).strip()
+        if field not in CORE_INFO_FIELD_INDEX:
+            issues.append(
+                {
+                    "line_number": line_number,
+                    "line": stripped,
+                    "reason": "core_info_unknown_field",
+                    "field": field,
+                }
+            )
+            continue
+
+        if field in seen_fields:
+            issues.append(
+                {
+                    "line_number": line_number,
+                    "line": stripped,
+                    "reason": "core_info_duplicate_field",
+                    "field": field,
+                }
+            )
+            continue
+
+        field_index = CORE_INFO_FIELD_INDEX[field]
+        if field_index < last_known_index:
+            issues.append(
+                {
+                    "line_number": line_number,
+                    "line": stripped,
+                    "reason": "core_info_field_order_invalid",
+                    "field": field,
+                }
+            )
+        seen_fields.add(field)
+        last_known_index = max(last_known_index, field_index)
+
+    return issues
 
 
 def is_prose_line(line: str) -> bool:
@@ -1329,16 +1509,22 @@ def main() -> None:
     missing_sections = find_missing_sections(text)
     warnings: list[str] = []
     mixed_issues = mixed_language_issues(text)
+    mechanical_artifact_issues = mechanical_translation_artifact_issues(text)
     linebreak_issues = suspicious_mid_sentence_linebreaks(body_text)
     code_math_issues = suspicious_code_formatted_math(text)
     math_issues = math_render_issues(text)
     figure_issues = figure_structure_issues(text)
+    core_info_issues = core_info_structure_issues(text)
     substantive_issues = inspect_substantive_content(text)
     planning_artifact_found, planning_artifact_issues = inspect_note_plan(
         resolve_note_plan_path(path, args.plan_file)
     )
     warnings.extend(inspect_figure_callouts(text))
     for issue in figure_issues:
+        reason = str(issue.get("reason", ""))
+        if reason and reason not in warnings:
+            warnings.append(reason)
+    for issue in core_info_issues:
         reason = str(issue.get("reason", ""))
         if reason and reason not in warnings:
             warnings.append(reason)
@@ -1365,6 +1551,8 @@ def main() -> None:
         warnings.append("note_too_short")
     if mixed_issues:
         warnings.append("mixed_language_lines_present")
+    if mechanical_artifact_issues:
+        warnings.append("mechanical_translation_artifacts_present")
     if linebreak_issues:
         warnings.append("suspicious_mid_sentence_linebreaks")
     if code_math_issues:
@@ -1381,15 +1569,31 @@ def main() -> None:
         "missing_sections": missing_sections,
         "warnings": warnings,
         "mixed_language_issues": mixed_issues,
+        "mechanical_translation_artifact_issues": mechanical_artifact_issues,
         "linebreak_issues": linebreak_issues,
         "code_math_issues": code_math_issues,
         "math_render_issues": math_issues,
         "figure_structure_issues": figure_issues,
+        "core_info_structure_issues": core_info_issues,
         "substantive_content_issues": substantive_issues,
         "planning_artifact_found": planning_artifact_found,
         "planning_artifact_issues": planning_artifact_issues,
-        "passes_basic_structure": not missing_sections and not {"title_heading_missing", "no_level2_sections", "front_matter_order_invalid"} & set(warnings),
-        "passes_style_gate": not mixed_issues and not linebreak_issues and not code_math_issues,
+        "passes_basic_structure": (
+            not missing_sections
+            and not core_info_issues
+            and not {
+                "title_heading_missing",
+                "no_level2_sections",
+                "front_matter_order_invalid",
+            }
+            & set(warnings)
+        ),
+        "passes_style_gate": (
+            not mixed_issues
+            and not mechanical_artifact_issues
+            and not linebreak_issues
+            and not code_math_issues
+        ),
         "passes_math_gate": not math_issues,
         "passes_figure_gate": not figure_issues,
         "passes_plan_gate": planning_artifact_found and not planning_artifact_issues,

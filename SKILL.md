@@ -47,15 +47,18 @@ Follow this order:
 1. resolve the paper identity
 2. collect metadata
 3. acquire the best available PDF
-4. extract evidence
-5. extract PDF image assets
+4. extract canonical raw source text: `*_raw_sections.jsonl`, `*_source_manifest.json`, and optional derived `*_full_text.md`
+5. extract structural indexes and PDF assets
 6. plan figure placement
-7. build the synthesis bundle
-8. have the model read the bundle and plan the note
-9. have the model write the note
-10. lint the final note — if the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 11 or 12
-11. perform `final_readability_review` after lint passes
-12. write into Obsidian
+7. build the full figure/table decision table
+8. build the manifest synthesis bundle
+9. have the model read the bundle plus raw sections and plan the note
+10. run grounding lint on the note plan before drafting from it
+11. have the model write the note
+12. lint the final note — if the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 13, 14, or 15
+13. perform `final_quality_review` after lint passes
+14. perform `final_readability_review` after the quality review passes
+15. write into Obsidian
 
 This is the required workflow for a normal single-paper note request, not a loose suggestion.
 Unless this skill explicitly marks a stage as optional, required stages must not be silently skipped, reordered into a shortcut, or treated as complete just because a partial artifact already exists.
@@ -86,15 +89,17 @@ Completion-language rule:
 Files under `references/` are optional stage-specific deep dives, not a default reading checklist.
 
 Non-negotiable rules:
-- evidence-first: draft only from the synthesis bundle, coverage metadata, explicit `note_plan`, and inspected paper evidence; never finish from title/abstract/headings alone
+- evidence-first: draft from the synthesis bundle, `source_manifest`, raw sections, coverage metadata, explicit `note_plan`, and inspected paper evidence; never finish from title/abstract/headings alone
+- raw-source authority: for ordinary PDFs, `*_raw_sections.jsonl` and `*_source_manifest.json` are the canonical reading material; old top-N evidence buckets, truncated `section_texts`, and `candidate_chunks` are not model-facing writing inputs
 - fail-closed: if a usable PDF or sufficient evidence cannot be obtained after supported acquisition paths, stop and ask for better source material rather than producing a finished degraded note
 - model-first: scripts structure evidence, but the model must decide emphasis, contribution, mechanism, limitations, and final Chinese prose
 - explicit planning: before drafting, save a compact JSON `note_plan` such as `<note>.plan.json` or `*_note_plan.json`; pass it to `scripts/lint_note.py --plan-file ...`
+- grounding gate: after the JSON `note_plan` exists, run `scripts/lint_grounding.py --note-plan ... --source-manifest ... --bundle-json ... --figure-decisions ...`; each substantive section must cite valid `section_id` values or valid page ranges
 - required structure: include the canonical required sections, with `原文摘要翻译` before `一句话总结` and a dedicated `创新点` section immediately after `原文摘要翻译`
 - abstract translation: when abstract metadata exists, `原文摘要翻译` is a faithful Chinese translation of the original abstract, not a bilingual block and not the model's own summary
 - mechanism depth: method, framework, and system papers should include `### 机制流程` under `方法主线`, normally as a 3 to 4 step numbered flow with input, operation, and output destination
 - placeholder-first figures: plan major figure/table placeholders first; replace one only when identity match and visual usability are both strong; otherwise keep the placeholder
-- final quality gates: lint is a floor; after lint passes, reread the whole note for final readability, and rerun lint if that review edits the note
+- final quality gates: lint is a floor; after lint passes, first run `final_quality_review` for analytical depth, then run `final_readability_review` for language polish, and rerun lint if either review edits the note
 - Obsidian-first save: if a vault is configured, treat it as the required target, create the paper-local `images/` directory, and never present a fallback/workspace write as a successful vault save
 
 Reference usage policy:
@@ -143,6 +148,8 @@ Local-library-first rule (applies only when the Zotero check above succeeds):
 - The `images/` folder is part of the required save protocol, not an optional cleanup step. If permission is missing, request it; do not skip the directory.
 - Do not present a workspace write as if the Obsidian save already succeeded.
 - The note must use real heading levels: `#`, `##`, and `###`.
+- Every final note must start with an Obsidian YAML properties block above the `#` title heading. Include at least a `tags` field with a `papers/<domain>` value and useful `aliases`; include `date`, `doi`, or `arxiv_id` when known, and omit unavailable fields rather than inventing placeholders.
+- `## 核心信息` must be a fixed metadata block only. Use only these fields, in this order, as `- 字段名: 值` bullets: `标题`, `标题翻译`, `作者`, `机构`, `发表时间`, `发表渠道`, `DOI`, `arXiv`, `论文链接`, `代码 / 项目`, `数据 / 资源`, `论文类型`. Omit unavailable fields; put any guide sentence, takeaway, or analysis in `一句话总结` or a later section instead.
 - The note should include `原文摘要翻译` near the beginning when abstract metadata is available, before `一句话总结`.
 - When abstract metadata is available, `原文摘要翻译` should directly translate the original paper abstract into Chinese rather than restating it as your own summary.
 - The `原文摘要翻译` section itself should be Chinese-only; do not place English abstract sentences or English paragraph excerpts in that section.
@@ -154,13 +161,17 @@ Local-library-first rule (applies only when the Zotero check above succeeds):
 - Every kept figure/table placeholder must appear directly under the most relevant analytical section named by its `建议位置`; do not collect unresolved placeholders in catch-all sections such as `剩余图表占位` or `Remaining figures`.
 - Every kept figure/table placeholder must use the standard `> [!figure]` callout format with `建议位置`, `放置原因`, and `当前状态`; do not use ordinary paragraph markers such as `[图表占位 | Fig. 1]`, `图表占位：Table 2`, or `Figure Placeholder | Fig. 3`.
 - Real images may replace some placeholders, but only if they clearly match the corresponding paper figure/table.
-- When inserting a real image, prefer the `obsidian_embed` returned by `scripts/materialize_figure_asset.py`.
+- When inserting a real image, use the `relative_markdown_embed` from `figure_table_decisions.json`; final save with `scripts/write_obsidian_note.py --figure-decisions ...` copies the image into the paper-local `images/` directory.
 - When a real image is inserted, render it as the Obsidian embed or Markdown image embed followed immediately by one italic caption line.
 - Do not keep a redundant `> [!figure]` placeholder callout for the same inserted real figure.
 - Figure captions in the note must preserve the original paper numbering such as `Fig. 1` or `Table 2`.
 - If a figure/table candidate is marked usable, resolve it explicitly: insert the real image, keep the placeholder because of a concrete visual defect, keep it as lower-priority because a more central related figure is already inserted, or keep it because materialization failed.
+- Do not misreport missing candidates as materialization failures: `asset_candidate_missing`, empty `source_image_path`, or no independent crop means the placeholder status should say no high-confidence image candidate was extracted. Use materialization/copy/write failure language only after a real chosen image asset failed to copy or write.
+- If a candidate crop contains another Figure/Table caption or a second figure body, treat that as contamination or lack of an independent crop; do not insert it and do not call it a clean usable candidate just because the target label is present.
+- When `figure_table_decisions.json` contains `insert` rows, pass it to `scripts/write_obsidian_note.py --figure-decisions ...`; the writer must copy those images into the paper-local `images/` directory and refuse a note that does not reference the selected image path.
 - Do not use soft reasons such as keeping the note light, values already transcribed, future lookup, or convenient back-reference as the standalone `当前状态` for a usable candidate.
 - The note must pass a style gate: no mixed Chinese-English prose lines except stable proper nouns or citation metadata.
+- The style gate also rejects mechanical term-replacement artifacts such as `KV缓存 of`, `批量ing`, `In相关 Researcher`, or `Single 序列 generation`; rewrite the sentence naturally instead of preserving a partially translated phrase.
 - Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, fix the reported issues and re-run lint. Keep fixing and re-running until lint passes — multiple rounds are normal and expected. Do not decide that any failure is an acceptable exception — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only escalate to the user if the same failures appear unchanged across multiple rounds with no reduction, indicating the model is unable to make further progress independently.
 - If PDF or evidence quality is insufficient for a real deep note, fail closed: stop, report the blocked stage, and ask for the better PDF, OCR/source material, or other input needed to continue.
 
@@ -170,18 +181,27 @@ Model-first rule:
 - final paper understanding and note writing belong to the model
 - before writing the final note, create an explicit short `note_plan` artifact rather than relying on hidden planning only
 - save `note_plan` as the canonical short JSON file outside the final note body, such as `<note>.plan.json` or a run-scoped `*_note_plan.json`
-- choose `note_plan.paper_type` from the synthesis bundle's allowed paper types before drafting; script-provided paper-type suggestions are hint-only and must not override the model's selection
-- keep the same 12 top-level note sections for every paper type, then use `paper_type_contracts[note_plan.paper_type].section_semantics` to interpret the typed meaning of those fixed sections and `paper_type_contracts[note_plan.paper_type].recommended_subsections` to draft `note_plan.section_plan`
+- choose `note_plan.paper_type` from the synthesis bundle's allowed paper types before drafting; the bundle must not bind writing behavior to a script-selected summary paper type
+- keep the same 12 top-level note sections for every paper type, then use `contracts_by_paper_type[note_plan.paper_type].section_semantics` to interpret the typed meaning of those fixed sections and `contracts_by_paper_type[note_plan.paper_type].recommended_subsections` to draft `note_plan.section_plan`
+- the note plan must include the analysis coverage fields from the writing contract: `central_claims`, `claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, `reuse_takeaways`, and `followup_questions`
+- each `central_claims` item must state the claim, source-grounded supporting evidence, what the evidence actually proves, and what it does not prove
+- `mechanism_result_map` must connect paper-specific mechanisms, design choices, protocols, constructs, or data decisions to the exact result pattern or diagnostic evidence they explain
+- `comparative_positioning` must explain how the paper differs from strong baselines, prior routes, human/clinical references, or obvious alternatives, and why that difference changes interpretation
+- `followup_questions` must be concrete replication, engineering, research, or validity checks that a reader could reuse later
 - pass that JSON file to `scripts/lint_note.py --plan-file ...` when linting the final note; if omitted, lint looks for sibling `<note>.plan.json`
+- pass the same JSON plan to `scripts/lint_grounding.py` before using it for final drafting; broad references such as `synthesis_bundle.evidence.method_evidence` are invalid
 - interactive sessions may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file
 - do not require or expose a long free-form `<thinking>` block
 - for technical papers, prefer replication-grade explanation over high-level summary
 - if formulas, objectives, or complexity expressions are central, include the key ones in the final note
 - render math as `$...$` or `$$...$$`, not as inline code or fenced code blocks
 - before final save, explicitly self-review whether the note contains enough technical detail, key numbers, and any necessary formulas
-- after script lint passes, reread the full note once more for readability; do not stop at formal compliance only
-- in that final readability review, ordinary English phrase leftovers should usually be rewritten into natural Chinese, while stable proper nouns may remain in English
-- do not use the final readability review to invent new facts, empty filler text, or shallower but safer wording just to satisfy lint
+- during `final_quality_review`, check the full note against seven questions: whether the central evidence chain is complete, whether key settings and numbers are present, whether mechanisms or protocols are mapped to the result pattern they explain, whether the paper is positioned against strong baselines or alternative routes, whether Discussion/Limitations conclusions are explained mechanistically, whether proven claims are separated from unproven claims, and whether the research, engineering, replication, or validity takeaways are specific enough to reuse
+- central quantitative comparisons with three or more systems, settings, tasks, datasets, metrics, or ablation rows should normally be written as compact Markdown tables, followed by interpretation; do not leave the main result table as a loose bullet list when a table would be clearer
+- short papers still need a complete deep note: use the saved space to explain protocol details, ablations, limitations, and deployment or replication implications rather than compressing the note into a terse summary
+- after `final_quality_review` passes, reread the full note once more for readability; do not stop at formal compliance only
+- in `final_readability_review`, ordinary English phrase leftovers should usually be rewritten into natural Chinese, while stable proper nouns may remain in English
+- do not use `final_readability_review` to invent new facts, empty filler text, or shallower but safer wording just to satisfy lint
 
 The topic references above can improve difficult runs, but the normal execution path should not depend on reading all of them.
 
@@ -195,10 +215,13 @@ Use these bundled scripts rather than rebuilding the workflow from scratch:
 - `scripts/run_pipeline.py`
 - `scripts/collect_metadata.py`
 - `scripts/fetch_pdf.py`
+- `scripts/extract_source_text.py`
 - `scripts/extract_evidence.py`
 - `scripts/extract_pdf_assets.py`
 - `scripts/plan_figures.py`
+- `scripts/plan_figure_table_decisions.py`
 - `scripts/build_synthesis_bundle.py`
+- `scripts/lint_grounding.py`
 - `scripts/lint_note.py`
 - `scripts/materialize_figure_asset.py`
 - `scripts/write_obsidian_note.py`

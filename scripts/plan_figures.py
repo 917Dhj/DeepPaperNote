@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import re
 
-from common import maybe_load_json_record, normalize_whitespace
+from common import caption_preference_score, maybe_load_json_record, normalize_whitespace
 
 
 def parser() -> argparse.ArgumentParser:
@@ -36,12 +36,113 @@ def merge_inputs(primary: dict | None, evidence: dict | None, assets: dict | Non
 
 def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
     text = f"{item_id} {caption}".lower()
-    if any(token in text for token in ["pipeline", "framework", "overview", "architecture", "system", "workflow", "stage"]):
-        return "method_overview", "机制流程", "这张图概括了整体方法或系统流程；如果匹配置信度足够高，最适合放在 `### 机制流程` 帮助快速建立执行链理解。"
-    if any(token in text for token in ["dataset", "data", "corpus", "participants", "recordings", "setup", "distribution", "quality"]):
-        return "data_or_task", "数据与任务定义", "这张图更像任务设定或数据说明，放在数据与任务定义最合适。"
-    if any(token in text for token in ["accuracy", "score", "performance", "comparison", "win-rate", "results", "recall"]):
+    if any(
+        token in text
+        for token in [
+            "accuracy",
+            "score",
+            "performance",
+            "comparison",
+            "win-rate",
+            "results",
+            "recall",
+            "latency",
+            "throughput",
+            "request rate",
+            "batched request",
+            "batch size",
+            "memory saving",
+            "ablation",
+            "ablated",
+            "overhead",
+            "microbenchmark",
+            "block size",
+            "single sequence generation",
+            "parallel generation",
+        ]
+    ) or re.search(
+        r"\b(?:model|system|architecture|method|approach)\s+"
+        r"(?:produces|achieves|outperforms|improves|reduces|increases)\b",
+        text,
+    ):
         return "main_result", "关键结果", "这张图或表直接承载主结果，适合放在关键结果部分。"
+    if any(
+        token in text
+        for token in [
+            "prisma",
+            "literature flow",
+            "flow diagram",
+            "study selection",
+            "screening flow",
+            "screened records",
+            "records screened",
+            "identification of studies",
+        ]
+    ):
+        return "data_or_task_overview", "数据与任务定义", "这张图解释文献筛选或纳入流程；如果候选图质量足够，适合放在数据与任务定义部分帮助读者理解综述证据来源。"
+    if any(
+        token in text
+        for token in [
+            "pipeline",
+            "framework",
+            "overview",
+            "architecture",
+            "system",
+            "workflow",
+            "stage",
+            "procedure",
+            "process",
+        ]
+    ):
+        return "method_overview", "机制流程", "这张图概括了整体方法或系统流程；如果匹配置信度足够高，最适合放在 `### 机制流程` 帮助快速建立执行链理解。"
+    if any(
+        token in text
+        for token in [
+            "created from",
+            "sources",
+            "connect",
+            "collection",
+            "curation",
+            "filtering",
+            "pull request",
+            "issue",
+        ]
+    ):
+        return "data_or_task_overview", "数据与任务定义", "这张图解释任务或数据集如何被构造；如果候选图质量足够，适合放在数据与任务定义部分帮助读者理解数据来源。"
+    if any(
+        token in text
+        for token in [
+            "dataset",
+            "data",
+            "corpus",
+            "participants",
+            "recordings",
+            "setup",
+            "distribution",
+            "quality",
+            "task",
+            "instance",
+            "attribute",
+        ]
+    ):
+        return "data_or_task", "数据与任务定义", "这张图更像任务设定或数据说明，放在数据与任务定义最合适。"
+    if any(
+        token in text
+        for token in [
+            "algorithm",
+            "block table",
+            "kv cache",
+            "key-value cache",
+            "copy-on-write",
+            "parallel sampling",
+            "beam search",
+            "shared prompt",
+            "shared prefix",
+            "memory management",
+            "block translation",
+        ]
+    ):
+        return "method_detail", "方法主线", "这张图解释方法内部机制或关键执行状态，适合放在方法主线部分作为机制细节占位。"
     if item_id.lower().startswith("table"):
         return "table_result", "关键结果", "这是关键结果表，适合放在关键结果部分辅助定位核心数值。"
     return "supporting_figure", "深度分析", "这张图更适合作为补充图，放在深度分析部分帮助解释作者论点。"
@@ -57,23 +158,27 @@ def build_figure_items(evidence_pack: dict, *, limit: int = 12) -> list[dict]:
             raw_items.append({"id": item.get("id", ""), "caption": item.get("caption", ""), "source": "table"})
 
     grouped: dict[str, dict] = {}
+    grouped_scores: dict[str, int] = {}
     order: list[str] = []
     for item in raw_items:
         item_id = normalize_whitespace(str(item.get("id", "")))
         caption = normalize_whitespace(str(item.get("caption", "")))
         if not item_id:
             continue
-        key = item_id.lower()
+        key = _normalize_label_for_match(item_id) or item_id.lower()
         current = grouped.get(key)
         candidate = {"id": item_id, "caption": caption, "source": item.get("source", "")}
         if current is None:
             grouped[key] = candidate
+            grouped_scores[key] = caption_preference_score(item_id, caption)
             order.append(key)
             continue
-        current_caption = str(current.get("caption", ""))
-        # Prefer the richer caption if multiple extraction passes produced duplicates.
-        if len(caption) > len(current_caption):
+        # Prefer true caption-looking lines over later body references such as
+        # "Fig. 14 shows ..."; fall back to richness when both look caption-like.
+        score = caption_preference_score(item_id, caption)
+        if score > grouped_scores[key]:
             grouped[key] = candidate
+            grouped_scores[key] = score
 
     picked: list[dict] = []
     for key in order:
@@ -84,7 +189,7 @@ def build_figure_items(evidence_pack: dict, *, limit: int = 12) -> list[dict]:
         priority = 3
         if kind == "method_overview":
             priority = 1
-        elif kind in {"main_result", "table_result"}:
+        elif kind in {"data_or_task_overview", "main_result", "table_result", "method_detail"}:
             priority = 2
         picked.append(
             {
@@ -100,7 +205,11 @@ def build_figure_items(evidence_pack: dict, *, limit: int = 12) -> list[dict]:
         )
     picked.sort(key=lambda item: (item["priority"], item["id"]))
     if limit and limit > 0:
-        return picked[:limit]
+        high_priority = [item for item in picked if int(item.get("priority", 99)) <= 2]
+        supporting = [item for item in picked if int(item.get("priority", 99)) > 2]
+        if len(high_priority) >= limit:
+            return high_priority
+        return high_priority + supporting[: limit - len(high_priority)]
     return picked
 
 

@@ -3,9 +3,10 @@
 Every note keeps the same 12 top-level sections from `NOTE_REQUIRED_SECTIONS`.
 Paper type only changes the typed semantics of shared sections and the recommended `###` subsections used in `note_plan.section_plan`.
 
-Use `paper_type_contracts[note_plan.paper_type]` as the canonical structured source:
+Use `contracts_by_paper_type[note_plan.paper_type]` as the canonical structured source:
 - `section_semantics`: how each fixed top-level section should be interpreted for this paper type.
 - `recommended_subsections`: paper-type-specific `###` candidates for technical or analytical sections.
+- `boundary_questions`: paper-type-specific questions that should shape `central_claims`, `claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, and `followup_questions`.
 
 ## `AI_method`
 
@@ -20,6 +21,11 @@ recommended_subsections:
 - 方法主线: `机制流程`, `模型结构`, `训练目标`, `推理与采样链路`, `关键实现细节`
 - 关键结果: `主结果与强基线`, `消融到底说明了什么`, `失败或不稳定设置`
 - 深度分析: `为什么有效`, `复杂度与扩展性`, `复现注意点`
+
+boundary_questions:
+- 核心机制的收益由哪个实验或消融支撑，而不是只由主结果暗示？
+- 哪些比较只能证明在当前数据、基线、算力或协议下有效，不能外推到通用场景？
+- 论文是否给出失败、退化、不稳定或成本上升的证据；如果没有，结论边界是什么？
 
 ## `benchmark_or_dataset`
 
@@ -36,6 +42,12 @@ recommended_subsections:
 - 关键结果: `基线表现`, `难度分布`, `覆盖与偏差`
 - 深度分析: `benchmark 真正测到了什么`, `适用边界`
 
+boundary_questions:
+- 这个 benchmark/dataset 实际测量的构念是什么，哪些能力只是间接近似？
+- 任务、标签、采样、过滤或评测协议会引入哪些覆盖缺口或偏差？
+- 基线结果证明了评测集有区分度，还是只证明某类模型适应该协议？
+- 样本时长、语料长度、人口统计、类别分布、数据可访问性或隐私限制如何影响复现和外推？
+
 ## `clinical_or_psychology_empirical`
 
 section_semantics:
@@ -50,6 +62,12 @@ recommended_subsections:
 - 方法主线: `研究设计`, `分析模型`, `主要比较`
 - 关键结果: `主要效应`, `不确定性与显著性`, `临床或心理学解释`
 - 深度分析: `因果解释边界`, `外推限制`
+
+boundary_questions:
+- 样本来源、纳排标准、测量工具和标注流程如何限制外推？
+- 结果支持相关、预测、组间差异还是因果解释；不要越过论文设计能证明的范围。
+- 临床或心理学意义是否依赖未观测混杂、量表阈值、文本/语音缺失或场景约束？
+- 样本构成、数据缺失、隐私限制或材料不可公开会怎样限制复现与再分析？
 
 ## `humanities_or_social_science`
 
@@ -66,6 +84,11 @@ recommended_subsections:
 - 关键结果: `核心解释性发现`, `概念贡献`
 - 深度分析: `论证强度`, `替代解释`, `材料边界`
 
+boundary_questions:
+- 作者的解释依赖哪些材料、案例或理论前提？
+- 是否存在同样能解释材料的替代解释，论文如何排除或没有排除？
+- 哪些结论是概念贡献或规范性判断，而不是可直接当作经验事实？
+
 ## `survey_or_review`
 
 section_semantics:
@@ -80,6 +103,11 @@ recommended_subsections:
 - 方法主线: `分类体系`, `方法谱系`, `证据组织方式`
 - 关键结果: `代表性方向`, `共识与分歧`, `开放问题`
 - 深度分析: `分类体系的局限`, `未覆盖区域`, `后续研究机会`
+
+boundary_questions:
+- 检索范围、纳入排除标准或分类轴会遗漏哪些研究路线？
+- 综述给出的是领域共识、作者分类，还是尚未解决的分歧？
+- 哪些趋势结论来自覆盖范围内的文献分布，不能直接当作技术成熟度判断？
 
 ## Selection Rule
 

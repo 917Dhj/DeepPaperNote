@@ -12,22 +12,26 @@ Do not write the finished note directly from:
 
 Instead, use a three-stage model-first pipeline:
 
-1. build an evidence bundle
-2. create the canonical short JSON `note_plan` around that evidence
-3. let the model write the note from the evidence and plan
+1. build raw-source artifacts and a manifest bundle
+2. create the canonical short JSON `note_plan` around source sections/pages
+3. run the grounding gate
+4. let the model write the note from the raw source, bundle, and plan
 
-## Evidence Bundle
+## Source Manifest Bundle
 
-The bundle should answer:
+The source manifest and bundle should answer:
 - what type of paper this is
 - which parts of the PDF were actually found
+- where the raw source text lives
 - which numbers matter
 - which datasets, metrics, baselines, or cohorts matter
 - which figures are method figures, data figures, and result figures
 - which conclusions are about scale, transfer, cost, limitations, or practical value
+- which central claims have source evidence and which boundaries the evidence cannot cross
 
 In `DeepPaperNote`, use:
 - `scripts/run_pipeline.py`
+- `scripts/extract_source_text.py`
 - `scripts/build_synthesis_bundle.py`
 
 ## Explicit Note Plan
@@ -46,6 +50,10 @@ The plan should state:
 - which evidence feeds each section
 - which 3 to 6 numbers matter most
 - which comparisons are the real ones
+- which central claims are supported by which source sections or pages
+- what each central claim actually proves and does not prove
+- which weak, negative, limiting, or explicitly unreported results constrain the conclusion
+- which research or engineering takeaways are reusable beyond the current paper
 - whether this is mostly a method note, system note, dataset note, benchmark note, or empirical/clinical note
 - whether key formulas or complexity expressions need to appear in the final note
 
@@ -66,16 +74,32 @@ Recommended shape:
   "must_cover": ["数据构建", "方法主线", "关键消融"],
   "key_numbers": ["主结果提升 3.2 points", "训练成本降低 40%"],
   "real_comparisons": ["against the strongest reported baseline"],
+  "central_claims": [
+    {
+      "claim": "The proposed mechanism improves multi-step tool use reliability.",
+      "supporting_evidence": [{"section_id": "sec:experiments"}, {"pages": [7, 8]}],
+      "what_it_actually_proves": "The reported benchmark settings show fewer unrecoverable tool errors than the named baseline.",
+      "what_it_does_not_prove": "It does not prove robustness to arbitrary tools or production latency failures."
+    }
+  ],
+  "claim_boundaries": ["The result is tied to the paper's tool set and benchmark distribution."],
+  "negative_or_limiting_results": ["The paper does not clearly report a failed external-tool setting."],
+  "mechanism_result_map": ["The state transition design explains the lower unrecoverable-error rate by preserving failed tool-call state for later repair."],
+  "comparative_positioning": ["Compared with answer-only baselines, the paper evaluates a mechanism that keeps intermediate failure states inspectable."],
+  "reuse_takeaways": ["Track tool failures as first-class state rather than hiding them in the final answer."],
+  "followup_questions": ["Does the same state logging still help when external tools are slow, missing, or adversarially noisy?"],
   "section_plan": [
     {
       "section": "方法主线",
       "weight": "high",
       "subsections": ["机制流程", "训练目标"],
-      "evidence_sources": ["synthesis_bundle.evidence.method_evidence"]
+      "evidence_sources": [{"section_id": "sec:method"}, {"pages": [4, 6]}]
     }
   ]
 }
 ```
+
+Before drafting from this plan, run `scripts/lint_grounding.py --note-plan ... --source-manifest ... --bundle-json ... --figure-decisions ...`.
 
 The plan should be short, structured, and directly useful for the final draft.
 
@@ -89,6 +113,7 @@ Good final notes should:
 - avoid abstract-only rewriting
 - explain why a figure or table matters, not just attach it
 - separate “作者声称了什么” from “论文真正证明了什么”
+- carry the plan's claim boundaries into `深度分析` and `局限`
 - explain the mechanism deeply enough that an engineer could re-explain or re-implement the main flow
 
 ## Minimum Quality Bar

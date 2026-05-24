@@ -85,6 +85,20 @@ def test_extract_arxiv_id_strips_version() -> None:
     assert extract_arxiv_id(text) == "2508.09736"
 
 
+def test_extract_arxiv_id_does_not_match_plain_doi_suffix() -> None:
+    text = "doi: 10.3389/fpubh.2019.00399"
+    assert extract_arxiv_id(text) is None
+
+
+def test_extract_arxiv_id_supports_arxiv_doi_marker() -> None:
+    text = "doi: 10.48550/arXiv.2302.13971"
+    assert extract_arxiv_id(text) == "2302.13971"
+
+
+def test_infer_source_type_prefers_doi_over_arxiv_like_suffix() -> None:
+    assert infer_source_type("10.3389/fpubh.2019.00399") == "doi"
+
+
 def test_infer_source_type_for_local_pdf(tmp_path: Path) -> None:
     pdf_path = tmp_path / "paper.pdf"
     pdf_path.write_bytes(b"%PDF-1.4")
@@ -415,6 +429,29 @@ def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_is_papers_rel
         subdir="Research/Papers/心理健康/My_Test_Paper",
     )
     assert path == vault / "Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
+
+
+def test_resolve_obsidian_note_path_avoids_double_folder_when_subdir_is_title_slug_but_filename_is_readable(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    config = {
+        "obsidian_vault": str(vault),
+        "papers_dir": "Research/Papers",
+        "workspace_output_dir": "DeepPaperNote_output",
+    }
+    path = resolve_obsidian_note_path(
+        config,
+        title="SWE-bench: Can Language Models Resolve Real-World GitHub Issues?",
+        subdir="Research/Papers/Benchmark/SWE_bench_Can_Language_Models_Resolve_Real_World_GitHub_Issues",
+        filename="SWE-bench - Can Language Models Resolve Real-World GitHub Issues.md",
+    )
+    assert path == (
+        vault
+        / "Research/Papers"
+        / "Benchmark"
+        / "SWE_bench_Can_Language_Models_Resolve_Real_World_GitHub_Issues"
+        / "SWE-bench - Can Language Models Resolve Real-World GitHub Issues.md"
+    )
 
 
 def test_existing_domain_dirs_excludes_root_level_paper_folder(tmp_path: Path) -> None:
@@ -871,6 +908,26 @@ def test_enrich_metadata_survives_arxiv_failure(monkeypatch) -> None:
     assert enriched["abstract"] == "Strong abstract"
 
 
+def test_normalize_openalex_keeps_landing_page_out_of_pdf_url() -> None:
+    normalized = common.normalize_openalex_work(
+        {
+            "display_name": "The Effectiveness of Crisis Line Services: A Systematic Review",
+            "ids": {"doi": "https://doi.org/10.3389/fpubh.2019.00399"},
+            "primary_location": {
+                "landing_page_url": "https://doi.org/10.3389/fpubh.2019.00399",
+                "source": {"display_name": "Frontiers in Public Health"},
+            },
+            "best_oa_location": {
+                "landing_page_url": "https://doi.org/10.3389/fpubh.2019.00399",
+            },
+            "publication_year": 2020,
+        }
+    )
+
+    assert normalized["pdf_url"] == ""
+    assert normalized["source_url"] == "https://doi.org/10.3389/fpubh.2019.00399"
+
+
 def test_enrich_metadata_local_pdf_corrects_artifact_title_and_fills_arxiv(monkeypatch) -> None:
     semantic_match = {
         "title": "LLaMA: Open and Efficient Foundation Language Models",
@@ -995,8 +1052,11 @@ def test_resolve_reference_arxiv_id_survives_arxiv_failure(monkeypatch) -> None:
     resolved = resolve_reference("2501.00001")
 
     assert resolved["status"] == "ok"
-    assert resolved["source_type"] == "title_query"
-    assert resolved["title"] == "2501.00001"
+    assert resolved["source_type"] == "arxiv_id"
+    assert resolved["arxiv_id"] == "2501.00001"
+    assert resolved["paper_id"] == "arxiv:2501.00001"
+    assert resolved["pdf_url"] == "https://arxiv.org/pdf/2501.00001.pdf"
+    assert resolved["identity_confidence"] == "high"
 
 
 def test_resolve_reference_arxiv_url_survives_arxiv_failure(monkeypatch) -> None:
@@ -1005,5 +1065,8 @@ def test_resolve_reference_arxiv_url_survives_arxiv_failure(monkeypatch) -> None
     resolved = resolve_reference("https://arxiv.org/abs/2501.00001")
 
     assert resolved["status"] == "ok"
-    assert resolved["source_type"] == "title_query"
-    assert resolved["title"] == "https://arxiv.org/abs/2501.00001"
+    assert resolved["source_type"] == "arxiv_url"
+    assert resolved["arxiv_id"] == "2501.00001"
+    assert resolved["paper_id"] == "arxiv:2501.00001"
+    assert resolved["pdf_url"] == "https://arxiv.org/pdf/2501.00001.pdf"
+    assert resolved["identity_confidence"] == "high"

@@ -396,19 +396,22 @@ The default path is:
 1. resolve the paper identity
 2. collect metadata
 3. fetch the best available PDF
-4. extract evidence
-5. extract PDF image assets
-6. plan figure positions
-7. build a synthesis bundle
-8. let the model write the note
-9. lint the final note
-10. perform the final readability review and write it into Obsidian
+4. extract canonical raw source text and a source manifest
+5. extract structural indexes and PDF image assets
+6. plan figure positions and the full figure/table decision table
+7. build a manifest synthesis bundle
+8. let the model read the raw source records and plan the note
+9. run grounding lint on the plan
+10. let the model write the note
+11. lint the final note
+12. perform the final analytical quality review
+13. perform the final readability review and write it into Obsidian
 
 Core principle:
 
-- scripts gather evidence
+- scripts gather source text, metadata, assets, and quality signals
 - the model understands and writes
-- linting and final readability review are the final gates before saving
+- linting, final quality review, and final readability review are the final gates before saving
 
 Related docs:
 
@@ -502,10 +505,13 @@ DeepPaperNote/
     ├── create_input_record.py
     ├── extract_evidence.py
     ├── extract_pdf_assets.py
+    ├── extract_source_text.py
     ├── fetch_pdf.py
+    ├── lint_grounding.py
     ├── lint_note.py
     ├── locate_zotero_attachment.py
     ├── materialize_figure_asset.py
+    ├── plan_figure_table_decisions.py
     ├── plan_figures.py
     ├── resolve_paper.py
     ├── run_pipeline.py

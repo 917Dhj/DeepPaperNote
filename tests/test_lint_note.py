@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from lint_note import (
+    core_info_structure_issues,
     figure_structure_issues,
     figure_structure_passes,
     find_missing_sections,
@@ -15,6 +16,7 @@ from lint_note import (
     inspect_figure_callouts,
     inspect_substantive_content,
     math_render_issues,
+    mechanical_translation_artifact_issues,
     mixed_language_issues,
     strip_frontmatter,
     suspicious_code_formatted_math,
@@ -351,6 +353,24 @@ def test_usable_candidate_materialization_blocked_reason_passes() -> None:
     assert figure_structure_passes(note) is True
 
 
+def test_missing_asset_must_not_be_reported_as_materialization_blocked() -> None:
+    note = """# Title
+
+## 方法主线
+
+> [!figure] Fig. 4 系统图
+> 建议位置：方法主线
+> 放置原因：帮助理解整体执行链。
+> 当前状态：保留占位：对应图像资产缺失导致 materialize_figure_asset.py 复制 blocked；保留结构占位用于回查原图。
+"""
+    issues = figure_structure_issues(note)
+    assert any(
+        issue["reason"] == "missing_asset_misreported_as_materialization_blocked"
+        for issue in issues
+    )
+    assert figure_structure_passes(note) is False
+
+
 def test_chinese_placeholder_policy_prose_is_not_flagged_as_nonstandard_placeholder() -> None:
     note = """# Title
 
@@ -359,6 +379,30 @@ def test_chinese_placeholder_policy_prose_is_not_flagged_as_nonstandard_placehol
 这里讨论图表占位策略为什么不能替代正文分析。
 """
     assert figure_structure_issues(note) == []
+
+
+def test_mechanical_translation_detector_flags_figure_title_artifacts() -> None:
+    note = "> [!figure] Figure 7 Storing the KV缓存 of two requests at the same time in vLLM"
+
+    issues = mechanical_translation_artifact_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["artifact"]
+
+
+def test_mechanical_translation_detector_flags_metadata_artifacts() -> None:
+    note = "- 机构: UC Berkeley, Stanford University, In相关 Researcher, UC San Diego"
+
+    issues = mechanical_translation_artifact_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["line_number"] == 1
+
+
+def test_mechanical_translation_detector_accepts_stable_proper_nouns() -> None:
+    note = "> [!figure] Fig. 2 Overview of the training pipeline，训练流程概览。"
+
+    assert mechanical_translation_artifact_issues(note) == []
 
 
 def test_mixed_language_detector_flags_prose_line() -> None:
@@ -693,6 +737,125 @@ def test_front_matter_order_requires_innovation_after_abstract() -> None:
     assert "front_matter_order_invalid" in warnings
 
 
+def test_core_info_accepts_fixed_metadata_schema() -> None:
+    note = """# Title
+
+## 核心信息
+
+- 标题: Example Paper
+- 标题翻译: 示例论文
+- 作者: Ada Lovelace; Alan Turing
+- 机构: Example Lab
+- 发表时间: 2024
+- 发表渠道: arXiv
+- DOI: 10.1234/example
+- arXiv: 2401.00001
+- 论文链接: https://arxiv.org/abs/2401.00001
+- 代码 / 项目: https://github.com/example/project
+- 数据 / 资源: https://example.org/data
+- 论文类型: AI_method
+
+## 原文摘要翻译
+"""
+
+    assert core_info_structure_issues(note) == []
+
+
+def test_core_info_rejects_prose_and_ad_hoc_fields() -> None:
+    note = """# Title
+
+## 核心信息
+
+- 标题: Example Paper
+- 作者: Ada Lovelace
+- 我的评价: 很重要
+
+这篇论文的核心不是提出新模型，而是建立一个评测场。
+
+## 原文摘要翻译
+"""
+
+    issues = core_info_structure_issues(note)
+
+    assert any(issue["reason"] == "core_info_unknown_field" for issue in issues)
+    assert any(issue["reason"] == "core_info_non_metadata_line" for issue in issues)
+
+
+def test_core_info_rejects_out_of_order_fields() -> None:
+    note = """# Title
+
+## 核心信息
+
+- 作者: Ada Lovelace
+- 标题: Example Paper
+
+## 原文摘要翻译
+"""
+
+    issues = core_info_structure_issues(note)
+
+    assert any(issue["reason"] == "core_info_field_order_invalid" for issue in issues)
+
+
+def test_core_info_issues_fail_basic_structure_gate(tmp_path) -> None:
+    note_path = tmp_path / "Paper.md"
+    plan_path = tmp_path / "Paper.plan.json"
+    note_path.write_text(
+        _valid_note_text().replace(
+            "- DOI: 10.1234/example",
+            "- DOI: 10.1234/example\n\n这篇论文在元数据块里追加了一句导读。",
+        ),
+        encoding="utf-8",
+    )
+    plan_path.write_text(
+        json.dumps(
+            {
+                "paper_type": "AI_method",
+                "paper_type_rationale": "method paper",
+                "dominant_domain": "NLP",
+                "must_cover": ["problem", "method"],
+                "key_numbers": ["78.5"],
+                "real_comparisons": ["baseline"],
+                "central_claims": [
+                    {
+                        "claim": "The method improves traceability.",
+                        "supporting_evidence": [{"section_id": "sec:method"}],
+                        "what_it_actually_proves": "The described mechanism records tool states.",
+                        "what_it_does_not_prove": "It does not prove production robustness.",
+                    }
+                ],
+                "claim_boundaries": ["The evidence is limited to the reported workflow."],
+                "negative_or_limiting_results": ["The paper does not report multi-service failures."],
+                "mechanism_result_map": ["The failure-state mechanism explains lower unrecoverable errors."],
+                "comparative_positioning": ["The method is compared against answer-only baselines."],
+                "reuse_takeaways": ["Track failure state explicitly."],
+                "followup_questions": ["Check whether the mechanism survives missing tool outputs."],
+                "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--input",
+            str(note_path),
+            "--plan-file",
+            str(plan_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["passes_basic_structure"] is False
+    assert "core_info_non_metadata_line" in payload["warnings"]
+
+
 def test_note_plan_missing_fails_plan_gate(tmp_path) -> None:
     note_path = tmp_path / "Paper.md"
     note_path.write_text(_valid_note_text(), encoding="utf-8")
@@ -716,6 +879,66 @@ def test_note_plan_missing_fails_plan_gate(tmp_path) -> None:
     assert payload["passes_plan_gate"] is False
 
 
+def test_mechanical_translation_artifacts_fail_style_gate(tmp_path) -> None:
+    note_path = tmp_path / "Paper.md"
+    plan_path = tmp_path / "Paper.plan.json"
+    note_path.write_text(
+        _valid_note_text().replace(
+            "放置原因：帮助理解整体过程。",
+            "放置原因：Figure 7 Storing the KV缓存 of two requests.",
+        ),
+        encoding="utf-8",
+    )
+    plan_path.write_text(
+        json.dumps(
+            {
+                "paper_type": "AI_method",
+                "paper_type_rationale": "The paper proposes a model mechanism and evaluates it experimentally.",
+                "dominant_domain": "reasoning",
+                "must_cover": ["方法主线"],
+                "key_numbers": ["78.5"],
+                "real_comparisons": ["baseline"],
+                "central_claims": [
+                    {
+                        "claim": "The method improves traceability.",
+                        "supporting_evidence": [{"section_id": "sec:method"}],
+                        "what_it_actually_proves": "The described mechanism records tool states.",
+                        "what_it_does_not_prove": "It does not prove production robustness.",
+                    }
+                ],
+                "claim_boundaries": ["The evidence is limited to the reported workflow."],
+                "negative_or_limiting_results": ["The paper does not report multi-service failures."],
+                "mechanism_result_map": ["The failure-state mechanism explains lower unrecoverable errors."],
+                "comparative_positioning": ["The method is compared against answer-only baselines."],
+                "reuse_takeaways": ["Track failure state explicitly."],
+                "followup_questions": ["Check whether the mechanism survives missing tool outputs."],
+                "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--input",
+            str(note_path),
+            "--plan-file",
+            str(plan_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["passes_style_gate"] is False
+    assert "mechanical_translation_artifacts_present" in payload["warnings"]
+    assert payload["mechanical_translation_artifact_issues"]
+
+
 def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
     note_path = tmp_path / "Paper.md"
     plan_path = tmp_path / "Paper.plan.json"
@@ -729,6 +952,13 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
                 "must_cover": [],
                 "key_numbers": [],
                 "real_comparisons": [],
+                "central_claims": [],
+                "claim_boundaries": [],
+                "negative_or_limiting_results": [],
+                "mechanism_result_map": [],
+                "comparative_positioning": [],
+                "reuse_takeaways": [],
+                "followup_questions": [],
                 "section_plan": [],
             }
         ),
@@ -753,6 +983,13 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
         "planning_must_cover_empty",
         "planning_key_numbers_empty",
         "planning_real_comparisons_empty",
+        "planning_central_claims_empty",
+        "planning_claim_boundaries_empty",
+        "planning_negative_or_limiting_results_empty",
+        "planning_mechanism_result_map_empty",
+        "planning_comparative_positioning_empty",
+        "planning_reuse_takeaways_empty",
+        "planning_followup_questions_empty",
         "planning_section_plan_empty",
     ]
 
@@ -770,6 +1007,20 @@ def test_note_plan_explicit_not_reported_entries_pass_plan_gate(tmp_path) -> Non
                 "must_cover": ["方法主线"],
                 "key_numbers": ["论文未报告明确核心数字"],
                 "real_comparisons": ["论文未提供直接对比"],
+                "central_claims": [
+                    {
+                        "claim": "The paper offers a method mechanism.",
+                        "supporting_evidence": [{"section_id": "sec:method"}],
+                        "what_it_actually_proves": "The mechanism is described in source sections.",
+                        "what_it_does_not_prove": "It does not prove all deployment cases.",
+                    }
+                ],
+                "claim_boundaries": ["The comparison evidence is limited."],
+                "negative_or_limiting_results": ["论文未清楚报告负向消融。"],
+                "mechanism_result_map": ["The state log explains why errors can be recovered."],
+                "comparative_positioning": ["The method is positioned against answer-only tool use."],
+                "reuse_takeaways": ["Use explicit state logs when evaluating tool chains."],
+                "followup_questions": ["Test the state log with slower external tools."],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),
@@ -943,6 +1194,220 @@ def test_write_obsidian_note_refuses_failed_substantive_gate(tmp_path) -> None:
     assert "substantive content gate failed" in result.stderr
 
 
+def passing_lint_payload() -> dict:
+    return {
+        "passes_basic_structure": True,
+        "passes_style_gate": True,
+        "passes_math_gate": True,
+        "passes_figure_gate": True,
+        "passes_plan_gate": True,
+        "passes_substantive_content": True,
+    }
+
+
+def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    source_image = tmp_path / "page_001_fig_figure_1.png"
+    source_image.write_bytes(b"fake-png")
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
+    decisions_path = tmp_path / "figure_decisions.json"
+    decisions_path.write_text(
+        json.dumps(
+            {
+                "decisions": [
+                    {
+                        "source_id": "Figure 1",
+                        "decision": "insert",
+                        "source_image_path": str(source_image),
+                        "source_image_filename": source_image.name,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_path = tmp_path / "write.json"
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--title",
+            "Figure Insert Paper",
+            "--filename",
+            "Figure Insert Paper.md",
+            "--subdir",
+            "Research/Papers/Figure Insert Paper",
+            "--content",
+            "# Figure Insert Paper\n\n![Figure 1](images/page_001_fig_figure_1.png)\n*Fig. 1 caption.*\n",
+            "--lint-json",
+            str(lint_path),
+            "--figure-decisions",
+            str(decisions_path),
+            "--vault",
+            str(vault),
+            "--output",
+            str(output_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    materialized = payload["materialized_figures"][0]
+    assert materialized["relative_markdown_path"] == "images/page_001_fig_figure_1.png"
+    assert Path(materialized["dest_image_path"]).read_bytes() == b"fake-png"
+
+
+def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    source_image = tmp_path / "page_001_fig_figure_1.png"
+    source_image.write_bytes(b"fake-png")
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
+    decisions_path = tmp_path / "figure_decisions.json"
+    decisions_path.write_text(
+        json.dumps(
+            {
+                "decisions": [
+                    {
+                        "source_id": "Figure 1",
+                        "decision": "insert",
+                        "source_image_path": str(source_image),
+                        "source_image_filename": source_image.name,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--title",
+            "Figure Insert Paper",
+            "--content",
+            "# Figure Insert Paper\n\n正文没有引用图片。\n",
+            "--lint-json",
+            str(lint_path),
+            "--figure-decisions",
+            str(decisions_path),
+            "--vault",
+            str(vault),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "is not referenced as an image embed" in result.stderr
+
+
+def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    source_image = tmp_path / "page_001_fig_figure_1.png"
+    source_image.write_bytes(b"fake-png")
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
+    decisions_path = tmp_path / "figure_decisions.json"
+    decisions_path.write_text(
+        json.dumps(
+            {
+                "decisions": [
+                    {
+                        "source_id": "Figure 1",
+                        "decision": "insert",
+                        "source_image_path": str(source_image),
+                        "source_image_filename": source_image.name,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--title",
+            "Figure Insert Paper",
+            "--content",
+            "# Figure Insert Paper\n\n正文只提到 images/page_001_fig_figure_1.png 这个路径。\n",
+            "--lint-json",
+            str(lint_path),
+            "--figure-decisions",
+            str(decisions_path),
+            "--vault",
+            str(vault),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "is not referenced as an image embed" in result.stderr
+
+
+def test_write_obsidian_note_rejects_unsafe_insert_filename(tmp_path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    source_image = tmp_path / "page_001_fig_figure_1.png"
+    source_image.write_bytes(b"fake-png")
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
+    decisions_path = tmp_path / "figure_decisions.json"
+    decisions_path.write_text(
+        json.dumps(
+            {
+                "decisions": [
+                    {
+                        "source_id": "Figure 1",
+                        "decision": "insert",
+                        "source_image_path": str(source_image),
+                        "source_image_filename": "../escaped.png",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--title",
+            "Figure Insert Paper",
+            "--content",
+            "# Figure Insert Paper\n\n![Figure 1](images/../escaped.png)\n*Fig. 1 caption.*\n",
+            "--lint-json",
+            str(lint_path),
+            "--figure-decisions",
+            str(decisions_path),
+            "--vault",
+            str(vault),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "Unsafe figure image filename" in result.stderr
+
+
 def test_inspect_note_plan_reports_missing_file(tmp_path) -> None:
     found, issues = inspect_note_plan(tmp_path / "missing.plan.json")
     assert found is False
@@ -978,6 +1443,20 @@ def test_inspect_note_plan_rejects_invalid_paper_type(tmp_path) -> None:
                 "must_cover": ["方法主线"],
                 "key_numbers": ["42"],
                 "real_comparisons": ["baseline"],
+                "central_claims": [
+                    {
+                        "claim": "The method improves a target behavior.",
+                        "supporting_evidence": [{"section_id": "sec:method"}],
+                        "what_it_actually_proves": "The source states the mechanism and reported setting.",
+                        "what_it_does_not_prove": "It does not prove all deployment cases.",
+                    }
+                ],
+                "claim_boundaries": ["The claim is limited to reported settings."],
+                "negative_or_limiting_results": ["No external failure case is reported."],
+                "mechanism_result_map": ["The mechanism explains the reported target behavior."],
+                "comparative_positioning": ["The plan names the relevant baseline comparison."],
+                "reuse_takeaways": ["Track the mechanism separately from the final result."],
+                "followup_questions": ["Check whether the mechanism transfers to a new dataset."],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),
@@ -1000,6 +1479,13 @@ def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
                 "must_cover": "method",
                 "key_numbers": [],
                 "real_comparisons": [],
+                "central_claims": "not-a-list",
+                "claim_boundaries": [],
+                "negative_or_limiting_results": [],
+                "mechanism_result_map": [],
+                "comparative_positioning": [],
+                "reuse_takeaways": [],
+                "followup_questions": [],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),
@@ -1022,6 +1508,13 @@ def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
                 "must_cover": [],
                 "key_numbers": [],
                 "real_comparisons": [],
+                "central_claims": [],
+                "claim_boundaries": [],
+                "negative_or_limiting_results": [],
+                "mechanism_result_map": [],
+                "comparative_positioning": [],
+                "reuse_takeaways": [],
+                "followup_questions": [],
                 "section_plan": [],
             }
         ),
@@ -1034,6 +1527,13 @@ def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
         "planning_must_cover_empty",
         "planning_key_numbers_empty",
         "planning_real_comparisons_empty",
+        "planning_central_claims_empty",
+        "planning_claim_boundaries_empty",
+        "planning_negative_or_limiting_results_empty",
+        "planning_mechanism_result_map_empty",
+        "planning_comparative_positioning_empty",
+        "planning_reuse_takeaways_empty",
+        "planning_followup_questions_empty",
         "planning_section_plan_empty",
     ]
 
@@ -1049,6 +1549,20 @@ def test_inspect_note_plan_accepts_valid_plan(tmp_path) -> None:
                 "must_cover": ["方法主线"],
                 "key_numbers": ["42"],
                 "real_comparisons": ["baseline"],
+                "central_claims": [
+                    {
+                        "claim": "The method improves a target behavior.",
+                        "supporting_evidence": [{"section_id": "sec:method"}],
+                        "what_it_actually_proves": "The source states the mechanism and reported setting.",
+                        "what_it_does_not_prove": "It does not prove all deployment cases.",
+                    }
+                ],
+                "claim_boundaries": ["The claim is limited to reported settings."],
+                "negative_or_limiting_results": ["No external failure case is reported."],
+                "mechanism_result_map": ["The mechanism explains the reported target behavior."],
+                "comparative_positioning": ["The plan names the relevant baseline comparison."],
+                "reuse_takeaways": ["Track the mechanism separately from the final result."],
+                "followup_questions": ["Check whether the mechanism transfers to a new dataset."],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),

@@ -13,6 +13,7 @@ except ImportError:  # pragma: no cover
     fitz = None
 
 from build_synthesis_bundle import bundle
+from common import extract_caption_lines
 from contracts import NOTE_REQUIRED_SECTIONS
 from extract_evidence import build_appendix_evidence, evidence_quality, extract_equation_candidates
 
@@ -38,7 +39,8 @@ def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
         "paper_id": "paper:test",
         "title": "Ablation Heavy Paper",
         "abstract": (
-            "We propose a multimodal framework. The visual encoder extracts region features and sends them to a fusion module. "
+            "We propose a multimodal framework. The visual encoder extracts region "
+            "features and sends them to a fusion module. "
             "Without the memory replay module, accuracy drops by 4.1 points, "
             "and training becomes unstable during the final stage."
         ),
@@ -48,7 +50,14 @@ def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
     input_path.write_text(json.dumps(input_payload, ensure_ascii=False), encoding="utf-8")
 
     result = subprocess.run(
-        [sys.executable, str(EXTRACT_EVIDENCE_SCRIPT), "--input", str(input_path), "--output", str(output_path)],
+        [
+            sys.executable,
+            str(EXTRACT_EVIDENCE_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ],
         check=True,
         capture_output=True,
         text=True,
@@ -136,6 +145,90 @@ def test_extract_evidence_outputs_pdf_coverage_for_truncated_pdf(tmp_path: Path)
     assert coverage["section_stop_reason"] == "references"
     assert coverage["section_stop_page"] == 10
     assert payload["summary"]["pdf_coverage"] == coverage
+
+
+def test_extract_evidence_keeps_later_main_result_captions(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "many_figures.pdf"
+    captions = "\n".join(
+        f"Figure {index}. Auxiliary setup diagram {index}."
+        for index in range(1, 15)
+    )
+    write_test_pdf(
+        pdf_path,
+        [
+            (
+                "Abstract\nWe study a system.\n"
+                "Introduction\nThis paper studies serving throughput.\n"
+                "Method\nThe method manages cached states.\n"
+                "Experiment\nThe experiment reports latency and batching.\n"
+                f"{captions}\n"
+                "Figure 15. Average number of batched requests under the main serving workload."
+            )
+        ],
+    )
+
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "evidence.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "paper_id": "paper:many-figures",
+                "title": "Many Figures Paper",
+                "abstract": "We study a system.",
+                "pdf_path": str(pdf_path),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_EVIDENCE_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    ids = [item["id"] for item in payload["evidence_pack"]["figure_captions"]]
+    assert "Figure 15" in ids
+
+
+def test_extract_caption_lines_dedupes_body_fig_references() -> None:
+    captions = extract_caption_lines(
+        "\n".join(
+            [
+                "Figure 14. Parallel generation and beam search with OPT-13B on the Alpaca dataset.",
+                "Fig. 14 shows the results for beam search with different beam widths.",
+                "Figure 15. Average amount of memory saving from sharing KV blocks.",
+                "Fig. 15 plots the amount of memory saving.",
+            ]
+        ),
+        "figure",
+    )
+
+    assert [item["id"] for item in captions] == ["Figure 14", "Figure 15"]
+    assert captions[0]["caption"].startswith("Parallel generation")
+    assert captions[1]["caption"].startswith("Average amount")
+
+
+def test_extract_caption_lines_keeps_fig_caption_when_no_better_label_exists() -> None:
+    captions = extract_caption_lines(
+        "Fig. 1 shows an overview of the proposed pipeline.",
+        "figure",
+    )
+
+    assert captions == [
+        {"id": "Fig 1", "caption": "shows an overview of the proposed pipeline."}
+    ]
 
 
 def test_extract_evidence_default_scans_short_pdf_without_truncation(tmp_path: Path) -> None:
@@ -233,7 +326,8 @@ def test_extract_evidence_default_truncates_after_32_pages(tmp_path: Path) -> No
 def test_extract_evidence_outputs_appendix_index_and_selective_evidence(tmp_path: Path) -> None:
     pdf_path = tmp_path / "paper.pdf"
     pages = [
-        "Abstract\nWe propose appendix-aware extraction.\nIntroduction\nThe paper studies coverage.",
+        "Abstract\nWe propose appendix-aware extraction.\n"
+        "Introduction\nThe paper studies coverage.",
         "Method\nThe main method uses a compact extraction pipeline.",
         "Experiment\nThe main experiment reports stable results.",
     ]
@@ -431,7 +525,33 @@ def test_extract_equation_candidates_keeps_complexity_and_tex_math() -> None:
     assert any("R_t" in equation and ">=" in equation for equation in equations)
 
 
-def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
+def test_bundle_exposes_manifest_coverage_without_old_model_inputs() -> None:
+    source_manifest = {
+        "paper_id": "paper:coverage",
+        "title": "Coverage Paper",
+        "source_kind": "pdf_text",
+        "raw_sections_path": "/tmp/paper_raw_sections.jsonl",
+        "full_text_md_path": "/tmp/paper_full_text.md",
+        "language_hint": "zh",
+        "coverage": {
+            "total_pages": 25,
+            "text_max_pages": None,
+            "text_pages_extracted": 25,
+            "text_truncated": False,
+        },
+        "pdf": {"total_pages": 25, "text_pages_extracted": 25, "text_truncated": False},
+        "sections": [
+            {"section_id": "sec:method", "title": "Method", "page_start": 3, "page_end": 7}
+        ],
+        "pages": [{"page": 3, "section_ids": ["sec:method"]}],
+        "captions": {
+            "figures": [],
+            "tables": [{"id": "Table A1", "caption": "Extra ablation results"}],
+        },
+        "math_index": [{"text": "L = -log p", "section_id": "sec:method"}],
+        "appendix_index": {"appendix_detected": True, "start_page": 20},
+        "text_hash_sha256": "abc123",
+    }
     synthesis = bundle(
         metadata={"title": "Coverage Paper"},
         evidence_wrapper={
@@ -487,9 +607,14 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
         },
         figures_wrapper={},
         assets_wrapper={},
+        source_manifest=source_manifest,
     )
 
     assert synthesis["evidence_quality"] == "low"
+    assert "evidence" not in synthesis
+    assert "candidate_chunks" not in synthesis
+    assert "section_texts" not in synthesis
+    assert "summary" not in synthesis
     assert synthesis["coverage"] == {
         "language_hint": "zh",
         "section_extraction_coverage": {
@@ -509,22 +634,18 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
             "section_stop_reason": "references",
             "section_stop_page": 10,
         },
-        "bundle_text_budget": {
-            "section_text_default_max_chars": 4000,
-            "section_text_limit_sections": 8,
-            "section_text_limits": {
-                "method": 12000,
-                "experiment": 12000,
-            },
-            "section_text_original_chars": {
-                "method": 13000,
-                "experiment": 4,
-            },
-            "section_text_included_chars": {
-                "method": 12000,
-                "experiment": 4,
-            },
-            "section_text_truncated_sections": ["method"],
+        "source_coverage": {
+            "total_pages": 25,
+            "text_max_pages": None,
+            "text_pages_extracted": 25,
+            "text_truncated": False,
+        },
+        "source_manifest": {
+            "raw_sections_path": "/tmp/paper_raw_sections.jsonl",
+            "full_text_md_path": "/tmp/paper_full_text.md",
+            "section_count": 1,
+            "page_count": 1,
+            "text_hash_sha256": "abc123",
         },
         "appendix_evidence_counts": {
             "ablation": 1,
@@ -541,40 +662,14 @@ def test_bundle_exposes_coverage_without_removing_evidence_quality() -> None:
             "reject": 0,
             "unknown": 0,
         },
-        "truncation_warnings": ["section_text_truncated"],
+        "truncation_warnings": [],
         "identity_confidence": "",
         "identity_confidence_reasons": [],
     }
-    assert synthesis["appendix"] == {
-        "index": {
-            "appendix_detected": True,
-            "start_page": 20,
-            "sections": [{"title": "A. Additional Experiments", "page": 20}],
-            "figure_captions": [],
-            "table_captions": [
-                {"id": "Table A1", "caption": "Extra ablation results", "page_hint": "p.20"}
-            ],
-        },
-        "evidence": {
-            "ablation": [
-                {
-                    "evidence": "Without replay, F1 drops by 4.1 points.",
-                    "source_section": "A. Additional Experiments",
-                    "page_hint": "p.20",
-                    "kind_hint": "ablation",
-                }
-            ],
-            "implementation_details": [],
-            "dataset_details": [],
-            "extra_results": [],
-            "qualitative_examples": [],
-        },
-    }
-    review_rules = synthesis["writing_contract"]["self_review_rules"]
-    assert any("bundle.coverage" in rule for rule in review_rules)
-    assert any("max_pages" in rule for rule in review_rules)
-    assert any("bundle_text_budget" in rule for rule in review_rules)
-    assert any("appendix evidence" in rule for rule in review_rules)
+    assert synthesis["source_manifest"]["raw_sections_path"] == "/tmp/paper_raw_sections.jsonl"
+    assert synthesis["source_index"]["sections"][0]["section_id"] == "sec:method"
+    assert synthesis["source_index"]["math_index"][0]["text"] == "L = -log p"
+    assert synthesis["source_index"]["appendix_index"]["appendix_detected"] is True
 
 
 def test_bundle_coverage_exposes_asset_quality_truncation_and_identity() -> None:
@@ -626,7 +721,7 @@ def test_bundle_coverage_exposes_asset_quality_truncation_and_identity() -> None
     assert synthesis["coverage"]["identity_confidence_reasons"] == ["doi_present"]
 
 
-def test_bundle_uses_section_aware_text_budget() -> None:
+def test_bundle_uses_raw_source_manifest_instead_of_section_text_budget() -> None:
     synthesis = bundle(
         metadata={"title": "Long Paper"},
         evidence_wrapper={
@@ -641,27 +736,23 @@ def test_bundle_uses_section_aware_text_budget() -> None:
         },
         figures_wrapper={},
         assets_wrapper={},
+        source_manifest={
+            "raw_sections_path": "/tmp/long_raw_sections.jsonl",
+            "coverage": {"total_pages": 18, "text_pages_extracted": 18, "text_truncated": False},
+            "sections": [
+                {"section_id": "sec:method", "title": "Method", "page_start": 3, "page_end": 10}
+            ],
+            "pages": [{"page": 3, "section_ids": ["sec:method"]}],
+        },
     )
 
-    section_texts = synthesis["section_texts"]
-    assert len(section_texts["method"]) == 10000
-    assert len(section_texts["introduction"]) == 6000
-    assert len(section_texts["data"]) == 8000
-    assert len(section_texts["general"]) == 4000
-    assert synthesis["coverage"]["bundle_text_budget"]["section_text_limits"] == {
-        "method": 12000,
-        "introduction": 6000,
-        "data": 8000,
-        "general": 4000,
-    }
-    assert synthesis["coverage"]["bundle_text_budget"]["section_text_truncated_sections"] == [
-        "introduction",
-        "data",
-        "general",
-    ]
+    assert "section_texts" not in synthesis
+    assert "bundle_text_budget" not in synthesis["coverage"]
+    assert synthesis["source_manifest"]["raw_sections_path"] == "/tmp/long_raw_sections.jsonl"
+    assert synthesis["source_index"]["sections"][0]["section_id"] == "sec:method"
 
 
-def test_bundle_appendix_summary_keeps_eight_items_per_category() -> None:
+def test_bundle_keeps_appendix_as_source_index_not_heuristic_evidence() -> None:
     synthesis = bundle(
         metadata={"title": "Appendix Paper"},
         evidence_wrapper={
@@ -681,51 +772,70 @@ def test_bundle_appendix_summary_keeps_eight_items_per_category() -> None:
         },
         figures_wrapper={},
         assets_wrapper={},
+        source_manifest={
+            "appendix_index": {
+                "appendix_detected": True,
+                "start_page": 20,
+                "sections": [{"title": "A. Additional Experiments", "page": 20}],
+            }
+        },
     )
 
-    assert len(synthesis["appendix"]["evidence"]["ablation"]) == 8
+    assert "appendix" not in synthesis
+    assert synthesis["source_index"]["appendix_index"]["sections"] == [
+        {"title": "A. Additional Experiments", "page": 20}
+    ]
 
 
-def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:
+def test_bundle_removes_top_n_evidence_and_uses_compact_contract() -> None:
     synthesis = bundle(
         metadata={"title": "Mechanism Paper"},
         evidence_wrapper={
-            "summary": {"paper_type": "AI_method"},
             "evidence_pack": {
                 "mechanism_evidence": [
                     {
-                        "evidence": "The encoder extracts audio tokens and sends them into the fusion module.",
+                        "evidence": (
+                            "The encoder extracts audio tokens and sends them into "
+                            "the fusion module."
+                        ),
                         "source_section": "method",
                         "page_hint": "p.4",
                     }
                 ],
                 "ablation_evidence": [
                     {
-                        "evidence": "Removing the decoder causes a 2-point drop and unstable optimization.",
+                        "evidence": (
+                            "Removing the decoder causes a 2-point drop and unstable "
+                            "optimization."
+                        ),
                         "source_section": "experiment",
                         "page_hint": "p.8",
                     }
                 ]
             },
-            "summary": {"ablation_signals": ["Removing the decoder causes a 2-point drop."]},
+            "summary": {
+                "paper_type": "AI_method",
+                "ablation_signals": ["Removing the decoder causes a 2-point drop."],
+            },
         },
         figures_wrapper={},
         assets_wrapper={},
     )
 
-    assert synthesis["evidence"]["mechanism"][0]["source_section"] == "method"
-    assert synthesis["evidence"]["ablation"][0]["source_section"] == "experiment"
-    planning_rules = synthesis["writing_contract"]["planning_rules"]
-    self_review_rules = synthesis["writing_contract"]["self_review_rules"]
-    method_contract = synthesis["writing_contract"]["paper_type_contracts"]["AI_method"]
+    assert "evidence" not in synthesis
+    assert "summary" not in synthesis
+    assert "candidate_chunks" not in synthesis
+    assert "section_texts" not in synthesis
+    contract = synthesis["writing_contract"]
+    method_contract = contract["contracts_by_paper_type"]["AI_method"]
     formula_rules = method_contract["formula_rules"]
     mechanism_flow_contract = method_contract["mechanism_flow_contract"]
 
-    assert any("note_plan.paper_type" in rule for rule in planning_rules)
-    assert any("section_semantics" in rule and "note_plan.section_plan" in rule for rule in planning_rules)
-    assert any("recommended_subsections" in rule and "note_plan.section_plan" in rule for rule in planning_rules)
-    assert any("工程解释" in rule for rule in formula_rules)
-    assert any("ablation_evidence" in rule for rule in self_review_rules)
+    assert contract["paper_type_selection"]["source_of_truth"] == "note_plan.paper_type"
+    assert contract["grounding_contract"]["source_of_truth"] == "source_manifest"
+    assert "section_id" in contract["grounding_contract"]["accepted_reference_forms"]
+    assert "pages" in contract["grounding_contract"]["accepted_reference_forms"]
+    assert any("工程含义" in rule for rule in formula_rules)
     assert method_contract["section_semantics"]["方法主线"] == "模型、算法、训练或推理机制。"
     assert method_contract["recommended_subsections"]["方法主线"] == [
         "机制流程",
@@ -734,7 +844,7 @@ def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:
         "推理与采样链路",
         "关键实现细节",
     ]
-    assert mechanism_flow_contract["title"] == "机制流程"
+    assert mechanism_flow_contract["required_step_count"] == "3_to_4"
 
 
 @pytest.mark.parametrize(
@@ -747,7 +857,10 @@ def test_bundle_exposes_ablation_evidence_and_new_contract_rules() -> None:
         ("survey_or_review", "综述"),
     ],
 )
-def test_bundle_exposes_all_paper_type_contracts_for_model_selection(paper_type: str, expected_token: str) -> None:
+def test_bundle_exposes_all_paper_type_contracts_for_model_selection(
+    paper_type: str,
+    expected_token: str,
+) -> None:
     synthesis = bundle(
         metadata={"title": "Typed Paper"},
         evidence_wrapper={"summary": {"paper_type": "AI_method"}, "evidence_pack": {}},
@@ -756,7 +869,7 @@ def test_bundle_exposes_all_paper_type_contracts_for_model_selection(paper_type:
     )
 
     contract = synthesis["writing_contract"]
-    typed_contract = contract["paper_type_contracts"][paper_type]
+    typed_contract = contract["contracts_by_paper_type"][paper_type]
     typed_text = json.dumps(typed_contract, ensure_ascii=False)
 
     assert typed_contract["paper_type"] == paper_type
@@ -779,20 +892,11 @@ def test_bundle_exposes_all_paper_type_contracts_for_model_selection(paper_type:
     assert "active_paper_type_contract" not in contract
     assert contract["paper_type_selection"] == {
         "source_of_truth": "note_plan.paper_type",
-        "suggested_paper_type": "AI_method",
-        "suggested_paper_type_role": "hint_only",
-        "allowed_paper_types": list(contract["paper_type_contracts"]),
+        "suggested_paper_type_role": "none",
+        "allowed_paper_types": list(contract["contracts_by_paper_type"]),
     }
-    assert "note_plan.paper_type" in "\n".join(contract["planning_rules"])
-    assert "paper_type_contracts[note_plan.paper_type]" in "\n".join(contract["planning_rules"])
-    assert "section_semantics" in "\n".join(contract["planning_rules"])
-    assert "recommended_subsections" in "\n".join(contract["planning_rules"])
-    assert "note_plan.section_plan" in "\n".join(contract["planning_rules"])
-    assert "paper_type_contracts[note_plan.paper_type]" in "\n".join(contract["self_review_rules"])
-
-    if paper_type != "AI_method":
-        assert "### 机制流程" not in "\n".join(contract["planning_rules"])
-        assert "开发者看懂方法主线" not in "\n".join(contract["self_review_rules"])
+    assert contract["grounding_contract"]["source_of_truth"] == "source_manifest"
+    assert contract["note_plan_contract"]["grounding_field"] == "section_plan[*].evidence_sources"
 
 
 def test_bundle_exposes_sanitized_figure_asset_quality_and_hard_gate_rules() -> None:
@@ -844,13 +948,8 @@ def test_bundle_exposes_sanitized_figure_asset_quality_and_hard_gate_rules() -> 
         }
     ]
 
-    figure_rules_text = "\n".join(synthesis["writing_contract"]["figure_rules"])
-    assert "label/caption match is not insertion approval" in figure_rules_text
-    assert "caption-only" in figure_rules_text
-    assert "missing table body" in figure_rules_text
-    assert "low visual body ratio" in figure_rules_text
-    assert "directly under the most relevant analytical section" in figure_rules_text
-    assert "reject_visual_quality" in figure_rules_text
-    assert "catch-all sections" in figure_rules_text
-    assert "[!figure]" in figure_rules_text
-    assert "[图表占位 |" in figure_rules_text
+    figure_contract = synthesis["writing_contract"]["figure_table_contract"]
+    assert figure_contract["placeholder_first"] is True
+    assert figure_contract["visual_quality_gate"] == "fail_closed"
+    assert figure_contract["decision_table_required"] is True
+    assert "visual_defect" in figure_contract["decision_values"]

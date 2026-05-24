@@ -256,6 +256,23 @@ def test_quality_classification_rejects_table_covering_other_caption() -> None:
     assert "multiple_caption_regions_suspected" in signals["quality_reason_codes"]
 
 
+def test_quality_classification_rejects_figure_covering_other_caption() -> None:
+    signals = _classify_visual_quality(
+        kind="figure",
+        page_coverage_ratio=0.22,
+        visual_rect_count=8,
+        visual_body_ratio=0.18,
+        paragraph_text_chars=40,
+        table_body_rows=0,
+        caption_text_chars=80,
+        other_caption_labels=["Figure 4"],
+    )
+
+    assert signals["visual_quality_status"] == "reject"
+    assert signals["other_caption_labels"] == ["Figure 4"]
+    assert "multiple_caption_regions_suspected" in signals["quality_reason_codes"]
+
+
 def test_other_caption_labels_for_crop_detects_substantial_overlap() -> None:
     current = {"label": "Table 7", "bbox": (10.0, 10.0, 80.0, 24.0)}
     other = {"label": "Table 8", "bbox": (12.0, 120.0, 82.0, 136.0)}
@@ -263,6 +280,23 @@ def test_other_caption_labels_for_crop_detects_substantial_overlap() -> None:
     labels = _other_caption_labels_for_crop([current, other], current, (0.0, 0.0, 100.0, 140.0))
 
     assert labels == ["Table 8"]
+
+
+def test_other_caption_labels_for_crop_detects_partial_label_line_overlap() -> None:
+    current = {"label": "Figure 18", "bbox": (370.0, 190.0, 506.0, 200.0)}
+    other = {
+        "label": "Figure 16",
+        "bbox": (54.0, 200.0, 294.0, 234.0),
+        "label_bbox": (54.0, 200.0, 294.0, 210.0),
+    }
+
+    labels = _other_caption_labels_for_crop(
+        [current, other],
+        current,
+        (60.0, 67.0, 554.0, 206.5),
+    )
+
+    assert labels == ["Figure 16"]
 
 
 def test_quality_classification_accepts_clean_table_crop() -> None:

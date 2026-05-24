@@ -164,13 +164,23 @@ def _classify_visual_quality(
             reasons.append("multiple_caption_regions_suspected")
         status = "reject" if reasons else "usable"
     else:
+        if other_caption_labels:
+            reasons.append("multiple_caption_regions_suspected")
         if paragraph_text_chars >= 450:
             reasons.append("large_text_block_suspected")
         if page_coverage_ratio >= 0.70 and paragraph_text_chars >= 250:
             reasons.append("oversized_page_crop")
         if visual_rect_count <= 1 and visual_body_ratio < 0.03:
             reasons.append("low_visual_body_ratio")
-        if any(code in reasons for code in ("large_text_block_suspected", "oversized_page_crop", "low_visual_body_ratio")):
+        if any(
+            code in reasons
+            for code in (
+                "multiple_caption_regions_suspected",
+                "large_text_block_suspected",
+                "oversized_page_crop",
+                "low_visual_body_ratio",
+            )
+        ):
             status = "reject"
         elif visual_rect_count == 0 or visual_body_ratio < 0.08:
             if "low_visual_body_ratio" not in reasons:
@@ -342,6 +352,7 @@ def _find_caption_blocks(page) -> list[dict]:
                 "label": label,
                 "kind": kind,
                 "bbox": (x0, y0, x1, y1),
+                "label_bbox": tuple(first_bbox),
                 "line_text": full_caption,
             })
     anchors.sort(key=lambda a: a["bbox"][1])
@@ -510,15 +521,19 @@ def _other_caption_labels_for_crop(
     for anchor in caption_anchors:
         label = normalize_whitespace(str(anchor.get("label", "")))
         anchor_bbox = tuple(anchor.get("bbox", ()))
+        label_bbox = tuple(anchor.get("label_bbox", anchor_bbox))
         if not label or len(anchor_bbox) != 4:
             continue
         if label == current_label and anchor_bbox == current_bbox:
             continue
 
         overlap = _intersection_area(anchor_bbox, bbox)
-        if overlap <= 0:
+        label_overlap = _intersection_area(label_bbox, bbox) if len(label_bbox) == 4 else 0.0
+        if overlap <= 0 and label_overlap <= 0:
             continue
-        if overlap / max(_rect_area(anchor_bbox), 1.0) < 0.5:
+        caption_overlap_ratio = overlap / max(_rect_area(anchor_bbox), 1.0)
+        label_overlap_ratio = label_overlap / max(_rect_area(label_bbox), 1.0) if len(label_bbox) == 4 else 0.0
+        if caption_overlap_ratio < 0.5 and label_overlap_ratio < 0.15:
             continue
         labels.append(label)
 

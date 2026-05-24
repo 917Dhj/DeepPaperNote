@@ -8,7 +8,6 @@ from build_synthesis_bundle import bundle
 from contracts import NOTE_REQUIRED_SECTIONS, PAPER_TYPE_VALUES
 from lint_note import REQUIRED_SECTIONS
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 NOTE_PLAN_REFERENCE_DOCS = (
     "workflow.md",
@@ -24,6 +23,13 @@ NOTE_PLAN_REQUIRED_FIELDS = (
     "must_cover",
     "key_numbers",
     "real_comparisons",
+    "central_claims",
+    "claim_boundaries",
+    "negative_or_limiting_results",
+    "mechanism_result_map",
+    "comparative_positioning",
+    "reuse_takeaways",
+    "followup_questions",
     "section_plan",
 )
 REFERENCE_ROUTING_DOCS = (
@@ -182,21 +188,66 @@ def test_bundle_paper_type_contracts_use_canonical_enum() -> None:
     )
     writing_contract = synthesis["writing_contract"]
 
-    assert tuple(writing_contract["paper_type_contracts"]) == PAPER_TYPE_VALUES
-    assert tuple(writing_contract["paper_type_selection"]["allowed_paper_types"]) == PAPER_TYPE_VALUES
+    assert tuple(writing_contract["contracts_by_paper_type"]) == PAPER_TYPE_VALUES
+    assert (
+        tuple(writing_contract["paper_type_selection"]["allowed_paper_types"])
+        == PAPER_TYPE_VALUES
+    )
     assert writing_contract["paper_type_selection"]["source_of_truth"] == "note_plan.paper_type"
-    assert writing_contract["paper_type_selection"]["suggested_paper_type_role"] == "hint_only"
+    assert writing_contract["paper_type_selection"]["suggested_paper_type_role"] == "none"
 
 
 def test_bundle_paper_type_contracts_expose_exact_section_profiles() -> None:
     synthesis = bundle(metadata={}, evidence_wrapper={}, figures_wrapper={}, assets_wrapper={})
-    contracts = synthesis["writing_contract"]["paper_type_contracts"]
+    contracts = synthesis["writing_contract"]["contracts_by_paper_type"]
 
     assert tuple(EXPECTED_PAPER_TYPE_SECTION_PROFILES) == PAPER_TYPE_VALUES
     for paper_type, expected_profile in EXPECTED_PAPER_TYPE_SECTION_PROFILES.items():
         typed_contract = contracts[paper_type]
         assert typed_contract["section_semantics"] == expected_profile["section_semantics"]
-        assert typed_contract["recommended_subsections"] == expected_profile["recommended_subsections"]
+        assert (
+            typed_contract["recommended_subsections"]
+            == expected_profile["recommended_subsections"]
+        )
+        assert typed_contract["boundary_questions"]
+
+
+def test_bundle_exposes_depth_and_figure_decision_contracts_without_old_inputs() -> None:
+    synthesis = bundle(
+        metadata={},
+        evidence_wrapper={"evidence_pack": {"section_texts": {"method": "legacy"}}},
+        figures_wrapper={},
+        assets_wrapper={},
+        source_manifest={"raw_sections_path": "/tmp/raw_sections.jsonl"},
+        figure_decisions_wrapper={"decisions": []},
+    )
+    writing_contract = synthesis["writing_contract"]
+
+    assert "evidence" not in synthesis
+    assert "candidate_chunks" not in synthesis
+    assert "section_texts" not in synthesis
+    assert "summary" not in synthesis
+    assert (
+        writing_contract["grounding_contract"]["note_plan_depth_requirements"][
+            "required_section_focus_min_chars"
+        ]
+        >= 20
+    )
+    assert writing_contract["figure_table_contract"]["usable_insert_candidate"] == {
+        "kind": "figure",
+        "max_priority": 2,
+        "visual_quality_status": "usable_candidate",
+        "plan_kinds": ["method_overview", "data_or_task_overview", "main_result"],
+    }
+    assert "materialization_blocked" in writing_contract["figure_table_contract"][
+        "allowed_usable_placeholder_reasons"
+    ]
+    assert writing_contract["analysis_coverage_contract"]["central_claim_fields"] == [
+        "claim",
+        "supporting_evidence",
+        "what_it_actually_proves",
+        "what_it_does_not_prove",
+    ]
 
 
 def test_paper_types_doc_uses_typed_profiles_without_legacy_common_subheadings() -> None:
@@ -263,10 +314,66 @@ def test_normal_execution_docs_do_not_force_broad_reference_reads() -> None:
         assert "Use [references/" not in text
 
     skill_text = (PROJECT_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    model_synthesis_text = (PROJECT_ROOT / "references" / "model-synthesis.md").read_text(encoding="utf-8")
+    model_synthesis_text = (PROJECT_ROOT / "references" / "model-synthesis.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "not a default reading checklist" in skill_text
     assert "not a second router" in model_synthesis_text
+
+
+def test_normal_execution_docs_require_obsidian_yaml_frontmatter() -> None:
+    skill_text = (PROJECT_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    final_writing_text = (PROJECT_ROOT / "references" / "final-writing.md").read_text(
+        encoding="utf-8"
+    )
+
+    for text in (skill_text, final_writing_text):
+        assert "Obsidian YAML" in text
+        assert "above the `#` title heading" in text
+        assert "`tags`" in text
+        assert "`aliases`" in text
+
+
+def test_final_writing_defines_fixed_core_info_schema() -> None:
+    final_writing_text = (PROJECT_ROOT / "references" / "final-writing.md").read_text(
+        encoding="utf-8"
+    )
+    obsidian_format_text = (PROJECT_ROOT / "references" / "obsidian-format.md").read_text(
+        encoding="utf-8"
+    )
+
+    required_fields = [
+        "标题",
+        "标题翻译",
+        "作者",
+        "机构",
+        "发表时间",
+        "发表渠道",
+        "DOI",
+        "arXiv",
+        "论文链接",
+        "代码 / 项目",
+        "数据 / 资源",
+        "论文类型",
+    ]
+
+    for text in (final_writing_text, obsidian_format_text):
+        assert "Core info field schema" in text
+        assert "only the following fields" in text
+        assert "no free prose" in text
+        for field in required_fields:
+            assert f"`{field}`" in text
+
+
+def test_final_writing_requires_tables_for_central_quantitative_comparisons() -> None:
+    final_writing_text = (PROJECT_ROOT / "references" / "final-writing.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "three or more compared systems" in final_writing_text
+    assert "use a compact Markdown table" in final_writing_text
+    assert "loose bullet list" in final_writing_text
 
 
 def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
@@ -323,7 +430,10 @@ def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
     ):
         assert required_source in skill_text[source_priority:stop_policy]
 
-    assert "Accepted inputs: title, DOI, URL, arXiv ID, local PDF path, Zotero item key." in workflow_text
+    assert (
+        "Accepted inputs: title, DOI, URL, arXiv ID, local PDF path, Zotero item key."
+        in workflow_text
+    )
     assert "Acquire the best available PDF" in workflow_text
     assert "stop and report the blocked stage honestly" in workflow_text
     assert "A title, DOI, URL, arXiv ID, or local PDF all work." in readme_text

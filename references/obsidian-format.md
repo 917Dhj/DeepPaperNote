@@ -46,11 +46,12 @@ If the user already has a vault convention, preserve it.
 `## 核心信息` is a fixed metadata zone.
 
 Formatting and scope rules:
-- use the stable template-style metadata bullets only
+- Core info field schema: use only the following fields, in this order, and no free prose:
+  `标题`, `标题翻译`, `作者`, `机构`, `发表时间`, `发表渠道`, `DOI`, `arXiv`, `论文链接`, `代码 / 项目`, `数据 / 资源`, `论文类型`
 - keep each entry in `- 字段名: 值` form
+- omit fields that are unavailable or not applicable; do not add placeholder rows just to fill the schema
 - do not add interpretation, commentary, judgment, or takeaway lines inside `核心信息`
 - do not use the last metadata bullet as a place to append extra analysis
-- if a field is missing, leave it blank or mark it as unavailable rather than replacing the field with prose
 - move explanatory content to `一句话总结`、`深度分析`、`我的笔记` or another true analysis section
 
 ## YAML Frontmatter

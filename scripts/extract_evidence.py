@@ -33,6 +33,7 @@ from citation_links import extract_reference_candidates_from_pdf
 
 
 CORE_SECTIONS = ("introduction", "method", "experiment")
+CAPTION_LIST_LIMIT = 48
 APPENDIX_EVIDENCE_CATEGORIES = (
     "ablation",
     "implementation_details",
@@ -582,7 +583,7 @@ def main() -> None:
         experiment_text = abstract
         experiment_source = "abstract" if abstract else ""
     conclusion_text, conclusion_source = section_text_with_source(section_map, "conclusion", abstract)
-    figure_captions = extract_caption_lines(full_text, "figure")[:12] if full_text else []
+    figure_captions = extract_caption_lines(full_text, "figure")[:CAPTION_LIST_LIMIT] if full_text else []
     mechanism_caption_text = " ".join(
         item.get("caption", "")
         for item in figure_captions
@@ -699,7 +700,7 @@ def main() -> None:
         if normalize_whitespace(value)
     }
     pack["figure_captions"] = figure_captions
-    pack["table_captions"] = extract_caption_lines(full_text, "table")[:12] if full_text else []
+    pack["table_captions"] = extract_caption_lines(full_text, "table")[:CAPTION_LIST_LIMIT] if full_text else []
     pack["sections"] = [
         {"name": key, "length": len(value), "preview": value[:240]}
         for key, value in section_map.items()

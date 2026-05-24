@@ -49,10 +49,18 @@ Do not let scripts make the final semantic choice; scripts should only prepare c
 
 `usable_candidate` means the candidate is eligible for final judgment; it is not an automatic insertion command.
 For every usable figure/table candidate, resolve the final note into one of these states:
-- `inserted`: materialize the image and replace the placeholder with the real image plus one italic caption line
+- `insert`: materialize the image and replace the placeholder with the real image plus one italic caption line
 - `kept_placeholder_visual_defect`: keep the placeholder because manual review found a concrete visual defect, such as contamination, truncation, missing table body, partial subfigure, or caption loss
 - `kept_placeholder_lower_priority`: keep the placeholder because a more central or more direct related figure/table is already inserted
 - `kept_placeholder_materialization_blocked`: keep the placeholder because `materialize_figure_asset.py` or file copy/write permission failed
+
+Keep missing-candidate cases separate from materialization failures:
+- if `source_image_path` is empty, `skip_reason` is `asset_candidate_missing`, or no independent matching crop exists, write `当前状态` as missing/unavailable candidate, not as copy/materialization blocked
+- reserve `materialization blocked` only for a real chosen image asset that failed during `materialize_figure_asset.py`, final copy, permission, or `write_obsidian_note.py`
+- if a crop includes another Figure/Table caption or another figure body, treat it as a visual defect or missing independent candidate; do not call it usable just because it contains the target label
+
+`plan_figure_table_decisions.py` may preselect high-priority usable figure crops as `insert`.
+That does not mean `run_pipeline.py` writes into the vault; materialization happens at the final save step, where `write_obsidian_note.py --figure-decisions ...` copies the selected images and refuses a note that does not reference the selected image path.
 
 Do not use soft reasons such as keeping the note light, values already transcribed, future lookup, or convenient back-reference as the standalone reason for keeping a usable candidate as a placeholder.
 
@@ -83,6 +91,7 @@ Reject candidates that are:
 - caption-only crops
 - tables with no visible table body
 - table crops contaminated by running prose or another Figure/Table caption
+- figure crops contaminated by another Figure/Table caption or by a second figure body
 - large text, title-page, or abstract crops masquerading as figures
 - crops where the visual body is tiny relative to the crop
 
@@ -118,7 +127,7 @@ The placeholder text should be stable and explicit:
 If a real image is inserted:
 - keep the original paper identifier, for example `Fig. 2` or `Table 1`
 - do not renumber it according to note order
-- prefer the `obsidian_embed` returned by `scripts/materialize_figure_asset.py`
+- use the `relative_markdown_embed` from `figure_table_decisions.json`; final save with `write_obsidian_note.py --figure-decisions ...` copies the image into the paper-local `images/` directory
 - render the embed followed immediately by one italic caption line
 - do not keep a redundant `[!figure]` callout for that same inserted figure
 - if the extracted image is only a subpanel or partial crop, say so explicitly

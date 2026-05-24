@@ -53,6 +53,10 @@ If you only have the abstract after the supported PDF acquisition paths have fai
    - which sections deserve the most weight
    - which details need `###` subheadings
    - which 3 to 6 numbers matter most
+   - which central claims are supported by which source sections or pages
+   - what each central claim actually proves and does not prove
+   - which negative, weak, missing, or limiting results constrain the conclusion
+   - which research or engineering takeaways are specific enough to reuse
    - which figure/table placeholders are essential
    - whether the paper needs explicit formulas, objective functions, or complexity expressions
 5. Write the final note in Chinese.
@@ -169,6 +173,14 @@ Include:
 - where the evidence is still thin
 - hidden assumptions
 - what the paper does not prove
+
+Use the plan's `central_claims` as the spine of this section:
+- connect each major claim to the evidence that supports it
+- say exactly what the evidence proves
+- say what remains unproven, untested, or only indirectly supported
+- use `mechanism_result_map` to explain why the paper's mechanism, protocol, construct, or data decision should produce the observed result pattern
+- use `comparative_positioning` to say what changes relative to strong baselines or obvious alternatives, not only that the paper is better
+- when the paper has Discussion or Limitations, explain the mechanism behind those caveats rather than copying them as a list
 
 Good subsections often include:
 - `### 真正贡献是什么`

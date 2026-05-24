@@ -76,23 +76,27 @@ For a normal single-paper note request, the pipeline below is a required executi
    - stop and report which acquisition paths were tried and what input is needed
    - do not continue as a degraded, provisional, abstract-only, or full-text-substitute note when no usable PDF exists
 
-4. `extract_evidence`
-   Produce an evidence pack rather than a finished note.
-   This stage should favor broad collection over early judgment.
-   Evidence targets:
-   - section texts
-   - candidate chunks per section
-   - data/material mentions
-   - metrics and numeric claims
-   - figure and table captions
-   - enough context for the model to decide what is truly central
+4. `extract_source_text`
+   Produce the canonical raw reading artifacts.
+   Canonical outputs:
+   - `*_raw_sections.jsonl`
+   - `*_source_manifest.json`
+   - optional derived `*_full_text.md`, generated from JSONL
    Completion condition:
-   - an evidence pack exists with section-level or candidate-level evidence for the paper
+   - all available PDF pages are extracted by default
+   - any explicit truncation is marked in `source_manifest.coverage`
+   - source sections and page records are available for grounding
    Allowed on failure:
    - retry extraction, ask for a better PDF/OCR/source material, or stop
    - do not replace this stage with "I read some of the PDF myself so it is probably fine"
 
-5. `extract_pdf_assets`
+5. `extract_evidence`
+   Produce deterministic structural indexes and quality signals.
+   This stage can keep heuristic fields for diagnostics and legacy tooling, but top-N evidence buckets, `candidate_chunks`, and truncated `section_texts` are not the model-facing writing substrate.
+   Completion condition:
+   - structural indexes, reference candidates, coverage signals, and extraction-quality metadata exist
+
+6. `extract_pdf_assets`
    Export page-level PDF image assets and page metadata.
    This stage should be deterministic:
    - prefer object-level image extraction from the PDF
@@ -104,7 +108,7 @@ For a normal single-paper note request, the pipeline below is a required executi
    - continue with placeholder-first figure handling only if the failure is surfaced honestly
    - do not silently skip this stage and then talk as if figure handling were complete
 
-6. `plan_figures`
+7. `plan_figures`
    Build a figure inventory and plan placeholders for all major figures/tables that matter to the note.
    Placeholder-first rule:
    - preserve the important figure/table structure even if images are missing
@@ -116,27 +120,36 @@ For a normal single-paper note request, the pipeline below is a required executi
    - keep placeholders and explain the limitation
    - do not skip this stage just because image matching is slow or imperfect
 
-7. `build_synthesis_bundle`
-   Assemble a model-facing bundle from metadata, evidence, coverage, section previews, figure plan, and PDF assets.
+8. `plan_figure_table_decisions`
+   Build a decision row for every detected figure/table caption.
+   Each item should have one explicit state: `insert`, `placeholder`, `low_priority`, `visual_defect`, or `skip` with reason.
+   High-priority usable figure crops may be marked `insert`, but this is still a final-save obligation, not a pipeline-time vault write.
+   Completion condition:
+   - every major detected figure/table has a recorded decision or skip reason
+
+9. `build_synthesis_bundle`
+   Assemble a model-facing manifest bundle from metadata, source manifest, coverage, references, figure/table manifest, figure plan, and PDF assets.
    This is the main handoff point from scripts to the language model.
-   The model must inspect `coverage` before treating section evidence as reliable; weak section coverage, PDF page truncation, appendix detection, or bundle text truncation means the model must not present partial evidence as full-paper evidence.
-   Appendix evidence is a supplemental layer for extra experiments, implementation details, dataset details, qualitative examples, and figure/table context; it must not redefine the main-text evidence backbone.
+   The model must read raw source records through `source_manifest.raw_sections_path`; the bundle itself must not expose old top-N `evidence`, `candidate_chunks`, or truncated `section_texts` as the primary writing input.
+   The model must inspect `coverage` before treating source evidence as complete; truncated source text means the run is partial unless the user explicitly accepts partial reading.
    Completion condition:
    - the synthesis bundle exists and is the actual model handoff input
    Allowed on failure:
    - stop and report bundle construction as the blocking stage
    - do not replace the bundle with ad hoc memory of prior stages
 
-8. model note planning
+10. model note planning
    Before drafting the final note, create an explicit short note-planning artifact:
    - infer the paper type
    - decide which sections deserve the most weight
    - decide which sections need `###` subheadings
    - select the most important numbers, comparisons, and figure/table placeholders
+   - identify central claims, supporting source evidence, claim boundaries, limiting results, and reusable takeaways
    - add paper-specific subsections when the evidence supports them
    Canonical artifact:
    - a short JSON planning file such as `<note>.plan.json` or a run-scoped `*_note_plan.json`
    - pass that file to `scripts/lint_note.py --plan-file ...` when linting the final note
+   - pass that file to `scripts/lint_grounding.py --note-plan ... --source-manifest ... --bundle-json ... --figure-decisions ...` before drafting from it
    - in interactive contexts, you may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file
    Do not rely only on an implicit hidden-planning step.
    Completion condition:
@@ -145,13 +158,23 @@ For a normal single-paper note request, the pipeline below is a required executi
    - revise planning until a short inspectable plan file exists
    - do not jump straight to prose and claim planning was basically done
 
-9. model synthesis
+11. `lint_grounding`
+   Validate that the note plan is grounded in the canonical source manifest.
+   Completion condition:
+   - every substantive planned section cites either a valid `section_id` or a valid page range
+   - every substantive planned section has a paper-specific `focus`/reading goal, not only a valid anchor
+   - high-priority usable figure candidates are not left as vague placeholders
+   - old broad bundle references such as `synthesis_bundle.evidence.method_evidence` are rejected
+   - truncated source text blocks full-read drafting unless partial reading was explicitly accepted
+
+12. model synthesis
    The language model reads the synthesis bundle and writes the actual note.
    It should do all understanding-heavy work:
    - choose emphasis
    - separate research problem from task definition
    - reconstruct method flow
    - pick the most meaningful results
+   - explain what the evidence proves and does not prove
    - identify limitations and what the paper does not prove
    Completion condition:
    - a complete note draft exists, not just scattered sections or a partial summary
@@ -159,7 +182,7 @@ For a normal single-paper note request, the pipeline below is a required executi
    - stop and report that drafting is incomplete
    - do not collapse a partial draft into "the note is finished"
 
-10. `lint_note`
+13. `lint_note`
    Check structure, heading levels, missing sections, weak analysis, and mixed-language prose.
    If the refined note still contains half-English half-Chinese lines, fail closed before vault write.
    Completion condition:
@@ -168,8 +191,27 @@ For a normal single-paper note request, the pipeline below is a required executi
    - revise and rerun lint
    - do not say the note is already validated if lint never ran
 
-11. `final_readability_review`
-   After the first successful script lint pass, reread the full note once more as a language-and-expression quality pass.
+14. `final_quality_review`
+   After the first successful script lint pass, reread the full note once more as an analytical quality pass against the source artifacts and note plan.
+   This stage exists because script lint only enforces the floor and cannot judge whether the evidence chain, mechanism-to-result explanation, comparative positioning, claim boundaries, Discussion/Limitations interpretation, and reusable takeaways are deep enough.
+   Required focus:
+   - central claims are backed by raw sections or page ranges
+   - key experimental settings, protocol details, and numbers are present when the paper depends on them
+   - mechanisms, protocols, constructs, data decisions, or study design choices are mapped to the result pattern they explain
+   - strong baselines, prior routes, human/clinical references, or obvious alternatives are used to interpret what the paper changes
+   - proven claims are separated from unproven or unvalidated claims
+   - negative, weak, missing, or limiting results are discussed when they constrain the conclusion
+   - takeaways and follow-up questions are paper-specific enough to reuse in research, engineering, replication, or validity work
+   Completion condition:
+   - the full note has been reread after lint for analytical depth
+   - any depth-driven edits are complete
+   - if edits were made, the note is marked for a lint rerun before save
+   Allowed on failure:
+   - return to the source artifacts, revise the note, and rerun lint
+   - do not treat formal lint success as permission to save a shallow note
+
+15. `final_readability_review`
+   After `final_quality_review` passes, reread the full note once more as a language-and-expression quality pass.
    This stage exists because script lint only enforces the floor and cannot judge every awkward phrase or stiff translation.
    Required focus:
    - smooth unnatural Chinese prose
@@ -185,7 +227,7 @@ For a normal single-paper note request, the pipeline below is a required executi
    - do not treat lint already passed as permission to skip this stage
    - do not invent new facts or change core numbers and conclusions under the name of polish
 
-12. `write_obsidian_note`
+16. `write_obsidian_note`
    Save the final Markdown into the target vault.
    First decide the save mode explicitly:
     - if no Obsidian vault is configured, workspace mode is allowed
@@ -197,9 +239,10 @@ For a normal single-paper note request, the pipeline below is a required executi
     - keep existing-folder reuse conservative; method-only evidence is not enough to force reuse of an unrelated application folder
     - create a new domain only when no existing domain fits well
     - do not save directly into the bare papers root
-    Complete the figure decision before this step:
+   Complete the figure decision before this step:
     - replace high-confidence placeholders with real images
     - keep lower-confidence items as placeholders
+    - pass the figure decision table to `write_obsidian_note.py --figure-decisions ...` so `insert` rows are copied into the paper-local `images/` folder and must be referenced by the final Markdown
     - do not split text writing and figure handling into two separate user turns by default
     If the configured vault or its paper-local `images/` directory cannot currently be written:
     - immediately ask the user for permission escalation
@@ -225,7 +268,7 @@ The structured artifacts are necessary, but they are not the final goal.
 
 For the best note quality:
 - scripts should gather and structure evidence
-- the model should read the synthesis bundle and write the final note in its own words
+- the model should read the synthesis bundle plus canonical raw source records and write the final note in its own words
 - do not delegate paper understanding to keyword scripts if the model can infer it from the bundle
 
 Use [final-writing.md](final-writing.md) as the last-mile writing guide.
@@ -257,27 +300,22 @@ Optional keys:
 
 ### `evidence_pack.json`
 
+Legacy/diagnostic evidence extraction may still produce heuristic buckets, but the normal model-facing path should not draft from top-N evidence, `candidate_chunks`, or truncated `section_texts`.
+
+### `source_manifest.json`
+
 Suggested keys:
-- `problem_evidence`
-- `task_evidence`
-- `data_evidence`
-- `method_evidence`
-- `results_evidence`
-- `limitations_evidence`
-- `section_texts`
-- `candidate_chunks`
-- `language_hint`
-- `section_sources`
-- `section_extraction_coverage`
-- `pdf_coverage`
-- `appendix_index`
-- `appendix_evidence`
-- `figure_captions`
-- `table_captions`
+- `raw_sections_path`
+- `full_text_md_path`
+- `pdf`
+- `coverage`
 - `sections`
-- `evidence_quality`
-- `extraction_failures`
-- `quotes`
+- `pages`
+- `captions`
+- `math_index`
+- `appendix_index`
+- `language_hint`
+- `text_hash_sha256`
 
 ### `figure_plan.json`
 
@@ -298,16 +336,15 @@ See `scripts/contracts.py` for the corresponding scaffolded JSON contract defini
 Suggested keys:
 - `metadata`
 - `coverage`
-- `evidence`
-- `appendix`
+- `source_manifest`
+- `source_index`
 - `references`
-- `section_previews`
 - `figure_plan`
+- `figure_table_manifest`
 - `pdf_assets`
-- `summary`
 - `writing_contract`
 
-`coverage` should include section extraction coverage, PDF page coverage, appendix evidence counts, extraction failures, and bundle text budget metadata.
+`coverage` should include source coverage, PDF/asset coverage, extraction failures, and truncation warnings. It should not hide source truncation behind a normal-looking full-read bundle.
 
 `references.candidates` contains model-facing candidates extracted from the paper's references section. Each candidate may include a confirmed `wikilink` when an existing vault note matched by basename or alias; otherwise use `display_text` as the plain-text fallback.
 
@@ -324,9 +361,19 @@ Required JSON keys:
 - `must_cover`
 - `key_numbers`
 - `real_comparisons`
+- `central_claims`
+- `claim_boundaries`
+- `negative_or_limiting_results`
+- `mechanism_result_map`
+- `comparative_positioning`
+- `reuse_takeaways`
+- `followup_questions`
 - `section_plan`
 
 Choose `paper_type` from `writing_contract.paper_type_selection.allowed_paper_types`; the script's suggested paper type is a hint only, not the authority. Use `paper_type_rationale` to explain the model's selection.
+Each substantive `section_plan` item should include `evidence_sources` using valid `section_id` values from `source_manifest.sections` or valid page ranges within the PDF.
+Each `central_claims` item should include `claim`, `supporting_evidence`, `what_it_actually_proves`, and `what_it_does_not_prove`.
+`mechanism_result_map`, `comparative_positioning`, and `followup_questions` should be concise paper-specific lists that later force the final note to explain why results happened, what the comparison really means, and what the reader should test next.
 
 ## Failure Policy
 

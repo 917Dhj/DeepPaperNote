@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -26,6 +28,11 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--content", default="", help="Inline Markdown content.")
     p.add_argument("--stdin", action="store_true", help="Read Markdown content from stdin.")
     p.add_argument("--lint-json", default="", help="Optional lint JSON path. Refuse write if structure, style, or math gate failed.")
+    p.add_argument(
+        "--figure-decisions",
+        default="",
+        help="Optional figure/table decisions JSON. Insert decisions must have referenced materialized images.",
+    )
     p.add_argument("--title", default="", help="Explicit title override.")
     p.add_argument("--output", default="", help="JSON status output path.")
     p.add_argument("--vault", default="", help="Target Obsidian vault path.")
@@ -34,6 +41,87 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--asset-subdir", default="images", help="Asset folder name relative to the note directory.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
     return p
+
+
+def insert_decisions(decisions: dict) -> list[dict]:
+    items = decisions.get("decisions", []) if isinstance(decisions, dict) else []
+    if not isinstance(items, list):
+        return []
+    return [
+        item
+        for item in items
+        if isinstance(item, dict) and str(item.get("decision", "")).strip() == "insert"
+    ]
+
+
+def safe_image_filename(filename: str, source_image: Path) -> str:
+    candidate = filename.strip() or source_image.name
+    if (
+        not candidate
+        or candidate in {".", ".."}
+        or "/" in candidate
+        or "\\" in candidate
+        or Path(candidate).is_absolute()
+    ):
+        raise SystemExit(f"Unsafe figure image filename in insert decision: {candidate}")
+    return candidate
+
+
+def embed_target_matches(target: str, expected_relative: str) -> bool:
+    normalized = target.strip().strip("<>").split("|", 1)[0]
+    if normalized == expected_relative:
+        return True
+    return normalized.endswith(f"/{expected_relative}")
+
+
+def note_references_image_embed(note_text: str, expected_relative: str) -> bool:
+    markdown_targets = re.findall(r"!\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)", note_text)
+    obsidian_targets = re.findall(r"!\[\[([^\]]+)\]\]", note_text)
+    return any(
+        embed_target_matches(target, expected_relative)
+        for target in markdown_targets + obsidian_targets
+    )
+
+
+def materialize_insert_decisions(
+    note_text: str,
+    target_path: Path,
+    decisions: dict,
+    asset_subdir: str,
+) -> list[dict]:
+    materialized: list[dict] = []
+    asset_dir = target_path.parent / asset_subdir
+    for item in insert_decisions(decisions):
+        source_value = str(item.get("source_image_path", "")).strip()
+        source_image = Path(source_value).expanduser()
+        if not source_value or not source_image.is_file():
+            label = item.get("source_id") or item.get("label") or item.get("item_id") or "unknown"
+            raise SystemExit(f"Insert decision source image does not exist for {label}: {source_value}")
+        filename = safe_image_filename(
+            str(item.get("source_image_filename", "")),
+            source_image,
+        )
+        expected_relative = f"{asset_subdir}/{filename}"
+        if not note_references_image_embed(note_text, expected_relative):
+            label = item.get("source_id") or item.get("label") or item.get("item_id") or filename
+            raise SystemExit(
+                f"Insert decision for {label} is not referenced as an image embed: {expected_relative}."
+            )
+        asset_dir.mkdir(parents=True, exist_ok=True)
+        dest_image = asset_dir / filename
+        if dest_image.resolve().parent != asset_dir.resolve():
+            raise SystemExit(f"Unsafe figure image destination: {dest_image}")
+        if source_image.resolve() != dest_image.resolve():
+            shutil.copy2(source_image, dest_image)
+        materialized.append(
+            {
+                "source_id": item.get("source_id") or item.get("label") or item.get("item_id") or "",
+                "source_image": str(source_image.resolve()),
+                "dest_image_path": str(dest_image),
+                "relative_markdown_path": expected_relative,
+            }
+        )
+    return materialized
 
 
 def main() -> None:
@@ -85,8 +173,21 @@ def main() -> None:
         filename=args.filename,
     )
     ensure_parent(target_path)
-    Path(target_path).write_text(note_text, encoding="utf-8")
     asset_dir = target_path.parent / args.asset_subdir
+    figure_decisions = maybe_load_json_record(args.figure_decisions) if args.figure_decisions else {}
+    if args.figure_decisions and figure_decisions is None:
+        raise SystemExit(f"Expected JSON object for --figure-decisions: {args.figure_decisions}")
+    materialized_figures = (
+        materialize_insert_decisions(
+            note_text,
+            target_path,
+            figure_decisions,
+            args.asset_subdir,
+        )
+        if figure_decisions
+        else []
+    )
+    Path(target_path).write_text(note_text, encoding="utf-8")
     asset_dir.mkdir(parents=True, exist_ok=True)
 
     payload = {
@@ -97,6 +198,7 @@ def main() -> None:
         "note_path": str(target_path),
         "subdir": resolved_subdir,
         "images_dir": str(asset_dir),
+        "materialized_figures": materialized_figures,
     }
     output_mode, root_path = resolve_note_output_mode(config)
     payload["output_mode"] = output_mode

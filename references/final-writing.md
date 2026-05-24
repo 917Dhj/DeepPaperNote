@@ -4,13 +4,23 @@ The final note should not read like raw extracted evidence.
 
 Use the structured artifacts as inputs:
 - `metadata.json`
-- `evidence_pack.json`
-- `figure_plan.json`
+- `source_manifest.json`
+- `raw_sections.jsonl`
+- `figure_table_decisions.json`
 - `synthesis_bundle.json`
 
 Then let the model draft the final note in natural language.
 
 ## Front-Matter Structure
+
+Every final note must start with an Obsidian YAML properties block above the `#` title heading.
+Include at least:
+- `tags`: a `papers/<domain>` hierarchy tag
+- `aliases`: a short English name, acronym, or stable title alias useful for wikilinks
+- `date`: when publication date or year is known
+- `doi` or `arxiv_id`: when available
+
+Do not invent placeholder metadata values. Omit unavailable fields instead.
 
 Near the beginning of the note, include:
 - `## 核心信息`
@@ -20,11 +30,13 @@ Near the beginning of the note, include:
 
 `## 核心信息` is a fixed metadata block, not an analysis block.
 Rules for this section:
-- only use the predefined metadata-style fields from the note template
+- Core info field schema: use only the following fields, in this order, and no free prose:
+  `标题`, `标题翻译`, `作者`, `机构`, `发表时间`, `发表渠道`, `DOI`, `arXiv`, `论文链接`, `代码 / 项目`, `数据 / 资源`, `论文类型`
 - keep each line in `- 字段名: 值` form
+- omit fields that are unavailable or not applicable; do not add `未知`, `无`, or placeholder rows just to fill the schema
 - do not add ad hoc fields such as judgments, takeaways, or mini-summaries
 - do not move explanatory prose, evaluation, or "my view" sentences into this section
-- if a field is unavailable, leave it blank or mark it as not clearly available rather than replacing the field with commentary
+- move any paper-positioning or guide sentence to `一句话总结` or an analysis section, not under `核心信息`
 
 The `原文摘要翻译` section should be a Chinese translation of the paper's original abstract:
 - if the abstract is available, translate the original abstract into Chinese before the one-sentence summary
@@ -84,9 +96,11 @@ Scripts are not enough on their own for:
 - writing strong, natural Chinese analytical prose
 
 The language model should do all of the following:
-- infer the paper type from the evidence bundle
+- choose `note_plan.paper_type` from the allowed bundle contract values after reading the raw source records
 - make an explicit short `note_plan` before drafting
 - decide which sections need more weight
+- write `central_claims` so each major claim carries source-grounded evidence, what it actually proves, and what it does not prove
+- write `claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, `reuse_takeaways`, and `followup_questions` before drafting, so the final note has a planned place for judgment rather than only summary
 - decide where `###` subheadings are needed
 - select the truly central results
 - reconstruct the method or analysis flow
@@ -101,12 +115,17 @@ The note should feel like:
 - not a raw evidence dump
 - not a benchmark table converted into bullets
 
+For quantitative results, preserve the central numbers instead of replacing them with only qualitative claims.
+When the source comparison is naturally tabular, especially with three or more compared systems, settings, tasks, datasets, metrics, ablations, or experimental conditions, use a compact Markdown table for the central comparison rather than prose-only or a loose bullet list.
+Keep only the rows and metrics that matter for understanding the paper, and follow the table with interpretation of what the numbers mean.
+If a paper is short, do not make the final note shallow; use the saved space to explain protocol details, ablations, limitations, and deployment or replication implications.
+
 The final Chinese note must also pass a language-cleanliness check:
 - no half-English half-Chinese prose lines
 - English is allowed only for stable proper nouns or citation metadata
 - if the style gate fails, do not write the note into Obsidian yet
 - do not write for the linter; lint is only a minimum floor, not the writing objective
-- after script lint passes, `final_readability_review` is still required before the note should be treated as polished and ready to save
+- after script lint passes, `final_quality_review` and then `final_readability_review` are still required before the note should be treated as polished and ready to save
 
 正文术语策略:
 - default to natural Chinese prose in正文分析
@@ -133,7 +152,10 @@ Before the final draft exists, there should already be a compact structured plan
 The canonical artifact is a short JSON file such as `<note>.plan.json` or a run-scoped `*_note_plan.json`.
 Pass that file to `scripts/lint_note.py --plan-file ...` when linting; if omitted, lint looks for a sibling `<note>.plan.json`.
 In interactive contexts, you may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file.
-The plan's `paper_type` is the authoritative paper-type selection; choose it from the allowed values in the synthesis bundle and treat any script suggestion as hint-only.
+The plan's `paper_type` is the authoritative paper-type selection; choose it from the allowed values in the synthesis bundle.
+Before drafting from the plan, run `scripts/lint_grounding.py` against the source manifest, bundle, and figure/table decisions so every substantive section cites valid `section_id` values or page ranges.
+The plan must include `central_claims`, `claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, `reuse_takeaways`, and `followup_questions`.
+Each `central_claims` item should contain `claim`, `supporting_evidence`, `what_it_actually_proves`, and `what_it_does_not_prove`.
 This plan should be short and inspectable.
 Do not require or expose a long free-form `<thinking>` block.
 
@@ -219,14 +241,17 @@ If the bundle contains candidate figure pages or candidate image files:
 - if visual quality is missing, ambiguous, or failed, keep the placeholder
 - still make the final decision yourself rather than trusting the candidate ranking blindly
 - if a candidate is usable, resolve it explicitly as inserted, kept for a concrete visual defect, kept as lower-priority because a more central related figure is already inserted, or kept because materialization/copy/write failed
+- never describe a missing image asset, empty `source_image_path`, `asset_candidate_missing`, or absent independent crop as a materialization/copy failure
+- if the crop contains a different Figure/Table caption or another figure body, describe that as contamination/visual defect or lack of an independent crop, not as a usable clean candidate
 - do not keep a usable candidate as a placeholder only because the note should stay light, the values were transcribed, the figure can be checked later, or it is convenient as a back-reference
 
 Final-note figure rules:
 - keep the original paper numbering, such as `Fig. 1`, `Fig. 3`, `Table 2`
 - do not rename them to `图 1`, `图 2` just because of note order
 - if you replace a placeholder with a real image, keep the same paper figure id in the caption
-- if you replace a placeholder with a real image, prefer the `obsidian_embed` returned by `scripts/materialize_figure_asset.py`
+- if you replace a placeholder with a real image, use the `relative_markdown_embed` from `figure_table_decisions.json`; let `write_obsidian_note.py --figure-decisions ...` copy the image during final save
 - if you replace a placeholder with a real image, render only the embed plus one italic caption line; do not keep a redundant `[!figure]` callout for that same figure
+- if `figure_table_decisions.json` marks an item as `insert`, the final note must reference its `images/<filename>` path and `write_obsidian_note.py` must be run with `--figure-decisions ...`
 - if an important figure cannot be confidently extracted, keep a placeholder with a short explanation
 - every kept placeholder must appear directly under its most relevant analytical section; do not create catch-all sections such as `剩余图表占位`, `未放置图表`, `Remaining figures`, or `Leftover figures`
 - every kept placeholder must use the standard `[!figure]` callout format; never use ordinary paragraph markers such as `[图表占位 | Fig. 1]`, `图表占位：Table 2`, or `Figure Placeholder | Fig. 3`
@@ -247,26 +272,33 @@ Final-note figure rules:
 
 ## Final Self-Review
 
-Before outputting the final Markdown, explicitly check:
+Before outputting the final Markdown, first run `final_quality_review` and explicitly check:
+- does the note reconstruct the central evidence chain rather than only restating claims?
+- does it separate what the evidence actually proves from what the paper has not proven?
+- does it map mechanisms, protocols, constructs, data decisions, or study design choices to the result pattern they explain?
+- does it position the paper against strong baselines, prior routes, human references, or obvious alternatives?
+- does it explain the paper's own Discussion/Limitations claims mechanistically when those sections exist?
+- are the planned `claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, `reuse_takeaways`, and `followup_questions` reflected in the final prose?
 - does the note contain concrete numbers, dimensions, complexity terms, or formulas when the paper clearly depends on them?
 - can a reader familiar with Python and deep learning frameworks follow the core method from this note alone?
 - does the method section explain the mechanism rather than only summarize the claim?
 - if this is a method/system/framework paper, does `方法主线` explicitly contain `### 机制流程` with a 3 to 4 step numbered list?
-- if the evidence bundle contains negative or unstable ablation signals, did the note include at least one of them?
-- if the evidence bundle does not contain such signals, did the note explicitly say the paper did not clearly report failed or unstable settings?
+- if the raw source reports negative or unstable ablation settings, did the note include at least one of them?
+- if the raw source does not clearly report such settings, did the note avoid inventing failed or unstable cases?
 - does the note contain at least one honest limitation and one paper-specific insight?
 - are there any suspicious mid-sentence line breaks left in the prose?
-- after script lint passes, have you reread the full note once more for readability rather than stopping at `lint passed`?
-- are there still any stiff translations, awkward Chinese phrasing, or ordinary English phrases that should be rewritten into natural Chinese?
-- are there any lines that sound like they were written only to satisfy lint or section compliance rather than to help a real reader?
 - if the note includes LaTeX formulas, did you quickly check that the final Markdown uses directly renderable TeX rather than double-escaped commands or broken math delimiters?
 
-This final readability review is a language-and-expression pass, not a second evidence-judgment pass:
+If `final_quality_review` finds missing evidence-chain coverage, missing mechanism-to-result explanation, missing comparative positioning, missing boundary judgment, missing negative/limiting result discussion, or generic reusable takeaways or follow-up questions, return to the source artifacts and revise the note before saving.
+
+After `final_quality_review`, run `final_readability_review`.
+This review is a language-and-expression pass, not a second evidence-judgment pass:
 - improve fluency and readability
 - remove stiff translations
 - convert ordinary English phrase leftovers into natural Chinese
+- remove mechanical term-replacement artifacts such as `KV缓存 of`, `批量ing`, `In相关 Researcher`, or `Single 序列 generation`; figure/table callout titles and captions count too
 - keep stable proper nouns when forcing a translation would sound worse
 - do not invent new facts, numbers, comparisons, or failure cases during this pass
 - do not use polish as an excuse to flatten the note into a safer but shallower summary
 
-If the answer to the first three questions is `no`, the draft is still too shallow and should be revised before save.
+If the answer to the first four quality-review questions is `no`, the draft is still too shallow and should be revised before save.
