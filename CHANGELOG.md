@@ -12,6 +12,10 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+No unreleased user-facing changes yet.
+
+## v2.0.0
+
 - Strengthened note-depth planning with source-grounded central claims, claim boundaries, limiting-result coverage, mechanism-to-result mapping, comparative positioning, reusable takeaways, follow-up questions, and a separate final analytical quality review before readability polish.
 - Expanded benchmark/dataset and clinical paper guidance to cover sample statistics, data access, privacy constraints, and reproducibility boundaries when the paper reports them.
 

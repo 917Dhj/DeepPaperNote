@@ -8,7 +8,7 @@
 
 [![Homepage](https://img.shields.io/badge/homepage-online-2563eb)](https://917dhj.github.io/DeepPaperNote/)
 [![Status](https://img.shields.io/badge/status-stable-16a34a)](https://github.com/917Dhj/DeepPaperNote)
-[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v1.1.1)
+[![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.0.0)
 [![License](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
 [![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a)](./references/obsidian-format.md)
@@ -379,6 +379,7 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 
 | 🏷️ Version | 🚦 Status | ✨ Highlights |
 | --- | --- | --- |
+| v2.0.0 | ✅ Released | Major upgrade for deeper evidence-first notes, raw-source grounding, paper-type-aware writing, and more reliable figure/table handling |
 | v1.1.1 | ✅ Released | Patch release tightening figure placeholder validation and table crop quality checks |
 | v1.1.0 | ✅ Released | Major figure/table extraction upgrade with caption-anchored crops, visual quality gates, and placeholder-first figure asset candidates |
 | v1.0.1 | ✅ Released | Patch release for Obsidian-native frontmatter formatting, lint compatibility fixes, and cleaner README assets |
@@ -387,7 +388,7 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 | v0.3.0-alpha | ✅ Released | Major quality upgrade: dedicated innovation section, explicit mechanism flow, stronger workflow discipline, final readability review, math syntax gate, and the new `Original Abstract Translation` front-matter block |
 | v0.2.0-alpha | ✅ Released | Replication-oriented note-writing upgrade: explicit `note_plan`, equation-aware output, stricter final self-review, bilingual abstract handling, and stronger formatting checks |
 | v0.1.0-alpha | ✅ Released | First public alpha: evidence-bundle workflow, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
-| Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v1.1.1 |
+| Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v2.0.0 |
 
 ## ⚙️ Workflow
 
