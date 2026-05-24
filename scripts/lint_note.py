@@ -117,6 +117,10 @@ USABLE_CANDIDATE_STATUS_RE = re.compile(
         |
         (?:图像|图片|表格|图|表)?\s*裁剪[^。；，\n>]{0,12}(?<!不)(?:可用|可读|清晰)
         |
+        (?:图像|图片|表格|图|表)[^。；，\n>]{0,12}(?<!不)(?:可用|可读|清晰)
+        |
+        图号\s*匹配
+        |
         匹配度\s*高
         |
         高\s*置信(?:度)?[^。；，\n>]{0,12}候选
@@ -145,24 +149,6 @@ USABLE_CANDIDATE_VISUAL_DEFECT_RE = re.compile(
         partial|subpanel|contaminat|truncat|incomplete|missing
         |
         caption\s*(?:missing|cut|truncated)
-    )
-    """,
-    flags=re.IGNORECASE | re.VERBOSE,
-)
-
-USABLE_CANDIDATE_LOWER_PRIORITY_RE = re.compile(
-    r"""
-    (?:
-        低优先级|优先级较低|次要|补充性
-        |
-        (?:已插入|已有|already\s+inserted)[^。；\n]{0,40}
-        (?:更核心|更直接|低优先级|同一(?:机制|概念|结论|任务|流程))
-        |
-        (?:Fig(?:ure)?|Table|图|表)\s*[\w.-]*[^。；\n]{0,40}(?:更核心|更直接)
-        |
-        lower[-\s]*priority
-        |
-        more\s+(?:central|direct|core)
     )
     """,
     flags=re.IGNORECASE | re.VERBOSE,
@@ -625,14 +611,9 @@ def figure_status_text(line: str) -> str:
     return stripped.removeprefix("> 当前状态：").strip()
 
 
-def has_lower_priority_placeholder_reason(status_text: str) -> bool:
-    return bool(USABLE_CANDIDATE_LOWER_PRIORITY_RE.search(status_text))
-
-
 def has_accepted_usable_placeholder_reason(status_text: str) -> bool:
     return bool(
         USABLE_CANDIDATE_VISUAL_DEFECT_RE.search(status_text)
-        or USABLE_CANDIDATE_LOWER_PRIORITY_RE.search(status_text)
         or USABLE_CANDIDATE_MATERIALIZATION_BLOCKED_RE.search(status_text)
     )
 
@@ -773,7 +754,7 @@ def figure_callout_real_image_status_issues(text: str) -> list[dict[str, object]
             if not nxt.startswith(">"):
                 break
             status_text = figure_status_text(nxt)
-            if status_text and REAL_IMAGE_STATUS_RE.search(nxt) and not has_lower_priority_placeholder_reason(status_text):
+            if status_text and REAL_IMAGE_STATUS_RE.search(nxt):
                 issues.append(
                     {
                         "line_number": j + 1,

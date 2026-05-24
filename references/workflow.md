@@ -123,7 +123,7 @@ For a normal single-paper note request, the pipeline below is a required executi
 8. `plan_figure_table_decisions`
    Build a decision row for every detected figure/table caption.
    Each item should have one explicit state: `insert`, `placeholder`, `low_priority`, `visual_defect`, or `skip` with reason.
-   High-priority usable figure crops may be marked `insert`, but this is still a final-save obligation, not a pipeline-time vault write.
+   Planned usable figure/table crops with real image paths should be marked `insert`; this is still a final-save obligation, not a pipeline-time vault write.
    Completion condition:
    - every major detected figure/table has a recorded decision or skip reason
 
@@ -163,7 +163,7 @@ For a normal single-paper note request, the pipeline below is a required executi
    Completion condition:
    - every substantive planned section cites either a valid `section_id` or a valid page range
    - every substantive planned section has a paper-specific `focus`/reading goal, not only a valid anchor
-   - high-priority usable figure candidates are not left as vague placeholders
+   - usable figure/table candidates with real image paths are not left as vague placeholders or low-priority placeholders
    - old broad bundle references such as `synthesis_bundle.evidence.method_evidence` are rejected
    - truncated source text blocks full-read drafting unless partial reading was explicitly accepted
 
@@ -240,8 +240,8 @@ For a normal single-paper note request, the pipeline below is a required executi
     - create a new domain only when no existing domain fits well
     - do not save directly into the bare papers root
    Complete the figure decision before this step:
-    - replace high-confidence placeholders with real images
-    - keep lower-confidence items as placeholders
+    - replace usable matched placeholders with real images
+    - keep lower-confidence, missing, contaminated, or blocked items as placeholders
     - pass the figure decision table to `write_obsidian_note.py --figure-decisions ...` so `insert` rows are copied into the paper-local `images/` folder and must be referenced by the final Markdown
     - do not split text writing and figure handling into two separate user turns by default
     If the configured vault or its paper-local `images/` directory cannot currently be written:

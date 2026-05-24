@@ -340,11 +340,7 @@ def validate_figure_decisions(
         return [issue("figure_table_decisions_invalid")]
     valid_decisions = set(WRITING_CONTRACT_RULES["figure_decision_values"])
     usable_insert = WRITING_CONTRACT_RULES["usable_insert_candidate"]
-    max_insert_priority = int(usable_insert["max_priority"])
-    auto_insert_plan_kinds = set(usable_insert.get("plan_kinds", ()))
-    allowed_placeholder_reasons = set(
-        WRITING_CONTRACT_RULES["allowed_usable_placeholder_reasons"]
-    )
+    insertable_kinds = set(usable_insert.get("kinds", ()))
     decision_ids = {
         normalize_whitespace(
             str(item.get("source_id") or item.get("label") or item.get("item_id") or "")
@@ -397,29 +393,21 @@ def validate_figure_decisions(
                     source_id=item.get("source_id") or item.get("label") or "",
                 )
             )
-        try:
-            priority = int(item.get("priority", 99) or 99)
-        except (TypeError, ValueError):
-            priority = 99
         is_required_insert_candidate = (
-            normalize_whitespace(str(item.get("kind", ""))) == usable_insert["kind"]
+            normalize_whitespace(str(item.get("kind", ""))) in insertable_kinds
             and normalize_whitespace(str(item.get("visual_quality_status", "")))
             == usable_insert["visual_quality_status"]
-            and priority <= max_insert_priority
+            and normalize_whitespace(str(item.get("source_image_path", "")))
         )
-        plan_kind = normalize_whitespace(str(item.get("plan_kind", "")))
-        if plan_kind not in auto_insert_plan_kinds:
-            is_required_insert_candidate = False
-        if is_required_insert_candidate and decision == "placeholder":
+        if is_required_insert_candidate and decision != "insert":
             skip_reason = normalize_whitespace(str(item.get("skip_reason", "")))
-            if skip_reason not in allowed_placeholder_reasons:
-                issues.append(
-                    issue(
-                        "usable_insert_candidate_left_placeholder",
-                        source_id=item.get("source_id") or item.get("label") or "",
-                        skip_reason=skip_reason,
-                    )
+            issues.append(
+                issue(
+                    "usable_insert_candidate_left_placeholder",
+                    source_id=item.get("source_id") or item.get("label") or "",
+                    skip_reason=skip_reason,
                 )
+            )
     return issues
 
 

@@ -295,6 +295,8 @@ def test_usable_candidate_soft_placeholder_reasons_fail_figure_structure_gate() 
         "图像匹配度高，但最终笔记不插入真实图片。",
         "表格裁剪清晰，但正文已摘录核心数值。",
         "虽然有可用候选图，但表格内容在正文中更适合直接转写关键数值。",
+        "已人工查看，裁剪清晰且图号匹配；但 Fig. 1 已承担主流程说明，因此作为低优先级补充图保留占位。",
+        "已人工查看，图像清晰且图号匹配；由于它服务于辅助集说明，而非主结论，因此作为低优先级补充图保留占位。",
     ]
     for status in statuses:
         note = f"""# Title
@@ -325,7 +327,7 @@ def test_usable_candidate_visual_defect_placeholder_reason_passes() -> None:
     assert figure_structure_passes(note) is True
 
 
-def test_usable_candidate_lower_priority_placeholder_reason_passes() -> None:
+def test_usable_candidate_lower_priority_placeholder_reason_fails() -> None:
     note = """# Title
 
 ## 方法主线
@@ -335,8 +337,9 @@ def test_usable_candidate_lower_priority_placeholder_reason_passes() -> None:
 > 放置原因：帮助理解补充机制。
 > 当前状态：候选裁剪可用；已插入 Figure 2 作为同一机制更核心图，因此本图低优先级。
 """
-    assert figure_structure_issues(note) == []
-    assert figure_structure_passes(note) is True
+    issues = figure_structure_issues(note)
+    assert any(issue["reason"] == "usable_candidate_unresolved_decision" for issue in issues)
+    assert figure_structure_passes(note) is False
 
 
 def test_usable_candidate_materialization_blocked_reason_passes() -> None:

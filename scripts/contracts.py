@@ -278,14 +278,12 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
     ),
     "figure_decision_values": ("insert", "placeholder", "low_priority", "visual_defect", "skip"),
     "usable_insert_candidate": {
-        "kind": "figure",
-        "max_priority": 2,
+        "kinds": ("figure", "table"),
         "visual_quality_status": "usable_candidate",
-        "plan_kinds": ("method_overview", "data_or_task_overview", "main_result"),
+        "requires_source_image_path": True,
     },
     "allowed_usable_placeholder_reasons": (
         "visual_defect",
-        "lower_priority_related_inserted",
         "materialization_blocked",
     ),
     "manual_visual_review_required_statuses": (

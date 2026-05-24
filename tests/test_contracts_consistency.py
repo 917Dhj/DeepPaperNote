@@ -234,10 +234,9 @@ def test_bundle_exposes_depth_and_figure_decision_contracts_without_old_inputs()
         >= 20
     )
     assert writing_contract["figure_table_contract"]["usable_insert_candidate"] == {
-        "kind": "figure",
-        "max_priority": 2,
+        "kinds": ["figure", "table"],
         "visual_quality_status": "usable_candidate",
-        "plan_kinds": ["method_overview", "data_or_task_overview", "main_result"],
+        "requires_source_image_path": True,
     }
     assert "materialization_blocked" in writing_contract["figure_table_contract"][
         "allowed_usable_placeholder_reasons"

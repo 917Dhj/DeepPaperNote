@@ -48,12 +48,13 @@ def test_bundle_compact_writing_contract_keeps_depth_rules_without_old_bundle_fi
         ),
     }
     assert contract["figure_table_contract"]["usable_insert_candidate"] == {
-        "kind": WRITING_CONTRACT_RULES["usable_insert_candidate"]["kind"],
-        "max_priority": WRITING_CONTRACT_RULES["usable_insert_candidate"]["max_priority"],
+        "kinds": list(WRITING_CONTRACT_RULES["usable_insert_candidate"]["kinds"]),
         "visual_quality_status": WRITING_CONTRACT_RULES["usable_insert_candidate"][
             "visual_quality_status"
         ],
-        "plan_kinds": list(WRITING_CONTRACT_RULES["usable_insert_candidate"]["plan_kinds"]),
+        "requires_source_image_path": WRITING_CONTRACT_RULES["usable_insert_candidate"][
+            "requires_source_image_path"
+        ],
     }
     assert contract["figure_table_contract"]["manual_visual_review_required_statuses"] == list(
         WRITING_CONTRACT_RULES["manual_visual_review_required_statuses"]

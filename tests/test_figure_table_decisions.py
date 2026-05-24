@@ -205,7 +205,9 @@ def test_figure_table_decisions_dedupe_figure_and_fig_variants(tmp_path: Path) -
     assert payload["decisions"][0]["decision"] == "insert"
 
 
-def test_figure_table_decisions_require_insertable_plan_kind(tmp_path: Path) -> None:
+def test_figure_table_decisions_insert_selected_usable_figure_regardless_priority(
+    tmp_path: Path,
+) -> None:
     source_manifest = {
         "captions": {
             "figures": [{"id": "Figure 1", "caption": "Auxiliary distribution", "page": 2}],
@@ -219,7 +221,7 @@ def test_figure_table_decisions_require_insertable_plan_kind(tmp_path: Path) -> 
                     "id": "Figure 1",
                     "kind": "data_or_task",
                     "section": "数据与任务定义",
-                    "priority": 1,
+                    "priority": 3,
                     "figure_asset_candidate": {
                         "filename": "page_002_fig_figure_1.png",
                         "path": "/tmp/images/page_002_fig_figure_1.png",
@@ -233,11 +235,11 @@ def test_figure_table_decisions_require_insertable_plan_kind(tmp_path: Path) -> 
     payload = run_decisions(tmp_path, source_manifest, figures)
     decision = payload["decisions"][0]
 
-    assert decision["decision"] == "placeholder"
+    assert decision["decision"] == "insert"
     assert decision["plan_kind"] == "data_or_task"
 
 
-def test_figure_table_decisions_keep_usable_tables_as_placeholders(tmp_path: Path) -> None:
+def test_figure_table_decisions_insert_selected_usable_tables(tmp_path: Path) -> None:
     source_manifest = {
         "captions": {
             "figures": [],
@@ -264,5 +266,5 @@ def test_figure_table_decisions_keep_usable_tables_as_placeholders(tmp_path: Pat
     payload = run_decisions(tmp_path, source_manifest, figures)
     decision = payload["decisions"][0]
 
-    assert decision["decision"] == "placeholder"
-    assert decision["skip_reason"] == "not_auto_insertable_by_kind_or_priority"
+    assert decision["decision"] == "insert"
+    assert decision["skip_reason"] == ""

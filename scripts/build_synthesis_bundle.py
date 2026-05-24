@@ -274,7 +274,7 @@ def compact_writing_contract() -> dict:
         depth_requirements["generic_focus_phrases"]
     )
     usable_insert_candidate = dict(WRITING_CONTRACT_RULES["usable_insert_candidate"])
-    usable_insert_candidate["plan_kinds"] = list(usable_insert_candidate["plan_kinds"])
+    usable_insert_candidate["kinds"] = list(usable_insert_candidate["kinds"])
     analysis_coverage = dict(WRITING_CONTRACT_RULES["analysis_coverage_contract"])
     analysis_coverage["central_claim_fields"] = list(
         analysis_coverage["central_claim_fields"]

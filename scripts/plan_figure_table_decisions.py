@@ -16,9 +16,7 @@ from common import (
 )
 
 DECISION_VALUES = {"insert", "placeholder", "low_priority", "visual_defect", "skip"}
-INSERTABLE_KIND = "figure"
-INSERTABLE_PRIORITY_MAX = 2
-AUTO_INSERT_PLAN_KINDS = {"method_overview", "data_or_task_overview", "main_result"}
+INSERTABLE_KINDS = {"figure", "table"}
 
 
 def parser() -> argparse.ArgumentParser:
@@ -137,16 +135,9 @@ def source_image_filename(plan_item: dict[str, Any]) -> str:
 def should_insert(caption: dict[str, Any], plan_item: dict[str, Any], status: str) -> bool:
     if status != "usable_candidate":
         return False
-    if caption.get("kind") != INSERTABLE_KIND:
+    if caption.get("kind") not in INSERTABLE_KINDS:
         return False
-    plan_kind = normalize_whitespace(str(plan_item.get("kind", "")))
-    if plan_kind not in AUTO_INSERT_PLAN_KINDS:
-        return False
-    try:
-        priority = int(plan_item.get("priority", 99) or 99)
-    except (TypeError, ValueError):
-        priority = 99
-    return priority <= INSERTABLE_PRIORITY_MAX and bool(source_image_path(plan_item))
+    return bool(source_image_path(plan_item))
 
 
 def decide(caption: dict[str, Any], plan_item: dict[str, Any] | None) -> dict[str, Any]:
@@ -193,7 +184,7 @@ def decide(caption: dict[str, Any], plan_item: dict[str, Any] | None) -> dict[st
     else:
         base["decision"] = "placeholder"
         if status == "usable_candidate":
-            base["skip_reason"] = "not_auto_insertable_by_kind_or_priority"
+            base["skip_reason"] = "asset_candidate_missing"
         elif status:
             base["skip_reason"] = "visual_quality_requires_review"
         else:

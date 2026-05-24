@@ -242,7 +242,9 @@ If the bundle contains candidate figure pages or candidate image files:
 - still make the final decision yourself rather than trusting the candidate ranking blindly
 - for `usable_candidate` or `needs_visual_quality_check` / `review`, make that final decision only after opening and inspecting the actual candidate image file; do not say manual visual review found no reliable candidate unless that inspection actually happened
 - treat `reject_visual_quality` and `asset_candidate_missing` as automatic fail-closed script outcomes that do not require manual visual review
-- if a candidate is usable, resolve it explicitly as inserted, kept for a concrete visual defect, kept as lower-priority because a more central related figure is already inserted, or kept because materialization/copy/write failed
+- if a candidate is usable and has a real image path, insert it
+- do not keep a usable candidate as a placeholder merely because it is lower priority, supplemental, already summarized in text, or less central than another inserted figure/table
+- keep a placeholder only when there is a concrete visual defect, missing candidate, unresolved visual review, identity mismatch, contamination, or materialization/copy/write failure
 - never describe a missing image asset, empty `source_image_path`, `asset_candidate_missing`, or absent independent crop as a materialization/copy failure
 - if the crop contains a different Figure/Table caption or another figure body, describe that as contamination/visual defect or lack of an independent crop, not as a usable clean candidate
 - do not keep a usable candidate as a placeholder only because the note should stay light, the values were transcribed, the figure can be checked later, or it is convenient as a back-reference

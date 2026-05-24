@@ -351,6 +351,7 @@ def test_lint_grounding_rejects_placeholder_decision_for_usable_candidate(tmp_pa
                 "visual_quality_status": "usable_candidate",
                 "priority": 1,
                 "plan_kind": "method_overview",
+                "source_image_path": "/tmp/images/page_004_fig_figure_1.png",
                 "skip_reason": "not_auto_insertable_by_kind_or_priority",
             }
         ]
@@ -386,6 +387,38 @@ def test_lint_grounding_rejects_high_priority_usable_figure_placeholder(
                 "visual_quality_status": "usable_candidate",
                 "priority": 1,
                 "plan_kind": "method_overview",
+                "source_image_path": "/tmp/images/page_004_fig_figure_1.png",
+                "skip_reason": "not_auto_insertable_by_kind_or_priority",
+            }
+        ]
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        source_manifest(),
+        slim_bundle(),
+        figure_decisions=decisions,
+    )
+    codes = {issue["code"] for issue in result["issues"]}
+
+    assert result["passes_grounding"] is False
+    assert "usable_insert_candidate_left_placeholder" in codes
+
+
+def test_lint_grounding_rejects_lower_priority_usable_figure_placeholder(
+    tmp_path: Path,
+) -> None:
+    decisions = {
+        "decisions": [
+            {
+                "source_id": "Figure 2",
+                "kind": "figure",
+                "decision": "placeholder",
+                "visual_quality_status": "usable_candidate",
+                "priority": 3,
+                "plan_kind": "data_or_task",
+                "source_image_path": "/tmp/images/page_003_fig_figure_2.png",
                 "skip_reason": "not_auto_insertable_by_kind_or_priority",
             }
         ]

@@ -47,12 +47,13 @@ Do not let scripts make the final semantic choice; scripts should only prepare c
 
 ## Usable Candidate Decision Contract
 
-`usable_candidate` means the candidate is eligible for final judgment; it is not an automatic insertion command.
+`usable_candidate` means the pipeline found a candidate that is visually eligible to insert.
 For every usable figure/table candidate, resolve the final note into one of these states:
 - `insert`: materialize the image and replace the placeholder with the real image plus one italic caption line
 - `kept_placeholder_visual_defect`: keep the placeholder because manual review found a concrete visual defect, such as contamination, truncation, missing table body, partial subfigure, or caption loss
-- `kept_placeholder_lower_priority`: keep the placeholder because a more central or more direct related figure/table is already inserted
 - `kept_placeholder_materialization_blocked`: keep the placeholder because `materialize_figure_asset.py` or file copy/write permission failed
+
+Do not keep a usable candidate as a placeholder merely because it is lower priority, supplemental, already summarized in text, or less central than another inserted figure/table. If a usable candidate is important enough to appear as a callout in the final note, insert the real image. If it is not important enough to appear, omit it or summarize it in prose rather than leaving a placeholder.
 
 For `usable_candidate` and `needs_visual_quality_check` / `review` candidates, final visual judgment requires opening and inspecting the actual candidate image file.
 Do not write that manual visual review found no reliable insertable candidate unless that inspection actually happened.
@@ -63,7 +64,7 @@ Keep missing-candidate cases separate from materialization failures:
 - reserve `materialization blocked` only for a real chosen image asset that failed during `materialize_figure_asset.py`, final copy, permission, or `write_obsidian_note.py`
 - if a crop includes another Figure/Table caption or another figure body, treat it as a visual defect or missing independent candidate; do not call it usable just because it contains the target label
 
-`plan_figure_table_decisions.py` may preselect high-priority usable figure crops as `insert`.
+`plan_figure_table_decisions.py` preselects planned usable figure/table crops as `insert`.
 That does not mean `run_pipeline.py` writes into the vault; materialization happens at the final save step, where `write_obsidian_note.py --figure-decisions ...` copies the selected images and refuses a note that does not reference the selected image path.
 
 Do not use soft reasons such as keeping the note light, values already transcribed, future lookup, or convenient back-reference as the standalone reason for keeping a usable candidate as a placeholder.
