@@ -962,17 +962,95 @@ a {
   padding: 24px;
 }
 
-.terminal-card code {
+.terminal-command {
+  align-items: center;
   background: var(--surface-elevated);
   border: 1px solid rgba(250, 249, 245, 0.12);
   border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  min-height: 82px;
+  padding-right: 10px;
+}
+
+.terminal-card code {
   color: var(--on-dark);
   display: block;
   font-family: var(--mono);
   font-size: 14px;
   line-height: 1.6;
   overflow-wrap: anywhere;
-  padding: 14px 16px;
+  padding: 14px 0 14px 16px;
+}
+
+.copy-command-button {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgba(250, 249, 245, 0.72);
+  cursor: pointer;
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  padding: 0;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+  width: 36px;
+}
+
+.copy-command-button:hover,
+.copy-command-button:focus-visible {
+  background: rgba(250, 249, 245, 0.12);
+  border-color: rgba(250, 249, 245, 0.28);
+  color: #ffffff;
+}
+
+.copy-command-button:focus-visible {
+  outline: 2px solid rgba(250, 249, 245, 0.46);
+  outline-offset: 3px;
+}
+
+.copy-command-button:active {
+  transform: scale(0.96);
+}
+
+.copy-command-button.is-copied {
+  background: rgba(204, 119, 86, 0.22);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.copy-command-button.is-copied:hover,
+.copy-command-button.is-copied:focus-visible {
+  border-color: rgba(204, 119, 86, 0.48);
+}
+
+.copy-command-icon {
+  fill: none;
+  height: 17px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 17px;
+}
+
+.copy-command-icon-check {
+  display: none;
+}
+
+.copy-command-button.is-copied .copy-command-icon-copy {
+  display: none;
+}
+
+.copy-command-button.is-copied .copy-command-icon-check {
+  display: block;
 }
 
 .site-footer {

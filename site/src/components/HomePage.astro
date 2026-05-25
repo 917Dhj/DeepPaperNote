@@ -52,6 +52,8 @@ const faviconHref = `${basePath}favicon.svg`;
 const demoLang = locale === "zh" ? "zh" : "en";
 const demoSrc = `${basePath}demos/deeppapernote-readme-demo/index.html?lang=${demoLang}&theme=dark`;
 const starLocale = locale === "zh" ? "zh-CN" : "en";
+const copyCommandLabel = locale === "zh" ? "复制命令" : "Copy command";
+const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
 ---
 
 <html lang={content.lang} data-theme-preference="system" data-theme="dark">
@@ -411,7 +413,40 @@ const starLocale = locale === "zh" ? "zh-CN" : "en";
           <p>{content.install.body}</p>
         </div>
         <div class="terminal-card" aria-label={content.install.commandsLabel}>
-          {content.install.commands.map((command) => <code>{command}</code>)}
+          {
+            content.install.commands.map((command) => (
+              <div class="terminal-command">
+                <code>{command}</code>
+                <button
+                  class="copy-command-button"
+                  type="button"
+                  aria-label={copyCommandLabel}
+                  title={copyCommandLabel}
+                  data-copy-command={command}
+                  data-copy-label={copyCommandLabel}
+                  data-copied-label={copiedCommandLabel}
+                >
+                  <svg
+                    class="copy-command-icon copy-command-icon-copy"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <svg
+                    class="copy-command-icon copy-command-icon-check"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d="M20 6 9 17l-5-5"></path>
+                  </svg>
+                </button>
+              </div>
+            ))
+          }
         </div>
       </section>
     </main>
@@ -535,6 +570,66 @@ const starLocale = locale === "zh" ? "zh-CN" : "en";
             });
         }
       }
+
+      document.querySelectorAll("[data-copy-command]").forEach((button) => {
+        let resetTimer;
+
+        const copyTextFallback = (text) => {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.setAttribute("readonly", "");
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          const copied = document.execCommand("copy");
+          textarea.remove();
+
+          if (!copied) {
+            throw new Error("Copy command failed");
+          }
+        };
+
+        const copyText = async (text) => {
+          if (navigator.clipboard?.writeText) {
+            try {
+              await navigator.clipboard.writeText(text);
+              return;
+            } catch {
+              copyTextFallback(text);
+              return;
+            }
+          }
+
+          copyTextFallback(text);
+        };
+
+        button.addEventListener("click", async () => {
+          const command = button.getAttribute("data-copy-command");
+
+          if (!command) {
+            return;
+          }
+
+          const copyLabel = button.getAttribute("data-copy-label") || "Copy command";
+          const copiedLabel = button.getAttribute("data-copied-label") || "Copied";
+
+          try {
+            await copyText(command);
+            window.clearTimeout(resetTimer);
+            button.classList.add("is-copied");
+            button.setAttribute("aria-label", copiedLabel);
+            button.setAttribute("title", copiedLabel);
+            resetTimer = window.setTimeout(() => {
+              button.classList.remove("is-copied");
+              button.setAttribute("aria-label", copyLabel);
+              button.setAttribute("title", copyLabel);
+            }, 1600);
+          } catch {
+            button.classList.remove("is-copied");
+          }
+        });
+      });
     </script>
   </body>
 </html>
