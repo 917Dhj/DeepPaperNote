@@ -15,6 +15,7 @@ node_modules/
 .astro/
 dist/
 build/
+tmp/
 *.egg-info/
 .agent-work/
 .claude/
