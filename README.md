@@ -590,6 +590,10 @@ DeepPaperNote was influenced by projects that take paper reading, evidence extra
   </picture>
 </a>
 
-## 📄 License
+<p align="center">
+  <em>Thanks for reading, using, and supporting DeepPaperNote. May your paper-reading days be a little clearer, calmer, and more rewarding.</em>
+</p>
 
-This project is licensed under the [MIT License](./LICENSE).
+<p align="center">
+  <a href="./LICENSE">MIT License</a> &copy; <a href="https://github.com/917Dhj">917Dhj</a>
+</p>

@@ -580,6 +580,10 @@ DeepPaperNote 在工作流设计上受到了这些论文阅读 / 笔记生成项
   </picture>
 </a>
 
-## 📄 License
+<p align="center">
+  <em>感谢你阅读、使用和支持 DeepPaperNote。愿你的每一次论文精读，都更清晰、更从容，也更有收获。</em>
+</p>
 
-本项目采用 [MIT License](./LICENSE)。
+<p align="center">
+  <a href="./LICENSE">MIT License</a> &copy; <a href="https://github.com/917Dhj">917Dhj</a>
+</p>
