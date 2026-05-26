@@ -86,6 +86,7 @@ export type HomePageContent = {
     commandsLabel: string;
     commands: string[];
   };
+  closingNote: string;
   footer: {
     by: string;
     github: string;
@@ -221,6 +222,8 @@ export const homePages: Record<Locale, HomePageContent> = {
         "Turn this paper into an Obsidian note: https://arxiv.org/abs/1706.03762",
       ],
     },
+    closingNote:
+      "Thanks for reading, using, and supporting DeepPaperNote. May your paper-reading days be a little clearer, calmer, and more rewarding.",
     footer: {
       by: "by",
       github: "GitHub",
@@ -348,6 +351,8 @@ export const homePages: Record<Locale, HomePageContent> = {
         "把这篇文章整理成 Obsidian 笔记：https://arxiv.org/abs/1706.03762",
       ],
     },
+    closingNote:
+      "感谢你阅读、使用和支持 DeepPaperNote。愿你的每一次论文精读，都更清晰、更从容，也更有收获。",
     footer: {
       by: "by",
       github: "GitHub",

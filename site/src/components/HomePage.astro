@@ -451,20 +451,28 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
       </section>
     </main>
 
+    <section class="closing-note">
+      <p>
+        <em>{content.closingNote}</em>
+      </p>
+    </section>
+
     <footer class="site-footer">
-      <span class="footer-credit">
-        <span class="footer-product">DeepPaperNote</span>
-        <span class="footer-muted">· {content.footer.by}</span>
-        <a href="https://github.com/917Dhj">917Dhj</a>
-      </span>
-      <a class="github-link" href="https://github.com/917Dhj/DeepPaperNote">
-        <svg class="link-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <path d={githubIconPath} fill="currentColor" />
-        </svg>
-        <span>{content.footer.github}</span>
-      </a>
-      <a href="https://github.com/917Dhj/DeepPaperNote/releases">{content.footer.releases}</a>
-      <a href="https://github.com/917Dhj/DeepPaperNote/issues">{content.footer.issues}</a>
+      <div class="footer-links">
+        <span class="footer-credit">
+          <span class="footer-product">DeepPaperNote</span>
+          <span class="footer-muted">· {content.footer.by}</span>
+          <a href="https://github.com/917Dhj">917Dhj</a>
+        </span>
+        <a class="github-link" href="https://github.com/917Dhj/DeepPaperNote">
+          <svg class="link-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d={githubIconPath} fill="currentColor" />
+          </svg>
+          <span>{content.footer.github}</span>
+        </a>
+        <a href="https://github.com/917Dhj/DeepPaperNote/releases">{content.footer.releases}</a>
+        <a href="https://github.com/917Dhj/DeepPaperNote/issues">{content.footer.issues}</a>
+      </div>
     </footer>
     <script>
       const starTarget = document.querySelector("[data-star-count]");
