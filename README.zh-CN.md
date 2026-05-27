@@ -97,7 +97,7 @@ DeepPaperNote 同时支持 Claude Code 和 Codex。
 
 #### npx Skills（推荐）
 
-大多数情况下，可以直接用 npx 安装：
+大多数情况下，可以直接用 npx 安装。在终端运行：
 
 ```bash
 npx skills add 917Dhj/DeepPaperNote
@@ -111,6 +111,10 @@ npx skills add 917Dhj/DeepPaperNote
 npx skills add 917Dhj/DeepPaperNote -a codex
 npx skills add 917Dhj/DeepPaperNote -a claude-code
 ```
+
+##### 更新
+
+如果要更新已有的 DeepPaperNote 版本，重新运行 npx 安装命令即可；它会替换目标 skills 目录中的现有版本。
 
 #### 手动安装
 

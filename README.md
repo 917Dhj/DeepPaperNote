@@ -97,7 +97,7 @@ DeepPaperNote supports both Claude Code and Codex.
 
 #### npx Skills (Recommended)
 
-For most users, install directly with npx:
+For most users, install directly with npx. Run in your terminal:
 
 ```bash
 npx skills add 917Dhj/DeepPaperNote
@@ -111,6 +111,10 @@ You can also install for a specific agent directly:
 npx skills add 917Dhj/DeepPaperNote -a codex
 npx skills add 917Dhj/DeepPaperNote -a claude-code
 ```
+
+##### Update
+
+To update an existing DeepPaperNote installation, rerun the same command; it will replace the copy in the target skill directory.
 
 #### Manual install
 
