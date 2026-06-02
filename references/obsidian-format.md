@@ -32,6 +32,7 @@ If the user already has a vault convention, preserve it.
 - Prefer short paragraphs over long bullet lists.
 - Use bullets for metadata and sharply list-shaped content.
 - Keep code or metric identifiers in backticks.
+- When English proper nouns (model names, dataset names, method names, metric names, venue abbreviations) or standalone key numeric values appear inline within Chinese prose, wrap them in backticks for visual separation — e.g. `GPT-4`、`SQuAD`、`BLEU`、`87.3%`.
 - Preserve stable internal links where useful.
 - Use normal LaTeX delimiters for math:
   - inline math: `$...$`

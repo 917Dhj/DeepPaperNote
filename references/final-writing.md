@@ -138,6 +138,7 @@ The final Chinese note must also pass a language-cleanliness check:
   - math symbols
   - code tokens
   - original paper figure/table ids
+- when any of the above retained English terms or standalone key numbers appear inline within Chinese prose, wrap them in backticks for visual separation
 - English that should usually be rewritten into natural Chinese:
   - ordinary English phrases
   - abstract descriptive phrases in analytical prose
