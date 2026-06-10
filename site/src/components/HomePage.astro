@@ -479,7 +479,7 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
 
       if (starTarget) {
         const cacheKey = "deeppapernote:github-stars";
-        const staleCacheTtl = 24 * 60 * 60 * 1000;
+        const cacheTtl = 10 * 60 * 1000;
         const repoUrl = "https://api.github.com/repos/917Dhj/DeepPaperNote";
         const starPill = starTarget.closest("[data-star-pill]");
         const fallbackLabel = starTarget.getAttribute("data-star-fallback") || "Stars";
@@ -542,45 +542,41 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
           starPill?.setAttribute("aria-label", ariaTemplate.replace("{count}", label));
         };
 
-        const applyFallbackLabel = () => {
-          starTarget.textContent = fallbackLabel;
-          starPill?.setAttribute("aria-label", fallbackLabel);
-        };
-
         const cachedStars = readCachedStars();
 
         if (cachedStars) {
           applyStars(cachedStars.count);
         }
 
-        fetch(repoUrl, {
-          cache: "no-store",
-          headers: {
-            Accept: "application/vnd.github+json",
-          },
-        })
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error(`GitHub stars request failed: ${response.status}`);
-            }
-
-            return response.json();
+        if (!cachedStars || Date.now() - cachedStars.timestamp >= cacheTtl) {
+          fetch(repoUrl, {
+            headers: {
+              Accept: "application/vnd.github+json",
+            },
           })
-          .then((repo) => {
-            const count = Number(repo.stargazers_count);
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`GitHub stars request failed: ${response.status}`);
+              }
 
-            if (!Number.isFinite(count)) {
-              return;
-            }
+              return response.json();
+            })
+            .then((repo) => {
+              const count = Number(repo.stargazers_count);
 
-            applyStars(count);
-            writeCachedStars(count);
-          })
-          .catch(() => {
-            if (!cachedStars || Date.now() - cachedStars.timestamp > staleCacheTtl) {
-              applyFallbackLabel();
-            }
-          });
+              if (!Number.isFinite(count)) {
+                return;
+              }
+
+              applyStars(count);
+              writeCachedStars(count);
+            })
+            .catch(() => {
+              if (!cachedStars) {
+                starTarget.textContent = fallbackLabel;
+              }
+            });
+        }
       }
 
       document.querySelectorAll("[data-copy-command]").forEach((button) => {
