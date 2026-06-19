@@ -252,6 +252,14 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
         "局限",
     ),
     "allowed_grounding_reference_forms": ("section_id", "pages"),
+    "excluded_model_input_fields": (
+        "evidence",
+        "evidence_pack",
+        "candidate_chunks",
+        "section_texts",
+        "summary",
+        "summary_hints",
+    ),
     "old_bundle_reference_prefixes": (
         "synthesis_bundle.evidence",
         "bundle.evidence",

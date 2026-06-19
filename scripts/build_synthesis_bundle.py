@@ -307,11 +307,17 @@ def compact_writing_contract() -> dict:
         "contracts_by_paper_type": PAPER_TYPE_CONTRACTS,
         "grounding_contract": {
             "source_of_truth": "source_manifest",
+            "source_index_source_of_truth": "source_manifest",
+            "truncation_source_of_truth": "source_manifest.coverage_or_pdf",
+            "partial_reading_acceptance_owner": "note_plan_or_grounding",
             "accepted_reference_forms": list(
                 WRITING_CONTRACT_RULES["allowed_grounding_reference_forms"]
             ),
             "required_sections": list(WRITING_CONTRACT_RULES["grounding_required_sections"]),
             "note_plan_depth_requirements": depth_requirements,
+            "excluded_model_input_fields": list(
+                WRITING_CONTRACT_RULES["excluded_model_input_fields"]
+            ),
             "reject_old_references": list(WRITING_CONTRACT_RULES["old_bundle_reference_prefixes"]),
             "lint_command": (
                 "scripts/lint_grounding.py --note-plan ... "

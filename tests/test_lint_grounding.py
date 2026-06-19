@@ -5,7 +5,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from contracts import PAPER_TYPE_CONTRACTS
+import pytest
+
+from contracts import PAPER_TYPE_CONTRACTS, WRITING_CONTRACT_RULES
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LINT_GROUNDING_SCRIPT = PROJECT_ROOT / "scripts" / "lint_grounding.py"
@@ -212,6 +214,21 @@ def test_lint_grounding_rejects_old_bundle_summary_field(tmp_path: Path) -> None
 
     assert result["passes_grounding"] is False
     assert "summary" in fields
+
+
+@pytest.mark.parametrize("old_key", WRITING_CONTRACT_RULES["excluded_model_input_fields"])
+def test_lint_grounding_rejects_excluded_model_input_fields(
+    tmp_path: Path,
+    old_key: str,
+) -> None:
+    bundle = slim_bundle()
+    bundle[old_key] = {"legacy": True}
+
+    result = run_lint_grounding(tmp_path, grounded_note_plan(), source_manifest(), bundle)
+    fields = {issue.get("field") for issue in result["issues"]}
+
+    assert result["passes_grounding"] is False
+    assert old_key in fields
 
 
 def test_lint_grounding_rejects_old_evidence_pack_refs(tmp_path: Path) -> None:

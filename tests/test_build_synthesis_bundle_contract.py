@@ -29,6 +29,16 @@ def test_bundle_compact_writing_contract_keeps_depth_rules_without_old_bundle_fi
 
     assert contract["note_plan_contract"]["grounding_field"] == "section_plan[*].evidence_sources"
     assert contract["grounding_contract"]["source_of_truth"] == "source_manifest"
+    assert contract["grounding_contract"]["source_index_source_of_truth"] == "source_manifest"
+    assert contract["grounding_contract"]["truncation_source_of_truth"] == (
+        "source_manifest.coverage_or_pdf"
+    )
+    assert contract["grounding_contract"]["partial_reading_acceptance_owner"] == (
+        "note_plan_or_grounding"
+    )
+    assert contract["grounding_contract"]["excluded_model_input_fields"] == list(
+        WRITING_CONTRACT_RULES["excluded_model_input_fields"]
+    )
     assert contract["grounding_contract"]["required_sections"] == list(
         WRITING_CONTRACT_RULES["grounding_required_sections"]
     )
@@ -67,7 +77,36 @@ def test_bundle_compact_writing_contract_keeps_depth_rules_without_old_bundle_fi
     assert contract["analysis_coverage_contract"]["required_plan_fields"] == list(
         WRITING_CONTRACT_RULES["analysis_coverage_contract"]["required_plan_fields"]
     )
-    assert "evidence" not in synthesis
-    assert "candidate_chunks" not in synthesis
-    assert "section_texts" not in synthesis
-    assert "summary" not in synthesis
+    for old_key in WRITING_CONTRACT_RULES["excluded_model_input_fields"]:
+        assert old_key not in synthesis
+
+
+def test_bundle_truncation_warnings_use_source_manifest_not_evidence_pack() -> None:
+    synthesis = bundle(
+        metadata={},
+        evidence_wrapper={
+            "evidence_pack": {
+                "pdf_coverage": {
+                    "total_pages": 4,
+                    "text_truncated": True,
+                    "truncated_due_to_page_limit": True,
+                }
+            }
+        },
+        figures_wrapper={},
+        assets_wrapper={},
+        source_manifest={
+            "coverage": {
+                "total_pages": 4,
+                "text_truncated": False,
+                "truncated_due_to_page_limit": False,
+            }
+        },
+    )
+
+    assert synthesis["coverage"]["source_coverage"] == {
+        "total_pages": 4,
+        "text_truncated": False,
+        "truncated_due_to_page_limit": False,
+    }
+    assert "source_text_truncated" not in synthesis["coverage"]["truncation_warnings"]
