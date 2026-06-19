@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+from pathlib import Path
 from typing import Any
 
 from common import (
@@ -14,6 +15,7 @@ from common import (
     maybe_load_json_record,
     normalize_whitespace,
 )
+from source_corpus import SourceCorpusLoadError, load_source_corpus
 
 DECISION_VALUES = {"insert", "placeholder", "low_priority", "visual_defect", "skip"}
 INSERTABLE_KINDS = {"figure", "table"}
@@ -44,45 +46,75 @@ def normalize_label(label: str) -> str:
     return normalize_whitespace(text)
 
 
+def input_is_file(value: str) -> bool:
+    if not value or value.strip().startswith("{"):
+        return False
+    try:
+        return Path(value).expanduser().is_file()
+    except OSError:
+        return False
+
+
+def normalized_caption_items(raw_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    scores: dict[str, int] = {}
+    order: list[str] = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        label = normalize_whitespace(str(item.get("id") or item.get("label") or ""))
+        caption = normalize_whitespace(str(item.get("caption", "")))
+        if not label and not caption:
+            continue
+        page = item.get("page") or item.get("page_number") or 0
+        group_key = caption_label_key(label)
+        if not group_key:
+            continue
+        candidate = {
+            "kind": item.get("kind", ""),
+            "label": label,
+            "caption": caption,
+            "page": page,
+            "pages": item.get("pages") or ([page] if page else []),
+            "section_id": item.get("section_id", ""),
+        }
+        score = caption_preference_score(label, caption)
+        if group_key not in grouped:
+            grouped[group_key] = candidate
+            scores[group_key] = score
+            order.append(group_key)
+            continue
+        if score > scores[group_key]:
+            grouped[group_key] = candidate
+            scores[group_key] = score
+    return [grouped[key] for key in order]
+
+
 def caption_items(source_manifest: dict[str, Any]) -> list[dict[str, Any]]:
     captions = (
         source_manifest.get("captions", {})
         if isinstance(source_manifest.get("captions"), dict)
         else {}
     )
-    grouped: dict[str, dict[str, Any]] = {}
-    scores: dict[str, int] = {}
-    order: list[str] = []
+    raw_items: list[dict[str, Any]] = []
     for kind, key in (("figure", "figures"), ("table", "tables")):
         for item in captions.get(key, []) or []:
-            if not isinstance(item, dict):
-                continue
-            label = normalize_whitespace(str(item.get("id", "")))
-            caption = normalize_whitespace(str(item.get("caption", "")))
-            if not label and not caption:
-                continue
-            page = item.get("page") or item.get("page_number") or 0
-            group_key = caption_label_key(label)
-            if not group_key:
-                continue
-            candidate = {
-                "kind": kind,
-                "label": label,
-                "caption": caption,
-                "page": page,
-                "pages": item.get("pages") or ([page] if page else []),
-                "section_id": item.get("section_id", ""),
-            }
-            score = caption_preference_score(label, caption)
-            if group_key not in grouped:
-                grouped[group_key] = candidate
-                scores[group_key] = score
-                order.append(group_key)
-                continue
-            if score > scores[group_key]:
-                grouped[group_key] = candidate
-                scores[group_key] = score
-    return [grouped[key] for key in order]
+            if isinstance(item, dict):
+                raw_items.append({**dict(item), "kind": kind})
+    return normalized_caption_items(raw_items)
+
+
+def source_caption_items(
+    source_manifest: dict[str, Any],
+    source_manifest_input: str = "",
+) -> list[dict[str, Any]]:
+    if input_is_file(source_manifest_input):
+        try:
+            corpus = load_source_corpus(source_manifest_input)
+        except SourceCorpusLoadError as exc:
+            raise SystemExit(str(exc)) from exc
+        return normalized_caption_items(corpus.caption_items())
+    return caption_items(source_manifest)
 
 
 def planned_items(figures_wrapper: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -195,11 +227,12 @@ def decide(caption: dict[str, Any], plan_item: dict[str, Any] | None) -> dict[st
 def build_decisions(
     source_manifest: dict[str, Any],
     figures_wrapper: dict[str, Any],
+    source_manifest_input: str = "",
 ) -> list[dict[str, Any]]:
     planned = planned_items(figures_wrapper)
     decisions = [
         decide(caption, planned.get(normalize_label(str(caption.get("label", "")))))
-        for caption in caption_items(source_manifest)
+        for caption in source_caption_items(source_manifest, source_manifest_input)
     ]
     for decision in decisions:
         if decision["decision"] not in DECISION_VALUES:
@@ -213,7 +246,7 @@ def main() -> None:
     source_manifest = load_record(args.source_manifest)
     figures = load_record(args.figures) if args.figures else {}
     _assets = load_record(args.assets) if args.assets else {}
-    decisions = build_decisions(source_manifest, figures)
+    decisions = build_decisions(source_manifest, figures, args.source_manifest)
     payload = {
         "status": "ok",
         "script": "plan_figure_table_decisions.py",
