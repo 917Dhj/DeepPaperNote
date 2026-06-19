@@ -202,6 +202,14 @@ def test_load_source_corpus_exposes_manifest_raw_records_and_views(tmp_path: Pat
     assert corpus.appendix_pages() == [
         {"page": 4, "char_count": 45, "section_ids": ["sec:appendix"]}
     ]
+    assert corpus.appendix_text_pages() == [
+        {
+            "page": 4,
+            "text": "Appendix details describe the implementation.",
+            "section_id": "sec:appendix",
+            "title": "Appendix A",
+        }
+    ]
     assert corpus.coverage()["text_pages_extracted"] == 4
     assert corpus.truncation()["text_truncated"] is False
     assert corpus.language_hint() == "en"
