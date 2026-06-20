@@ -14,6 +14,7 @@ from lint_note import (
     has_figure_marker,
     inspect_note_plan,
     inspect_figure_callouts,
+    inspect_reference_hygiene,
     inspect_substantive_content,
     math_render_issues,
     mechanical_translation_artifact_issues,
@@ -85,6 +86,79 @@ def _valid_note_text() -> str:
 
 - Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example
 """
+
+
+def _valid_plan_payload() -> dict:
+    return {
+        "paper_type": "AI_method",
+        "paper_type_rationale": "The paper proposes a model mechanism and evaluates it experimentally.",
+        "dominant_domain": "reasoning",
+        "must_cover": ["方法主线"],
+        "key_numbers": ["78.5"],
+        "real_comparisons": ["baseline"],
+        "central_claims": [
+            {
+                "claim": "The method improves traceability.",
+                "supporting_evidence": [{"section_id": "sec:method"}],
+                "what_it_actually_proves": "The described mechanism records tool states.",
+                "what_it_does_not_prove": "It does not prove production robustness.",
+            }
+        ],
+        "claim_boundaries": ["The evidence is limited to the reported workflow."],
+        "negative_or_limiting_results": ["The paper does not report multi-service failures."],
+        "mechanism_result_map": ["The failure-state mechanism explains lower unrecoverable errors."],
+        "comparative_positioning": ["The method is compared against answer-only baselines."],
+        "reuse_takeaways": ["Track failure state explicitly."],
+        "followup_questions": ["Check whether the mechanism survives missing tool outputs."],
+        "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
+    }
+
+
+def test_reference_hygiene_allows_images_doi_arxiv_and_urls() -> None:
+    note = (
+        _valid_note_text()
+        + "\n![Figure 1](images/page_001_fig_figure_1.png)\n"
+        + "*论文原图编号：Fig. 1。方法示意图。*\n"
+        + "\n- arXiv: 2401.00001\n"
+        + "- Project: https://example.org/papers/demo\n"
+    )
+
+    assert inspect_reference_hygiene(note) == []
+
+
+def test_reference_hygiene_gate_flags_runtime_artifact_references(tmp_path) -> None:
+    note_path = tmp_path / "Paper.md"
+    plan_path = tmp_path / "Paper.plan.json"
+    note_path.write_text(
+        _valid_note_text().replace(
+            "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
+            "- LLaMA source: /private/tmp/dpn-test-runs/candidate/artifacts/llama_source_manifest.json",
+        ),
+        encoding="utf-8",
+    )
+    plan_path.write_text(json.dumps(_valid_plan_payload()), encoding="utf-8")
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--input",
+            str(note_path),
+            "--plan-file",
+            str(plan_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["passes_reference_hygiene_gate"] is False
+    assert "runtime_artifact_references_present" in payload["warnings"]
+    assert payload["reference_hygiene_issues"]
+    assert payload["reference_hygiene_issues"][0]["reason"] == "runtime_artifact_reference"
+    assert "llama_source_manifest.json" in payload["reference_hygiene_issues"][0]["match"]
 
 
 def test_figure_callout_requires_status_line() -> None:

@@ -169,6 +169,71 @@ def test_write_note_accepts_legacy_lint_json_without_figure_gate(tmp_path: Path)
     assert Path(payload["note_path"]).exists()
 
 
+def test_write_note_refuses_when_reference_hygiene_gate_fails(tmp_path: Path) -> None:
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "passes_basic_structure": True,
+                "passes_style_gate": True,
+                "passes_math_gate": True,
+                "passes_reference_hygiene_gate": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
+    env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
+    env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WRITE_SCRIPT),
+            "--title",
+            "Reference Hygiene Gate Test",
+            "--content",
+            "# Reference Hygiene Gate Test\n\nBody.\n",
+            "--lint-json",
+            str(lint_path),
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "reference hygiene gate failed" in result.stderr
+
+
+def test_write_note_refuses_runtime_artifact_reference_without_lint_json(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
+    env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
+    env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WRITE_SCRIPT),
+            "--title",
+            "Direct Reference Hygiene Test",
+            "--content",
+            "# Direct Reference Hygiene Test\n\n## 引用\n\n- /private/tmp/dpn-test-runs/candidate/artifacts/llama_source_manifest.json\n",
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "reference hygiene gate failed" in result.stderr
+    assert not (tmp_path / "DeepPaperNote_output").exists()
+
+
 def test_write_note_refuses_when_figure_gate_fails(tmp_path: Path) -> None:
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(

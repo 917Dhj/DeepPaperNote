@@ -186,6 +186,20 @@ MISSING_ASSET_MATERIALIZATION_RE = re.compile(
 
 MARKDOWN_IMAGE_EMBED_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*$")
 FIGURE_CALLOUT_TITLE_RE = re.compile(r"^>\s*\[!figure\][+-]?\s*(.*)$")
+HTTP_URL_RE = re.compile(r"https?://\S+")
+
+RUNTIME_ARTIFACT_REFERENCE_PATTERNS = [
+    re.compile(
+        r"\b[A-Za-z0-9][A-Za-z0-9._-]*_"
+        r"(?:source_manifest|note_plan|raw_sections)\."
+        r"(?:json|jsonl)\b",
+        flags=re.IGNORECASE,
+    ),
+    re.compile(r"\b[A-Za-z0-9][A-Za-z0-9._-]*_(?:bundle|lint)\.json\b", flags=re.IGNORECASE),
+    re.compile(r"(?:/private)?/tmp/[^\s)\]>\"']*"),
+    re.compile(r"(?<![A-Za-z0-9:])/?artifacts/[^\s)\]>\"']*"),
+    re.compile(r"\b(?:source_manifest|note_plan|raw_sections)\b", flags=re.IGNORECASE),
+]
 
 MECHANICAL_TRANSLATION_ARTIFACT_RE = re.compile(
     r"""
@@ -319,6 +333,35 @@ def front_matter_order_warnings(text: str) -> list[str]:
     if positions != sorted(positions):
         warnings.append("front_matter_order_invalid")
     return warnings
+
+
+def _inside_any_span(start: int, end: int, spans: list[tuple[int, int]]) -> bool:
+    return any(span_start <= start and end <= span_end for span_start, span_end in spans)
+
+
+def inspect_reference_hygiene(text: str) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    seen: set[tuple[int, str]] = set()
+    for idx, line in enumerate(text.splitlines(), start=1):
+        url_spans = [(match.start(), match.end()) for match in HTTP_URL_RE.finditer(line)]
+        for pattern in RUNTIME_ARTIFACT_REFERENCE_PATTERNS:
+            for match in pattern.finditer(line):
+                matched_text = match.group(0)
+                if _inside_any_span(match.start(), match.end(), url_spans):
+                    continue
+                key = (idx, matched_text)
+                if key in seen:
+                    continue
+                seen.add(key)
+                issues.append(
+                    {
+                        "line_number": idx,
+                        "line": line.strip(),
+                        "reason": "runtime_artifact_reference",
+                        "match": matched_text,
+                    }
+                )
+    return issues
 
 
 METHOD_PAPER_SIGNAL_KEYWORDS = [
@@ -1496,6 +1539,7 @@ def main() -> None:
     math_issues = math_render_issues(text)
     figure_issues = figure_structure_issues(text)
     core_info_issues = core_info_structure_issues(text)
+    reference_hygiene_issues = inspect_reference_hygiene(text)
     substantive_issues = inspect_substantive_content(text)
     planning_artifact_found, planning_artifact_issues = inspect_note_plan(
         resolve_note_plan_path(path, args.plan_file)
@@ -1540,6 +1584,8 @@ def main() -> None:
         warnings.append("suspicious_code_formatted_math")
     if math_issues:
         warnings.append("math_render_issues_present")
+    if reference_hygiene_issues:
+        warnings.append("runtime_artifact_references_present")
 
     payload = {
         "status": "ok",
@@ -1556,6 +1602,7 @@ def main() -> None:
         "math_render_issues": math_issues,
         "figure_structure_issues": figure_issues,
         "core_info_structure_issues": core_info_issues,
+        "reference_hygiene_issues": reference_hygiene_issues,
         "substantive_content_issues": substantive_issues,
         "planning_artifact_found": planning_artifact_found,
         "planning_artifact_issues": planning_artifact_issues,
@@ -1577,6 +1624,7 @@ def main() -> None:
         ),
         "passes_math_gate": not math_issues,
         "passes_figure_gate": not figure_issues,
+        "passes_reference_hygiene_gate": not reference_hygiene_issues,
         "passes_plan_gate": planning_artifact_found and not planning_artifact_issues,
         "passes_substantive_content": not any(
             str(issue.get("severity", "")) == "error" for issue in substantive_issues

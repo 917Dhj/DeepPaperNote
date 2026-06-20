@@ -19,6 +19,7 @@ from common import (
     resolve_obsidian_note_path,
     runtime_config,
 )
+from lint_note import inspect_reference_hygiene
 
 
 def parser() -> argparse.ArgumentParser:
@@ -80,6 +81,21 @@ def note_references_image_embed(note_text: str, expected_relative: str) -> bool:
     return any(
         embed_target_matches(target, expected_relative)
         for target in markdown_targets + obsidian_targets
+    )
+
+
+def require_reference_hygiene(note_text: str, stage: str) -> None:
+    issues = inspect_reference_hygiene(note_text)
+    if not issues:
+        return
+    first = issues[0]
+    match = str(first.get("match", "")).strip()
+    line_number = first.get("line_number", "")
+    detail = f": {match}" if match else ""
+    line_detail = f" on line {line_number}" if line_number else ""
+    raise SystemExit(
+        f"write_obsidian_note.py refused to write note because reference hygiene gate failed"
+        f" {stage}{line_detail}{detail}."
     )
 
 
@@ -146,6 +162,8 @@ def main() -> None:
             raise SystemExit("write_obsidian_note.py refused to write note because plan gate failed.")
         if "passes_substantive_content" in lint and not lint.get("passes_substantive_content", False):
             raise SystemExit("write_obsidian_note.py refused to write note because substantive content gate failed.")
+        if "passes_reference_hygiene_gate" in lint and not lint.get("passes_reference_hygiene_gate", False):
+            raise SystemExit("write_obsidian_note.py refused to write note because reference hygiene gate failed.")
 
     if args.content_file:
         note_text = Path(args.content_file).expanduser().resolve().read_text(encoding="utf-8")
@@ -155,6 +173,7 @@ def main() -> None:
         note_text = sys.stdin.read()
     else:
         raise SystemExit("write_obsidian_note.py requires --content-file, --content, or --stdin.")
+    require_reference_hygiene(note_text, "before save")
 
     config = runtime_config()
     if args.vault:
@@ -188,6 +207,7 @@ def main() -> None:
         else []
     )
     Path(target_path).write_text(note_text, encoding="utf-8")
+    require_reference_hygiene(Path(target_path).read_text(encoding="utf-8"), "after save")
     asset_dir.mkdir(parents=True, exist_ok=True)
 
     payload = {
