@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from build_synthesis_bundle import bundle
-from contracts import NOTE_REQUIRED_SECTIONS, PAPER_TYPE_VALUES
+from contracts import NOTE_REQUIRED_SECTIONS, PAPER_TYPE_VALUES, WRITING_CONTRACT_RULES
 from lint_note import REQUIRED_SECTIONS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -223,10 +223,11 @@ def test_bundle_exposes_depth_and_figure_decision_contracts_without_old_inputs()
     )
     writing_contract = synthesis["writing_contract"]
 
-    assert "evidence" not in synthesis
-    assert "candidate_chunks" not in synthesis
-    assert "section_texts" not in synthesis
-    assert "summary" not in synthesis
+    for old_key in WRITING_CONTRACT_RULES["excluded_model_input_fields"]:
+        assert old_key not in synthesis
+    assert writing_contract["grounding_contract"]["excluded_model_input_fields"] == list(
+        WRITING_CONTRACT_RULES["excluded_model_input_fields"]
+    )
     assert (
         writing_contract["grounding_contract"]["note_plan_depth_requirements"][
             "required_section_focus_min_chars"

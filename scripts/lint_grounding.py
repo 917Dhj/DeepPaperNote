@@ -301,14 +301,7 @@ def validate_bundle_contract(
     if not bundle:
         return []
     issues: list[dict[str, Any]] = []
-    for old_key in (
-        "evidence",
-        "evidence_pack",
-        "candidate_chunks",
-        "section_texts",
-        "summary",
-        "summary_hints",
-    ):
+    for old_key in WRITING_CONTRACT_RULES["excluded_model_input_fields"]:
         if old_key in bundle:
             issues.append(issue("bundle_old_model_input_field_present", field=old_key))
     writing_contract = bundle.get("writing_contract", {})
