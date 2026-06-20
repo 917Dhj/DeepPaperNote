@@ -20,6 +20,28 @@ def test_pdf_source_candidates_add_frontiers_pdf_from_doi(monkeypatch: pytest.Mo
     assert ("pdf_url", "https://www.frontiersin.org/articles/10.3389/fpubh.2019.00399/pdf") in candidates
 
 
+def test_pdf_source_candidates_reuses_existing_pdf_url_without_enrichment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_enrich_metadata(record: dict) -> dict:
+        raise AssertionError("metadata artifact already has a direct PDF candidate")
+
+    monkeypatch.setattr("fetch_pdf.enrich_metadata", fail_enrich_metadata)
+
+    candidates = fetch_pdf.pdf_source_candidates(
+        {
+            "doi": "10.3389/fpubh.2019.00399",
+            "title": "Crisis Lines",
+            "pdf_url": "https://doi.org/10.3389/fpubh.2019.00399",
+        }
+    )
+
+    assert candidates == [
+        ("pdf_url", "https://doi.org/10.3389/fpubh.2019.00399"),
+        ("pdf_url", "https://www.frontiersin.org/articles/10.3389/fpubh.2019.00399/pdf"),
+    ]
+
+
 def test_fetch_pdf_rejects_html_and_falls_back_to_frontiers_pdf(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

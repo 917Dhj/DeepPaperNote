@@ -62,7 +62,7 @@ def main() -> None:
             py,
             str(scripts_dir / "collect_metadata.py"),
             "--input",
-            args.input,
+            str(resolve_json),
             "--output",
             str(metadata_json),
         ]
@@ -72,7 +72,7 @@ def main() -> None:
             py,
             str(scripts_dir / "fetch_pdf.py"),
             "--input",
-            args.input,
+            str(metadata_json),
             "--output",
             str(fetch_json),
         ]

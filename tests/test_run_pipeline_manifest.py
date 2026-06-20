@@ -126,6 +126,19 @@ def test_run_pipeline_does_not_materialize_before_final_save(
         "build_synthesis_bundle.py",
     ]
 
+    resolve_call = calls[0]
+    metadata_call = calls[1]
+    fetch_call = calls[2]
+    assert resolve_call[resolve_call.index("--input") + 1] == "paper.pdf"
+    assert (
+        metadata_call[metadata_call.index("--input") + 1]
+        == str((workdir / "paper_resolve.json").resolve())
+    )
+    assert (
+        fetch_call[fetch_call.index("--input") + 1]
+        == str((workdir / "paper_metadata.json").resolve())
+    )
+
     evidence_call = calls[4]
     assert "--source-manifest" in evidence_call
     assert (

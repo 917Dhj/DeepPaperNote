@@ -14,6 +14,7 @@ from common import (
     http_get_bytes,
     maybe_load_json_record,
     paper_id_for_record,
+    require_ok_input_artifact,
     resolve_reference,
 )
 
@@ -69,10 +70,11 @@ def pdf_source_candidates(record: dict) -> list[tuple[str, str]]:
 
     doi = extract_doi(str(record.get("doi", "")).strip())
     if doi:
-        enriched = enrich_metadata({"doi": doi, "title": record.get("title", "")})
-        enriched_pdf = str(enriched.get("pdf_url", "")).strip()
-        if enriched_pdf:
-            append_candidate(candidates, "pdf_url", enriched_pdf)
+        if not candidates:
+            enriched = enrich_metadata({"doi": doi, "title": record.get("title", "")})
+            enriched_pdf = str(enriched.get("pdf_url", "")).strip()
+            if enriched_pdf:
+                append_candidate(candidates, "pdf_url", enriched_pdf)
         frontiers_pdf = frontiers_pdf_url_from_doi(doi)
         if frontiers_pdf:
             append_candidate(candidates, "pdf_url", frontiers_pdf)
@@ -84,7 +86,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser().parse_args(argv)
     input_record = maybe_load_json_record(args.input)
     if input_record is not None:
-        record = dict(input_record)
+        record = dict(require_ok_input_artifact(input_record, "fetch_pdf.py"))
     else:
         record = enrich_metadata(resolve_reference(args.input))
 

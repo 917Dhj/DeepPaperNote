@@ -92,6 +92,15 @@ def maybe_load_json_record(value: str | None) -> dict[str, Any] | None:
     return None
 
 
+def require_ok_input_artifact(record: dict[str, Any], consumer: str) -> dict[str, Any]:
+    status = normalize_whitespace(str(record.get("status", ""))).lower()
+    if status and status != "ok":
+        producer = normalize_whitespace(str(record.get("script", ""))) or "unknown producer"
+        message = f"{consumer} refuses non-ok input artifact from {producer}: status={status}"
+        raise SystemExit(message)
+    return record
+
+
 def normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "")).strip()
 

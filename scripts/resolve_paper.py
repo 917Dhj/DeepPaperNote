@@ -3,7 +3,14 @@
 
 from __future__ import annotations
 
-from common import base_parser, emit, maybe_load_json_record, paper_id_for_record, resolve_reference
+from common import (
+    base_parser,
+    emit,
+    maybe_load_json_record,
+    paper_id_for_record,
+    require_ok_input_artifact,
+    resolve_reference,
+)
 
 
 def main() -> None:
@@ -15,7 +22,7 @@ def main() -> None:
 
     input_record = maybe_load_json_record(args.input)
     if input_record is not None:
-        resolved = dict(input_record)
+        resolved = dict(require_ok_input_artifact(input_record, "resolve_paper.py"))
     else:
         resolved = resolve_reference(args.input)
 
