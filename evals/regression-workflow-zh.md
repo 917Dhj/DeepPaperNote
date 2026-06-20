@@ -19,7 +19,7 @@ prompt 模板见 `evals/note-evaluator-prompt.md`。
 
 - 论文集合
 - runner 工具和模型设置
-- prompt 形状
+- 子 Codex CLI prompt 模板
 - 每次运行安装的 skill 版本
 - vault 布局
 - 输出 artifact 布局
@@ -42,6 +42,24 @@ paper-set.md
 ```
 
 runner manifest 还应指向 run root 下的机器可读 artifacts。
+
+## Goal 模式与子 Runner Prompt
+
+每个 workflow 阶段的 Agent 都应以 goal mode 启动。本文档中的每个 Agent
+Prompt Template 都以 `/goal` 开头。
+
+Baseline Runner 和 Candidate Runner 为每篇论文启动的独立 Codex CLI session
+是例外：这些子 session 不使用 `/goal`。
+
+每篇论文必须用完全相同的单句 prompt 启动独立 Codex CLI，替换占位符后不
+得添加任何额外信息：
+
+```text
+给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
+```
+
+不要给这个子 prompt 添加额外约束、解释、source path、agent instruction、
+model note 或前后缀。必须在 manifest 中记录实际使用的完整子 prompt。
 
 ## 推荐 Agent 角色
 
@@ -120,6 +138,8 @@ Title | Type | Venue/Year | Note path | PDF or source evidence | Why it is a goo
 ### Paper Finder Agent Prompt Template
 
 ```text
+/goal
+
 目标：
 为 DeepPaperNote 回归测试选择一组可复用的真实论文。
 
@@ -168,26 +188,29 @@ Baseline Runner 负责 baseline manifest。生成笔记前，它必须记录：
 1. 创建隔离 run directory。
 2. 创建或指定隔离 test vault。
 3. 安装或同步 baseline skill 版本。
-4. 使用标准短 generation prompt 运行 runner 工具。
+4. 为每篇论文启动一个独立 Codex CLI session，并使用规定的精确子 prompt。
 5. 保存原始最终笔记和所有 artifacts。
 6. 在 baseline manifest 中记录 present/missing artifacts。
 7. 生成后不要编辑笔记。
 
-runner prompt 应保持简短，只说明：
+单篇论文的子 Codex CLI prompt 必须严格等于：
 
-- 不允许使用 subagents
-- 使用已安装的 DeepPaperNote skill
-- 保存到指定 test vault
-- 论文任务
+```text
+给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
+```
 
-baseline 和 candidate 必须使用相同 prompt 形状。
+runner 可以在这个子 prompt 之外控制 working directory、temp vault、已安装
+skill 版本、日志和 manifest 收集，但不得给子 prompt 添加任何额外文字。
+baseline 和 candidate 必须使用相同的子 prompt 模板。
 
 不要复用旧 baseline artifacts，除非它们使用了相同论文集合、runner 设置、
-prompt 形状和 artifact 收集规则。
+子 Codex CLI prompt 模板和 artifact 收集规则。
 
 ### Baseline Runner Agent Prompt Template
 
 ```text
+/goal
+
 目标：
 使用冻结的 baseline DeepPaperNote 版本为已选论文集生成 baseline 笔记，并写出完整 baseline manifest。
 
@@ -198,14 +221,18 @@ prompt 形状和 artifact 收集规则。
 
 任务：
 - 在运行任何论文前记录 baseline 身份。
-- 使用计划给 candidate run 复用的短 generation prompt 形状。
+- 使用本 workflow 规定的单篇论文子 Codex CLI prompt 模板。
 - 对每篇主测试论文创建隔离 run directory 和 test vault。
 - 同步或安装 baseline skill 版本。
-- 运行 baseline 笔记生成。
+- 为每篇主测试论文启动一个单独的、独立的 Codex CLI session。
+- 每个子 Codex CLI session 中只能使用这个 prompt，替换占位符后不得添加任何其他文字：`给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。`
+- 不要给子 Codex CLI prompt 添加任何额外信息。
 - 保存原始最终笔记、runner logs 和所有可用 artifacts。
-- 显式记录缺失 artifacts。
+- 记录实际使用的完整子 prompt、temp vault path、run directory、final note path、logs、exit status、可用 artifacts 和缺失 artifacts。
 
 约束：
+- 本 workflow 阶段 Agent 使用 `/goal`；单篇论文的子 Codex CLI session 不使用 `/goal`。
+- 不要把多篇论文合并到同一个 Codex CLI session 中运行。
 - 不要评估笔记质量。
 - 不要修补或重写生成笔记。
 - 不要运行 candidate 代码。
@@ -213,7 +240,7 @@ prompt 形状和 artifact 收集规则。
 
 输出：
 - 写入 <BASELINE_MANIFEST_DOC>。
-- manifest 必须包含 baseline 身份、runner 设置、prompt 形状、每篇论文状态、最终笔记路径、artifact 路径和缺失 artifacts。
+- manifest 必须包含 baseline 身份、runner 设置、子 Codex CLI prompt 模板、每篇论文实际使用的完整子 prompt、每篇论文状态、最终笔记路径、artifact 路径、logs、exit status 和缺失 artifacts。
 - 如可行，同时在 <BASELINE_RUN_ROOT> 下写入或更新机器可读 manifest 数据。
 ```
 
@@ -225,7 +252,7 @@ candidate 在相同论文列表上、baseline 之后运行。
 
 1. 使用相同论文身份输入。
 2. 使用相同 runner 工具和模型设置。
-3. 使用相同 prompt 形状。
+3. 使用完全相同的子 Codex CLI prompt 模板。
 4. 使用隔离的 candidate run directory 和 test vault。
 5. 安装或同步 candidate skill 版本。
 6. 保存原始最终笔记和所有 artifacts。
@@ -235,9 +262,17 @@ candidate 在相同论文列表上、baseline 之后运行。
 当 baseline runner 和 candidate runner 共享全局状态时，例如共享 installed
 skill 目录，不应并发运行。
 
+单篇论文的子 Codex CLI prompt 必须与 baseline 使用完全相同的模板：
+
+```text
+给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
+```
+
 ### Candidate Runner Agent Prompt Template
 
 ```text
+/goal
+
 目标：
 在完全相同的论文集上运行 candidate DeepPaperNote 版本，并写出能和 baseline manifest 对齐的 candidate manifest。
 
@@ -248,15 +283,19 @@ skill 目录，不应并发运行。
 - candidate ref 或变更说明：<CANDIDATE_REF_DOC_OR_VALUE>
 
 任务：
-- 确认论文集和 prompt 形状与 baseline manifest 一致。
+- 确认论文集和子 Codex CLI prompt 模板与 baseline manifest 一致。
 - 同步或安装 candidate skill 版本。
 - 对每篇主测试论文创建隔离 candidate run directory 和 test vault。
-- 使用相同 runner 设置和 prompt 形状运行 candidate 笔记生成。
+- 为每篇主测试论文启动一个单独的、独立的 Codex CLI session。
+- 每个子 Codex CLI session 中只能使用这个 prompt，替换占位符后不得添加任何其他文字：`给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。`
+- 不要给子 Codex CLI prompt 添加任何额外信息。
 - 保存原始最终笔记、runner logs 和所有可用 artifacts。
-- 显式记录缺失 artifacts。
+- 记录实际使用的完整子 prompt、temp vault path、run directory、final note path、logs、exit status、可用 artifacts 和缺失 artifacts。
 - 把每个 candidate output 映射到对应 baseline output。
 
 约束：
+- 本 workflow 阶段 Agent 使用 `/goal`；单篇论文的子 Codex CLI session 不使用 `/goal`。
+- 不要把多篇论文合并到同一个 Codex CLI session 中运行。
 - 不要评估笔记质量。
 - 不要修补或重写生成笔记。
 - 不要重跑 baseline。
@@ -264,7 +303,7 @@ skill 目录，不应并发运行。
 
 输出：
 - 写入 <CANDIDATE_MANIFEST_DOC>。
-- manifest 必须包含 candidate 身份、runner 设置、prompt 形状、每篇论文状态、最终笔记路径、artifact 路径、缺失 artifacts 和 baseline/candidate 对应关系。
+- manifest 必须包含 candidate 身份、runner 设置、子 Codex CLI prompt 模板、每篇论文实际使用的完整子 prompt、每篇论文状态、最终笔记路径、artifact 路径、logs、exit status、缺失 artifacts 和 baseline/candidate 对应关系。
 - 如可行，同时在 <CANDIDATE_RUN_ROOT> 下写入或更新机器可读 manifest 数据。
 ```
 
@@ -296,6 +335,8 @@ artifact 改善不等同于最终笔记改善。当 artifacts 或契约改善，
 ### Artifact Auditor Agent Prompt Template
 
 ```text
+/goal
+
 目标：
 审查 baseline 和 candidate run 是否产出了完整、符合契约的 artifacts。
 
@@ -358,6 +399,8 @@ evaluator 不得：
 ### Note Evaluator Agent Prompt Template
 
 ```text
+/goal
+
 目标：
 评估 candidate 最终笔记是否比 baseline 最终笔记有实质提升。
 
@@ -482,6 +525,8 @@ Regression Judge 应产出：
 ### Regression Judge Agent Prompt Template
 
 ```text
+/goal
+
 目标：
 判断本次回归实验是否支持声称 real improvement。
 

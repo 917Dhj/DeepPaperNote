@@ -21,7 +21,7 @@ A useful experiment keeps these variables stable:
 
 - paper set
 - runner tool and model settings
-- prompt shape
+- child Codex CLI prompt template
 - installed skill version for each run
 - vault layout
 - output artifact layout
@@ -46,6 +46,25 @@ paper-set.md
 
 The runner manifests should also point to the machine-readable artifacts under
 the run root.
+
+## Goal Mode And Child Runner Prompts
+
+Every workflow-stage agent should be started in goal mode. Use `/goal` as the
+first line of each Agent Prompt Template in this document.
+
+The independent per-paper Codex CLI sessions launched by the Baseline Runner and
+Candidate Runner are different: they must not use `/goal`.
+
+For each paper, the runner must launch an independent Codex CLI session with
+exactly this prompt after replacing placeholders:
+
+```text
+给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
+```
+
+Do not add constraints, explanations, source paths, agent instructions, model
+notes, or extra surrounding text to that child prompt. Record the exact child
+prompt in the run manifest.
 
 ## Recommended Agent Roles
 
@@ -124,6 +143,8 @@ Title | Type | Venue/Year | Note path | PDF or source evidence | Why it is a goo
 ### Paper Finder Agent Prompt Template
 
 ```text
+/goal
+
 Goal:
 Choose a reusable real-paper test set for a DeepPaperNote regression run.
 
@@ -169,26 +190,31 @@ For each selected paper:
 1. Create an isolated run directory.
 2. Create or assign an isolated test vault.
 3. Install or sync the baseline skill version.
-4. Run the runner tool with the standard short generation prompt.
+4. Start one independent Codex CLI session per paper with the exact child prompt.
 5. Save the raw final note and all artifacts.
 6. Update the baseline manifest with present and missing artifacts.
 7. Do not edit the note after generation.
 
-The runner prompt should stay short. It should specify only:
+The per-paper child Codex CLI prompt must be exactly:
 
-- no subagents
-- use the installed DeepPaperNote skill
-- save to the specified test vault
-- the paper task
+```text
+给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
+```
 
-Use the same prompt shape for baseline and candidate.
+The runner may control working directory, temp vault, installed skill version,
+logging, and manifest collection outside the child prompt. It must not add any
+extra text to the child prompt. Baseline and candidate must use the same child
+prompt template.
 
 Do not reuse old baseline artifacts unless they were produced with the same paper
-set, runner settings, prompt shape, and artifact collection rules.
+set, runner settings, child Codex CLI prompt template, and artifact collection
+rules.
 
 ### Baseline Runner Agent Prompt Template
 
 ```text
+/goal
+
 Goal:
 Run the frozen baseline DeepPaperNote version for the selected paper set and
 write a complete baseline manifest.
@@ -200,14 +226,18 @@ Read first:
 
 Task:
 - Record the baseline identity before running any paper.
-- Use the same short generation prompt shape planned for candidate runs.
+- Use the exact per-paper child Codex CLI prompt template required by this workflow.
 - For each primary paper, create an isolated run directory and test vault.
 - Sync or install the baseline skill version.
-- Run the baseline note generation.
+- For each primary paper, start a separate independent Codex CLI session.
+- In each child Codex CLI session, use exactly this prompt after replacing placeholders: `给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。`
+- Do not add any other text to the child Codex CLI prompt.
 - Preserve raw final notes, runner logs, and all available artifacts.
-- Record missing artifacts explicitly.
+- Record the exact child prompt, temp vault path, run directory, final note path, logs, exit status, available artifacts, and missing artifacts.
 
 Constraints:
+- This workflow-stage agent uses `/goal`; the per-paper child Codex CLI sessions must not use `/goal`.
+- Do not batch multiple papers into one Codex CLI session.
 - Do not evaluate note quality.
 - Do not repair or rewrite generated notes.
 - Do not run candidate code.
@@ -215,7 +245,7 @@ Constraints:
 
 Output:
 - Write <BASELINE_MANIFEST_DOC>.
-- The manifest must include baseline identity, runner settings, prompt shape, per-paper status, final note paths, artifact paths, and missing artifacts.
+- The manifest must include baseline identity, runner settings, child Codex CLI prompt template, per-paper exact child prompt, per-paper status, final note paths, artifact paths, logs, exit status, and missing artifacts.
 - Also write or update machine-readable manifest data under <BASELINE_RUN_ROOT> when practical.
 ```
 
@@ -227,7 +257,7 @@ For each selected paper:
 
 1. Use the same paper identity input.
 2. Use the same runner tool and model settings.
-3. Use the same prompt shape.
+3. Use the same exact child Codex CLI prompt template.
 4. Use an isolated candidate run directory and test vault.
 5. Install or sync the candidate skill version.
 6. Save the raw final note and all artifacts.
@@ -237,9 +267,18 @@ For each selected paper:
 Baseline and candidate runners should not run concurrently when they share global
 state such as an installed skill directory.
 
+The per-paper child Codex CLI prompt must be exactly the same template used by
+the baseline:
+
+```text
+给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
+```
+
 ### Candidate Runner Agent Prompt Template
 
 ```text
+/goal
+
 Goal:
 Run the candidate DeepPaperNote version on the exact same paper set and write a
 candidate manifest that lines up with the baseline manifest.
@@ -251,15 +290,19 @@ Read first:
 - candidate ref or change summary: <CANDIDATE_REF_DOC_OR_VALUE>
 
 Task:
-- Confirm the paper set and prompt shape match the baseline manifest.
+- Confirm the paper set and child Codex CLI prompt template match the baseline manifest.
 - Sync or install the candidate skill version.
 - For each primary paper, create an isolated candidate run directory and test vault.
-- Run candidate note generation with the same runner settings and prompt shape.
+- For each primary paper, start a separate independent Codex CLI session.
+- In each child Codex CLI session, use exactly this prompt after replacing placeholders: `给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。`
+- Do not add any other text to the child Codex CLI prompt.
 - Preserve raw final notes, runner logs, and all available artifacts.
-- Record missing artifacts explicitly.
+- Record the exact child prompt, temp vault path, run directory, final note path, logs, exit status, available artifacts, and missing artifacts.
 - Map every candidate output to the matching baseline output.
 
 Constraints:
+- This workflow-stage agent uses `/goal`; the per-paper child Codex CLI sessions must not use `/goal`.
+- Do not batch multiple papers into one Codex CLI session.
 - Do not evaluate note quality.
 - Do not repair or rewrite generated notes.
 - Do not rerun baseline.
@@ -267,7 +310,7 @@ Constraints:
 
 Output:
 - Write <CANDIDATE_MANIFEST_DOC>.
-- The manifest must include candidate identity, runner settings, prompt shape, per-paper status, final note paths, artifact paths, missing artifacts, and baseline/candidate pairing.
+- The manifest must include candidate identity, runner settings, child Codex CLI prompt template, per-paper exact child prompt, per-paper status, final note paths, artifact paths, logs, exit status, missing artifacts, and baseline/candidate pairing.
 - Also write or update machine-readable manifest data under <CANDIDATE_RUN_ROOT> when practical.
 ```
 
@@ -301,6 +344,8 @@ does not materially improve.
 ### Artifact Auditor Agent Prompt Template
 
 ```text
+/goal
+
 Goal:
 Audit whether the baseline and candidate runs produced complete, contract-respecting artifacts.
 
@@ -363,6 +408,8 @@ The evaluator must not:
 ### Note Evaluator Agent Prompt Template
 
 ```text
+/goal
+
 Goal:
 Evaluate whether candidate final notes are materially better than baseline final notes.
 
@@ -487,6 +534,8 @@ The summary should distinguish:
 ### Regression Judge Agent Prompt Template
 
 ```text
+/goal
+
 Goal:
 Decide whether the regression experiment supports claiming a real improvement.
 
