@@ -27,6 +27,26 @@ A useful experiment keeps these variables stable:
 - output artifact layout
 - evaluation rubric version
 
+## Handoff Documents
+
+Each agent should read the previous stage's output document before starting, then
+write its own result document for the next agent. Use placeholders rather than
+hard-coded local paths in prompts.
+
+Recommended handoff chain:
+
+```text
+paper-set.md
+  -> baseline-run-manifest.md
+  -> candidate-run-manifest.md
+  -> artifact-audit-report.md
+  -> note-evaluation-report.md
+  -> regression-summary.md
+```
+
+The runner manifests should also point to the machine-readable artifacts under
+the run root.
+
 ## Recommended Agent Roles
 
 Use these roles as separate sessions or clearly separated phases.
@@ -37,13 +57,13 @@ Selects the test papers. It is read-only and must not run DeepPaperNote.
 
 ### Baseline Runner Agent
 
-Runs the frozen baseline skill version and writes baseline notes plus artifacts.
-It does not evaluate quality.
+Records the frozen baseline identity, runs the baseline skill version, and writes
+baseline notes plus artifacts. It does not evaluate quality.
 
 ### Candidate Runner Agent
 
-Runs the candidate skill version on the exact same paper set. It does not
-evaluate quality.
+Runs the candidate skill version on the exact same paper set and writes candidate
+notes plus artifacts. It does not evaluate quality.
 
 ### Artifact Auditor Agent
 
@@ -57,8 +77,8 @@ notes. It does not generate or repair notes.
 
 ### Regression Judge Agent
 
-Synthesizes the Artifact Auditor and Note Evaluator outputs into one experiment
-verdict.
+Synthesizes runner status, artifact audit, and note evaluation into one
+experiment verdict.
 
 ## Phase 1: Select Real Papers
 
@@ -90,51 +110,69 @@ too ambiguous to identify reliably.
 
 ### Paper Selection Output
 
-The Paper Finder Agent should output a table with this shape:
+The Paper Finder Agent should output a Markdown report with:
+
+- 4 primary test papers
+- 2 backup papers
+- the expected stress point for each paper
+- a table with this shape:
 
 ```text
 Title | Type | Venue/Year | Note path | PDF or source evidence | Why it is a good test | What the change should help with | Risk
 ```
 
-The final paper list must identify:
+### Paper Finder Agent Prompt Template
 
-- 4 primary test papers
-- 2 backup papers
-- the expected stress point for each paper
+```text
+Goal:
+Choose a reusable real-paper test set for a DeepPaperNote regression run.
 
-## Phase 2: Freeze The Baseline
+Read first:
+- <REPO_ROOT>/evals/regression-workflow.md
+- optional prior paper selection notes: <PRIOR_SELECTION_DOC_OR_NONE>
+- paper source root or index: <PAPER_SOURCE_ROOT>
+
+Task:
+- Find 6 candidate papers: 4 primary papers and 2 backups.
+- Prefer papers with stable identity evidence, usable PDF/source material, and enough technical depth.
+- Cover benchmark/evaluation, method/model/system, appendix-heavy, figure/table-heavy, and limitations-heavy stress patterns when possible.
+- Do not run DeepPaperNote.
+- Do not modify notes, PDFs, or the vault.
+
+Output:
+- Write a Markdown paper-set report to <PAPER_SET_DOC>.
+- Include the required selection table.
+- Mark the 4 primary papers and 2 backups.
+- For each primary paper, state the expected stress point and what a regression should reveal.
+```
+
+## Phase 2: Run Baseline Notes
 
 Run baseline before candidate. Without a frozen baseline, the experiment can only
 say that a candidate looks acceptable, not that it improved.
 
-The baseline should be:
+The Baseline Runner owns the baseline manifest. Before generating notes, it must
+record:
 
-- a released version
-- a pre-change commit
-- or another explicitly named reference version
-
-Record the baseline identity:
-
-- git ref or release tag
+- baseline git ref or release tag
 - installed skill source
 - runner tool
 - model settings
 - prompt template
 - run timestamp
-
-Do not reuse old baseline artifacts unless they were produced with the same paper
-set, runner settings, prompt shape, and artifact collection rules.
-
-## Phase 3: Run Baseline Notes
+- paper-set document path
+- run root and vault layout
+- artifact collection rules
 
 For each selected paper:
 
 1. Create an isolated run directory.
 2. Create or assign an isolated test vault.
 3. Install or sync the baseline skill version.
-4. Run the runner tool with the standard short prompt.
+4. Run the runner tool with the standard short generation prompt.
 5. Save the raw final note and all artifacts.
-6. Do not edit the note after generation.
+6. Update the baseline manifest with present and missing artifacts.
+7. Do not edit the note after generation.
 
 The runner prompt should stay short. It should specify only:
 
@@ -145,7 +183,43 @@ The runner prompt should stay short. It should specify only:
 
 Use the same prompt shape for baseline and candidate.
 
-## Phase 4: Run Candidate Notes
+Do not reuse old baseline artifacts unless they were produced with the same paper
+set, runner settings, prompt shape, and artifact collection rules.
+
+### Baseline Runner Agent Prompt Template
+
+```text
+Goal:
+Run the frozen baseline DeepPaperNote version for the selected paper set and
+write a complete baseline manifest.
+
+Read first:
+- <REPO_ROOT>/evals/regression-workflow.md
+- paper set report: <PAPER_SET_DOC>
+- baseline ref or release note: <BASELINE_REF_DOC_OR_VALUE>
+
+Task:
+- Record the baseline identity before running any paper.
+- Use the same short generation prompt shape planned for candidate runs.
+- For each primary paper, create an isolated run directory and test vault.
+- Sync or install the baseline skill version.
+- Run the baseline note generation.
+- Preserve raw final notes, runner logs, and all available artifacts.
+- Record missing artifacts explicitly.
+
+Constraints:
+- Do not evaluate note quality.
+- Do not repair or rewrite generated notes.
+- Do not run candidate code.
+- Do not change the paper set.
+
+Output:
+- Write <BASELINE_MANIFEST_DOC>.
+- The manifest must include baseline identity, runner settings, prompt shape, per-paper status, final note paths, artifact paths, and missing artifacts.
+- Also write or update machine-readable manifest data under <BASELINE_RUN_ROOT> when practical.
+```
+
+## Phase 3: Run Candidate Notes
 
 Run candidate after baseline on the same paper list.
 
@@ -157,50 +231,47 @@ For each selected paper:
 4. Use an isolated candidate run directory and test vault.
 5. Install or sync the candidate skill version.
 6. Save the raw final note and all artifacts.
-7. Do not edit the note after generation.
+7. Update the candidate manifest with present and missing artifacts.
+8. Do not edit the note after generation.
 
 Baseline and candidate runners should not run concurrently when they share global
 state such as an installed skill directory.
 
-## Phase 5: Collect Artifacts
-
-Each paper run should produce a manifest that maps the paper to its note and
-artifacts.
-
-Recommended run layout:
+### Candidate Runner Agent Prompt Template
 
 ```text
-<RUN_ROOT>/
-  manifest.json
-  baseline/
-    <paper_slug>/
-      final_note.md
-      artifacts/
-  candidate/
-    <paper_slug>/
-      final_note.md
-      artifacts/
-  reports/
+Goal:
+Run the candidate DeepPaperNote version on the exact same paper set and write a
+candidate manifest that lines up with the baseline manifest.
+
+Read first:
+- <REPO_ROOT>/evals/regression-workflow.md
+- paper set report: <PAPER_SET_DOC>
+- baseline manifest: <BASELINE_MANIFEST_DOC>
+- candidate ref or change summary: <CANDIDATE_REF_DOC_OR_VALUE>
+
+Task:
+- Confirm the paper set and prompt shape match the baseline manifest.
+- Sync or install the candidate skill version.
+- For each primary paper, create an isolated candidate run directory and test vault.
+- Run candidate note generation with the same runner settings and prompt shape.
+- Preserve raw final notes, runner logs, and all available artifacts.
+- Record missing artifacts explicitly.
+- Map every candidate output to the matching baseline output.
+
+Constraints:
+- Do not evaluate note quality.
+- Do not repair or rewrite generated notes.
+- Do not rerun baseline.
+- Do not change the paper set unless the baseline manifest is invalid.
+
+Output:
+- Write <CANDIDATE_MANIFEST_DOC>.
+- The manifest must include candidate identity, runner settings, prompt shape, per-paper status, final note paths, artifact paths, missing artifacts, and baseline/candidate pairing.
+- Also write or update machine-readable manifest data under <CANDIDATE_RUN_ROOT> when practical.
 ```
 
-Collect these artifacts when available:
-
-- final Markdown note
-- runner transcript or last message
-- metadata JSON
-- source manifest
-- raw sections JSONL
-- synthesis bundle
-- note plan JSON
-- grounding lint output
-- note lint output
-- figure/table decisions
-- figure/table assets or copy logs
-- Obsidian save output
-
-Missing artifacts should be recorded, not silently ignored.
-
-## Phase 6: Artifact Audit
+## Phase 4: Artifact Audit
 
 The Artifact Auditor determines whether the run respected workflow contracts.
 It does not evaluate final prose quality.
@@ -227,7 +298,38 @@ An artifact improvement alone is not the same as final note improvement. It can
 support an `architectural_improvement_only` conclusion when final note quality
 does not materially improve.
 
-## Phase 7: Note Evaluation
+### Artifact Auditor Agent Prompt Template
+
+```text
+Goal:
+Audit whether the baseline and candidate runs produced complete, contract-respecting artifacts.
+
+Read first:
+- <REPO_ROOT>/evals/regression-workflow.md
+- paper set report: <PAPER_SET_DOC>
+- baseline manifest: <BASELINE_MANIFEST_DOC>
+- candidate manifest: <CANDIDATE_MANIFEST_DOC>
+
+Task:
+- Inspect the artifacts listed in both manifests.
+- Check Source Corpus, synthesis bundle, grounding, lint, figure/table, and save artifacts.
+- Record whether candidate artifacts respect the expected contracts.
+- Record missing or inconsistent artifacts.
+- Distinguish artifact improvements from final note quality improvements.
+
+Constraints:
+- Do not judge final prose quality.
+- Do not edit notes or artifacts.
+- Do not rerun DeepPaperNote.
+- Do not infer success from artifact presence alone.
+
+Output:
+- Write <ARTIFACT_AUDIT_REPORT>.
+- Include one section per primary paper with pass/partial/fail/unknown, evidence paths, and risks.
+- End with an overall artifact verdict and any blocker for note evaluation.
+```
+
+## Phase 5: Note Evaluation
 
 The Note Evaluator uses `evals/note-evaluator-prompt.md` and
 `evals/note-quality-rubric.md`.
@@ -258,11 +360,47 @@ The evaluator must not:
 - use a different rubric
 - treat clean formatting as content improvement by itself
 
-## Phase 8: Regression Judgment
+### Note Evaluator Agent Prompt Template
+
+```text
+Goal:
+Evaluate whether candidate final notes are materially better than baseline final notes.
+
+Read first:
+- <REPO_ROOT>/evals/regression-workflow.md
+- <REPO_ROOT>/evals/note-quality-rubric.md
+- <REPO_ROOT>/evals/note-evaluator-prompt.md
+- paper set report: <PAPER_SET_DOC>
+- baseline manifest: <BASELINE_MANIFEST_DOC>
+- candidate manifest: <CANDIDATE_MANIFEST_DOC>
+- artifact audit report: <ARTIFACT_AUDIT_REPORT>
+
+Task:
+- For each primary paper, compare the raw baseline note and raw candidate note.
+- Use the fixed rubric hard gates and scored dimensions.
+- Use source evidence and artifacts when available.
+- Mark evidence-grounded dimensions as lower-confidence when source evidence is missing.
+- Identify content improvements, regressions, and ties.
+
+Constraints:
+- Do not rewrite or repair notes.
+- Do not rerun DeepPaperNote.
+- Do not evaluate artifact contract quality except where it affects note quality.
+- Do not reward cleaner formatting unless content quality also improves.
+
+Output:
+- Write <NOTE_EVALUATION_REPORT>.
+- Include the required rubric JSON for each primary paper.
+- Add a short per-paper comparison summary and final per-paper verdict.
+```
+
+## Phase 6: Regression Judgment
 
 The Regression Judge combines:
 
-- run manifest
+- paper set report
+- baseline manifest
+- candidate manifest
 - artifact audit report
 - note evaluation report
 - runner failures or missing artifacts
@@ -345,3 +483,36 @@ The summary should distinguish:
 - one-paper improvement
 - broad real improvement
 - failed or inconclusive experiment
+
+### Regression Judge Agent Prompt Template
+
+```text
+Goal:
+Decide whether the regression experiment supports claiming a real improvement.
+
+Read first:
+- <REPO_ROOT>/evals/regression-workflow.md
+- <REPO_ROOT>/evals/note-quality-rubric.md
+- paper set report: <PAPER_SET_DOC>
+- baseline manifest: <BASELINE_MANIFEST_DOC>
+- candidate manifest: <CANDIDATE_MANIFEST_DOC>
+- artifact audit report: <ARTIFACT_AUDIT_REPORT>
+- note evaluation report: <NOTE_EVALUATION_REPORT>
+
+Task:
+- Check runner success, artifact audit outcomes, and note evaluation verdicts.
+- Assign a per-paper verdict.
+- Assign one experiment-level verdict.
+- Decide whether optimization success can be claimed.
+- Identify the next recommended action.
+
+Constraints:
+- Do not rerun tools.
+- Do not edit generated notes.
+- Do not override hard-gate failures with average scores.
+- Do not claim real improvement for formatting-only gains or one cherry-picked paper.
+
+Output:
+- Write <REGRESSION_SUMMARY_DOC>.
+- Include experiment id, baseline version, candidate version, paper list, runner settings summary, artifact audit summary, note evaluation summary, per-paper verdicts, experiment-level verdict, and next recommended action.
+```

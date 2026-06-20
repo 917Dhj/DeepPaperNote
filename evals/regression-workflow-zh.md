@@ -25,6 +25,24 @@ prompt 模板见 `evals/note-evaluator-prompt.md`。
 - 输出 artifact 布局
 - 评估 rubric 版本
 
+## 交接文档
+
+每个 Agent 开始前都应读取上一阶段输出的文档，然后把自己的结果写成下一
+个 Agent 可读取的文档。prompt 中使用占位符，不写死本地路径。
+
+推荐交接链路：
+
+```text
+paper-set.md
+  -> baseline-run-manifest.md
+  -> candidate-run-manifest.md
+  -> artifact-audit-report.md
+  -> note-evaluation-report.md
+  -> regression-summary.md
+```
+
+runner manifest 还应指向 run root 下的机器可读 artifacts。
+
 ## 推荐 Agent 角色
 
 这些角色可以作为独立 session，也可以作为清晰隔离的阶段来执行。
@@ -35,12 +53,13 @@ prompt 模板见 `evals/note-evaluator-prompt.md`。
 
 ### Baseline Runner Agent
 
-运行冻结的 baseline skill 版本，生成 baseline 笔记和 artifacts。它不评估
-质量。
+记录冻结的 baseline 身份，运行 baseline skill 版本，并写出 baseline 笔记
+和 artifacts。它不评估质量。
 
 ### Candidate Runner Agent
 
-在完全相同的论文集合上运行 candidate skill 版本。它不评估质量。
+在完全相同的论文集合上运行 candidate skill 版本，并写出 candidate 笔记和
+artifacts。它不评估质量。
 
 ### Artifact Auditor Agent
 
@@ -54,7 +73,8 @@ figure/table 和保存契约。它不评价最终正文质量。
 
 ### Regression Judge Agent
 
-综合 Artifact Auditor 和 Note Evaluator 的输出，给出一次实验的总体判定。
+综合 runner 状态、artifact audit 和 note evaluation，给出一次实验的总体判
+定。
 
 ## 阶段 1：选择真实论文
 
@@ -86,51 +106,72 @@ figure/table 和保存契约。它不评价最终正文质量。
 
 ### 论文选择输出
 
-Paper Finder Agent 应输出如下表格：
+Paper Finder Agent 应输出一个 Markdown 报告，包含：
+
+- 4 篇主测试论文
+- 2 篇备用论文
+- 每篇论文对应的测试压力点
+- 如下表格：
 
 ```text
 Title | Type | Venue/Year | Note path | PDF or source evidence | Why it is a good test | What the change should help with | Risk
 ```
 
-最终论文列表必须标出：
+### Paper Finder Agent Prompt Template
 
-- 4 篇主测试论文
-- 2 篇备用论文
-- 每篇论文对应的测试压力点
+```text
+目标：
+为 DeepPaperNote 回归测试选择一组可复用的真实论文。
 
-## 阶段 2：冻结 Baseline
+先读取：
+- <REPO_ROOT>/evals/regression-workflow-zh.md
+- 可选的历史论文选择文档：<PRIOR_SELECTION_DOC_OR_NONE>
+- 论文来源根目录或索引：<PAPER_SOURCE_ROOT>
+
+任务：
+- 找出 6 篇候选论文：4 篇主测试论文和 2 篇备用论文。
+- 优先选择身份信息稳定、有可用 PDF/source material、技术深度足够的论文。
+- 尽量覆盖 benchmark/evaluation、method/model/system、appendix-heavy、figure/table-heavy、limitations-heavy 压力点。
+- 不要运行 DeepPaperNote。
+- 不要修改笔记、PDF 或 vault。
+
+约束：
+- 只做 read-only 搜索。
+- 不要因为论文看起来有名就推荐；必须给出本地 note 或 source evidence。
+
+输出：
+- 将 Markdown 论文集报告写入 <PAPER_SET_DOC>。
+- 包含指定选择表格。
+- 标出 4 篇主测试论文和 2 篇备用论文。
+- 对每篇主测试论文写明预期压力点，以及这篇论文能暴露什么回归问题。
+```
+
+## 阶段 2：运行 Baseline Notes
 
 先跑 baseline，再跑 candidate。没有冻结 baseline，就只能说 candidate 看
 起来可接受，不能说它相对 baseline 有提升。
 
-baseline 应该是：
+Baseline Runner 负责 baseline manifest。生成笔记前，它必须记录：
 
-- 一个已发布版本
-- 一个修改前 commit
-- 或另一个明确命名的参考版本
-
-记录 baseline 身份：
-
-- git ref 或 release tag
+- baseline git ref 或 release tag
 - installed skill 来源
 - runner 工具
 - 模型设置
 - prompt 模板
 - 运行时间
-
-不要复用旧 baseline artifacts，除非它们使用了相同论文集合、runner 设置、
-prompt 形状和 artifact 收集规则。
-
-## 阶段 3：运行 Baseline Notes
+- paper-set 文档路径
+- run root 和 vault 布局
+- artifact 收集规则
 
 对每篇已选论文：
 
 1. 创建隔离 run directory。
 2. 创建或指定隔离 test vault。
 3. 安装或同步 baseline skill 版本。
-4. 使用标准短 prompt 运行 runner 工具。
+4. 使用标准短 generation prompt 运行 runner 工具。
 5. 保存原始最终笔记和所有 artifacts。
-6. 生成后不要编辑笔记。
+6. 在 baseline manifest 中记录 present/missing artifacts。
+7. 生成后不要编辑笔记。
 
 runner prompt 应保持简短，只说明：
 
@@ -141,7 +182,42 @@ runner prompt 应保持简短，只说明：
 
 baseline 和 candidate 必须使用相同 prompt 形状。
 
-## 阶段 4：运行 Candidate Notes
+不要复用旧 baseline artifacts，除非它们使用了相同论文集合、runner 设置、
+prompt 形状和 artifact 收集规则。
+
+### Baseline Runner Agent Prompt Template
+
+```text
+目标：
+使用冻结的 baseline DeepPaperNote 版本为已选论文集生成 baseline 笔记，并写出完整 baseline manifest。
+
+先读取：
+- <REPO_ROOT>/evals/regression-workflow-zh.md
+- 论文集报告：<PAPER_SET_DOC>
+- baseline ref 或 release 说明：<BASELINE_REF_DOC_OR_VALUE>
+
+任务：
+- 在运行任何论文前记录 baseline 身份。
+- 使用计划给 candidate run 复用的短 generation prompt 形状。
+- 对每篇主测试论文创建隔离 run directory 和 test vault。
+- 同步或安装 baseline skill 版本。
+- 运行 baseline 笔记生成。
+- 保存原始最终笔记、runner logs 和所有可用 artifacts。
+- 显式记录缺失 artifacts。
+
+约束：
+- 不要评估笔记质量。
+- 不要修补或重写生成笔记。
+- 不要运行 candidate 代码。
+- 不要改变论文集。
+
+输出：
+- 写入 <BASELINE_MANIFEST_DOC>。
+- manifest 必须包含 baseline 身份、runner 设置、prompt 形状、每篇论文状态、最终笔记路径、artifact 路径和缺失 artifacts。
+- 如可行，同时在 <BASELINE_RUN_ROOT> 下写入或更新机器可读 manifest 数据。
+```
+
+## 阶段 3：运行 Candidate Notes
 
 candidate 在相同论文列表上、baseline 之后运行。
 
@@ -153,49 +229,46 @@ candidate 在相同论文列表上、baseline 之后运行。
 4. 使用隔离的 candidate run directory 和 test vault。
 5. 安装或同步 candidate skill 版本。
 6. 保存原始最终笔记和所有 artifacts。
-7. 生成后不要编辑笔记。
+7. 在 candidate manifest 中记录 present/missing artifacts。
+8. 生成后不要编辑笔记。
 
 当 baseline runner 和 candidate runner 共享全局状态时，例如共享 installed
 skill 目录，不应并发运行。
 
-## 阶段 5：收集 Artifacts
-
-每篇论文的运行都应产生一个 manifest，把论文映射到对应笔记和 artifacts。
-
-推荐 run layout：
+### Candidate Runner Agent Prompt Template
 
 ```text
-<RUN_ROOT>/
-  manifest.json
-  baseline/
-    <paper_slug>/
-      final_note.md
-      artifacts/
-  candidate/
-    <paper_slug>/
-      final_note.md
-      artifacts/
-  reports/
+目标：
+在完全相同的论文集上运行 candidate DeepPaperNote 版本，并写出能和 baseline manifest 对齐的 candidate manifest。
+
+先读取：
+- <REPO_ROOT>/evals/regression-workflow-zh.md
+- 论文集报告：<PAPER_SET_DOC>
+- baseline manifest：<BASELINE_MANIFEST_DOC>
+- candidate ref 或变更说明：<CANDIDATE_REF_DOC_OR_VALUE>
+
+任务：
+- 确认论文集和 prompt 形状与 baseline manifest 一致。
+- 同步或安装 candidate skill 版本。
+- 对每篇主测试论文创建隔离 candidate run directory 和 test vault。
+- 使用相同 runner 设置和 prompt 形状运行 candidate 笔记生成。
+- 保存原始最终笔记、runner logs 和所有可用 artifacts。
+- 显式记录缺失 artifacts。
+- 把每个 candidate output 映射到对应 baseline output。
+
+约束：
+- 不要评估笔记质量。
+- 不要修补或重写生成笔记。
+- 不要重跑 baseline。
+- 除非 baseline manifest 无效，否则不要改变论文集。
+
+输出：
+- 写入 <CANDIDATE_MANIFEST_DOC>。
+- manifest 必须包含 candidate 身份、runner 设置、prompt 形状、每篇论文状态、最终笔记路径、artifact 路径、缺失 artifacts 和 baseline/candidate 对应关系。
+- 如可行，同时在 <CANDIDATE_RUN_ROOT> 下写入或更新机器可读 manifest 数据。
 ```
 
-尽量收集这些 artifacts：
-
-- final Markdown note
-- runner transcript 或 last message
-- metadata JSON
-- source manifest
-- raw sections JSONL
-- synthesis bundle
-- note plan JSON
-- grounding lint output
-- note lint output
-- figure/table decisions
-- figure/table assets 或 copy logs
-- Obsidian save output
-
-缺失 artifacts 必须记录，不要静默忽略。
-
-## 阶段 6：Artifact Audit
+## 阶段 4：Artifact Audit
 
 Artifact Auditor 判断运行是否遵守工作流契约。它不评价最终 prose 质量。
 
@@ -220,7 +293,38 @@ Artifact audit 结果：
 artifact 改善不等同于最终笔记改善。当 artifacts 或契约改善，但最终笔记质量
 没有实质提升时，它只能支持 `architectural_improvement_only` 结论。
 
-## 阶段 7：Note Evaluation
+### Artifact Auditor Agent Prompt Template
+
+```text
+目标：
+审查 baseline 和 candidate run 是否产出了完整、符合契约的 artifacts。
+
+先读取：
+- <REPO_ROOT>/evals/regression-workflow-zh.md
+- 论文集报告：<PAPER_SET_DOC>
+- baseline manifest：<BASELINE_MANIFEST_DOC>
+- candidate manifest：<CANDIDATE_MANIFEST_DOC>
+
+任务：
+- 检查两个 manifest 中列出的 artifacts。
+- 检查 Source Corpus、synthesis bundle、grounding、lint、figure/table 和 save artifacts。
+- 记录 candidate artifacts 是否遵守预期契约。
+- 记录缺失或不一致 artifacts。
+- 区分 artifact 改善和最终笔记质量改善。
+
+约束：
+- 不要评价最终正文质量。
+- 不要编辑笔记或 artifacts。
+- 不要重跑 DeepPaperNote。
+- 不要仅凭 artifacts 存在就推断成功。
+
+输出：
+- 写入 <ARTIFACT_AUDIT_REPORT>。
+- 对每篇主测试论文给出 pass/partial/fail/unknown、证据路径和风险。
+- 最后给出总体 artifact verdict，以及是否存在阻塞 note evaluation 的问题。
+```
+
+## 阶段 5：Note Evaluation
 
 Note Evaluator 使用 `evals/note-evaluator-prompt.md` 和
 `evals/note-quality-rubric.md`。
@@ -251,11 +355,47 @@ evaluator 不得：
 - 使用不同 rubric
 - 仅因为格式更干净就判定内容提升
 
-## 阶段 8：Regression Judgment
+### Note Evaluator Agent Prompt Template
+
+```text
+目标：
+评估 candidate 最终笔记是否比 baseline 最终笔记有实质提升。
+
+先读取：
+- <REPO_ROOT>/evals/regression-workflow-zh.md
+- <REPO_ROOT>/evals/note-quality-rubric.md
+- <REPO_ROOT>/evals/note-evaluator-prompt.md
+- 论文集报告：<PAPER_SET_DOC>
+- baseline manifest：<BASELINE_MANIFEST_DOC>
+- candidate manifest：<CANDIDATE_MANIFEST_DOC>
+- artifact audit report：<ARTIFACT_AUDIT_REPORT>
+
+任务：
+- 对每篇主测试论文，比较 raw baseline note 和 raw candidate note。
+- 使用固定 rubric 的 hard gates 和 scored dimensions。
+- 在可用时使用 source evidence 和 artifacts。
+- 当 source evidence 缺失时，把相关 evidence-grounded dimensions 标为较低置信度。
+- 标出内容提升、回归和平局。
+
+约束：
+- 不要重写或修补笔记。
+- 不要重跑 DeepPaperNote。
+- 除非 artifact 问题影响笔记质量，否则不要评价 artifact contract quality。
+- 不要因为格式更整洁就判定内容质量提升。
+
+输出：
+- 写入 <NOTE_EVALUATION_REPORT>。
+- 对每篇主测试论文包含 required rubric JSON。
+- 添加每篇论文的简短比较总结和最终 per-paper verdict。
+```
+
+## 阶段 6：Regression Judgment
 
 Regression Judge 综合：
 
-- run manifest
+- 论文集报告
+- baseline manifest
+- candidate manifest
 - artifact audit report
 - note evaluation report
 - runner 失败或缺失 artifacts
@@ -338,3 +478,36 @@ Regression Judge 应产出：
 - 单篇论文改善
 - 广泛真实改善
 - 失败或无法得出结论的实验
+
+### Regression Judge Agent Prompt Template
+
+```text
+目标：
+判断本次回归实验是否支持声称 real improvement。
+
+先读取：
+- <REPO_ROOT>/evals/regression-workflow-zh.md
+- <REPO_ROOT>/evals/note-quality-rubric.md
+- 论文集报告：<PAPER_SET_DOC>
+- baseline manifest：<BASELINE_MANIFEST_DOC>
+- candidate manifest：<CANDIDATE_MANIFEST_DOC>
+- artifact audit report：<ARTIFACT_AUDIT_REPORT>
+- note evaluation report：<NOTE_EVALUATION_REPORT>
+
+任务：
+- 检查 runner success、artifact audit outcomes 和 note evaluation verdicts。
+- 给出 per-paper verdict。
+- 给出一个 experiment-level verdict。
+- 判断是否可以声称 optimization success。
+- 标出 next recommended action。
+
+约束：
+- 不要重跑工具。
+- 不要编辑生成笔记。
+- 不要用平均分覆盖 hard-gate failures。
+- 不要因为 formatting-only gains 或单篇 cherry-picked paper 声称 real improvement。
+
+输出：
+- 写入 <REGRESSION_SUMMARY_DOC>。
+- 包含 experiment id、baseline version、candidate version、paper list、runner settings summary、artifact audit summary、note evaluation summary、per-paper verdicts、experiment-level verdict 和 next recommended action。
+```
