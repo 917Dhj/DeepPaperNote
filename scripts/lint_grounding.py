@@ -16,6 +16,7 @@ from contracts import (
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
 )
+from source_corpus import SourceCorpusLoadError, load_source_corpus
 
 
 def parser() -> argparse.ArgumentParser:
@@ -56,6 +57,37 @@ def issue(code: str, severity: str = "error", **details: Any) -> dict[str, Any]:
     payload = {"code": code, "severity": severity}
     payload.update(details)
     return payload
+
+
+def input_is_file(value: str) -> bool:
+    if not value or value.strip().startswith("{"):
+        return False
+    try:
+        return Path(value).expanduser().is_file()
+    except OSError:
+        return False
+
+
+def source_caption_items(
+    source_manifest: dict[str, Any],
+    source_manifest_input: str = "",
+) -> list[dict[str, Any]]:
+    if input_is_file(source_manifest_input):
+        try:
+            return load_source_corpus(source_manifest_input).caption_items()
+        except SourceCorpusLoadError as exc:
+            raise SystemExit(str(exc)) from exc
+    captions = (
+        source_manifest.get("captions", {})
+        if isinstance(source_manifest.get("captions"), dict)
+        else {}
+    )
+    items: list[dict[str, Any]] = []
+    for manifest_key, kind in (("figures", "figure"), ("tables", "table")):
+        for item in captions.get(manifest_key, []) or []:
+            if isinstance(item, dict):
+                items.append({**dict(item), "kind": kind})
+    return items
 
 
 def source_section_ids(source_manifest: dict[str, Any]) -> set[str]:
@@ -324,6 +356,7 @@ def validate_bundle_contract(
 def validate_figure_decisions(
     source_manifest: dict[str, Any],
     decisions_wrapper: dict[str, Any],
+    source_manifest_input: str = "",
 ) -> list[dict[str, Any]]:
     if not isinstance(decisions_wrapper, dict) or "decisions" not in decisions_wrapper:
         return [issue("figure_table_decisions_missing")]
@@ -346,24 +379,18 @@ def validate_figure_decisions(
         for source_id in decision_ids
         if caption_label_key(source_id)
     }
-    captions = (
-        source_manifest.get("captions", {})
-        if isinstance(source_manifest.get("captions"), dict)
-        else {}
-    )
-    for kind in ("figures", "tables"):
-        for caption in captions.get(kind, []) or []:
-            if not isinstance(caption, dict):
-                continue
-            caption_id = normalize_whitespace(str(caption.get("id", "")))
-            caption_key = caption_label_key(caption_id)
-            if caption_id and caption_id not in decision_ids and caption_key not in decision_label_keys:
-                issues.append(
-                    issue(
-                        "figure_table_caption_missing_decision",
-                        caption_id=caption_id,
-                    )
+    for caption in source_caption_items(source_manifest, source_manifest_input):
+        if not isinstance(caption, dict):
+            continue
+        caption_id = normalize_whitespace(str(caption.get("id") or caption.get("label") or ""))
+        caption_key = caption_label_key(caption_id)
+        if caption_id and caption_id not in decision_ids and caption_key not in decision_label_keys:
+            issues.append(
+                issue(
+                    "figure_table_caption_missing_decision",
+                    caption_id=caption_id,
                 )
+            )
     for item in decisions:
         if not isinstance(item, dict):
             issues.append(issue("figure_table_decision_item_invalid"))
@@ -414,7 +441,7 @@ def main() -> None:
     issues = []
     issues.extend(validate_note_plan(note_plan, source_manifest))
     issues.extend(validate_bundle_contract(note_plan, bundle))
-    issues.extend(validate_figure_decisions(source_manifest, decisions))
+    issues.extend(validate_figure_decisions(source_manifest, decisions, args.source_manifest))
     error_issues = [item for item in issues if item.get("severity", "error") == "error"]
     payload = {
         "status": "ok",

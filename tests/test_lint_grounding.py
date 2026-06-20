@@ -18,6 +18,18 @@ def write_json(path: Path, payload: dict) -> Path:
     return path
 
 
+def write_raw_sections(path: Path) -> Path:
+    record = {
+        "section_id": "sec:method",
+        "title": "Method",
+        "page_start": 1,
+        "page_end": 6,
+        "text": "Figure 1. Architecture.\n\nTable 1. Main results.",
+    }
+    path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+    return path
+
+
 def run_lint_grounding(
     tmp_path: Path,
     note_plan: dict,
@@ -316,6 +328,42 @@ def test_lint_grounding_blocks_caption_without_figure_table_decision(tmp_path: P
     assert severities["figure_table_caption_missing_decision"] == "error"
 
 
+def test_lint_grounding_blocks_source_corpus_table_caption_without_decision(
+    tmp_path: Path,
+) -> None:
+    write_raw_sections(tmp_path / "raw_sections.jsonl")
+    manifest = source_manifest()
+    manifest["raw_sections_path"] = "raw_sections.jsonl"
+    manifest["captions"] = {
+        "figures": [{"id": "Figure 1", "caption": "Architecture", "page": 4}],
+        "tables": [{"id": "Table 1", "caption": "Main results", "page": 7}],
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        manifest,
+        slim_bundle(),
+        figure_decisions={
+            "decisions": [
+                {
+                    "source_id": "Figure 1",
+                    "kind": "figure",
+                    "decision": "placeholder",
+                    "reason": "selected_by_figure_plan",
+                    "visual_quality_status": "",
+                    "priority": 2,
+                    "skip_reason": "asset_candidate_missing",
+                }
+            ]
+        },
+    )
+    codes = {issue["code"] for issue in result["issues"]}
+
+    assert result["passes_grounding"] is False
+    assert "figure_table_caption_missing_decision" in codes
+
+
 def test_lint_grounding_treats_fig_abbreviation_as_same_decision(tmp_path: Path) -> None:
     manifest = source_manifest()
     manifest["captions"] = {
@@ -349,6 +397,37 @@ def test_lint_grounding_treats_fig_abbreviation_as_same_decision(tmp_path: Path)
     codes = {issue["code"] for issue in result["issues"]}
 
     assert "figure_table_caption_missing_decision" not in codes
+
+
+def test_lint_grounding_rejects_invalid_figure_table_decision_value(
+    tmp_path: Path,
+) -> None:
+    manifest = source_manifest()
+    manifest["captions"] = {
+        "figures": [{"id": "Figure 1", "caption": "Architecture", "page": 4}],
+        "tables": [],
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        manifest,
+        slim_bundle(),
+        figure_decisions={
+            "decisions": [
+                {
+                    "source_id": "Figure 1",
+                    "kind": "figure",
+                    "decision": "defer",
+                    "reason": "not an allowed decision",
+                }
+            ]
+        },
+    )
+    codes = {issue["code"] for issue in result["issues"]}
+
+    assert result["passes_grounding"] is False
+    assert "figure_table_decision_value_invalid" in codes
 
 
 def test_lint_grounding_rejects_placeholder_decision_for_usable_candidate(tmp_path: Path) -> None:
