@@ -60,20 +60,24 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
 
     source_manifest_path = workdir / "paper_source_manifest.json"
     raw_sections_path = workdir / "paper_raw_sections.jsonl"
+    evidence_path = workdir / "paper_evidence.json"
     decisions_path = workdir / "paper_figure_table_decisions.json"
     bundle_path = workdir / "paper_bundle.json"
     assert source_manifest_path.exists()
     assert raw_sections_path.exists()
+    assert evidence_path.exists()
     assert decisions_path.exists()
     assert bundle_path.exists()
 
     source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
     decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
 
     assert source_manifest["coverage"]["text_pages_extracted"] == 4
     assert source_manifest["coverage"]["text_truncated"] is False
     assert any(section["section_id"] == "sec:method" for section in source_manifest["sections"])
+    assert evidence["summary"]["source_corpus_used"] is True
     assert {item["source_id"] for item in decisions["decisions"]} == {"Figure 1", "Table 1"}
     assert bundle["source_manifest"]["raw_sections_path"] == str(raw_sections_path.resolve())
     assert bundle["figure_table_manifest"]["decisions"]
@@ -110,3 +114,21 @@ def test_run_pipeline_does_not_materialize_before_final_save(
     run_pipeline.main()
 
     assert not any("materialize_figure_asset.py" in cmd[1] for cmd in calls)
+    assert [Path(cmd[1]).name for cmd in calls] == [
+        "resolve_paper.py",
+        "collect_metadata.py",
+        "fetch_pdf.py",
+        "extract_source_text.py",
+        "extract_evidence.py",
+        "extract_pdf_assets.py",
+        "plan_figures.py",
+        "plan_figure_table_decisions.py",
+        "build_synthesis_bundle.py",
+    ]
+
+    evidence_call = calls[4]
+    assert "--source-manifest" in evidence_call
+    assert (
+        evidence_call[evidence_call.index("--source-manifest") + 1]
+        == str((workdir / "paper_source_manifest.json").resolve())
+    )

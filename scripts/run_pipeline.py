@@ -97,6 +97,8 @@ def main() -> None:
             str(scripts_dir / "extract_evidence.py"),
             "--input",
             str(fetch_json),
+            "--source-manifest",
+            str(source_manifest_json),
             "--output",
             str(evidence_json),
         ]
