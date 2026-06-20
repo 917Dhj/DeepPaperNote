@@ -29,3 +29,15 @@ Constraints that every Source Corpus implementation must preserve: one corpus pe
 ## Source Corpus Migration Boundary
 
 The first migration should converge text consumers onto the Source Corpus without changing the public workflow shape. It preserves existing run artifact names and stage order, keeps `source_manifest.json` and `raw_sections.jsonl` as the external contract, avoids a new public pseudo-command, leaves image extraction, Obsidian saving, final prose, and note-plan semantic decisions outside the change, and may keep `candidate_chunks` and `section_texts` only as diagnostic derived views.
+
+## Note Evaluation Rubric
+
+A reusable evaluator-facing standard for judging final DeepPaperNote outputs after generation. It is used by evaluation agents to compare candidate notes against baselines and is not a writing reference for the note-generation workflow.
+
+## Evaluation Agent
+
+An agent that judges finished notes and related evaluation evidence. It must not generate, repair, or rewrite the note being evaluated.
+
+## Strict Gate Verdict
+
+An evaluation outcome where severe failures such as major factual errors, unsupported central claims, broken grounding, or misleading claim boundaries override numeric quality scores.
