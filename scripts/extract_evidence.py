@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import re
 from pathlib import Path
+from typing import Any
 
 from common import (
+    SECTION_ALIASES,
     emit,
     enrich_metadata,
     extract_appendix_index,
@@ -21,6 +23,7 @@ from common import (
     extract_pdf_text,
     infer_paper_type,
     maybe_load_json_record,
+    normalize_heading,
     normalize_whitespace,
     paper_id_for_record,
     pick_sentences_by_keywords,
@@ -30,6 +33,7 @@ from common import (
 )
 from contracts import empty_evidence_pack
 from citation_links import extract_reference_candidates_from_pdf
+from source_corpus import SourceCorpus, SourceCorpusLoadError, load_source_corpus, validate_source_corpus
 
 
 CORE_SECTIONS = ("introduction", "method", "experiment")
@@ -45,7 +49,8 @@ APPENDIX_EVIDENCE_CATEGORIES = (
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "extract evidence")
-    p.add_argument("--input", required=True, help="Metadata JSON path, fetch_pdf JSON path, JSON string, or raw paper reference.")
+    p.add_argument("--input", default="", help="Metadata JSON path, fetch_pdf JSON path, JSON string, or raw paper reference.")
+    p.add_argument("--source-manifest", default="", help="Source Corpus source_manifest.json path.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id if already known.")
     p.add_argument("--max-pages", type=int, default=32, help="Maximum number of PDF pages to scan.")
@@ -133,6 +138,150 @@ def build_section_extraction_coverage(
             if normalize_whitespace(text)
         },
         "fallback_sections": fallback_sections,
+    }
+
+
+def source_corpus_error_payload(issues: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "status": "error",
+        "script": "extract_evidence.py",
+        "error": "source_corpus_invalid",
+        "source_corpus_issues": issues,
+    }
+
+
+def ensure_source_corpus(source_manifest_path: str, output_path: str = "") -> SourceCorpus:
+    try:
+        corpus = load_source_corpus(source_manifest_path)
+    except SourceCorpusLoadError as exc:
+        emit(
+            source_corpus_error_payload(
+                [
+                    {
+                        "code": "source_corpus_load_error",
+                        "severity": "error",
+                        "message": str(exc),
+                        "path": source_manifest_path,
+                    }
+                ]
+            ),
+            output_path,
+        )
+        raise SystemExit(1) from exc
+
+    issues = validate_source_corpus(corpus)
+    if issues:
+        emit(source_corpus_error_payload(issues), output_path)
+        raise SystemExit(1)
+    return corpus
+
+
+def record_from_source_corpus(corpus: SourceCorpus, input_value: str) -> dict:
+    manifest = corpus.manifest
+    record = {
+        key: manifest.get(key, "")
+        for key in ("paper_id", "title", "abstract", "doi", "arxiv_id", "url")
+        if manifest.get(key)
+    }
+    if input_value:
+        input_record = ensure_record(input_value)
+        for key, value in input_record.items():
+            if value not in ("", None):
+                record[key] = value
+    return record
+
+
+def source_section_key(record: dict[str, Any]) -> str:
+    for key in ("kind", "title", "section_id"):
+        normalized = normalize_heading(str(record.get(key, "")).replace("_", " "))
+        if not normalized:
+            continue
+        for section, aliases in SECTION_ALIASES.items():
+            if normalized == section or normalized in aliases:
+                return section
+        if normalized in {"appendix", "appendices", "supplementary material", "附录", "补充材料"}:
+            return "appendix"
+    kind = normalize_whitespace(str(record.get("kind", ""))).lower()
+    return kind if kind else ""
+
+
+def section_texts_from_source_corpus(corpus: SourceCorpus) -> dict[str, str]:
+    sections: dict[str, list[str]] = {}
+    for record in corpus.raw_sections:
+        text = normalize_whitespace(str(record.get("text", "")))
+        section = source_section_key(record)
+        if not text or not section:
+            continue
+        sections.setdefault(section, []).append(text)
+    return {
+        section: normalize_whitespace(" ".join(texts))
+        for section, texts in sections.items()
+        if normalize_whitespace(" ".join(texts))
+    }
+
+
+def page_hint_for_caption(item: dict[str, Any]) -> str:
+    pages = item.get("pages")
+    page = pages[0] if isinstance(pages, list) and pages else item.get("page")
+    if page in ("", None):
+        return ""
+    return f"p.{page}"
+
+
+def captions_from_source_corpus(corpus: SourceCorpus, kind: str) -> list[dict]:
+    captions: list[dict] = []
+    for item in corpus.caption_items():
+        if item.get("kind") != kind:
+            continue
+        caption = {
+            "id": normalize_whitespace(str(item.get("id", ""))),
+            "caption": normalize_whitespace(str(item.get("caption", ""))),
+        }
+        page_hint = normalize_whitespace(str(item.get("page_hint", ""))) or page_hint_for_caption(item)
+        section_id = normalize_whitespace(str(item.get("section_id", "")))
+        if page_hint:
+            caption["page_hint"] = page_hint
+        if section_id:
+            caption["section_id"] = section_id
+        if caption["id"] and caption["caption"]:
+            captions.append(caption)
+    return captions[:CAPTION_LIST_LIMIT]
+
+
+def pdf_coverage_from_source_corpus(corpus: SourceCorpus) -> dict:
+    coverage = corpus.coverage()
+    truncation = corpus.truncation()
+    appendix_index = corpus.manifest.get("appendix_index", {})
+    appendix_start_page = coverage.get("appendix_start_page")
+    if not appendix_start_page and isinstance(appendix_index, dict):
+        appendix_start_page = appendix_index.get("start_page")
+    return {
+        "total_pages": coverage.get("total_pages"),
+        "text_max_pages": coverage.get("text_max_pages"),
+        "text_pages_extracted": coverage.get("text_pages_extracted"),
+        "text_pages_scanned": coverage.get("text_pages_scanned")
+        or coverage.get("text_pages_extracted"),
+        "text_truncated": truncation["text_truncated"],
+        "truncated_due_to_page_limit": truncation["truncated_due_to_page_limit"],
+        "appendix_detected": bool(coverage.get("appendix_detected") or appendix_start_page),
+        "appendix_start_page": appendix_start_page,
+        "references_start_page": coverage.get("references_start_page"),
+        "section_stop_reason": coverage.get("section_stop_reason", ""),
+        "section_stop_page": coverage.get("section_stop_page"),
+    }
+
+
+def appendix_index_from_source_corpus(corpus: SourceCorpus) -> dict:
+    appendix_index = corpus.manifest.get("appendix_index", {})
+    if isinstance(appendix_index, dict):
+        return dict(appendix_index)
+    coverage = corpus.coverage()
+    return {
+        "appendix_detected": bool(coverage.get("appendix_detected")),
+        "start_page": coverage.get("appendix_start_page"),
+        "sections": [],
+        "figure_captions": [],
+        "table_captions": [],
     }
 
 
@@ -526,46 +675,68 @@ def evidence_quality(pack: dict) -> str:
 
 def main() -> None:
     args = parser().parse_args()
-    record = ensure_record(args.input)
-    pdf_value = str(record.get("pdf_path", "")).strip()
-    pdf_path = Path(pdf_value).expanduser() if pdf_value else None
-
-    if pdf_path is None or not pdf_path.is_file():
-        from_fetch = maybe_load_json_record(args.input) or {}
-        pdf_candidate = str(from_fetch.get("pdf_path", "")).strip()
-        if pdf_candidate:
-            candidate_path = Path(pdf_candidate).expanduser()
-            if candidate_path.is_file():
-                pdf_path = candidate_path
-
     section_map: dict[str, str] = {}
     full_text = ""
     extraction_failures: list[str] = []
-    has_pdf = pdf_path is not None and pdf_path.is_file()
-    pdf_coverage = (
-        pdf_coverage_summary(pdf_path.resolve(), max_pages=args.max_pages)
-        if has_pdf
-        else pdf_coverage_summary(Path(""), max_pages=args.max_pages)
-    )
-    appendix_index = (
-        extract_appendix_index(pdf_path.resolve(), pdf_coverage)
-        if has_pdf and pdf_coverage.get("appendix_detected")
-        else extract_appendix_index(Path(""), pdf_coverage)
-    )
-    appendix_pages = (
-        extract_appendix_page_texts(pdf_path.resolve(), pdf_coverage.get("appendix_start_page"))
-        if has_pdf and pdf_coverage.get("appendix_detected")
-        else []
-    )
-    appendix_evidence = build_appendix_evidence(appendix_pages, appendix_index)
-    if has_pdf:
-        try:
-            section_map = extract_pdf_sections(pdf_path.resolve(), max_pages=args.max_pages)
-            full_text = extract_pdf_text(pdf_path.resolve(), max_pages=args.max_pages)
-        except Exception as exc:
-            extraction_failures.append(f"pdf_parse_failed: {exc}")
+    language_hint = ""
+    source_corpus_used = bool(args.source_manifest)
+    if not args.input and not args.source_manifest:
+        raise SystemExit("--input or --source-manifest is required.")
+
+    if source_corpus_used:
+        corpus = ensure_source_corpus(args.source_manifest, args.output)
+        record = record_from_source_corpus(corpus, args.input)
+        has_pdf = False
+        pdf_path = None
+        section_map = section_texts_from_source_corpus(corpus)
+        full_text = corpus.full_text()
+        pdf_coverage = pdf_coverage_from_source_corpus(corpus)
+        appendix_index = appendix_index_from_source_corpus(corpus)
+        appendix_pages = corpus.appendix_text_pages()
+        appendix_evidence = build_appendix_evidence(appendix_pages, appendix_index)
+        figure_captions = captions_from_source_corpus(corpus, "figure")
+        table_captions = captions_from_source_corpus(corpus, "table")
+        language_hint = corpus.language_hint()
     else:
-        extraction_failures.append("pdf_missing")
+        record = ensure_record(args.input)
+        pdf_value = str(record.get("pdf_path", "")).strip()
+        pdf_path = Path(pdf_value).expanduser() if pdf_value else None
+
+        if pdf_path is None or not pdf_path.is_file():
+            from_fetch = maybe_load_json_record(args.input) or {}
+            pdf_candidate = str(from_fetch.get("pdf_path", "")).strip()
+            if pdf_candidate:
+                candidate_path = Path(pdf_candidate).expanduser()
+                if candidate_path.is_file():
+                    pdf_path = candidate_path
+
+        has_pdf = pdf_path is not None and pdf_path.is_file()
+        pdf_coverage = (
+            pdf_coverage_summary(pdf_path.resolve(), max_pages=args.max_pages)
+            if has_pdf
+            else pdf_coverage_summary(Path(""), max_pages=args.max_pages)
+        )
+        appendix_index = (
+            extract_appendix_index(pdf_path.resolve(), pdf_coverage)
+            if has_pdf and pdf_coverage.get("appendix_detected")
+            else extract_appendix_index(Path(""), pdf_coverage)
+        )
+        appendix_pages = (
+            extract_appendix_page_texts(pdf_path.resolve(), pdf_coverage.get("appendix_start_page"))
+            if has_pdf and pdf_coverage.get("appendix_detected")
+            else []
+        )
+        appendix_evidence = build_appendix_evidence(appendix_pages, appendix_index)
+        if has_pdf:
+            try:
+                section_map = extract_pdf_sections(pdf_path.resolve(), max_pages=args.max_pages)
+                full_text = extract_pdf_text(pdf_path.resolve(), max_pages=args.max_pages)
+            except Exception as exc:
+                extraction_failures.append(f"pdf_parse_failed: {exc}")
+        else:
+            extraction_failures.append("pdf_missing")
+        figure_captions = extract_caption_lines(full_text, "figure")[:CAPTION_LIST_LIMIT] if full_text else []
+        table_captions = extract_caption_lines(full_text, "table")[:CAPTION_LIST_LIMIT] if full_text else []
 
     paper_type, paper_type_rationale = infer_paper_type(record.get("title", ""), record.get("abstract", ""))
 
@@ -583,7 +754,6 @@ def main() -> None:
         experiment_text = abstract
         experiment_source = "abstract" if abstract else ""
     conclusion_text, conclusion_source = section_text_with_source(section_map, "conclusion", abstract)
-    figure_captions = extract_caption_lines(full_text, "figure")[:CAPTION_LIST_LIMIT] if full_text else []
     mechanism_caption_text = " ".join(
         item.get("caption", "")
         for item in figure_captions
@@ -686,7 +856,7 @@ def main() -> None:
             pdf_coverage.get("references_start_page"),
         )
     pack["candidate_chunks"] = candidates
-    pack["language_hint"] = language_hint_for_text(
+    pack["language_hint"] = language_hint or language_hint_for_text(
         " ".join(part for part in [full_text, abstract] if part)
     )
     pack["section_sources"] = section_sources
@@ -700,7 +870,7 @@ def main() -> None:
         if normalize_whitespace(value)
     }
     pack["figure_captions"] = figure_captions
-    pack["table_captions"] = extract_caption_lines(full_text, "table")[:CAPTION_LIST_LIMIT] if full_text else []
+    pack["table_captions"] = table_captions
     pack["sections"] = [
         {"name": key, "length": len(value), "preview": value[:240]}
         for key, value in section_map.items()
@@ -733,6 +903,7 @@ def main() -> None:
                 for category, items in appendix_evidence.items()
             },
             "pdf_used": has_pdf,
+            "source_corpus_used": source_corpus_used,
             "candidate_chunk_sections": sorted([key for key, value in candidates.items() if value]),
         },
     }

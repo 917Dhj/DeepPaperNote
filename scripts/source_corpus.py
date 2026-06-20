@@ -51,6 +51,17 @@ def _positive_int(value: Any) -> int | None:
     return number if number >= 1 else None
 
 
+def _record_has_appendix_hint(record: dict[str, Any]) -> bool:
+    searchable = " ".join(
+        str(record.get(key, ""))
+        for key in ("kind", "title", "section_id")
+    ).lower()
+    return any(
+        token in searchable
+        for token in ("appendix", "appendices", "supplementary", "附录", "补充材料")
+    )
+
+
 def _resolve_manifest_path(source_manifest_path: str | Path) -> Path:
     return Path(source_manifest_path).expanduser().resolve()
 
@@ -192,6 +203,48 @@ class SourceCorpus:
             for page in _copy_list(self.manifest.get("pages"))
             if isinstance(page, dict) and (_positive_int(page.get("page")) or 0) >= start_page
         ]
+
+    def appendix_text_pages(self) -> list[dict[str, Any]]:
+        appendix_index = self.manifest.get("appendix_index", {})
+        coverage = self.manifest.get("coverage", {})
+        start_page = None
+        if isinstance(appendix_index, dict):
+            start_page = _positive_int(appendix_index.get("start_page"))
+        if start_page is None and isinstance(coverage, dict):
+            start_page = _positive_int(coverage.get("appendix_start_page"))
+
+        pages: list[dict[str, Any]] = []
+        seen: set[tuple[int, str, str]] = set()
+        for record in self.raw_sections:
+            text = str(record.get("text", "")).strip()
+            page_start = _positive_int(record.get("page_start"))
+            page_end = _positive_int(record.get("page_end")) or page_start
+            if not text or page_start is None or page_end is None:
+                continue
+
+            is_appendix = _record_has_appendix_hint(record)
+            if start_page is not None:
+                if page_end < start_page:
+                    continue
+                page_number = max(page_start, start_page)
+            elif is_appendix:
+                page_number = page_start
+            else:
+                continue
+
+            section_id = str(record.get("section_id", "")).strip()
+            title = str(record.get("title", "")).strip()
+            marker = (page_number, section_id, text)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            page = {"page": page_number, "text": text}
+            if section_id:
+                page["section_id"] = section_id
+            if title:
+                page["title"] = title
+            pages.append(page)
+        return pages
 
     def coverage(self) -> dict[str, Any]:
         return _copy_record(self.manifest.get("coverage"))
