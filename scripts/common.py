@@ -485,24 +485,267 @@ def identity_provenance(
     }
 
 
+PROVIDER_IDENTITY_SOURCES = {
+    "arxiv",
+    "crossref",
+    "doi",
+    "openalex",
+    "semantic_scholar",
+    "zotero",
+    "zotero_key",
+}
+CHALLENGEABLE_IDENTITY_SOURCES = {"local_pdf", "pdf_url", "title_query"}
+STRONG_ANCHOR_SOURCE_TYPES = {
+    "doi": {"doi", "doi_url"},
+    "arxiv_id": {"arxiv_id", "arxiv_url"},
+    "zotero_key": {"zotero_key"},
+}
+
+
+def _metadata_source_set(record: dict[str, Any]) -> set[str]:
+    sources = set()
+    source_type = _string_field(record, "source_type").lower()
+    if source_type:
+        sources.add(source_type)
+    for source in _dedupe_string_list(record.get("metadata_sources", [])):
+        sources.add(source.lower())
+    return sources
+
+
+def _normalized_anchor_value(key: str, value: Any) -> str:
+    cleaned = normalize_whitespace(str(value or ""))
+    if not cleaned:
+        return ""
+    if key == "doi":
+        return (extract_doi(cleaned) or cleaned).lower()
+    if key == "arxiv_id":
+        return (extract_arxiv_id(cleaned) or cleaned).lower()
+    if key == "zotero_key":
+        return cleaned.upper()
+    return cleaned.lower()
+
+
+def _paper_id_for_effective_identity(record: dict[str, Any]) -> str:
+    without_stale_id = dict(record)
+    without_stale_id.pop("paper_id", None)
+    return paper_id_for_record(without_stale_id)
+
+
+def _has_stronger_identity_evidence(record: dict[str, Any]) -> bool:
+    if any(_string_field(record, key) for key in ("doi", "arxiv_id", "zotero_key")):
+        return True
+    return bool(_metadata_source_set(record) & PROVIDER_IDENTITY_SOURCES)
+
+
+def _repair_evidence_used(record: dict[str, Any]) -> list[dict[str, str]]:
+    evidence = selected_identity_evidence(record)
+    metadata_sources = _dedupe_string_list(record.get("metadata_sources", []))
+    if metadata_sources:
+        trust = (
+            "provider"
+            if _metadata_source_set(record) & PROVIDER_IDENTITY_SOURCES
+            else "metadata"
+        )
+        evidence.append(
+            {
+                "kind": "metadata_sources",
+                "value": ", ".join(metadata_sources),
+                "trust": trust,
+                "source": "metadata",
+            }
+        )
+    return evidence
+
+
+def _challengeable_title_replacement_reason(record: dict[str, Any]) -> str:
+    title = _string_field(record, "title")
+    sources = _metadata_source_set(record)
+    title_source = _string_field(record, "local_pdf_title_source").lower()
+    reasons = {
+        reason.lower()
+        for reason in _dedupe_string_list(record.get("identity_confidence_reasons", []))
+    }
+
+    if not title and sources & CHALLENGEABLE_IDENTITY_SOURCES:
+        return "blank_challengeable_title_filled_by_stronger_identity_evidence"
+    if title_source == "first_page_title_used" or "first_page_title_used" in reasons:
+        return "challengeable_first_page_title_replaced_by_stronger_identity_evidence"
+    if (
+        title_source == "local_pdf_stem_used"
+        or record.get("local_pdf_artifact_title")
+        or "local_pdf_stem_used" in reasons
+        or "local_pdf_artifact_title" in reasons
+    ):
+        return "challengeable_filename_title_replaced_by_stronger_identity_evidence"
+    if title_source == "pdf_metadata_title_used" or "pdf_metadata_title_used" in reasons:
+        return "challengeable_pdf_metadata_title_replaced_by_stronger_identity_evidence"
+    if "title_query" in sources:
+        return "challengeable_title_query_replaced_by_stronger_identity_evidence"
+    if "pdf_url" in sources:
+        return "challengeable_pdf_url_title_replaced_by_stronger_identity_evidence"
+    return ""
+
+
+def _title_was_replaced(original: dict[str, Any], accepted: dict[str, Any]) -> bool:
+    original_title = _string_field(original, "title")
+    accepted_title = _string_field(accepted, "title")
+    if not accepted_title:
+        return False
+    if not original_title:
+        return True
+    return normalize_title(original_title) != normalize_title(accepted_title)
+
+
+def _resolve_anchor_is_strong(resolve_record: dict[str, Any], key: str) -> bool:
+    if not _string_field(resolve_record, key):
+        return False
+    source_type = _string_field(resolve_record, "source_type").lower()
+    if source_type in STRONG_ANCHOR_SOURCE_TYPES.get(key, set()):
+        return True
+    sources = _metadata_source_set(resolve_record)
+    if key == "doi":
+        return bool(sources & {"doi", "crossref"})
+    if key == "arxiv_id":
+        return "arxiv" in sources
+    if key == "zotero_key":
+        return bool(sources & {"zotero", "zotero_key"})
+    return False
+
+
+def _strong_anchor_conflicts(
+    metadata: dict[str, Any],
+    resolve_record: dict[str, Any],
+) -> list[dict[str, str]]:
+    conflicts: list[dict[str, str]] = []
+    for key in ("doi", "arxiv_id", "zotero_key"):
+        if not _resolve_anchor_is_strong(resolve_record, key):
+            continue
+        resolve_value = _normalized_anchor_value(key, resolve_record.get(key))
+        metadata_value = _normalized_anchor_value(key, metadata.get(key))
+        if metadata_value and resolve_value and metadata_value != resolve_value:
+            conflicts.append(
+                {
+                    "kind": key,
+                    "accepted_value": _string_field(resolve_record, key),
+                    "rejected_value": _string_field(metadata, key),
+                }
+            )
+    return conflicts
+
+
+def _apply_strong_anchor_protection(
+    effective: dict[str, Any],
+    resolve_record: dict[str, Any],
+    conflicts: list[dict[str, str]],
+) -> dict[str, Any]:
+    rejected_candidate = work_level_identity_from_record(effective)
+    protected_fields = (
+        "title",
+        "translated_title",
+        "authors",
+        "year",
+        "venue",
+        "doi",
+        "arxiv_id",
+        "zotero_key",
+        "source_type",
+        "source_url",
+        "pdf_url",
+        "local_pdf_path",
+    )
+    removable_fields = {
+        "title",
+        "translated_title",
+        "authors",
+        "year",
+        "venue",
+        "source_url",
+        "pdf_url",
+    }
+    for key in protected_fields:
+        if resolve_record.get(key) not in ("", None, [], {}):
+            effective[key] = deepcopy(resolve_record[key])
+        elif key in removable_fields:
+            effective.pop(key, None)
+    effective["paper_id"] = _paper_id_for_effective_identity(effective)
+    return {
+        "attempt": 1,
+        "action": "protect_strong_identity_anchor",
+        "status": "accepted",
+        "evidence_used": _repair_evidence_used(resolve_record),
+        "rejected_candidate_identity": rejected_candidate,
+        "accepted_correction": work_level_identity_from_record(effective),
+        "replacement_reason": "strong_identity_anchor_protected_from_unrelated_provider_evidence",
+        "conflicting_anchors": conflicts,
+    }
+
+
+def identity_repair_decision(
+    metadata: dict[str, Any],
+    *,
+    resolve_record: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    effective = deepcopy(metadata)
+    repair_attempts: list[dict[str, Any]] = []
+
+    if resolve_record:
+        conflicts = _strong_anchor_conflicts(effective, resolve_record)
+        if conflicts:
+            repair_attempts.append(
+                _apply_strong_anchor_protection(effective, resolve_record, conflicts)
+            )
+        else:
+            replacement_reason = _challengeable_title_replacement_reason(resolve_record)
+            if (
+                replacement_reason
+                and _title_was_replaced(resolve_record, effective)
+                and _has_stronger_identity_evidence(effective)
+            ):
+                repair_attempts.append(
+                    {
+                        "attempt": 1,
+                        "action": "replace_challengeable_identity_anchor",
+                        "status": "accepted",
+                        "evidence_used": _repair_evidence_used(effective),
+                        "rejected_candidate_identity": work_level_identity_from_record(
+                            resolve_record
+                        ),
+                        "accepted_correction": work_level_identity_from_record(effective),
+                        "replacement_reason": replacement_reason,
+                    }
+                )
+                effective["paper_id"] = _paper_id_for_effective_identity(effective)
+
+    return {
+        "record": effective,
+        "identity_verdict": "accepted",
+        "repair_attempts": repair_attempts,
+        "warnings": [],
+        "unresolved_risks": [],
+    }
+
+
 def build_identity_repair_trace(
     metadata: dict[str, Any],
     *,
+    resolve_record: dict[str, Any] | None = None,
     resolve_artifact_path: str = "",
     metadata_artifact_path: str = "",
 ) -> dict[str, Any]:
-    paper_id = metadata.get("paper_id") or paper_id_for_record(metadata)
+    decision = identity_repair_decision(metadata, resolve_record=resolve_record)
+    effective = decision["record"]
+    paper_id = effective.get("paper_id") or paper_id_for_record(effective)
     return {
         "status": "ok",
         "script": "build_identity_contract.py",
         "artifact_type": "identity_repair_trace",
         "schema_version": 1,
         "paper_id": paper_id,
-        "identity_verdict": "accepted",
-        "repair_attempts": [],
-        "selected_identity_evidence": selected_identity_evidence(metadata),
-        "warnings": [],
-        "unresolved_risks": [],
+        "identity_verdict": decision["identity_verdict"],
+        "repair_attempts": decision["repair_attempts"],
+        "selected_identity_evidence": selected_identity_evidence(effective),
+        "warnings": decision["warnings"],
+        "unresolved_risks": decision["unresolved_risks"],
         "provenance": identity_provenance(
             resolve_artifact_path=resolve_artifact_path,
             metadata_artifact_path=metadata_artifact_path,
@@ -513,11 +756,14 @@ def build_identity_repair_trace(
 def build_canonical_identity_artifact(
     metadata: dict[str, Any],
     *,
+    resolve_record: dict[str, Any] | None = None,
     repair_trace_path: str = "",
     resolve_artifact_path: str = "",
     metadata_artifact_path: str = "",
 ) -> dict[str, Any]:
-    paper_id = metadata.get("paper_id") or paper_id_for_record(metadata)
+    decision = identity_repair_decision(metadata, resolve_record=resolve_record)
+    effective = decision["record"]
+    paper_id = effective.get("paper_id") or paper_id_for_record(effective)
     return {
         "status": "ok",
         "run_status": "ok",
@@ -526,24 +772,24 @@ def build_canonical_identity_artifact(
         "artifact_type": "canonical_identity",
         "schema_version": 1,
         "paper_id": paper_id,
-        "identity_verdict": "accepted",
-        "work_level_identity": work_level_identity_from_record(metadata),
-        "source_manifestation": source_manifestation_from_record(metadata),
-        "selected_identity_evidence": selected_identity_evidence(metadata),
+        "identity_verdict": decision["identity_verdict"],
+        "work_level_identity": work_level_identity_from_record(effective),
+        "source_manifestation": source_manifestation_from_record(effective),
+        "selected_identity_evidence": selected_identity_evidence(effective),
         "equivalence_decision": {
             "status": "not_evaluated",
             "reason": "accepted_pass_through_without_manifestation_equivalence",
         },
-        "warnings": [],
+        "warnings": decision["warnings"],
         "repair_trace_path": _artifact_path(repair_trace_path),
         "provenance": identity_provenance(
             resolve_artifact_path=resolve_artifact_path,
             metadata_artifact_path=metadata_artifact_path,
         ),
         "diagnostics": {
-            "identity_confidence": _string_field(metadata, "identity_confidence"),
+            "identity_confidence": _string_field(effective, "identity_confidence"),
             "identity_confidence_reasons": _dedupe_string_list(
-                metadata.get("identity_confidence_reasons", [])
+                effective.get("identity_confidence_reasons", [])
             ),
         },
     }
@@ -555,7 +801,8 @@ def require_accepted_canonical_identity(record: dict[str, Any], consumer: str) -
     verdict = _string_field(identity, "identity_verdict").lower()
     if artifact_type != "canonical_identity":
         raise SystemExit(f"{consumer} refuses non-canonical identity artifact: {artifact_type}")
-    if verdict != "accepted":
+    normalized_verdict = verdict.replace("-", "_")
+    if normalized_verdict not in {"accepted", "accepted_with_warnings"}:
         raise SystemExit(
             f"{consumer} refuses unaccepted canonical identity: identity_verdict={verdict}"
         )

@@ -33,9 +33,17 @@ def load_required_record(value: str, consumer: str) -> dict:
 def main() -> None:
     args = parser().parse_args()
     metadata = load_required_record(args.input, "build_identity_contract.py")
+    resolve_record = None
+    if args.resolve:
+        loaded_resolve = maybe_load_json_record(args.resolve)
+        if loaded_resolve is not None:
+            resolve_record = dict(
+                require_ok_input_artifact(loaded_resolve, "build_identity_contract.py")
+            )
 
     trace = build_identity_repair_trace(
         metadata,
+        resolve_record=resolve_record,
         resolve_artifact_path=args.resolve,
         metadata_artifact_path=args.input,
     )
@@ -43,6 +51,7 @@ def main() -> None:
 
     identity = build_canonical_identity_artifact(
         metadata,
+        resolve_record=resolve_record,
         repair_trace_path=args.trace_output,
         resolve_artifact_path=args.resolve,
         metadata_artifact_path=args.input,

@@ -4,8 +4,8 @@ import json
 import sys
 from pathlib import Path
 
-import collect_metadata
 import build_identity_contract
+import collect_metadata
 import fetch_pdf
 import pytest
 
@@ -21,6 +21,43 @@ def write_error_artifact(path: Path, script: str) -> None:
             }
         ),
         encoding="utf-8",
+    )
+
+
+def build_identity_from_payloads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    resolve_payload: dict,
+    metadata_payload: dict,
+) -> tuple[dict, dict]:
+    resolve_path = tmp_path / "paper_resolve.json"
+    metadata_path = tmp_path / "paper_metadata.json"
+    identity_path = tmp_path / "paper_identity.json"
+    trace_path = tmp_path / "paper_identity_repair_trace.json"
+    resolve_path.write_text(json.dumps(resolve_payload), encoding="utf-8")
+    metadata_path.write_text(json.dumps(metadata_payload), encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_identity_contract.py",
+            "--input",
+            str(metadata_path),
+            "--resolve",
+            str(resolve_path),
+            "--trace-output",
+            str(trace_path),
+            "--output",
+            str(identity_path),
+        ],
+    )
+
+    build_identity_contract.main()
+
+    return (
+        json.loads(identity_path.read_text(encoding="utf-8")),
+        json.loads(trace_path.read_text(encoding="utf-8")),
     )
 
 
@@ -102,6 +139,210 @@ def test_build_identity_contract_emits_accepted_artifact_and_trace(
     assert trace["repair_attempts"] == []
     assert trace["provenance"]["resolve_artifact_path"] == str(resolve_path.resolve())
     assert trace["provenance"]["metadata_artifact_path"] == str(metadata_path.resolve())
+
+
+def test_build_identity_contract_repairs_noisy_first_page_title(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf_path = tmp_path / "noisy.pdf"
+    identity, trace = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload={
+            "status": "ok",
+            "script": "resolve_paper.py",
+            "paper_id": "title:weak",
+            "source_type": "local_pdf",
+            "source_url": str(pdf_path),
+            "local_pdf_path": str(pdf_path),
+            "title": "A Noisy Cover Sheet Title For Testing",
+            "local_pdf_title_source": "first_page_title_used",
+            "metadata_sources": ["local_pdf"],
+        },
+        metadata_payload={
+            "status": "ok",
+            "script": "collect_metadata.py",
+            "paper_id": "doi:10.1234/canonical",
+            "source_type": "local_pdf",
+            "source_url": str(pdf_path),
+            "local_pdf_path": str(pdf_path),
+            "title": "Canonical DOI Title For Testing",
+            "authors": ["Alice Example"],
+            "doi": "10.1234/canonical",
+            "metadata_sources": ["local_pdf", "crossref"],
+            "title_corrected_from_external_metadata": True,
+            "local_pdf_title_source": "first_page_title_used",
+            "identity_confidence": "high",
+            "identity_confidence_reasons": ["doi_present"],
+        },
+    )
+
+    assert identity["identity_verdict"] == "accepted"
+    assert identity["work_level_identity"]["title"] == "Canonical DOI Title For Testing"
+    assert identity["work_level_identity"]["doi"] == "10.1234/canonical"
+    assert identity["source_manifestation"]["local_pdf_path"] == str(pdf_path.resolve())
+    assert len(trace["repair_attempts"]) == 1
+    attempt = trace["repair_attempts"][0]
+    assert attempt["action"] == "replace_challengeable_identity_anchor"
+    assert (
+        attempt["replacement_reason"]
+        == "challengeable_first_page_title_replaced_by_stronger_identity_evidence"
+    )
+    assert (
+        attempt["rejected_candidate_identity"]["title"]
+        == "A Noisy Cover Sheet Title For Testing"
+    )
+    assert attempt["accepted_correction"]["title"] == "Canonical DOI Title For Testing"
+    assert any(
+        item["kind"] == "doi" and item["value"] == "10.1234/canonical"
+        for item in attempt["evidence_used"]
+    )
+
+
+def test_build_identity_contract_repairs_filename_only_title_with_arxiv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf_path = tmp_path / "Smith 等 - 2024 - Noisy Local Filename-123456.pdf"
+    identity, trace = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload={
+            "status": "ok",
+            "script": "resolve_paper.py",
+            "paper_id": "title:weak",
+            "source_type": "local_pdf",
+            "source_url": str(pdf_path),
+            "local_pdf_path": str(pdf_path),
+            "title": "Smith 等 - 2024 - Noisy Local Filename-123456",
+            "local_pdf_title_source": "local_pdf_stem_used",
+            "local_pdf_artifact_title": True,
+            "metadata_sources": ["local_pdf"],
+        },
+        metadata_payload={
+            "status": "ok",
+            "script": "collect_metadata.py",
+            "paper_id": "arxiv:2401.00001",
+            "source_type": "local_pdf",
+            "source_url": str(pdf_path),
+            "pdf_url": "https://arxiv.org/pdf/2401.00001.pdf",
+            "local_pdf_path": str(pdf_path),
+            "title": "Authoritative arXiv Repair Title",
+            "authors": ["Bob Example"],
+            "arxiv_id": "2401.00001",
+            "metadata_sources": ["local_pdf", "arxiv"],
+            "title_corrected_from_external_metadata": True,
+            "local_pdf_title_source": "local_pdf_stem_used",
+            "local_pdf_artifact_title": True,
+            "identity_confidence": "high",
+            "identity_confidence_reasons": ["arxiv_id_present"],
+        },
+    )
+
+    assert identity["work_level_identity"]["title"] == "Authoritative arXiv Repair Title"
+    assert identity["work_level_identity"]["arxiv_id"] == "2401.00001"
+    attempt = trace["repair_attempts"][0]
+    assert (
+        attempt["replacement_reason"]
+        == "challengeable_filename_title_replaced_by_stronger_identity_evidence"
+    )
+    assert (
+        attempt["rejected_candidate_identity"]["title"]
+        == "Smith 等 - 2024 - Noisy Local Filename-123456"
+    )
+    assert any(
+        item["kind"] == "arxiv_id" and item["value"] == "2401.00001"
+        for item in attempt["evidence_used"]
+    )
+
+
+def test_build_identity_contract_repairs_blank_challengeable_title(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    identity, trace = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload={
+            "status": "ok",
+            "script": "resolve_paper.py",
+            "paper_id": "paper:blank",
+            "source_type": "title_query",
+            "title": "",
+            "metadata_sources": ["title_query"],
+            "identity_confidence": "low",
+            "identity_confidence_reasons": ["title_query_unmatched"],
+        },
+        metadata_payload={
+            "status": "ok",
+            "script": "collect_metadata.py",
+            "paper_id": "doi:10.5555/blank",
+            "source_type": "title_query",
+            "title": "Authoritative Metadata Filled Title",
+            "doi": "10.5555/blank",
+            "metadata_sources": ["title_query", "crossref"],
+            "identity_confidence": "high",
+            "identity_confidence_reasons": ["doi_present"],
+        },
+    )
+
+    assert identity["work_level_identity"]["title"] == "Authoritative Metadata Filled Title"
+    assert identity["work_level_identity"]["doi"] == "10.5555/blank"
+    attempt = trace["repair_attempts"][0]
+    assert (
+        attempt["replacement_reason"]
+        == "blank_challengeable_title_filled_by_stronger_identity_evidence"
+    )
+    assert attempt["rejected_candidate_identity"]["title"] == ""
+    assert attempt["accepted_correction"]["title"] == "Authoritative Metadata Filled Title"
+
+
+def test_build_identity_contract_protects_strong_anchor_from_unrelated_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    identity, trace = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload={
+            "status": "ok",
+            "script": "resolve_paper.py",
+            "paper_id": "doi:10.1234/original",
+            "source_type": "doi",
+            "source_url": "https://doi.org/10.1234/original",
+            "title": "User Intended Strong DOI Paper",
+            "doi": "10.1234/original",
+            "metadata_sources": ["doi"],
+        },
+        metadata_payload={
+            "status": "ok",
+            "script": "collect_metadata.py",
+            "paper_id": "doi:10.9999/unrelated",
+            "source_type": "crossref",
+            "source_url": "https://doi.org/10.9999/unrelated",
+            "pdf_url": "https://example.test/unrelated.pdf",
+            "title": "Unrelated Provider Paper",
+            "doi": "10.9999/unrelated",
+            "metadata_sources": ["doi", "crossref"],
+            "identity_confidence": "high",
+            "identity_confidence_reasons": ["doi_present"],
+        },
+    )
+
+    assert identity["work_level_identity"]["title"] == "User Intended Strong DOI Paper"
+    assert identity["work_level_identity"]["doi"] == "10.1234/original"
+    assert identity["source_manifestation"]["source_url"] == "https://doi.org/10.1234/original"
+    assert identity["source_manifestation"]["pdf_url"] == ""
+    assert len(trace["repair_attempts"]) == 1
+    attempt = trace["repair_attempts"][0]
+    assert attempt["action"] == "protect_strong_identity_anchor"
+    assert (
+        attempt["replacement_reason"]
+        == "strong_identity_anchor_protected_from_unrelated_provider_evidence"
+    )
+    assert attempt["rejected_candidate_identity"]["doi"] == "10.9999/unrelated"
+    assert attempt["accepted_correction"]["doi"] == "10.1234/original"
 
 
 def test_collect_metadata_refuses_non_ok_input_artifact(
@@ -259,6 +500,56 @@ def test_fetch_pdf_refuses_unaccepted_identity_contract_before_candidate_selecti
 
     assert "refuses unaccepted canonical identity" in str(exc_info.value)
     assert not output.exists()
+
+
+def test_fetch_pdf_allows_accepted_with_warnings_identity_contract(tmp_path: Path) -> None:
+    metadata_path = tmp_path / "metadata.json"
+    identity_path = tmp_path / "identity.json"
+    output = tmp_path / "fetch.json"
+    canonical_pdf = tmp_path / "canonical.pdf"
+    canonical_pdf.write_bytes(b"%PDF-1.4 canonical")
+    metadata_path.write_text(
+        json.dumps({"status": "ok", "script": "collect_metadata.py"}),
+        encoding="utf-8",
+    )
+    identity_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "build_identity_contract.py",
+                "artifact_type": "canonical_identity",
+                "paper_id": "paper:warning",
+                "identity_verdict": "accepted_with_warnings",
+                "work_level_identity": {"title": "Warning Scoped Paper"},
+                "source_manifestation": {
+                    "source_kind": "local_pdf",
+                    "local_pdf_path": str(canonical_pdf),
+                    "source_url": str(canonical_pdf),
+                    "title": "Warning Scoped Paper",
+                },
+                "selected_identity_evidence": [],
+                "warnings": ["metadata_year_missing"],
+                "repair_trace_path": str(tmp_path / "trace.json"),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    fetch_pdf.main(
+        [
+            "--input",
+            str(metadata_path),
+            "--identity",
+            str(identity_path),
+            "--output",
+            str(output),
+        ]
+    )
+
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["status"] == "ok"
+    assert payload["identity_contract"]["identity_verdict"] == "accepted_with_warnings"
+    assert payload["source_manifestation"]["local_pdf_path"] == str(canonical_pdf)
 
 
 def test_fetch_pdf_refuses_non_ok_input_artifact_before_candidate_selection(
