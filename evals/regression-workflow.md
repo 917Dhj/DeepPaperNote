@@ -325,6 +325,16 @@ The auditor should check:
 - whether `source_manifest.json` and `raw_sections.jsonl` were the canonical
   text-derived reading input
 - whether old diagnostic derived views became model-facing writing inputs
+- whether acquisition resolve, metadata, fetch, Canonical Identity Artifact, and
+  Identity Repair Trace artifacts are present or explicitly missing
+- whether the canonical identity provenance points back to the expected resolve
+  and metadata artifacts
+- whether fetch consumed the canonical identity/source manifestation contract
+  instead of reusing loose resolve or metadata identity fields
+- whether repaired identity, accepted-with-warnings identity,
+  repair-exhausted failure, and equivalent manifestation cases are explained by
+  explicit identity verdict, warning, failure class, equivalence, and repair
+  trace evidence
 - whether truncation or partial reading was explicit
 - whether grounding lint used valid section IDs or page ranges
 - whether figure/table decisions were fail-closed
@@ -337,9 +347,33 @@ Artifact audit outcomes:
 - `fail`
 - `unknown`
 
+Map acquisition identity behavior to these same outcomes using explicit evidence:
+
+- `pass`: resolve, metadata, fetch, canonical identity, and repair trace artifacts
+  were consistently reused or consumed; the identity verdict is accepted or
+  accepted-with-warnings; any warning is scoped to metadata/provenance; and
+  Source Corpus evidence binds to the selected source manifestation.
+- `partial`: the run remains safe for note evaluation, but non-blocking
+  provenance, warning, or repair trace evidence is incomplete enough to limit
+  confidence in the acquisition audit.
+- `fail`: identity evidence is contradictory or unsafe, repair-exhausted failure
+  did not fail closed before downstream consumption, fetch used a stale or wrong
+  identity, the selected PDF/source manifestation is inconsistent, or the trace
+  is missing for a repaired identity.
+- `unknown`: required acquisition artifacts are absent from the manifest or
+  inaccessible, so the auditor cannot determine whether the identity contract
+  was respected.
+
 An artifact improvement alone is not the same as final note improvement. It can
 support an `architectural_improvement_only` conclusion when final note quality
 does not materially improve.
+
+Acquisition identity improvements count as final note-visible improvement only
+when the evidence shows they prevented or fixed wrong identity, wrong PDF,
+metadata contradiction, missing source evidence, broken path, citation damage,
+or a comparable downstream failure. Otherwise they remain
+`architectural_improvement_only` even when the acquisition architecture is
+cleaner.
 
 ### Artifact Auditor Agent Prompt Template
 
@@ -358,6 +392,10 @@ Read first:
 Task:
 - Inspect the artifacts listed in both manifests.
 - Check Source Corpus, synthesis bundle, grounding, lint, figure/table, and save artifacts.
+- Check acquisition resolve, metadata, fetch, canonical identity, and repair trace artifacts.
+- Verify whether canonical identity and repair trace evidence were consistently reused or consumed.
+- Map identity behavior to pass/partial/fail/unknown with concrete evidence.
+- Cover repaired identity, accepted-with-warnings identity, repair-exhausted failure, and equivalent manifestation cases when they appear in the run.
 - Record whether candidate artifacts respect the expected contracts.
 - Record missing or inconsistent artifacts.
 - Distinguish artifact improvements from final note quality improvements.
@@ -370,7 +408,7 @@ Constraints:
 
 Output:
 - Write <ARTIFACT_AUDIT_REPORT>.
-- Include one section per primary paper with pass/partial/fail/unknown, evidence paths, and risks.
+- Include one section per primary paper with pass/partial/fail/unknown, evidence paths, identity verdict evidence, source manifestation evidence, repair trace evidence, and risks.
 - End with an overall artifact verdict and any blocker for note evaluation.
 ```
 
@@ -494,6 +532,21 @@ Do not claim real improvement for:
 Use `architectural_improvement_only` when artifacts or contracts improved but
 the final note quality is not materially better yet.
 
+For acquisition identity work, keep two fields separate in the regression
+summary:
+
+- `architectural_improvement_only`: the candidate improved artifact reuse,
+  provenance, canonical identity, repair trace, or reporting clarity, but the
+  final notes did not visibly improve.
+- `final_note_visible_improvement`: the candidate prevented or fixed wrong
+  identity, wrong PDF, metadata contradiction, missing source evidence, broken
+  path, citation damage, or a comparable downstream failure visible in the
+  generated note or its source evidence.
+
+Do not promote an acquisition architecture improvement into final note quality
+improvement merely because resolve, metadata, fetch, canonical identity, or
+repair trace artifacts are cleaner or more complete.
+
 ## Minimum First Experiment
 
 For the first reusable regression run:
@@ -527,6 +580,7 @@ The summary should distinguish:
 
 - mechanism improved but note quality did not
 - note quality improved but artifacts regressed
+- architectural_improvement_only versus final note-visible acquisition improvement
 - one-paper improvement
 - broad real improvement
 - failed or inconclusive experiment
@@ -550,6 +604,7 @@ Read first:
 
 Task:
 - Check runner success, artifact audit outcomes, and note evaluation verdicts.
+- Check whether acquisition identity improvements are architectural_improvement_only or final note-visible.
 - Assign a per-paper verdict.
 - Assign one experiment-level verdict.
 - Decide whether optimization success can be claimed.

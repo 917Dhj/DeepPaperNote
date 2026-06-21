@@ -317,6 +317,15 @@ auditor 应检查：
 - `source_manifest.json` 和 `raw_sections.jsonl` 是否作为 canonical
   text-derived reading input
 - 旧的 diagnostic derived views 是否又变成 model-facing writing inputs
+- acquisition resolve、metadata、fetch、Canonical Identity Artifact 和
+  Identity Repair Trace artifacts 是否存在，或是否被明确记录为缺失
+- canonical identity 的 provenance 是否指回预期的 resolve 和 metadata
+  artifacts
+- fetch 是否消费 canonical identity/source manifestation contract，而不是
+  重新使用松散的 resolve 或 metadata identity fields
+- repaired identity、accepted-with-warnings identity、repair-exhausted failure
+  和 equivalent manifestation 场景是否由 explicit identity verdict、warning、
+  failure class、equivalence 和 repair trace evidence 解释
 - truncation 或 partial reading 是否显式记录
 - grounding lint 是否使用有效 section IDs 或 page ranges
 - figure/table decisions 是否 fail closed
@@ -329,8 +338,28 @@ Artifact audit 结果：
 - `fail`
 - `unknown`
 
+acquisition identity behavior 也必须用 explicit evidence 映射到这些结果：
+
+- `pass`：resolve、metadata、fetch、canonical identity 和 repair trace
+  artifacts 被 consistent reuse/consume；identity verdict 是 accepted 或
+  accepted-with-warnings；warning 仅限 metadata/provenance；Source Corpus
+  evidence 绑定到 selected source manifestation。
+- `partial`：运行仍可进入 note evaluation，但非阻塞的 provenance、warning
+  或 repair trace evidence 不完整，导致 acquisition audit 置信度下降。
+- `fail`：identity evidence 矛盾或不安全；repair-exhausted failure 没有在
+  downstream consumption 前 fail closed；fetch 使用了 stale 或 wrong identity；
+  selected PDF/source manifestation 不一致；或 repaired identity 缺少 trace。
+- `unknown`：manifest 中缺少必要 acquisition artifacts，或 artifact 不可访问，
+  auditor 无法判断 identity contract 是否被遵守。
+
 artifact 改善不等同于最终笔记改善。当 artifacts 或契约改善，但最终笔记质量
 没有实质提升时，它只能支持 `architectural_improvement_only` 结论。
+
+acquisition identity improvement 只有在证据表明它 prevent/fix wrong identity、
+wrong PDF、metadata contradiction、missing source evidence、broken path、
+citation damage 或 comparable downstream failure 时，才能计入 final
+note-visible improvement。否则即使 acquisition architecture 更干净，也只能归入
+`architectural_improvement_only`。
 
 ### Artifact Auditor Agent Prompt Template
 
@@ -349,6 +378,10 @@ artifact 改善不等同于最终笔记改善。当 artifacts 或契约改善，
 任务：
 - 检查两个 manifest 中列出的 artifacts。
 - 检查 Source Corpus、synthesis bundle、grounding、lint、figure/table 和 save artifacts。
+- 检查 acquisition resolve、metadata、fetch、canonical identity 和 repair trace artifacts。
+- 验证 canonical identity 和 repair trace evidence 是否被 consistent reuse/consume。
+- 用具体证据把 identity behavior 映射到 pass/partial/fail/unknown。
+- 当运行中出现 repaired identity、accepted-with-warnings identity、repair-exhausted failure 和 equivalent manifestation 场景时，逐项覆盖。
 - 记录 candidate artifacts 是否遵守预期契约。
 - 记录缺失或不一致 artifacts。
 - 区分 artifact 改善和最终笔记质量改善。
@@ -361,7 +394,7 @@ artifact 改善不等同于最终笔记改善。当 artifacts 或契约改善，
 
 输出：
 - 写入 <ARTIFACT_AUDIT_REPORT>。
-- 对每篇主测试论文给出 pass/partial/fail/unknown、证据路径和风险。
+- 对每篇主测试论文给出 pass/partial/fail/unknown、证据路径、identity verdict evidence、source manifestation evidence、repair trace evidence 和风险。
 - 最后给出总体 artifact verdict，以及是否存在阻塞 note evaluation 的问题。
 ```
 
@@ -485,6 +518,20 @@ Regression Judge 综合：
 当 artifacts 或 contracts 改善，但最终笔记质量还没有实质变好时，使用
 `architectural_improvement_only`。
 
+对于 acquisition identity work，regression summary 必须分开记录两个字段：
+
+- `architectural_improvement_only`：candidate 改善了 artifact reuse、
+  provenance、canonical identity、repair trace 或 reporting clarity，但 final
+  notes 没有可见质量提升。
+- `final_note_visible_improvement`：candidate prevent/fix wrong identity、
+  wrong PDF、metadata contradiction、missing source evidence、broken path、
+  citation damage 或 comparable downstream failure，且这些问题会体现在生成笔记
+  或 source evidence 中。
+
+不要仅因为 resolve、metadata、fetch、canonical identity 或 repair trace artifacts
+更干净、更完整，就把 acquisition architecture improvement 升级为 final note
+quality improvement。
+
 ## 最小首轮实验
 
 第一轮可复用回归测试建议：
@@ -518,6 +565,7 @@ Regression Judge 应产出：
 
 - mechanism 改善但 note quality 没改善
 - note quality 改善但 artifacts 回归
+- architectural_improvement_only 与 final note-visible acquisition improvement
 - 单篇论文改善
 - 广泛真实改善
 - 失败或无法得出结论的实验
@@ -541,6 +589,7 @@ Regression Judge 应产出：
 
 任务：
 - 检查 runner success、artifact audit outcomes 和 note evaluation verdicts。
+- 检查 acquisition identity improvements 属于 architectural_improvement_only 还是 final note-visible。
 - 给出 per-paper verdict。
 - 给出一个 experiment-level verdict。
 - 判断是否可以声称 optimization success。

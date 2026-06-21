@@ -438,3 +438,40 @@ def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
     assert "stop and report the blocked stage honestly" in workflow_text
     assert "A title, DOI, URL, arXiv ID, or local PDF all work." in readme_text
     assert "标题、DOI、URL、本地 PDF 都可以" in readme_zh_text
+
+
+def test_regression_workflow_documents_acquisition_identity_audit_contract() -> None:
+    texts = [
+        (PROJECT_ROOT / "evals" / "regression-workflow.md").read_text(encoding="utf-8"),
+        (PROJECT_ROOT / "evals" / "regression-workflow-zh.md").read_text(encoding="utf-8"),
+    ]
+
+    for text in texts:
+        for artifact in (
+            "resolve",
+            "metadata",
+            "fetch",
+            "canonical identity",
+            "repair trace",
+        ):
+            assert artifact in text.lower()
+        for verdict in ("pass", "partial", "fail", "unknown"):
+            assert f"`{verdict}`" in text
+        for scenario in (
+            "repaired identity",
+            "accepted-with-warnings identity",
+            "repair-exhausted failure",
+            "equivalent manifestation",
+        ):
+            assert scenario in text.lower()
+        for downstream_failure in (
+            "wrong identity",
+            "wrong PDF",
+            "metadata contradiction",
+            "missing source evidence",
+            "broken path",
+            "citation damage",
+        ):
+            assert downstream_failure.lower() in text.lower()
+        assert "`architectural_improvement_only`" in text
+        assert "note-visible" in text.lower()
