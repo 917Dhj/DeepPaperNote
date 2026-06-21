@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 
 from common import (
+    ACCEPTED_IDENTITY_VERDICTS,
     build_canonical_identity_artifact,
     build_identity_repair_trace,
     emit,
@@ -58,6 +59,9 @@ def main() -> None:
         metadata_artifact_path=args.input,
     )
     emit(identity, args.output)
+    verdict = str(identity.get("identity_verdict", "")).lower().replace("-", "_")
+    if verdict not in ACCEPTED_IDENTITY_VERDICTS:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

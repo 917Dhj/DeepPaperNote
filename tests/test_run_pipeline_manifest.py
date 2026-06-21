@@ -178,3 +178,41 @@ def test_run_pipeline_does_not_materialize_before_final_save(
         evidence_call[evidence_call.index("--source-manifest") + 1]
         == str((workdir / "paper_source_manifest.json").resolve())
     )
+
+
+def test_run_pipeline_stops_before_fetch_when_identity_repair_is_exhausted(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workdir = tmp_path / "run"
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], check: bool = True, **kwargs) -> object:
+        calls.append(cmd)
+        if Path(cmd[1]).name == "build_identity_contract.py":
+            raise subprocess.CalledProcessError(1, cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(run_pipeline.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pipeline.py",
+            "--input",
+            "ambiguous-title",
+            "--workdir",
+            str(workdir),
+            "--prefix",
+            "paper",
+        ],
+    )
+
+    with pytest.raises(subprocess.CalledProcessError):
+        run_pipeline.main()
+
+    assert [Path(cmd[1]).name for cmd in calls] == [
+        "resolve_paper.py",
+        "collect_metadata.py",
+        "build_identity_contract.py",
+    ]

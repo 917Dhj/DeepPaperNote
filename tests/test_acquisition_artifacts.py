@@ -30,6 +30,7 @@ def build_identity_from_payloads(
     *,
     resolve_payload: dict,
     metadata_payload: dict,
+    expect_failure: bool = False,
 ) -> tuple[dict, dict]:
     resolve_path = tmp_path / "paper_resolve.json"
     metadata_path = tmp_path / "paper_metadata.json"
@@ -53,7 +54,12 @@ def build_identity_from_payloads(
         ],
     )
 
-    build_identity_contract.main()
+    if expect_failure:
+        with pytest.raises(SystemExit) as exc_info:
+            build_identity_contract.main()
+        assert exc_info.value.code == 1
+    else:
+        build_identity_contract.main()
 
     return (
         json.loads(identity_path.read_text(encoding="utf-8")),
@@ -429,7 +435,7 @@ def test_build_identity_contract_accepts_equivalent_arxiv_and_published_manifest
     assert trace["equivalence_decision"] == identity["equivalence_decision"]
 
 
-def test_build_identity_contract_marks_competing_manifestations_ambiguous(
+def test_build_identity_contract_fails_closed_for_competing_manifestations_after_repair(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -484,19 +490,156 @@ def test_build_identity_contract_marks_competing_manifestations_ambiguous(
         ],
     )
 
-    build_identity_contract.main()
+    with pytest.raises(SystemExit) as exc_info:
+        build_identity_contract.main()
+    assert exc_info.value.code == 1
 
     identity = json.loads(identity_path.read_text(encoding="utf-8"))
     trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert identity["status"] == "error"
+    assert identity["run_status"] == "failed"
     assert identity["identity_verdict"] == "ambiguous"
+    assert identity["identity_failure_class"] == "ambiguous_competing_identities"
+    assert "stronger identifier" in identity["failure_summary"]
+    assert "Efficient Vision Transformers" not in identity["failure_summary"]
+    assert "Efficient Language Models" not in identity["failure_summary"]
     assert identity["equivalence_decision"]["status"] == "ambiguous"
     assert identity["equivalence_decision"]["reason"] == "competing_identity_evidence"
     assert any(
         item["kind"] == "leading_author" and item["status"] == "conflict"
         for item in identity["equivalence_decision"]["evidence"]
     )
+    assert trace["status"] == "error"
+    assert trace["run_status"] == "failed"
     assert trace["identity_verdict"] == "ambiguous"
+    assert trace["identity_failure_class"] == "ambiguous_competing_identities"
+    assert trace["repair_attempts"][-1]["action"] == "repair_exhausted_fail_closed"
+    assert trace["repair_attempts"][-1]["status"] == "failed"
     assert trace["equivalence_decision"] == identity["equivalence_decision"]
+
+
+@pytest.mark.parametrize(
+    ("resolve_payload", "metadata_payload", "failure_class"),
+    [
+        (
+            {
+                "status": "ok",
+                "script": "resolve_paper.py",
+                "paper_id": "title:weak",
+                "source_type": "title_query",
+                "title": "Weak Title Only Paper",
+                "metadata_sources": ["title_query"],
+                "identity_confidence": "low",
+                "identity_confidence_reasons": ["title_query_unmatched"],
+            },
+            {
+                "status": "ok",
+                "script": "collect_metadata.py",
+                "paper_id": "title:weak",
+                "source_type": "title_query",
+                "title": "Weak Title Only Paper",
+                "metadata_sources": ["title_query"],
+                "identity_confidence": "low",
+                "identity_confidence_reasons": ["title_query_unmatched"],
+            },
+            "insufficient_evidence",
+        ),
+        (
+            {
+                "status": "ok",
+                "script": "resolve_paper.py",
+                "paper_id": "title:provider-down",
+                "source_type": "title_query",
+                "title": "Provider Down Paper",
+                "metadata_sources": ["title_query"],
+            },
+            {
+                "status": "ok",
+                "script": "collect_metadata.py",
+                "paper_id": "title:provider-down",
+                "source_type": "title_query",
+                "title": "Provider Down Paper",
+                "metadata_sources": ["title_query"],
+                "provider_unavailable": True,
+            },
+            "provider_unavailable",
+        ),
+        (
+            {
+                "status": "ok",
+                "script": "resolve_paper.py",
+                "paper_id": "doi:10.1234/original",
+                "source_type": "doi",
+                "title": "Original DOI Paper",
+                "doi": "10.1234/original",
+                "metadata_sources": ["doi"],
+            },
+            {
+                "status": "ok",
+                "script": "collect_metadata.py",
+                "paper_id": "doi:10.1234/original",
+                "source_type": "doi",
+                "title": "Original DOI Paper",
+                "doi": "10.1234/original",
+                "metadata_sources": ["doi", "crossref"],
+                "identity_contradictions": ["crossref_title_author_conflict"],
+            },
+            "metadata_contradiction",
+        ),
+        (
+            {
+                "status": "ok",
+                "script": "resolve_paper.py",
+                "paper_id": "title:local-pdf",
+                "source_type": "local_pdf",
+                "source_url": "/tmp/mismatched.pdf",
+                "local_pdf_path": "/tmp/mismatched.pdf",
+                "title": "Local PDF About Vision Models",
+                "authors": ["Alice Vision"],
+                "abstract": "We classify images with compact vision transformers.",
+                "metadata_sources": ["local_pdf"],
+            },
+            {
+                "status": "ok",
+                "script": "collect_metadata.py",
+                "paper_id": "doi:10.9999/legal-language",
+                "source_type": "local_pdf",
+                "source_url": "/tmp/mismatched.pdf",
+                "local_pdf_path": "/tmp/mismatched.pdf",
+                "title": "Legal Language Models For Contract Review",
+                "authors": ["Mallory Text"],
+                "abstract": "We improve contract review with legal language models.",
+                "doi": "10.9999/legal-language",
+                "metadata_sources": ["local_pdf", "crossref"],
+            },
+            "source_pdf_mismatch",
+        ),
+    ],
+)
+def test_build_identity_contract_classifies_repair_exhausted_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    resolve_payload: dict,
+    metadata_payload: dict,
+    failure_class: str,
+) -> None:
+    identity, trace = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload=resolve_payload,
+        metadata_payload=metadata_payload,
+        expect_failure=True,
+    )
+
+    assert identity["status"] == "error"
+    assert identity["run_status"] == "failed"
+    assert identity["identity_failure_class"] == failure_class
+    assert identity["failure_summary"]
+    assert "provider_unavailable" not in identity["failure_summary"]
+    assert trace["status"] == "error"
+    assert trace["identity_failure_class"] == failure_class
+    assert trace["repair_attempts"][-1]["action"] == "repair_exhausted_fail_closed"
+    assert trace["repair_attempts"][-1]["failure_class"] == failure_class
 
 
 def test_collect_metadata_refuses_non_ok_input_artifact(

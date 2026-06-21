@@ -717,6 +717,30 @@ STRONG_ANCHOR_SOURCE_TYPES = {
     "arxiv_id": {"arxiv_id", "arxiv_url"},
     "zotero_key": {"zotero_key"},
 }
+ACCEPTED_IDENTITY_VERDICTS = {"accepted", "accepted_with_warnings"}
+IDENTITY_FAILURE_SUMMARIES = {
+    "ambiguous_competing_identities": (
+        "Identity repair exhausted: multiple plausible papers remain. Provide a "
+        "stronger identifier such as a DOI, arXiv ID, Zotero key, or trusted source PDF."
+    ),
+    "insufficient_evidence": (
+        "Identity repair exhausted: there is not enough trusted evidence to choose the "
+        "paper. Provide a stronger identifier such as a DOI, arXiv ID, Zotero key, or "
+        "trusted source PDF."
+    ),
+    "provider_unavailable": (
+        "Identity repair exhausted: metadata providers were unavailable, so the paper "
+        "could not be verified. Retry later or provide a stronger identifier."
+    ),
+    "metadata_contradiction": (
+        "Identity repair exhausted: trusted identity metadata contradicts other "
+        "acquisition evidence. Provide a stronger identifier or a trusted source PDF."
+    ),
+    "source_pdf_mismatch": (
+        "Identity repair exhausted: the selected PDF appears to describe a different "
+        "paper. Provide the correct PDF or a stronger identifier."
+    ),
+}
 
 
 def _metadata_source_set(record: dict[str, Any]) -> set[str]:
@@ -727,6 +751,60 @@ def _metadata_source_set(record: dict[str, Any]) -> set[str]:
     for source in _dedupe_string_list(record.get("metadata_sources", [])):
         sources.add(source.lower())
     return sources
+
+
+def _boolish_field(record: dict[str, Any], key: str) -> bool:
+    value = record.get(key)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on", "unavailable"}
+    return bool(value)
+
+
+def _has_provider_unavailable(record: dict[str, Any]) -> bool:
+    if _boolish_field(record, "provider_unavailable") or _boolish_field(
+        record, "metadata_provider_unavailable"
+    ):
+        return True
+    if record.get("provider_errors") or record.get("provider_failures"):
+        return True
+    status = _string_field(record, "provider_status").lower()
+    return status in {"unavailable", "failed", "timeout"}
+
+
+def _has_metadata_contradiction(record: dict[str, Any]) -> bool:
+    contradiction_keys = (
+        "identity_contradictions",
+        "metadata_contradictions",
+        "unresolved_metadata_contradictions",
+    )
+    return any(bool(record.get(key)) for key in contradiction_keys)
+
+
+def _has_trusted_source_manifestation(record: dict[str, Any]) -> bool:
+    if _string_field(record, "local_pdf_path"):
+        return True
+    if _string_field(record, "pdf_url"):
+        return True
+    source_url = _string_field(record, "source_url")
+    source_type = _string_field(record, "source_type").lower()
+    return bool(source_url and source_type not in {"", "title", "title_query"})
+
+
+def _has_minimum_identity_evidence(
+    record: dict[str, Any],
+    source_record: dict[str, Any] | None,
+) -> bool:
+    if _has_stronger_identity_evidence(record):
+        return True
+    if _has_trusted_source_manifestation(record):
+        return True
+    if source_record and source_record is not record:
+        return _has_stronger_identity_evidence(source_record) or _has_trusted_source_manifestation(
+            source_record
+        )
+    return False
 
 
 def _normalized_anchor_value(key: str, value: Any) -> str:
@@ -904,6 +982,9 @@ def identity_repair_decision(
 ) -> dict[str, Any]:
     effective = deepcopy(metadata)
     repair_attempts: list[dict[str, Any]] = []
+    identity_verdict = "accepted"
+    failure_class = ""
+    unresolved_risks: list[str] = []
 
     if resolve_record:
         conflicts = _strong_anchor_conflicts(effective, resolve_record)
@@ -933,13 +1014,93 @@ def identity_repair_decision(
                 )
                 effective["paper_id"] = _paper_id_for_effective_identity(effective)
 
+    if _has_provider_unavailable(effective) and not _has_minimum_identity_evidence(
+        effective,
+        resolve_record,
+    ):
+        identity_verdict = "failed"
+        failure_class = "provider_unavailable"
+    elif _has_metadata_contradiction(effective):
+        identity_verdict = "failed"
+        failure_class = "metadata_contradiction"
+    elif not _has_minimum_identity_evidence(effective, resolve_record):
+        identity_verdict = "failed"
+        failure_class = "insufficient_evidence"
+
+    if failure_class:
+        unresolved_risks.append(failure_class)
+
     return {
         "record": effective,
-        "identity_verdict": "accepted",
+        "identity_verdict": identity_verdict,
+        "identity_failure_class": failure_class,
         "repair_attempts": repair_attempts,
         "warnings": [],
-        "unresolved_risks": [],
+        "unresolved_risks": unresolved_risks,
     }
+
+
+def _equivalence_has_identifier_conflict(equivalence_decision: dict[str, Any]) -> bool:
+    return any(
+        item.get("kind") == "identifier" and item.get("status") == "conflict"
+        for item in equivalence_decision.get("evidence", []) or []
+        if isinstance(item, dict)
+    )
+
+
+def _is_source_pdf_record(record: dict[str, Any] | None) -> bool:
+    if not record:
+        return False
+    return bool(
+        _string_field(record, "local_pdf_path")
+        or _string_field(record, "source_type").lower() == "local_pdf"
+    )
+
+
+def identity_failure_class_for_state(
+    decision: dict[str, Any],
+    equivalence_decision: dict[str, Any],
+    source_record: dict[str, Any] | None,
+) -> str:
+    failure_class = _string_field(decision, "identity_failure_class")
+    if _string_field(equivalence_decision, "status") == "ambiguous":
+        if _is_source_pdf_record(source_record):
+            return "source_pdf_mismatch"
+        if _equivalence_has_identifier_conflict(equivalence_decision):
+            return "metadata_contradiction"
+        if failure_class not in {"provider_unavailable", "metadata_contradiction"}:
+            return "ambiguous_competing_identities"
+    return failure_class
+
+
+def identity_failure_summary(failure_class: str) -> str:
+    return IDENTITY_FAILURE_SUMMARIES.get(
+        failure_class,
+        "Identity repair exhausted: acquisition could not safely choose the paper identity.",
+    )
+
+
+def _repair_attempts_with_failure(
+    attempts: list[dict[str, Any]],
+    *,
+    failure_class: str,
+    evidence_used: list[dict[str, str]],
+    equivalence_decision: dict[str, Any],
+) -> list[dict[str, Any]]:
+    if not failure_class:
+        return attempts
+    repaired = deepcopy(attempts)
+    repaired.append(
+        {
+            "attempt": len(repaired) + 1,
+            "action": "repair_exhausted_fail_closed",
+            "status": "failed",
+            "failure_class": failure_class,
+            "evidence_used": evidence_used,
+            "unresolved_reason": _string_field(equivalence_decision, "reason") or failure_class,
+        }
+    )
+    return repaired
 
 
 def build_identity_repair_trace(
@@ -957,18 +1118,37 @@ def build_identity_repair_trace(
     identity_verdict = identity_verdict_from_equivalence(equivalence_decision)
     if identity_verdict == "accepted":
         identity_verdict = decision["identity_verdict"]
+    failure_class = identity_failure_class_for_state(
+        decision,
+        equivalence_decision,
+        source_record,
+    )
+    selected_evidence = selected_identity_evidence(effective, source_record)
+    repair_attempts = _repair_attempts_with_failure(
+        decision["repair_attempts"],
+        failure_class=failure_class,
+        evidence_used=selected_evidence,
+        equivalence_decision=equivalence_decision,
+    )
+    failed = identity_verdict.replace("-", "_") not in ACCEPTED_IDENTITY_VERDICTS
+    unresolved_risks = list(decision["unresolved_risks"])
+    if failure_class and failure_class not in unresolved_risks:
+        unresolved_risks.append(failure_class)
     return {
-        "status": "ok",
+        "status": "error" if failed else "ok",
+        "run_status": "failed" if failed else "ok",
         "script": "build_identity_contract.py",
         "artifact_type": "identity_repair_trace",
         "schema_version": 1,
         "paper_id": paper_id,
         "identity_verdict": identity_verdict,
-        "repair_attempts": decision["repair_attempts"],
-        "selected_identity_evidence": selected_identity_evidence(effective, source_record),
+        "identity_failure_class": failure_class,
+        "repair_attempts": repair_attempts,
+        "selected_identity_evidence": selected_evidence,
         "equivalence_decision": equivalence_decision,
         "warnings": decision["warnings"],
-        "unresolved_risks": decision["unresolved_risks"],
+        "unresolved_risks": unresolved_risks,
+        "failure_summary": identity_failure_summary(failure_class) if failed else "",
         "provenance": identity_provenance(
             resolve_artifact_path=resolve_artifact_path,
             metadata_artifact_path=metadata_artifact_path,
@@ -992,18 +1172,27 @@ def build_canonical_identity_artifact(
     identity_verdict = identity_verdict_from_equivalence(equivalence_decision)
     if identity_verdict == "accepted":
         identity_verdict = decision["identity_verdict"]
+    failure_class = identity_failure_class_for_state(
+        decision,
+        equivalence_decision,
+        source_record,
+    )
+    failed = identity_verdict.replace("-", "_") not in ACCEPTED_IDENTITY_VERDICTS
+    selected_evidence = selected_identity_evidence(effective, source_record)
     return {
-        "status": "ok",
-        "run_status": "ok",
+        "status": "error" if failed else "ok",
+        "run_status": "failed" if failed else "ok",
         "script": "build_identity_contract.py",
         "producer": "build_identity_contract.py",
         "artifact_type": "canonical_identity",
         "schema_version": 1,
         "paper_id": paper_id,
         "identity_verdict": identity_verdict,
+        "identity_failure_class": failure_class,
+        "failure_summary": identity_failure_summary(failure_class) if failed else "",
         "work_level_identity": work_level_identity_from_record(effective),
         "source_manifestation": source_manifestation_from_record(source_record, effective),
-        "selected_identity_evidence": selected_identity_evidence(effective, source_record),
+        "selected_identity_evidence": selected_evidence,
         "equivalence_decision": equivalence_decision,
         "warnings": decision["warnings"],
         "repair_trace_path": _artifact_path(repair_trace_path),
