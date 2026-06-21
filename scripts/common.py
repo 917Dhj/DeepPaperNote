@@ -492,6 +492,8 @@ def source_manifestation_from_record(
     return {
         "source_kind": source_kind or "unknown",
         "title": _string_field(record, "title") or _string_field(work_record, "title"),
+        "year": _string_field(record, "year"),
+        "venue": _string_field(record, "venue"),
         "source_url": source_url or _string_field(work_record, "source_url"),
         "pdf_url": _string_field(record, "pdf_url") or _string_field(work_record, "pdf_url"),
         "local_pdf_path": _path_string(local_pdf),
@@ -975,6 +977,47 @@ def _apply_strong_anchor_protection(
     }
 
 
+WARNING_SCOPED_METADATA_FIELDS = {
+    "year": {
+        "reason": "source_manifestation_year_differs_from_work_identity",
+        "impact": "avoid_over_specific_year_claims",
+    },
+    "venue": {
+        "reason": "source_manifestation_venue_differs_from_work_identity",
+        "impact": "avoid_over_specific_venue_claims",
+    },
+}
+
+
+def _metadata_values_differ(left: str, right: str) -> bool:
+    if not left or not right:
+        return False
+    return normalize_title(left) != normalize_title(right)
+
+
+def _warning_scoped_metadata_uncertainty(
+    work_record: dict[str, Any],
+    source_record: dict[str, Any],
+) -> list[dict[str, str]]:
+    warnings: list[dict[str, str]] = []
+    for field, config in WARNING_SCOPED_METADATA_FIELDS.items():
+        work_value = _string_field(work_record, field)
+        source_value = _string_field(source_record, field)
+        if not _metadata_values_differ(work_value, source_value):
+            continue
+        warnings.append(
+            {
+                "reason": config["reason"],
+                "scope": "metadata",
+                "impact": config["impact"],
+                "field": field,
+                "work_value": work_value,
+                "source_value": source_value,
+            }
+        )
+    return warnings
+
+
 def identity_repair_decision(
     metadata: dict[str, Any],
     *,
@@ -1103,12 +1146,10 @@ def _repair_attempts_with_failure(
     return repaired
 
 
-def build_identity_repair_trace(
+def identity_contract_state(
     metadata: dict[str, Any],
     *,
     source_record: dict[str, Any] | None = None,
-    resolve_artifact_path: str = "",
-    metadata_artifact_path: str = "",
 ) -> dict[str, Any]:
     decision = identity_repair_decision(metadata, resolve_record=source_record)
     effective = decision["record"]
@@ -1116,8 +1157,14 @@ def build_identity_repair_trace(
     paper_id = effective.get("paper_id") or paper_id_for_record(effective)
     equivalence_decision = manifestation_equivalence_decision(effective, source_record)
     identity_verdict = identity_verdict_from_equivalence(equivalence_decision)
+    warnings = []
     if identity_verdict == "accepted":
         identity_verdict = decision["identity_verdict"]
+        if identity_verdict == "accepted":
+            warnings = deepcopy(decision.get("warnings", []) or [])
+            warnings.extend(_warning_scoped_metadata_uncertainty(effective, source_record))
+            if warnings:
+                identity_verdict = "accepted_with_warnings"
     failure_class = identity_failure_class_for_state(
         decision,
         equivalence_decision,
@@ -1135,19 +1182,45 @@ def build_identity_repair_trace(
     if failure_class and failure_class not in unresolved_risks:
         unresolved_risks.append(failure_class)
     return {
+        "decision": decision,
+        "record": effective,
+        "source_record": source_record,
+        "paper_id": paper_id,
+        "identity_verdict": identity_verdict,
+        "equivalence_decision": equivalence_decision,
+        "warnings": warnings,
+        "identity_failure_class": failure_class,
+        "selected_identity_evidence": selected_evidence,
+        "repair_attempts": repair_attempts,
+        "failed": failed,
+        "unresolved_risks": unresolved_risks,
+    }
+
+
+def build_identity_repair_trace(
+    metadata: dict[str, Any],
+    *,
+    source_record: dict[str, Any] | None = None,
+    resolve_artifact_path: str = "",
+    metadata_artifact_path: str = "",
+) -> dict[str, Any]:
+    state = identity_contract_state(metadata, source_record=source_record)
+    failed = state["failed"]
+    failure_class = state["identity_failure_class"]
+    return {
         "status": "error" if failed else "ok",
         "run_status": "failed" if failed else "ok",
         "script": "build_identity_contract.py",
         "artifact_type": "identity_repair_trace",
         "schema_version": 1,
-        "paper_id": paper_id,
-        "identity_verdict": identity_verdict,
+        "paper_id": state["paper_id"],
+        "identity_verdict": state["identity_verdict"],
         "identity_failure_class": failure_class,
-        "repair_attempts": repair_attempts,
-        "selected_identity_evidence": selected_evidence,
-        "equivalence_decision": equivalence_decision,
-        "warnings": decision["warnings"],
-        "unresolved_risks": unresolved_risks,
+        "repair_attempts": state["repair_attempts"],
+        "selected_identity_evidence": state["selected_identity_evidence"],
+        "equivalence_decision": state["equivalence_decision"],
+        "warnings": state["warnings"],
+        "unresolved_risks": state["unresolved_risks"],
         "failure_summary": identity_failure_summary(failure_class) if failed else "",
         "provenance": identity_provenance(
             resolve_artifact_path=resolve_artifact_path,
@@ -1164,21 +1237,11 @@ def build_canonical_identity_artifact(
     resolve_artifact_path: str = "",
     metadata_artifact_path: str = "",
 ) -> dict[str, Any]:
-    decision = identity_repair_decision(metadata, resolve_record=source_record)
-    effective = decision["record"]
-    source_record = source_record or metadata
-    paper_id = effective.get("paper_id") or paper_id_for_record(effective)
-    equivalence_decision = manifestation_equivalence_decision(effective, source_record)
-    identity_verdict = identity_verdict_from_equivalence(equivalence_decision)
-    if identity_verdict == "accepted":
-        identity_verdict = decision["identity_verdict"]
-    failure_class = identity_failure_class_for_state(
-        decision,
-        equivalence_decision,
-        source_record,
-    )
-    failed = identity_verdict.replace("-", "_") not in ACCEPTED_IDENTITY_VERDICTS
-    selected_evidence = selected_identity_evidence(effective, source_record)
+    state = identity_contract_state(metadata, source_record=source_record)
+    effective = state["record"]
+    source_record = state["source_record"]
+    failed = state["failed"]
+    failure_class = state["identity_failure_class"]
     return {
         "status": "error" if failed else "ok",
         "run_status": "failed" if failed else "ok",
@@ -1186,15 +1249,15 @@ def build_canonical_identity_artifact(
         "producer": "build_identity_contract.py",
         "artifact_type": "canonical_identity",
         "schema_version": 1,
-        "paper_id": paper_id,
-        "identity_verdict": identity_verdict,
+        "paper_id": state["paper_id"],
+        "identity_verdict": state["identity_verdict"],
         "identity_failure_class": failure_class,
         "failure_summary": identity_failure_summary(failure_class) if failed else "",
         "work_level_identity": work_level_identity_from_record(effective),
         "source_manifestation": source_manifestation_from_record(source_record, effective),
-        "selected_identity_evidence": selected_evidence,
-        "equivalence_decision": equivalence_decision,
-        "warnings": decision["warnings"],
+        "selected_identity_evidence": state["selected_identity_evidence"],
+        "equivalence_decision": state["equivalence_decision"],
+        "warnings": state["warnings"],
         "repair_trace_path": _artifact_path(repair_trace_path),
         "provenance": identity_provenance(
             resolve_artifact_path=resolve_artifact_path,
