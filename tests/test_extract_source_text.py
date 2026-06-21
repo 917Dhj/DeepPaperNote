@@ -138,3 +138,72 @@ def test_extract_source_text_full_text_markdown_is_derived_from_jsonl(tmp_path: 
     assert manifest["full_text_md_path"] == str(full_text_path.resolve())
     assert "A source note." in raw_text
     assert "A source note." in markdown
+
+
+def test_extract_source_text_binds_locations_to_source_manifestation(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "local_preprint.pdf"
+    write_test_pdf(
+        pdf_path,
+        [
+            "Abstract\nThis is the actually read source manifestation.",
+            "Method\nFigure 1: Source manifestation diagram",
+        ],
+    )
+
+    input_path = tmp_path / "fetch.json"
+    manifest_path = tmp_path / "paper_source_manifest.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "fetch_pdf.py",
+                "paper_id": "doi:10.1234/published",
+                "title": "Published Work-Level Title",
+                "pdf_path": str(pdf_path),
+                "identity_contract": {
+                    "artifact_type": "canonical_identity",
+                    "paper_id": "doi:10.1234/published",
+                    "identity_verdict": "accepted",
+                    "work_level_identity": {
+                        "title": "Published Work-Level Title",
+                        "doi": "10.1234/published",
+                    },
+                    "source_manifestation": {
+                        "source_kind": "local_pdf",
+                        "title": "Local Preprint Title",
+                        "local_pdf_path": str(pdf_path),
+                        "source_url": str(pdf_path),
+                    },
+                    "equivalence_decision": {
+                        "status": "equivalent",
+                        "reason": "title_author_or_abstract_supports_equivalence",
+                        "location_binding": "source_manifestation",
+                        "evidence": [],
+                    },
+                },
+                "source_manifestation": {
+                    "source_kind": "local_pdf",
+                    "title": "Local Preprint Title",
+                    "local_pdf_path": str(pdf_path),
+                    "source_url": str(pdf_path),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    manifest = run_extract_source(input_path, manifest_path)
+
+    assert manifest["identity_contract"]["work_level_identity"]["title"] == (
+        "Published Work-Level Title"
+    )
+    assert manifest["identity_contract"]["source_manifestation"]["title"] == (
+        "Local Preprint Title"
+    )
+    assert manifest["identity_contract"]["equivalence_decision"]["location_binding"] == (
+        "source_manifestation"
+    )
+    assert manifest["source_manifestation"]["local_pdf_path"] == str(pdf_path)
+    assert manifest["pdf"]["path"] == str(pdf_path.resolve())
+    assert manifest["pages"][1]["page"] == 2
+    assert manifest["captions"]["figures"][0]["page"] == 2
