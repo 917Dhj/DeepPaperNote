@@ -409,12 +409,18 @@ def _artifact_path(path_value: str) -> str:
     return str(path.resolve()) if path.exists() else str(path)
 
 
-def selected_identity_evidence(record: dict[str, Any]) -> list[dict[str, str]]:
+def selected_identity_evidence(
+    record: dict[str, Any],
+    source_record: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
     evidence: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
 
     def append(kind: str, value: str, trust: str, source: str) -> None:
         cleaned = normalize_whitespace(value)
-        if cleaned:
+        marker = (kind, cleaned, source)
+        if cleaned and marker not in seen:
+            seen.add(marker)
             evidence.append(
                 {
                     "kind": kind,
@@ -437,6 +443,16 @@ def selected_identity_evidence(record: dict[str, Any]) -> list[dict[str, str]]:
     source_url = _string_field(record, "source_url")
     if source_url and source_url != pdf_url:
         append("source_url", source_url, "source_manifestation", "metadata")
+    if source_record and source_record is not record:
+        local_pdf = _string_field(source_record, "local_pdf_path")
+        if local_pdf:
+            append("trusted_source_path", _path_string(local_pdf), "strong", "source_manifestation")
+        pdf_url = _string_field(source_record, "pdf_url")
+        if pdf_url:
+            append("pdf_url", pdf_url, "source_manifestation", "source_manifestation")
+        source_url = _string_field(source_record, "source_url")
+        if source_url and source_url != pdf_url:
+            append("source_url", source_url, "source_manifestation", "source_manifestation")
     return evidence
 
 
@@ -453,25 +469,226 @@ def work_level_identity_from_record(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def source_manifestation_from_record(record: dict[str, Any]) -> dict[str, str]:
+def source_manifestation_from_record(
+    record: dict[str, Any],
+    work_record: dict[str, Any] | None = None,
+) -> dict[str, str]:
+    work_record = work_record or {}
     local_pdf = _string_field(record, "local_pdf_path")
+    if not local_pdf:
+        local_pdf = _string_field(work_record, "local_pdf_path")
     source_kind = _string_field(record, "source_type")
+    if not source_kind:
+        source_kind = _string_field(work_record, "source_type")
     if local_pdf:
         source_kind = "local_pdf"
-    elif _string_field(record, "pdf_url"):
+    elif _string_field(record, "pdf_url") or _string_field(work_record, "pdf_url"):
         source_kind = source_kind or "pdf_url"
-    elif _string_field(record, "source_url"):
+    elif _string_field(record, "source_url") or _string_field(work_record, "source_url"):
         source_kind = source_kind or "source_url"
+    source_url = _string_field(record, "source_url")
+    if not source_url and local_pdf:
+        source_url = _path_string(local_pdf)
     return {
         "source_kind": source_kind or "unknown",
-        "title": _string_field(record, "title"),
-        "source_url": _string_field(record, "source_url") or _path_string(local_pdf),
-        "pdf_url": _string_field(record, "pdf_url"),
+        "title": _string_field(record, "title") or _string_field(work_record, "title"),
+        "source_url": source_url or _string_field(work_record, "source_url"),
+        "pdf_url": _string_field(record, "pdf_url") or _string_field(work_record, "pdf_url"),
         "local_pdf_path": _path_string(local_pdf),
         "doi": _string_field(record, "doi"),
         "arxiv_id": _string_field(record, "arxiv_id"),
         "zotero_key": _string_field(record, "zotero_key"),
     }
+
+
+def _normalized_identifier(record: dict[str, Any], key: str) -> str:
+    value = _string_field(record, key)
+    if key == "doi":
+        value = extract_doi(value) or value
+    if key == "arxiv_id":
+        value = extract_arxiv_id(value) or value
+    return value.lower()
+
+
+def _record_arxiv_id(record: dict[str, Any]) -> str:
+    for key in ("arxiv_id", "doi", "source_url", "pdf_url"):
+        arxiv_id = extract_arxiv_id(_string_field(record, key))
+        if arxiv_id:
+            return arxiv_id.lower()
+    return ""
+
+
+def _author_key(name: str) -> str:
+    raw = normalize_whitespace(name)
+    if not raw:
+        return ""
+    if "," in raw:
+        raw = raw.split(",", 1)[0]
+    parts = normalize_title(raw).split()
+    if not parts:
+        return ""
+    return parts[-1]
+
+
+def _leading_author_status(
+    source_record: dict[str, Any],
+    work_record: dict[str, Any],
+) -> dict[str, Any] | None:
+    source_authors = _dedupe_string_list(source_record.get("authors", []))
+    work_authors = _dedupe_string_list(work_record.get("authors", []))
+    if not source_authors or not work_authors:
+        return None
+    source_key = _author_key(source_authors[0])
+    work_key = _author_key(work_authors[0])
+    status = "match" if source_key and source_key == work_key else "conflict"
+    return {
+        "kind": "leading_author",
+        "status": status,
+        "source_value": source_authors[0],
+        "work_value": work_authors[0],
+    }
+
+
+def _record_abstract(record: dict[str, Any]) -> str:
+    for key in ("abstract", "first_paragraph", "first_page_text", "summary"):
+        value = _string_field(record, key)
+        if value:
+            return value
+    return ""
+
+
+def _shared_identifier_evidence(
+    source_record: dict[str, Any],
+    work_record: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    shared: list[dict[str, Any]] = []
+    conflicts: list[dict[str, Any]] = []
+    source_doi = _normalized_identifier(source_record, "doi")
+    work_doi = _normalized_identifier(work_record, "doi")
+    source_arxiv = _record_arxiv_id(source_record)
+    work_arxiv = _record_arxiv_id(work_record)
+    source_zotero = _normalized_identifier(source_record, "zotero_key")
+    work_zotero = _normalized_identifier(work_record, "zotero_key")
+
+    if source_doi and work_doi and source_doi == work_doi:
+        shared.append({"kind": "shared_identifier", "value": f"doi:{work_doi}"})
+    elif source_doi and work_doi and not (source_arxiv and source_arxiv == work_arxiv):
+        conflicts.append(
+            {
+                "kind": "identifier",
+                "status": "conflict",
+                "source_value": f"doi:{source_doi}",
+                "work_value": f"doi:{work_doi}",
+            }
+        )
+
+    if source_arxiv and work_arxiv and source_arxiv == work_arxiv:
+        shared.append({"kind": "shared_identifier", "value": f"arxiv_id:{work_arxiv}"})
+    elif source_arxiv and work_arxiv:
+        conflicts.append(
+            {
+                "kind": "identifier",
+                "status": "conflict",
+                "source_value": f"arxiv_id:{source_arxiv}",
+                "work_value": f"arxiv_id:{work_arxiv}",
+            }
+        )
+
+    if source_zotero and work_zotero and source_zotero == work_zotero:
+        shared.append({"kind": "shared_identifier", "value": f"zotero_key:{work_zotero}"})
+    elif source_zotero and work_zotero:
+        conflicts.append(
+            {
+                "kind": "identifier",
+                "status": "conflict",
+                "source_value": f"zotero_key:{source_zotero}",
+                "work_value": f"zotero_key:{work_zotero}",
+            }
+        )
+    return shared, conflicts
+
+
+def manifestation_equivalence_decision(
+    work_record: dict[str, Any],
+    source_record: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    source_record = source_record or work_record
+    source_title = _string_field(source_record, "title")
+    work_title = _string_field(work_record, "title")
+    title_score = title_similarity(source_title, work_title)
+    evidence: list[dict[str, Any]] = []
+
+    shared_identifiers, identifier_conflicts = _shared_identifier_evidence(
+        source_record,
+        work_record,
+    )
+    evidence.extend(shared_identifiers)
+    evidence.extend(identifier_conflicts)
+    if source_title and work_title:
+        title_status = "match" if title_score >= 0.82 else "weak_match"
+        evidence.append(
+            {
+                "kind": "title_similarity",
+                "status": title_status,
+                "score": round(title_score, 3),
+                "source_value": source_title,
+                "work_value": work_title,
+            }
+        )
+
+    author_evidence = _leading_author_status(source_record, work_record)
+    author_conflict = False
+    author_match = False
+    if author_evidence:
+        evidence.append(author_evidence)
+        author_match = author_evidence["status"] == "match"
+        author_conflict = author_evidence["status"] == "conflict"
+
+    source_abstract = _record_abstract(source_record)
+    work_abstract = _record_abstract(work_record)
+    abstract_score = title_similarity(source_abstract, work_abstract)
+    abstract_conflict = bool(source_abstract and work_abstract and abstract_score < 0.25)
+    abstract_match = bool(source_abstract and work_abstract and abstract_score >= 0.45)
+    if source_abstract and work_abstract:
+        evidence.append(
+            {
+                "kind": "abstract_similarity",
+                "status": "match" if abstract_match else "weak_match",
+                "score": round(abstract_score, 3),
+            }
+        )
+
+    if identifier_conflicts:
+        status = "ambiguous"
+        reason = "competing_identity_evidence"
+    elif title_score < 0.55 and (author_conflict or abstract_conflict):
+        status = "ambiguous"
+        reason = "competing_identity_evidence"
+    elif shared_identifiers:
+        status = "equivalent"
+        reason = "shared_work_identifier"
+    elif title_score >= 0.82 and (author_match or abstract_match):
+        status = "equivalent"
+        reason = "title_author_or_abstract_supports_equivalence"
+    elif title_score >= 0.9:
+        status = "equivalent"
+        reason = "minor_title_variation_only"
+    else:
+        status = "equivalent"
+        reason = "uncontested_manifestation"
+
+    return {
+        "status": status,
+        "reason": reason,
+        "location_binding": "source_manifestation",
+        "evidence": evidence,
+    }
+
+
+def identity_verdict_from_equivalence(equivalence_decision: dict[str, Any]) -> str:
+    if _string_field(equivalence_decision, "status") == "ambiguous":
+        return "ambiguous"
+    return "accepted"
 
 
 def identity_provenance(
@@ -488,19 +705,23 @@ def identity_provenance(
 def build_identity_repair_trace(
     metadata: dict[str, Any],
     *,
+    source_record: dict[str, Any] | None = None,
     resolve_artifact_path: str = "",
     metadata_artifact_path: str = "",
 ) -> dict[str, Any]:
     paper_id = metadata.get("paper_id") or paper_id_for_record(metadata)
+    equivalence_decision = manifestation_equivalence_decision(metadata, source_record)
+    identity_verdict = identity_verdict_from_equivalence(equivalence_decision)
     return {
         "status": "ok",
         "script": "build_identity_contract.py",
         "artifact_type": "identity_repair_trace",
         "schema_version": 1,
         "paper_id": paper_id,
-        "identity_verdict": "accepted",
+        "identity_verdict": identity_verdict,
         "repair_attempts": [],
-        "selected_identity_evidence": selected_identity_evidence(metadata),
+        "selected_identity_evidence": selected_identity_evidence(metadata, source_record),
+        "equivalence_decision": equivalence_decision,
         "warnings": [],
         "unresolved_risks": [],
         "provenance": identity_provenance(
@@ -513,11 +734,15 @@ def build_identity_repair_trace(
 def build_canonical_identity_artifact(
     metadata: dict[str, Any],
     *,
+    source_record: dict[str, Any] | None = None,
     repair_trace_path: str = "",
     resolve_artifact_path: str = "",
     metadata_artifact_path: str = "",
 ) -> dict[str, Any]:
     paper_id = metadata.get("paper_id") or paper_id_for_record(metadata)
+    source_record = source_record or metadata
+    equivalence_decision = manifestation_equivalence_decision(metadata, source_record)
+    identity_verdict = identity_verdict_from_equivalence(equivalence_decision)
     return {
         "status": "ok",
         "run_status": "ok",
@@ -526,14 +751,11 @@ def build_canonical_identity_artifact(
         "artifact_type": "canonical_identity",
         "schema_version": 1,
         "paper_id": paper_id,
-        "identity_verdict": "accepted",
+        "identity_verdict": identity_verdict,
         "work_level_identity": work_level_identity_from_record(metadata),
-        "source_manifestation": source_manifestation_from_record(metadata),
-        "selected_identity_evidence": selected_identity_evidence(metadata),
-        "equivalence_decision": {
-            "status": "not_evaluated",
-            "reason": "accepted_pass_through_without_manifestation_equivalence",
-        },
+        "source_manifestation": source_manifestation_from_record(source_record, metadata),
+        "selected_identity_evidence": selected_identity_evidence(metadata, source_record),
+        "equivalence_decision": equivalence_decision,
         "warnings": [],
         "repair_trace_path": _artifact_path(repair_trace_path),
         "provenance": identity_provenance(
@@ -570,6 +792,7 @@ def canonical_identity_summary(identity: dict[str, Any]) -> dict[str, Any]:
         "work_level_identity": deepcopy(identity.get("work_level_identity", {}) or {}),
         "source_manifestation": deepcopy(identity.get("source_manifestation", {}) or {}),
         "selected_identity_evidence": deepcopy(identity.get("selected_identity_evidence", []) or []),
+        "equivalence_decision": deepcopy(identity.get("equivalence_decision", {}) or {}),
         "warnings": deepcopy(identity.get("warnings", []) or []),
         "repair_trace_path": _string_field(identity, "repair_trace_path"),
         "provenance": deepcopy(identity.get("provenance", {}) or {}),

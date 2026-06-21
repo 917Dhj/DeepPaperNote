@@ -246,6 +246,7 @@ def identity_contract_summary(metadata: dict, source_manifest: dict) -> dict:
         "selected_identity_evidence": deepcopy(
             contract.get("selected_identity_evidence", []) or []
         ),
+        "equivalence_decision": deepcopy(contract.get("equivalence_decision", {}) or {}),
         "warnings": deepcopy(contract.get("warnings", []) or []),
         "repair_trace_path": contract.get("repair_trace_path", ""),
         "provenance": deepcopy(contract.get("provenance", {}) or {}),

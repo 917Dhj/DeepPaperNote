@@ -110,3 +110,50 @@ def test_bundle_truncation_warnings_use_source_manifest_not_evidence_pack() -> N
         "truncated_due_to_page_limit": False,
     }
     assert "source_text_truncated" not in synthesis["coverage"]["truncation_warnings"]
+
+
+def test_bundle_preserves_identity_equivalence_and_source_manifestation() -> None:
+    synthesis = bundle(
+        metadata={"title": "Published Work-Level Title"},
+        evidence_wrapper={"evidence_pack": {}},
+        figures_wrapper={},
+        assets_wrapper={},
+        source_manifest={
+            "identity_contract": {
+                "artifact_type": "canonical_identity",
+                "paper_id": "doi:10.1234/published",
+                "identity_verdict": "accepted",
+                "work_level_identity": {
+                    "title": "Published Work-Level Title",
+                    "doi": "10.1234/published",
+                },
+                "source_manifestation": {
+                    "source_kind": "local_pdf",
+                    "title": "Local Preprint Title",
+                    "local_pdf_path": "/tmp/local_preprint.pdf",
+                },
+                "selected_identity_evidence": [],
+                "equivalence_decision": {
+                    "status": "equivalent",
+                    "reason": "title_author_or_abstract_supports_equivalence",
+                    "location_binding": "source_manifestation",
+                    "evidence": [
+                        {
+                            "kind": "title_similarity",
+                            "status": "match",
+                            "score": 0.91,
+                        }
+                    ],
+                },
+                "warnings": [],
+                "repair_trace_path": "/tmp/trace.json",
+                "provenance": {},
+            }
+        },
+    )
+
+    identity_contract = synthesis["identity_contract"]
+    assert identity_contract["work_level_identity"]["title"] == "Published Work-Level Title"
+    assert identity_contract["source_manifestation"]["title"] == "Local Preprint Title"
+    assert identity_contract["equivalence_decision"]["status"] == "equivalent"
+    assert identity_contract["equivalence_decision"]["location_binding"] == "source_manifestation"

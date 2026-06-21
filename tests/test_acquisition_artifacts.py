@@ -104,6 +104,160 @@ def test_build_identity_contract_emits_accepted_artifact_and_trace(
     assert trace["provenance"]["metadata_artifact_path"] == str(metadata_path.resolve())
 
 
+def test_build_identity_contract_accepts_equivalent_arxiv_and_published_manifestations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    resolve_path = tmp_path / "paper_resolve.json"
+    metadata_path = tmp_path / "paper_metadata.json"
+    identity_path = tmp_path / "paper_identity.json"
+    trace_path = tmp_path / "paper_identity_repair_trace.json"
+    resolve_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "resolve_paper.py",
+                "paper_id": "arxiv:2401.00001",
+                "source_type": "arxiv_id",
+                "source_url": "https://arxiv.org/abs/2401.00001",
+                "pdf_url": "https://arxiv.org/pdf/2401.00001.pdf",
+                "title": "DeepPaperNote: Evidence First Reading",
+                "authors": ["Alice Smith", "Bob Jones"],
+                "abstract": "We introduce an evidence first reading workflow for one paper.",
+                "arxiv_id": "2401.00001",
+            }
+        ),
+        encoding="utf-8",
+    )
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "collect_metadata.py",
+                "paper_id": "doi:10.1234/published",
+                "source_type": "doi",
+                "source_url": "https://doi.org/10.1234/published",
+                "title": "DeepPaperNote: Evidence-First Reading",
+                "authors": ["Alice Smith", "Bob Jones"],
+                "abstract": "We introduce an evidence-first reading workflow for a single paper.",
+                "year": "2026",
+                "venue": "Journal of Paper Systems",
+                "doi": "10.1234/published",
+                "arxiv_id": "2401.00001",
+                "identity_confidence": "high",
+                "identity_confidence_reasons": ["doi_present", "arxiv_id_present"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_identity_contract.py",
+            "--input",
+            str(metadata_path),
+            "--resolve",
+            str(resolve_path),
+            "--trace-output",
+            str(trace_path),
+            "--output",
+            str(identity_path),
+        ],
+    )
+
+    build_identity_contract.main()
+
+    identity = json.loads(identity_path.read_text(encoding="utf-8"))
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert identity["identity_verdict"] == "accepted"
+    assert identity["work_level_identity"]["title"] == "DeepPaperNote: Evidence-First Reading"
+    assert identity["work_level_identity"]["doi"] == "10.1234/published"
+    assert identity["source_manifestation"]["source_kind"] == "arxiv_id"
+    assert identity["source_manifestation"]["title"] == "DeepPaperNote: Evidence First Reading"
+    assert identity["source_manifestation"]["source_url"] == "https://arxiv.org/abs/2401.00001"
+    assert identity["source_manifestation"]["pdf_url"] == "https://arxiv.org/pdf/2401.00001.pdf"
+    assert identity["equivalence_decision"]["status"] == "equivalent"
+    assert identity["equivalence_decision"]["location_binding"] == "source_manifestation"
+    assert any(
+        item["kind"] == "shared_identifier" and item["value"] == "arxiv_id:2401.00001"
+        for item in identity["equivalence_decision"]["evidence"]
+    )
+    assert trace["identity_verdict"] == "accepted"
+    assert trace["equivalence_decision"] == identity["equivalence_decision"]
+
+
+def test_build_identity_contract_marks_competing_manifestations_ambiguous(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    resolve_path = tmp_path / "paper_resolve.json"
+    metadata_path = tmp_path / "paper_metadata.json"
+    identity_path = tmp_path / "paper_identity.json"
+    trace_path = tmp_path / "paper_identity_repair_trace.json"
+    resolve_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "resolve_paper.py",
+                "paper_id": "title:vision",
+                "source_type": "title_query",
+                "title": "Efficient Vision Transformers for Medical Images",
+                "authors": ["Alice Vision"],
+                "abstract": "We classify medical images with compact vision transformers.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "collect_metadata.py",
+                "paper_id": "title:language",
+                "source_type": "title_query",
+                "title": "Efficient Language Models for Legal Reasoning",
+                "authors": ["Mallory Text"],
+                "abstract": "We improve legal reasoning with efficient language models.",
+                "identity_confidence": "medium",
+                "identity_confidence_reasons": ["external_metadata_title_match"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_identity_contract.py",
+            "--input",
+            str(metadata_path),
+            "--resolve",
+            str(resolve_path),
+            "--trace-output",
+            str(trace_path),
+            "--output",
+            str(identity_path),
+        ],
+    )
+
+    build_identity_contract.main()
+
+    identity = json.loads(identity_path.read_text(encoding="utf-8"))
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert identity["identity_verdict"] == "ambiguous"
+    assert identity["equivalence_decision"]["status"] == "ambiguous"
+    assert identity["equivalence_decision"]["reason"] == "competing_identity_evidence"
+    assert any(
+        item["kind"] == "leading_author" and item["status"] == "conflict"
+        for item in identity["equivalence_decision"]["evidence"]
+    )
+    assert trace["identity_verdict"] == "ambiguous"
+    assert trace["equivalence_decision"] == identity["equivalence_decision"]
+
+
 def test_collect_metadata_refuses_non_ok_input_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
