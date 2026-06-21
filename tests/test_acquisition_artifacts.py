@@ -429,6 +429,68 @@ def test_build_identity_contract_accepts_equivalent_arxiv_and_published_manifest
     assert trace["equivalence_decision"] == identity["equivalence_decision"]
 
 
+def test_build_identity_contract_marks_safe_metadata_uncertainty_as_warning_scoped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    identity, trace = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload={
+            "status": "ok",
+            "script": "resolve_paper.py",
+            "paper_id": "arxiv:2401.00001",
+            "source_type": "arxiv_id",
+            "source_url": "https://arxiv.org/abs/2401.00001",
+            "pdf_url": "https://arxiv.org/pdf/2401.00001.pdf",
+            "title": "DeepPaperNote: Evidence First Reading",
+            "authors": ["Alice Smith", "Bob Jones"],
+            "abstract": "We introduce an evidence first reading workflow for one paper.",
+            "year": "2024",
+            "venue": "arXiv",
+            "arxiv_id": "2401.00001",
+        },
+        metadata_payload={
+            "status": "ok",
+            "script": "collect_metadata.py",
+            "paper_id": "doi:10.1234/published",
+            "source_type": "doi",
+            "source_url": "https://doi.org/10.1234/published",
+            "title": "DeepPaperNote: Evidence-First Reading",
+            "authors": ["Alice Smith", "Bob Jones"],
+            "abstract": "We introduce an evidence-first reading workflow for a single paper.",
+            "year": "2026",
+            "venue": "Journal of Paper Systems",
+            "doi": "10.1234/published",
+            "arxiv_id": "2401.00001",
+            "identity_confidence": "high",
+            "identity_confidence_reasons": ["doi_present", "arxiv_id_present"],
+        },
+    )
+
+    assert identity["identity_verdict"] == "accepted_with_warnings"
+    assert identity["equivalence_decision"]["status"] == "equivalent"
+    assert identity["work_level_identity"]["year"] == "2026"
+    assert identity["work_level_identity"]["venue"] == "Journal of Paper Systems"
+    assert identity["source_manifestation"]["year"] == "2024"
+    assert identity["source_manifestation"]["venue"] == "arXiv"
+    assert {
+        item["reason"]: (item["scope"], item["impact"])
+        for item in identity["warnings"]
+    } == {
+        "source_manifestation_year_differs_from_work_identity": (
+            "metadata",
+            "avoid_over_specific_year_claims",
+        ),
+        "source_manifestation_venue_differs_from_work_identity": (
+            "metadata",
+            "avoid_over_specific_venue_claims",
+        ),
+    }
+    assert trace["identity_verdict"] == "accepted_with_warnings"
+    assert trace["warnings"] == identity["warnings"]
+
+
 def test_build_identity_contract_marks_competing_manifestations_ambiguous(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

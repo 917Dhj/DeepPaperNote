@@ -163,7 +163,7 @@ def test_extract_source_text_binds_locations_to_source_manifestation(tmp_path: P
                 "identity_contract": {
                     "artifact_type": "canonical_identity",
                     "paper_id": "doi:10.1234/published",
-                    "identity_verdict": "accepted",
+                    "identity_verdict": "accepted_with_warnings",
                     "work_level_identity": {
                         "title": "Published Work-Level Title",
                         "doi": "10.1234/published",
@@ -180,6 +180,13 @@ def test_extract_source_text_binds_locations_to_source_manifestation(tmp_path: P
                         "location_binding": "source_manifestation",
                         "evidence": [],
                     },
+                    "warnings": [
+                        {
+                            "reason": "source_manifestation_year_differs_from_work_identity",
+                            "scope": "metadata",
+                            "impact": "avoid_over_specific_year_claims",
+                        }
+                    ],
                 },
                 "source_manifestation": {
                     "source_kind": "local_pdf",
@@ -197,9 +204,17 @@ def test_extract_source_text_binds_locations_to_source_manifestation(tmp_path: P
     assert manifest["identity_contract"]["work_level_identity"]["title"] == (
         "Published Work-Level Title"
     )
+    assert manifest["identity_contract"]["identity_verdict"] == "accepted_with_warnings"
     assert manifest["identity_contract"]["source_manifestation"]["title"] == (
         "Local Preprint Title"
     )
+    assert manifest["identity_contract"]["warnings"] == [
+        {
+            "reason": "source_manifestation_year_differs_from_work_identity",
+            "scope": "metadata",
+            "impact": "avoid_over_specific_year_claims",
+        }
+    ]
     assert manifest["identity_contract"]["equivalence_decision"]["location_binding"] == (
         "source_manifestation"
     )
