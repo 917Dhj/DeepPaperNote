@@ -306,7 +306,7 @@ def build_manifest(
         "appendix_start_page": coverage.get("appendix_start_page"),
         "references_start_page": coverage.get("references_start_page"),
     }
-    return {
+    manifest = {
         "status": "ok",
         "script": "extract_source_text.py",
         "schema_version": 1,
@@ -349,6 +349,11 @@ def build_manifest(
         "language_hint": language_hint_for_text(full_text),
         "text_hash_sha256": text_hash(full_text),
     }
+    if isinstance(record.get("identity_contract"), dict):
+        manifest["identity_contract"] = record.get("identity_contract")
+    if isinstance(record.get("source_manifestation"), dict):
+        manifest["source_manifestation"] = record.get("source_manifestation")
+    return manifest
 
 
 def main() -> None:

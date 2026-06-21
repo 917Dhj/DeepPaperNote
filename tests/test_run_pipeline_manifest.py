@@ -59,27 +59,42 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     )
 
     source_manifest_path = workdir / "paper_source_manifest.json"
+    identity_path = workdir / "paper_identity.json"
+    identity_trace_path = workdir / "paper_identity_repair_trace.json"
     raw_sections_path = workdir / "paper_raw_sections.jsonl"
     evidence_path = workdir / "paper_evidence.json"
     decisions_path = workdir / "paper_figure_table_decisions.json"
     bundle_path = workdir / "paper_bundle.json"
+    assert identity_path.exists()
+    assert identity_trace_path.exists()
     assert source_manifest_path.exists()
     assert raw_sections_path.exists()
     assert evidence_path.exists()
     assert decisions_path.exists()
     assert bundle_path.exists()
 
+    identity = json.loads(identity_path.read_text(encoding="utf-8"))
+    identity_trace = json.loads(identity_trace_path.read_text(encoding="utf-8"))
     source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
     decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
 
+    assert identity["artifact_type"] == "canonical_identity"
+    assert identity["identity_verdict"] == "accepted"
+    assert identity["source_manifestation"]["source_kind"] == "local_pdf"
+    assert identity["repair_trace_path"] == str(identity_trace_path.resolve())
+    assert identity_trace["artifact_type"] == "identity_repair_trace"
+    assert identity_trace["repair_attempts"] == []
     assert source_manifest["coverage"]["text_pages_extracted"] == 4
     assert source_manifest["coverage"]["text_truncated"] is False
+    assert source_manifest["identity_contract"]["identity_verdict"] == "accepted"
     assert any(section["section_id"] == "sec:method" for section in source_manifest["sections"])
     assert evidence["summary"]["source_corpus_used"] is True
     assert {item["source_id"] for item in decisions["decisions"]} == {"Figure 1", "Table 1"}
     assert bundle["source_manifest"]["raw_sections_path"] == str(raw_sections_path.resolve())
+    assert bundle["identity_contract"]["identity_verdict"] == "accepted"
+    assert bundle["identity_contract"]["repair_trace_path"] == str(identity_trace_path.resolve())
     assert bundle["figure_table_manifest"]["decisions"]
     removed_bundle_keys = ("evidence", "candidate_chunks", "section_texts", "summary")
     assert not any(key in bundle for key in removed_bundle_keys)
@@ -117,6 +132,7 @@ def test_run_pipeline_does_not_materialize_before_final_save(
     assert [Path(cmd[1]).name for cmd in calls] == [
         "resolve_paper.py",
         "collect_metadata.py",
+        "build_identity_contract.py",
         "fetch_pdf.py",
         "extract_source_text.py",
         "extract_evidence.py",
@@ -128,18 +144,35 @@ def test_run_pipeline_does_not_materialize_before_final_save(
 
     resolve_call = calls[0]
     metadata_call = calls[1]
-    fetch_call = calls[2]
+    identity_call = calls[2]
+    fetch_call = calls[3]
     assert resolve_call[resolve_call.index("--input") + 1] == "paper.pdf"
     assert (
         metadata_call[metadata_call.index("--input") + 1]
         == str((workdir / "paper_resolve.json").resolve())
     )
     assert (
+        identity_call[identity_call.index("--input") + 1]
+        == str((workdir / "paper_metadata.json").resolve())
+    )
+    assert (
+        identity_call[identity_call.index("--resolve") + 1]
+        == str((workdir / "paper_resolve.json").resolve())
+    )
+    assert (
+        identity_call[identity_call.index("--trace-output") + 1]
+        == str((workdir / "paper_identity_repair_trace.json").resolve())
+    )
+    assert (
         fetch_call[fetch_call.index("--input") + 1]
         == str((workdir / "paper_metadata.json").resolve())
     )
+    assert (
+        fetch_call[fetch_call.index("--identity") + 1]
+        == str((workdir / "paper_identity.json").resolve())
+    )
 
-    evidence_call = calls[4]
+    evidence_call = calls[5]
     assert "--source-manifest" in evidence_call
     assert (
         evidence_call[evidence_call.index("--source-manifest") + 1]

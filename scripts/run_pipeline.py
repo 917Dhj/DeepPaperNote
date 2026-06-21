@@ -37,6 +37,8 @@ def main() -> None:
 
     resolve_json = workdir / f"{args.prefix}_resolve.json"
     metadata_json = workdir / f"{args.prefix}_metadata.json"
+    identity_json = workdir / f"{args.prefix}_identity.json"
+    identity_trace_json = workdir / f"{args.prefix}_identity_repair_trace.json"
     fetch_json = workdir / f"{args.prefix}_fetch.json"
     source_manifest_json = workdir / f"{args.prefix}_source_manifest.json"
     raw_sections_jsonl = workdir / f"{args.prefix}_raw_sections.jsonl"
@@ -70,9 +72,25 @@ def main() -> None:
     run_step(
         [
             py,
+            str(scripts_dir / "build_identity_contract.py"),
+            "--input",
+            str(metadata_json),
+            "--resolve",
+            str(resolve_json),
+            "--trace-output",
+            str(identity_trace_json),
+            "--output",
+            str(identity_json),
+        ]
+    )
+    run_step(
+        [
+            py,
             str(scripts_dir / "fetch_pdf.py"),
             "--input",
             str(metadata_json),
+            "--identity",
+            str(identity_json),
             "--output",
             str(fetch_json),
         ]
@@ -165,6 +183,8 @@ def main() -> None:
             [
                 f"resolve={resolve_json}",
                 f"metadata={metadata_json}",
+                f"identity={identity_json}",
+                f"identity_repair_trace={identity_trace_json}",
                 f"fetch={fetch_json}",
                 f"source_manifest={source_manifest_json}",
                 f"raw_sections={raw_sections_jsonl}",

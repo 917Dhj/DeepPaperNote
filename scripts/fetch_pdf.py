@@ -7,13 +7,16 @@ import argparse
 from pathlib import Path
 
 from common import (
+    canonical_identity_summary,
     default_pdf_path,
     emit,
     enrich_metadata,
     extract_doi,
+    fetch_record_from_canonical_identity,
     http_get_bytes,
     maybe_load_json_record,
     paper_id_for_record,
+    require_accepted_canonical_identity,
     require_ok_input_artifact,
     resolve_reference,
 )
@@ -25,6 +28,11 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--output", default="", help="Output path for JSON status.")
     p.add_argument("--paper-id", default="", help="Canonical paper id if already known.")
     p.add_argument("--dest-dir", default="", help="Directory for downloaded PDFs.")
+    p.add_argument(
+        "--identity",
+        default="",
+        help="Accepted Canonical Identity Artifact JSON path or JSON string.",
+    )
     return p
 
 
@@ -84,11 +92,25 @@ def pdf_source_candidates(record: dict) -> list[tuple[str, str]]:
 
 def main(argv: list[str] | None = None) -> None:
     args = parser().parse_args(argv)
-    input_record = maybe_load_json_record(args.input)
-    if input_record is not None:
-        record = dict(require_ok_input_artifact(input_record, "fetch_pdf.py"))
+    identity_summary: dict = {}
+    source_manifestation: dict = {}
+    if args.identity:
+        input_record = maybe_load_json_record(args.input)
+        if input_record is not None:
+            require_ok_input_artifact(input_record, "fetch_pdf.py")
+        identity_record = maybe_load_json_record(args.identity)
+        if identity_record is None:
+            raise SystemExit("fetch_pdf.py requires --identity to be a JSON artifact.")
+        identity = require_accepted_canonical_identity(identity_record, "fetch_pdf.py")
+        identity_summary = canonical_identity_summary(identity)
+        source_manifestation = dict(identity_summary.get("source_manifestation", {}) or {})
+        record = fetch_record_from_canonical_identity(identity)
     else:
-        record = enrich_metadata(resolve_reference(args.input))
+        input_record = maybe_load_json_record(args.input)
+        if input_record is not None:
+            record = dict(require_ok_input_artifact(input_record, "fetch_pdf.py"))
+        else:
+            record = enrich_metadata(resolve_reference(args.input))
 
     record["paper_id"] = args.paper_id or record.get("paper_id") or paper_id_for_record(record)
     source_candidates = pdf_source_candidates(record)
@@ -103,6 +125,9 @@ def main(argv: list[str] | None = None) -> None:
             "error": "No accessible PDF source found.",
             "source_url": record.get("source_url", ""),
         }
+        if identity_summary:
+            payload["identity_contract"] = identity_summary
+            payload["source_manifestation"] = source_manifestation
         emit(payload, args.output)
         raise SystemExit(1)
 
@@ -118,6 +143,9 @@ def main(argv: list[str] | None = None) -> None:
             "source_url": record.get("source_url", "") or str(pdf_path),
             "pdf_url": "",
         }
+        if identity_summary:
+            payload["identity_contract"] = identity_summary
+            payload["source_manifestation"] = source_manifestation
         emit(payload, args.output)
         return
 
@@ -152,6 +180,9 @@ def main(argv: list[str] | None = None) -> None:
             "source_url": record.get("source_url", ""),
             "attempted_sources": attempted_sources,
         }
+        if identity_summary:
+            payload["identity_contract"] = identity_summary
+            payload["source_manifestation"] = source_manifestation
         emit(payload, args.output)
         raise SystemExit(1)
 
@@ -168,6 +199,9 @@ def main(argv: list[str] | None = None) -> None:
         "pdf_url": source_value,
         "file_size": target_path.stat().st_size,
     }
+    if identity_summary:
+        payload["identity_contract"] = identity_summary
+        payload["source_manifestation"] = source_manifestation
     if attempted_sources:
         payload["attempted_sources"] = attempted_sources
     emit(payload, args.output)

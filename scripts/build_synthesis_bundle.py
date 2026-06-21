@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from pathlib import Path
 
 from citation_links import resolve_reference_links
@@ -228,6 +229,29 @@ def source_index(source_manifest: dict) -> dict:
     }
 
 
+def identity_contract_summary(metadata: dict, source_manifest: dict) -> dict:
+    contract = {}
+    if isinstance(source_manifest.get("identity_contract"), dict):
+        contract = source_manifest.get("identity_contract", {})
+    elif isinstance(metadata.get("identity_contract"), dict):
+        contract = metadata.get("identity_contract", {})
+    if not isinstance(contract, dict) or not contract:
+        return {}
+    return {
+        "artifact_type": contract.get("artifact_type", ""),
+        "paper_id": contract.get("paper_id", ""),
+        "identity_verdict": contract.get("identity_verdict", ""),
+        "work_level_identity": deepcopy(contract.get("work_level_identity", {}) or {}),
+        "source_manifestation": deepcopy(contract.get("source_manifestation", {}) or {}),
+        "selected_identity_evidence": deepcopy(
+            contract.get("selected_identity_evidence", []) or []
+        ),
+        "warnings": deepcopy(contract.get("warnings", []) or []),
+        "repair_trace_path": contract.get("repair_trace_path", ""),
+        "provenance": deepcopy(contract.get("provenance", {}) or {}),
+    }
+
+
 def figure_table_manifest(
     figure_decisions_wrapper: dict,
     source_manifest: dict,
@@ -371,6 +395,7 @@ def bundle(
         "script": "build_synthesis_bundle.py",
         "paper_id": metadata.get("paper_id") or evidence_wrapper.get("paper_id", ""),
         "title": metadata.get("title") or evidence_wrapper.get("title", ""),
+        "identity_contract": identity_contract_summary(metadata, source_manifest),
         "metadata": {
             "title": metadata.get("title", ""),
             "translated_title": metadata.get("translated_title", ""),

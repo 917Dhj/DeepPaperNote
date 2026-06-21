@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import hashlib
 import json
 import os
@@ -387,6 +388,215 @@ def paper_id_for_record(record: dict[str, Any]) -> str:
     source = str(record.get("source_url") or record.get("local_pdf_path") or "unknown")
     digest = hashlib.sha1(source.encode("utf-8")).hexdigest()[:12]
     return f"paper:{digest}"
+
+
+def _string_field(record: dict[str, Any], key: str) -> str:
+    return normalize_whitespace(str(record.get(key, "")))
+
+
+def _path_string(path_value: str) -> str:
+    value = normalize_whitespace(path_value)
+    if not value:
+        return ""
+    return str(Path(value).expanduser().resolve())
+
+
+def _artifact_path(path_value: str) -> str:
+    value = normalize_whitespace(path_value)
+    if not value:
+        return ""
+    path = Path(value).expanduser()
+    return str(path.resolve()) if path.exists() else str(path)
+
+
+def selected_identity_evidence(record: dict[str, Any]) -> list[dict[str, str]]:
+    evidence: list[dict[str, str]] = []
+
+    def append(kind: str, value: str, trust: str, source: str) -> None:
+        cleaned = normalize_whitespace(value)
+        if cleaned:
+            evidence.append(
+                {
+                    "kind": kind,
+                    "value": cleaned,
+                    "trust": trust,
+                    "source": source,
+                }
+            )
+
+    append("doi", _string_field(record, "doi"), "strong", "metadata")
+    append("arxiv_id", _string_field(record, "arxiv_id"), "strong", "metadata")
+    append("zotero_key", _string_field(record, "zotero_key"), "strong", "metadata")
+    append("title", _string_field(record, "title"), "metadata", "metadata")
+    local_pdf = _string_field(record, "local_pdf_path")
+    if local_pdf:
+        append("trusted_source_path", _path_string(local_pdf), "strong", "source_manifestation")
+    pdf_url = _string_field(record, "pdf_url")
+    if pdf_url:
+        append("pdf_url", pdf_url, "source_manifestation", "metadata")
+    source_url = _string_field(record, "source_url")
+    if source_url and source_url != pdf_url:
+        append("source_url", source_url, "source_manifestation", "metadata")
+    return evidence
+
+
+def work_level_identity_from_record(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "title": _string_field(record, "title"),
+        "translated_title": _string_field(record, "translated_title"),
+        "authors": _dedupe_string_list(record.get("authors", [])),
+        "year": _string_field(record, "year"),
+        "venue": _string_field(record, "venue"),
+        "doi": _string_field(record, "doi"),
+        "arxiv_id": _string_field(record, "arxiv_id"),
+        "zotero_key": _string_field(record, "zotero_key"),
+    }
+
+
+def source_manifestation_from_record(record: dict[str, Any]) -> dict[str, str]:
+    local_pdf = _string_field(record, "local_pdf_path")
+    source_kind = _string_field(record, "source_type")
+    if local_pdf:
+        source_kind = "local_pdf"
+    elif _string_field(record, "pdf_url"):
+        source_kind = source_kind or "pdf_url"
+    elif _string_field(record, "source_url"):
+        source_kind = source_kind or "source_url"
+    return {
+        "source_kind": source_kind or "unknown",
+        "title": _string_field(record, "title"),
+        "source_url": _string_field(record, "source_url") or _path_string(local_pdf),
+        "pdf_url": _string_field(record, "pdf_url"),
+        "local_pdf_path": _path_string(local_pdf),
+        "doi": _string_field(record, "doi"),
+        "arxiv_id": _string_field(record, "arxiv_id"),
+        "zotero_key": _string_field(record, "zotero_key"),
+    }
+
+
+def identity_provenance(
+    *,
+    resolve_artifact_path: str = "",
+    metadata_artifact_path: str = "",
+) -> dict[str, str]:
+    return {
+        "resolve_artifact_path": _artifact_path(resolve_artifact_path),
+        "metadata_artifact_path": _artifact_path(metadata_artifact_path),
+    }
+
+
+def build_identity_repair_trace(
+    metadata: dict[str, Any],
+    *,
+    resolve_artifact_path: str = "",
+    metadata_artifact_path: str = "",
+) -> dict[str, Any]:
+    paper_id = metadata.get("paper_id") or paper_id_for_record(metadata)
+    return {
+        "status": "ok",
+        "script": "build_identity_contract.py",
+        "artifact_type": "identity_repair_trace",
+        "schema_version": 1,
+        "paper_id": paper_id,
+        "identity_verdict": "accepted",
+        "repair_attempts": [],
+        "selected_identity_evidence": selected_identity_evidence(metadata),
+        "warnings": [],
+        "unresolved_risks": [],
+        "provenance": identity_provenance(
+            resolve_artifact_path=resolve_artifact_path,
+            metadata_artifact_path=metadata_artifact_path,
+        ),
+    }
+
+
+def build_canonical_identity_artifact(
+    metadata: dict[str, Any],
+    *,
+    repair_trace_path: str = "",
+    resolve_artifact_path: str = "",
+    metadata_artifact_path: str = "",
+) -> dict[str, Any]:
+    paper_id = metadata.get("paper_id") or paper_id_for_record(metadata)
+    return {
+        "status": "ok",
+        "run_status": "ok",
+        "script": "build_identity_contract.py",
+        "producer": "build_identity_contract.py",
+        "artifact_type": "canonical_identity",
+        "schema_version": 1,
+        "paper_id": paper_id,
+        "identity_verdict": "accepted",
+        "work_level_identity": work_level_identity_from_record(metadata),
+        "source_manifestation": source_manifestation_from_record(metadata),
+        "selected_identity_evidence": selected_identity_evidence(metadata),
+        "equivalence_decision": {
+            "status": "not_evaluated",
+            "reason": "accepted_pass_through_without_manifestation_equivalence",
+        },
+        "warnings": [],
+        "repair_trace_path": _artifact_path(repair_trace_path),
+        "provenance": identity_provenance(
+            resolve_artifact_path=resolve_artifact_path,
+            metadata_artifact_path=metadata_artifact_path,
+        ),
+        "diagnostics": {
+            "identity_confidence": _string_field(metadata, "identity_confidence"),
+            "identity_confidence_reasons": _dedupe_string_list(
+                metadata.get("identity_confidence_reasons", [])
+            ),
+        },
+    }
+
+
+def require_accepted_canonical_identity(record: dict[str, Any], consumer: str) -> dict[str, Any]:
+    identity = dict(require_ok_input_artifact(record, consumer))
+    artifact_type = _string_field(identity, "artifact_type")
+    verdict = _string_field(identity, "identity_verdict").lower()
+    if artifact_type != "canonical_identity":
+        raise SystemExit(f"{consumer} refuses non-canonical identity artifact: {artifact_type}")
+    if verdict != "accepted":
+        raise SystemExit(
+            f"{consumer} refuses unaccepted canonical identity: identity_verdict={verdict}"
+        )
+    return identity
+
+
+def canonical_identity_summary(identity: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "artifact_type": _string_field(identity, "artifact_type"),
+        "paper_id": _string_field(identity, "paper_id"),
+        "identity_verdict": _string_field(identity, "identity_verdict"),
+        "work_level_identity": deepcopy(identity.get("work_level_identity", {}) or {}),
+        "source_manifestation": deepcopy(identity.get("source_manifestation", {}) or {}),
+        "selected_identity_evidence": deepcopy(identity.get("selected_identity_evidence", []) or []),
+        "warnings": deepcopy(identity.get("warnings", []) or []),
+        "repair_trace_path": _string_field(identity, "repair_trace_path"),
+        "provenance": deepcopy(identity.get("provenance", {}) or {}),
+    }
+
+
+def fetch_record_from_canonical_identity(identity: dict[str, Any]) -> dict[str, Any]:
+    work_identity = identity.get("work_level_identity", {}) or {}
+    source_manifestation = identity.get("source_manifestation", {}) or {}
+    record: dict[str, Any] = {
+        "status": "ok",
+        "paper_id": identity.get("paper_id") or paper_id_for_record(work_identity),
+        "title": work_identity.get("title") or source_manifestation.get("title", ""),
+        "authors": work_identity.get("authors", []) or [],
+        "year": work_identity.get("year", ""),
+        "venue": work_identity.get("venue", ""),
+        "doi": work_identity.get("doi") or source_manifestation.get("doi", ""),
+        "arxiv_id": work_identity.get("arxiv_id") or source_manifestation.get("arxiv_id", ""),
+        "zotero_key": work_identity.get("zotero_key") or source_manifestation.get("zotero_key", ""),
+        "source_type": source_manifestation.get("source_kind", ""),
+        "source_url": source_manifestation.get("source_url", ""),
+        "pdf_url": source_manifestation.get("pdf_url", ""),
+        "local_pdf_path": source_manifestation.get("local_pdf_path", ""),
+        "identity_contract": canonical_identity_summary(identity),
+        "source_manifestation": deepcopy(source_manifestation),
+    }
+    return {key: value for key, value in record.items() if value not in ("", None, [], {})}
 
 
 def fallback_arxiv_record(arxiv_id: str, source_type: str, source_url: str = "") -> dict[str, Any]:
