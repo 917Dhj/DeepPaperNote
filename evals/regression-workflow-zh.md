@@ -282,6 +282,10 @@ skill 目录，不应并发运行。
 - baseline manifest：<BASELINE_MANIFEST_DOC>
 - candidate ref 或变更说明：<CANDIDATE_REF_DOC_OR_VALUE>
 
+candidate与baseline版本定义：
+- baseline版本：<main>分支
+- candidate版本：<CANDIDATE BRANCH>分支
+
 任务：
 - 确认论文集和子 Codex CLI prompt 模板与 baseline manifest 一致。
 - 同步或安装 candidate skill 版本。
@@ -294,7 +298,7 @@ skill 目录，不应并发运行。
 - 把每个 candidate output 映射到对应 baseline output。
 
 约束：
-- 本 workflow 阶段 Agent 使用 `/goal`；单篇论文的子 Codex CLI session 不使用 `/goal`。
+- 单篇论文的子 Codex CLI session 不使用 `/goal`。
 - 不要把多篇论文合并到同一个 Codex CLI session 中运行。
 - 不要评估笔记质量。
 - 不要修补或重写生成笔记。
