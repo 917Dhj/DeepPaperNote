@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import ssl
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -36,6 +37,11 @@ try:
     import fitz  # type: ignore
 except ImportError:  # pragma: no cover
     fitz = None
+
+try:
+    import certifi  # type: ignore
+except ImportError:  # pragma: no cover
+    certifi = None
 
 
 def base_parser(description: str) -> argparse.ArgumentParser:
@@ -395,7 +401,7 @@ def fallback_arxiv_record(arxiv_id: str, source_type: str, source_url: str = "")
 
 def http_get_text(url: str, *, timeout: int = 30, headers: dict[str, str] | None = None) -> str:
     request = urllib.request.Request(url, headers=headers or {"User-Agent": DEFAULT_USER_AGENT})
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with urllib.request.urlopen(request, timeout=timeout, context=https_ssl_context(url)) as response:
         return response.read().decode("utf-8")
 
 
@@ -405,8 +411,17 @@ def http_get_json(url: str, *, timeout: int = 30, headers: dict[str, str] | None
 
 def http_get_bytes(url: str, *, timeout: int = 60, headers: dict[str, str] | None = None) -> bytes:
     request = urllib.request.Request(url, headers=headers or {"User-Agent": DEFAULT_USER_AGENT})
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with urllib.request.urlopen(request, timeout=timeout, context=https_ssl_context(url)) as response:
         return response.read()
+
+
+def https_ssl_context(url: str) -> ssl.SSLContext | None:
+    if not str(url).lower().startswith("https://") or certifi is None:
+        return None
+    try:
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return None
 
 
 def semantic_scholar_headers() -> dict[str, str]:
@@ -2023,9 +2038,27 @@ def extract_local_pdf_hints(pdf_path: Path) -> dict[str, Any]:
 
 def choose_local_pdf_corrected_title(base: dict[str, Any], candidates: list[dict[str, Any]]) -> str:
     current_title = normalize_whitespace(str(base.get("title", "")))
-    if not current_title or not is_probable_local_pdf_artifact_title(current_title):
+    if not current_title:
         return ""
     titled_candidates = [candidate for candidate in candidates if normalize_whitespace(str(candidate.get("title", "")))]
+    if local_pdf_title_needs_identity_correction(base):
+        identity_matches = [
+            candidate for candidate in titled_candidates if external_identity_matches(base, candidate)
+        ]
+        if identity_matches:
+            best_identity = sorted(
+                identity_matches,
+                key=lambda item: (
+                    candidate_priority_score(item),
+                    publication_quality_score(item),
+                    len(normalize_whitespace(str(item.get("title", "")))),
+                ),
+                reverse=True,
+            )[0]
+            return normalize_whitespace(str(best_identity.get("title", "")))
+
+    if not is_probable_local_pdf_artifact_title(current_title):
+        return ""
     best = choose_best_title_match(current_title, titled_candidates)
     if not best:
         return ""
@@ -2037,6 +2070,41 @@ def choose_local_pdf_corrected_title(base: dict[str, Any], candidates: list[dict
     if not (best.get("doi") or best.get("arxiv_id") or publication_quality_score(best) >= 2):
         return ""
     return candidate_title
+
+
+LOW_CONFIDENCE_LOCAL_TITLE_PATTERNS = (
+    r"^provided proper attribution\b",
+    r"^published as\b",
+    r"^submitted to\b",
+    r"^accepted (?:as|to|for)\b",
+    r"^conference paper\b",
+    r"^proceedings of\b",
+    r"^arxiv\s*:",
+    r"^doi\s*:",
+)
+
+
+def local_pdf_title_needs_identity_correction(base: dict[str, Any]) -> bool:
+    title = normalize_whitespace(str(base.get("title", "")))
+    if not title:
+        return False
+    if base.get("local_pdf_artifact_title") or is_probable_local_pdf_artifact_title(title):
+        return True
+    source = normalize_whitespace(str(base.get("local_pdf_title_source", "")))
+    if source not in {"first_page_title_used", "local_pdf_stem_used", "pdf_metadata_title_used"}:
+        return False
+    lowered = title.lower()
+    return any(re.search(pattern, lowered) for pattern in LOW_CONFIDENCE_LOCAL_TITLE_PATTERNS)
+
+
+def external_identity_matches(base: dict[str, Any], candidate: dict[str, Any]) -> bool:
+    base_doi = extract_doi(str(base.get("doi", ""))) or ""
+    candidate_doi = extract_doi(str(candidate.get("doi", ""))) or ""
+    if base_doi and candidate_doi and base_doi.lower() == candidate_doi.lower():
+        return True
+    base_arxiv = normalize_whitespace(str(base.get("arxiv_id", "")))
+    candidate_arxiv = normalize_whitespace(str(candidate.get("arxiv_id", "")))
+    return bool(base_arxiv and candidate_arxiv and base_arxiv == candidate_arxiv)
 
 
 def normalize_caption_label(label: str) -> str:

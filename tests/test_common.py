@@ -36,6 +36,7 @@ from common import (
     resolve_note_output_mode,
     resolve_obsidian_note_path,
     semantic_scholar_headers,
+    choose_local_pdf_corrected_title,
 )
 
 
@@ -363,6 +364,46 @@ def test_resolve_reference_local_pdf_uses_extracted_hints(tmp_path: Path, monkey
     assert resolved["title"] == "LLaMA: Open and Efficient Foundation Language Models"
     assert resolved["doi"] == "10.48550/arXiv.2302.13971"
     assert resolved["arxiv_id"] == "2302.13971"
+
+
+def test_local_pdf_low_confidence_title_uses_external_identity_match() -> None:
+    corrected = choose_local_pdf_corrected_title(
+        {
+            "title": "Provided proper attribution is provided, Google hereby grants permission to",
+            "local_pdf_title_source": "first_page_title_used",
+            "arxiv_id": "1706.03762",
+            "doi": "10.48550/arXiv.1706.03762",
+        },
+        [
+            {
+                "title": "Attention Is All You Need",
+                "arxiv_id": "1706.03762",
+                "doi": "10.48550/arXiv.1706.03762",
+                "metadata_sources": ["arxiv"],
+            }
+        ],
+    )
+
+    assert corrected == "Attention Is All You Need"
+
+
+def test_local_pdf_good_title_does_not_use_unrelated_external_title() -> None:
+    corrected = choose_local_pdf_corrected_title(
+        {
+            "title": "A Careful Local PDF Title",
+            "local_pdf_title_source": "first_page_title_used",
+            "arxiv_id": "1706.03762",
+        },
+        [
+            {
+                "title": "Attention Is All You Need",
+                "arxiv_id": "1706.03762",
+                "metadata_sources": ["arxiv"],
+            }
+        ],
+    )
+
+    assert corrected == ""
 
 
 def test_resolve_note_output_mode_falls_back_to_workspace(tmp_path: Path, monkeypatch) -> None:
