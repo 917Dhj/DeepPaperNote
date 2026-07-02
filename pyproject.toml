@@ -33,6 +33,7 @@ classifiers = [
   "Topic :: Text Processing :: Markup :: Markdown",
 ]
 dependencies = [
+  "certifi>=2024.0.0",
   "PyMuPDF>=1.24",
 ]
 

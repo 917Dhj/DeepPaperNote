@@ -140,6 +140,42 @@ def materialize_insert_decisions(
     return materialized
 
 
+def lint_failure_message(lint: dict, gate: str, lint_path: str) -> str:
+    detail_parts: list[str] = []
+    for warning in lint.get("warnings", []) or []:
+        if warning:
+            detail_parts.append(str(warning))
+    for issue_key in (
+        "core_info_structure_issues",
+        "figure_structure_issues",
+        "planning_artifact_issues",
+        "substantive_content_issues",
+        "mixed_language_issues",
+        "mechanical_translation_artifact_issues",
+        "linebreak_issues",
+        "code_math_issues",
+        "math_render_issues",
+        "reference_hygiene_issues",
+    ):
+        issues = lint.get(issue_key, []) or []
+        if not issues:
+            continue
+        first = issues[0]
+        if isinstance(first, dict):
+            reason = first.get("reason") or first.get("line") or first.get("snippet") or first
+            detail_parts.append(f"{issue_key}: {reason}")
+        else:
+            detail_parts.append(f"{issue_key}: {first}")
+    details = "; ".join(detail_parts[:4])
+    suffix = f" Details: {details}." if details else ""
+    return f"write_obsidian_note.py refused to write note because {gate} gate failed.{suffix} See lint JSON: {lint_path}"
+
+
+def require_lint_gate(lint: dict, key: str, gate: str, lint_path: str) -> None:
+    if not lint.get(key, False):
+        raise SystemExit(lint_failure_message(lint, gate, lint_path))
+
+
 def main() -> None:
     args = parser().parse_args()
 
@@ -149,21 +185,19 @@ def main() -> None:
         raise SystemExit("write_obsidian_note.py requires --title or metadata with a title.")
 
     if args.lint_json:
-        lint = json.loads(Path(args.lint_json).expanduser().resolve().read_text(encoding="utf-8"))
-        if not lint.get("passes_basic_structure", False):
-            raise SystemExit("write_obsidian_note.py refused to write note because basic structure lint failed.")
-        if not lint.get("passes_style_gate", False):
-            raise SystemExit("write_obsidian_note.py refused to write note because style gate failed.")
-        if not lint.get("passes_math_gate", False):
-            raise SystemExit("write_obsidian_note.py refused to write note because math gate failed.")
+        lint_path = str(Path(args.lint_json).expanduser().resolve())
+        lint = json.loads(Path(lint_path).read_text(encoding="utf-8"))
+        require_lint_gate(lint, "passes_basic_structure", "basic structure", lint_path)
+        require_lint_gate(lint, "passes_style_gate", "style", lint_path)
+        require_lint_gate(lint, "passes_math_gate", "math", lint_path)
         if "passes_figure_gate" in lint and not lint.get("passes_figure_gate", False):
-            raise SystemExit("write_obsidian_note.py refused to write note because figure gate failed.")
+            raise SystemExit(lint_failure_message(lint, "figure", lint_path))
         if "passes_plan_gate" in lint and not lint.get("passes_plan_gate", False):
-            raise SystemExit("write_obsidian_note.py refused to write note because plan gate failed.")
+            raise SystemExit(lint_failure_message(lint, "plan", lint_path))
         if "passes_substantive_content" in lint and not lint.get("passes_substantive_content", False):
-            raise SystemExit("write_obsidian_note.py refused to write note because substantive content gate failed.")
+            raise SystemExit(lint_failure_message(lint, "substantive content", lint_path))
         if "passes_reference_hygiene_gate" in lint and not lint.get("passes_reference_hygiene_gate", False):
-            raise SystemExit("write_obsidian_note.py refused to write note because reference hygiene gate failed.")
+            raise SystemExit(lint_failure_message(lint, "reference hygiene", lint_path))
 
     if args.content_file:
         note_text = Path(args.content_file).expanduser().resolve().read_text(encoding="utf-8")

@@ -1152,6 +1152,46 @@ def test_write_obsidian_note_refuses_failed_plan_gate(tmp_path) -> None:
 
     assert result.returncode != 0
     assert "plan gate failed" in result.stderr
+    assert "See lint JSON" in result.stderr
+
+
+def test_write_obsidian_note_reports_lint_warning_details(tmp_path) -> None:
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "passes_basic_structure": True,
+                "passes_style_gate": False,
+                "passes_math_gate": True,
+                "warnings": ["mixed_language_lines_present"],
+                "mixed_language_issues": [{"line": "Table 2 是主结果表。"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--title",
+            "Style Gate Paper",
+            "--content",
+            "# Style Gate Paper",
+            "--lint-json",
+            str(lint_path),
+            "--vault",
+            str(tmp_path / "vault"),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "style gate failed" in result.stderr
+    assert "mixed_language_lines_present" in result.stderr
+    assert "Table 2 是主结果表" in result.stderr
 
 
 def test_real_image_embed_counts_as_figure_marker_in_full_lint(tmp_path) -> None:
