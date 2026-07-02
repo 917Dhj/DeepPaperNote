@@ -565,6 +565,17 @@ DeepPaperNote 在工作流设计上受到了这些论文阅读 / 笔记生成项
 - [heleninsights-dot/phd-deepread-workflow](https://github.com/heleninsights-dot/phd-deepread-workflow)
 - [juliye2025/evil-read-arxiv](https://github.com/juliye2025/evil-read-arxiv)
 
+## 🤝 贡献说明
+
+DeepPaperNote 的开发分支是 `develop`。请把 PR 提交到 `develop` 分支，而不是 `main`。
+
+如果改动可能影响最终笔记质量，请按照 `evals/` 中定义的评估流程和质量标准验证：
+
+- [`evals/regression-workflow-zh.md`](./evals/regression-workflow-zh.md)
+- [`evals/note-quality-rubric.md`](./evals/note-quality-rubric.md)
+
+对于和笔记质量相关的 PR，我只会接受在评估流程下能证明最终笔记质量有实际提升的改动。单纯的格式更整洁、内部抽象更多，或者代码结构调整，本身不算笔记质量提升，除非它们最终确实改善了生成出来的笔记。
+
 ## Star History
 
 <a href="https://www.star-history.com/?repos=917Dhj%2FDeepPaperNote&type=date&legend=top-left">
