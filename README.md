@@ -575,6 +575,17 @@ DeepPaperNote was influenced by projects that take paper reading, evidence extra
 - [heleninsights-dot/phd-deepread-workflow](https://github.com/heleninsights-dot/phd-deepread-workflow)
 - [juliye2025/evil-read-arxiv](https://github.com/juliye2025/evil-read-arxiv)
 
+## 🤝 Contributing
+
+DeepPaperNote is developed on the `develop` branch. Please open pull requests against `develop`, not `main`.
+
+For changes that may affect note quality, the PR should be evaluated with the workflow and rubric in `evals/`:
+
+- [`evals/regression-workflow.md`](./evals/regression-workflow.md)
+- [`evals/note-quality-rubric.md`](./evals/note-quality-rubric.md)
+
+I only accept note-quality-related changes when they show a real improvement under the evaluation workflow. Cleaner formatting, broader abstractions, or internal refactors are not enough by themselves unless they materially improve the final generated note.
+
 ## Star History
 
 <a href="https://www.star-history.com/?repos=917Dhj%2FDeepPaperNote&type=date&legend=top-left">
