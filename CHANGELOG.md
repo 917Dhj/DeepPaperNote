@@ -12,7 +12,13 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
-No unreleased user-facing changes yet.
+### Fixed
+
+- Fixed Windows-style Obsidian subdirectories so `Research/Papers` is not duplicated in saved note paths.
+
+### Contributors
+
+- Incorporated the Windows Obsidian path normalization fix from PR #4 by KumamuKuma.
 
 ## v2.0.0
 
