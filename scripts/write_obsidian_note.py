@@ -186,7 +186,9 @@ def main() -> None:
 
     if args.lint_json:
         lint_path = str(Path(args.lint_json).expanduser().resolve())
-        lint = json.loads(Path(lint_path).read_text(encoding="utf-8"))
+        # utf-8-sig tolerates a BOM in the lint JSON (e.g. produced/edited on
+        # Windows) that would otherwise crash json.loads before any gate check.
+        lint = json.loads(Path(lint_path).read_text(encoding="utf-8-sig"))
         require_lint_gate(lint, "passes_basic_structure", "basic structure", lint_path)
         require_lint_gate(lint, "passes_style_gate", "style", lint_path)
         require_lint_gate(lint, "passes_math_gate", "math", lint_path)
@@ -200,7 +202,9 @@ def main() -> None:
             raise SystemExit(lint_failure_message(lint, "reference hygiene", lint_path))
 
     if args.content_file:
-        note_text = Path(args.content_file).expanduser().resolve().read_text(encoding="utf-8")
+        # utf-8-sig strips a leading BOM so it is never written into the saved
+        # note (a leading BOM breaks Obsidian frontmatter / the H1 title).
+        note_text = Path(args.content_file).expanduser().resolve().read_text(encoding="utf-8-sig")
     elif args.content:
         note_text = args.content
     elif args.stdin:

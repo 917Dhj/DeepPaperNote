@@ -161,7 +161,9 @@ def source_image_filename(plan_item: dict[str, Any]) -> str:
     if filename:
         return filename
     path = source_image_path(plan_item)
-    return path.rsplit("/", 1)[-1] if path else ""
+    # Split on both separators so a Windows-style backslash path does not get
+    # returned whole (rsplit("/") alone leaves "C:\\...\\fig.png" intact).
+    return re.split(r"[\\/]", path)[-1] if path else ""
 
 
 def should_insert(caption: dict[str, Any], plan_item: dict[str, Any], status: str) -> bool:
