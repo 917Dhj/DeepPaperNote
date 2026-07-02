@@ -1542,12 +1542,25 @@ def resolve_obsidian_note_path(
     subdir: str = "",
     filename: str = "",
 ) -> Path:
+    def path_parts(value: str | Path) -> tuple[str, ...]:
+        return tuple(
+            part for part in re.split(r"[\\/]+", str(value).strip()) if part and part != "."
+        )
+
+    def path_from_parts(parts: tuple[str, ...]) -> Path:
+        return Path(*parts) if parts else Path()
+
+    def starts_with_parts(parts: tuple[str, ...], prefix: tuple[str, ...]) -> bool:
+        return bool(prefix) and parts[: len(prefix)] == prefix
+
     output_mode, root_path = resolve_note_output_mode(config)
     papers_dir = str(config.get("papers_dir", "Research/Papers")).strip() or "Research/Papers"
-    relative_dir = Path(papers_dir) if output_mode == "obsidian" else Path()
+    papers_dir_parts = path_parts(papers_dir)
+    relative_dir = path_from_parts(papers_dir_parts) if output_mode == "obsidian" else Path()
     if subdir:
-        subdir_path = Path(subdir)
-        if output_mode == "obsidian" and str(subdir_path).startswith(papers_dir):
+        subdir_parts = path_parts(subdir)
+        subdir_path = path_from_parts(subdir_parts)
+        if output_mode == "obsidian" and starts_with_parts(subdir_parts, papers_dir_parts):
             relative_dir = subdir_path
         else:
             relative_dir = relative_dir / subdir_path
