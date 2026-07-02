@@ -12,7 +12,9 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
-No unreleased user-facing changes yet.
+### Fixed
+
+- Cross-platform (Windows) path and encoding robustness: read files with `utf-8-sig` so a UTF-8 BOM (as written by PowerShell/Notepad) no longer crashes JSON loading or corrupts saved notes; tolerate CRLF line endings in note linting; and compare/emit paths without assuming `/` so the vault folder and Markdown image links resolve correctly on Windows. No behavior change on Linux/macOS.
 
 ## v2.0.0
 

@@ -46,7 +46,9 @@ def load_record(value: str) -> dict[str, Any]:
         return record
     path = Path(value).expanduser()
     if path.exists() and path.is_file():
-        data = json.loads(path.read_text(encoding="utf-8"))
+        # utf-8-sig strips a leading UTF-8 BOM (common on Windows-authored
+        # JSON) that would otherwise crash json.loads; no-op without a BOM.
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
         if isinstance(data, dict):
             return data
     raise SystemExit(f"Expected JSON object for {value!r}.")

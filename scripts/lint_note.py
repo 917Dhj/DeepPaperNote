@@ -1475,8 +1475,12 @@ def mechanism_flow_warnings(text: str) -> list[str]:
 
 
 def strip_frontmatter(text: str) -> str:
-    """Remove a leading YAML frontmatter block (---...---) if present."""
-    return re.sub(r"^---\n.*?\n---\n?", "", text, count=1, flags=re.DOTALL)
+    """Remove a leading YAML frontmatter block (---...---) if present.
+
+    Tolerates CRLF (\\r\\n) line endings so notes written on Windows are
+    stripped the same way as LF notes.
+    """
+    return re.sub(r"^---\r?\n.*?\r?\n---\r?\n?", "", text, count=1, flags=re.DOTALL)
 
 
 def main() -> None:
@@ -1484,7 +1488,10 @@ def main() -> None:
 
     args = parser().parse_args()
     path = Path(args.input).expanduser().resolve()
-    text = path.read_text(encoding="utf-8")
+    # utf-8-sig strips a leading BOM and the replace() normalizes CRLF so
+    # Windows-authored notes are linted identically to LF/BOM-less notes;
+    # otherwise the BOM/`\r` cause spurious title/frontmatter/style failures.
+    text = path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
     body_text = strip_frontmatter(text)
     headers = extract_headers(text)
     missing_sections = find_missing_sections(text)

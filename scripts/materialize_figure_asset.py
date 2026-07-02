@@ -66,7 +66,9 @@ def main() -> None:
     output_mode, root_root = resolve_note_output_mode(config)
     relative_from_note = dest_image.relative_to(note_path.parent)
     relative_markdown_embed = f"![{args.label or source_image.stem}]({relative_from_note.as_posix()})"
-    absolute_markdown_embed = f"![{args.label or source_image.stem}]({dest_image})"
+    # as_posix() keeps forward slashes; str(Path) would emit backslashes on
+    # Windows, producing a broken Markdown image link.
+    absolute_markdown_embed = f"![{args.label or source_image.stem}]({dest_image.as_posix()})"
 
     payload = {
         "status": "ok",

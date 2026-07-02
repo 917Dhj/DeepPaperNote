@@ -133,7 +133,9 @@ def main() -> None:
         raise SystemExit("write_obsidian_note.py requires --title or metadata with a title.")
 
     if args.lint_json:
-        lint = json.loads(Path(args.lint_json).expanduser().resolve().read_text(encoding="utf-8"))
+        # utf-8-sig tolerates a BOM in the lint JSON (e.g. produced/edited on
+        # Windows) that would otherwise crash json.loads before any gate check.
+        lint = json.loads(Path(args.lint_json).expanduser().resolve().read_text(encoding="utf-8-sig"))
         if not lint.get("passes_basic_structure", False):
             raise SystemExit("write_obsidian_note.py refused to write note because basic structure lint failed.")
         if not lint.get("passes_style_gate", False):
@@ -148,7 +150,9 @@ def main() -> None:
             raise SystemExit("write_obsidian_note.py refused to write note because substantive content gate failed.")
 
     if args.content_file:
-        note_text = Path(args.content_file).expanduser().resolve().read_text(encoding="utf-8")
+        # utf-8-sig strips a leading BOM so it is never written into the saved
+        # note (a leading BOM breaks Obsidian frontmatter / the H1 title).
+        note_text = Path(args.content_file).expanduser().resolve().read_text(encoding="utf-8-sig")
     elif args.content:
         note_text = args.content
     elif args.stdin:

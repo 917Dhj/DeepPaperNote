@@ -70,7 +70,10 @@ def stub_payload(script: str, description: str, outputs: list[str]) -> dict[str,
 
 
 def load_json_file(path: str | Path) -> dict[str, Any]:
-    data = json.loads(Path(path).expanduser().resolve().read_text(encoding="utf-8"))
+    # utf-8-sig transparently strips a UTF-8 BOM (e.g. files written by
+    # PowerShell Out-File / Notepad on Windows) that would otherwise make
+    # json.loads raise "Unexpected UTF-8 BOM". It is a no-op for BOM-less files.
+    data = json.loads(Path(path).expanduser().resolve().read_text(encoding="utf-8-sig"))
     if not isinstance(data, dict):
         raise RuntimeError("Expected a JSON object.")
     return data
@@ -226,7 +229,7 @@ def shell_config_value(name: str) -> str:
         if not path.exists() or not path.is_file():
             continue
         try:
-            lines = path.read_text(encoding="utf-8").splitlines()
+            lines = path.read_text(encoding="utf-8-sig").splitlines()
         except Exception:
             continue
         for raw_line in reversed(lines):
@@ -1359,7 +1362,7 @@ def load_domain_rules() -> dict[str, list[dict[str, Any]]]:
     try:
         if not DOMAIN_RULES_PATH.exists():
             return _copy_default_domain_rules()
-        parsed = _parse_domain_rules_yaml(DOMAIN_RULES_PATH.read_text(encoding="utf-8"))
+        parsed = _parse_domain_rules_yaml(DOMAIN_RULES_PATH.read_text(encoding="utf-8-sig"))
         normalized = _normalize_domain_rules(parsed)
         if normalized is None:
             return _copy_default_domain_rules()
@@ -1547,7 +1550,12 @@ def resolve_obsidian_note_path(
     relative_dir = Path(papers_dir) if output_mode == "obsidian" else Path()
     if subdir:
         subdir_path = Path(subdir)
-        if output_mode == "obsidian" and str(subdir_path).startswith(papers_dir):
+        # Compare on path components rather than the string form: str(Path(...))
+        # renders with the OS separator, so on Windows "Research\\Papers\\..."
+        # never .startswith("Research/Papers") and the prefix gets duplicated.
+        papers_parts = Path(papers_dir).parts
+        subdir_has_papers_prefix = subdir_path.parts[: len(papers_parts)] == papers_parts
+        if output_mode == "obsidian" and subdir_has_papers_prefix:
             relative_dir = subdir_path
         else:
             relative_dir = relative_dir / subdir_path
