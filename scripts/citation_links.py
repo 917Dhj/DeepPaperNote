@@ -316,7 +316,10 @@ def build_vault_note_index(config: dict[str, Any]) -> dict[str, Any]:
         except ValueError:
             continue
         try:
-            text = path.read_text(encoding="utf-8", errors="ignore")[:4096]
+            # utf-8-sig strips a leading BOM; without it a BOM-prefixed note
+            # fails the frontmatter check and is silently dropped from the
+            # index, so wiki-links to it never resolve.
+            text = path.read_text(encoding="utf-8-sig", errors="ignore")[:4096]
         except OSError:
             text = ""
         frontmatter = _frontmatter_fields(text)
