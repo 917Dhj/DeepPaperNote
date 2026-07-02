@@ -511,6 +511,27 @@ def test_resolve_obsidian_note_path_avoids_double_folder_when_subdir_is_title_sl
     )
 
 
+def test_resolve_obsidian_note_path_accepts_windows_style_papers_relative_subdir(
+    tmp_path: Path,
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    config = {
+        "obsidian_vault": str(vault),
+        "papers_dir": "Research/Papers",
+        "workspace_output_dir": "DeepPaperNote_output",
+    }
+    path = resolve_obsidian_note_path(
+        config,
+        title="My Test Paper",
+        subdir=r"Research\Papers\Benchmark\My_Test_Paper",
+    )
+    assert (
+        path
+        == vault / "Research/Papers" / "Benchmark" / "My_Test_Paper" / "My_Test_Paper.md"
+    )
+
+
 def test_existing_domain_dirs_excludes_root_level_paper_folder(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     papers = vault / "Research" / "Papers"
