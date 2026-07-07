@@ -20,7 +20,7 @@ import extract_evidence
 from extract_evidence import build_appendix_evidence, evidence_quality, extract_equation_candidates
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXTRACT_EVIDENCE_SCRIPT = PROJECT_ROOT / "scripts" / "extract_evidence.py"
+EXTRACT_EVIDENCE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "extract_evidence.py"
 
 
 def write_test_pdf(path: Path, pages: list[str]) -> None:

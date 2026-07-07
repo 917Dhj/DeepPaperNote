@@ -14,7 +14,7 @@ except ImportError:  # pragma: no cover
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXTRACT_SOURCE_SCRIPT = PROJECT_ROOT / "scripts" / "extract_source_text.py"
+EXTRACT_SOURCE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "extract_source_text.py"
 
 
 def write_test_pdf(path: Path, pages: list[str]) -> None:

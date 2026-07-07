@@ -22,7 +22,6 @@ The reusable core includes:
 These pieces should live primarily in:
 - `scripts/`
 - `references/`
-- `assets/`
 
 The core should be agent-agnostic wherever possible.
 
@@ -31,7 +30,7 @@ The core should be agent-agnostic wherever possible.
 A platform adapter can include:
 - `SKILL.md`
 - `agents/openai.yaml`
-- other distribution-specific manifest files
+- repository-level plugin manifests such as `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`
 - trigger phrasing
 - tool-selection instructions for the host environment
 - interaction-style notes
@@ -93,7 +92,7 @@ Keep only:
 A future adapter on another platform should be able to reuse:
 - the same scripts
 - the same contracts
-- the same note template
+- the same note-format rules
 - the same evidence-first workflow
 
 It should only need a different outer adapter.

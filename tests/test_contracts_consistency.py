@@ -9,6 +9,7 @@ from contracts import NOTE_REQUIRED_SECTIONS, PAPER_TYPE_VALUES, WRITING_CONTRAC
 from lint_note import REQUIRED_SECTIONS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SKILL_ROOT = PROJECT_ROOT / "skills" / "deeppapernote"
 NOTE_PLAN_REFERENCE_DOCS = (
     "workflow.md",
     "evidence-first.md",
@@ -33,11 +34,11 @@ NOTE_PLAN_REQUIRED_FIELDS = (
     "section_plan",
 )
 REFERENCE_ROUTING_DOCS = (
-    "SKILL.md",
-    "references/model-synthesis.md",
+    "skills/deeppapernote/SKILL.md",
+    "skills/deeppapernote/references/model-synthesis.md",
 )
 PDF_CONTRACT_DOCS = (
-    "SKILL.md",
+    "skills/deeppapernote/SKILL.md",
     "README.md",
     "README.zh-CN.md",
 )
@@ -134,7 +135,7 @@ EXPECTED_PAPER_TYPE_SECTION_PROFILES = {
 
 
 def note_quality_structural_sections() -> tuple[str, ...]:
-    text = (PROJECT_ROOT / "references" / "note-quality.md").read_text(encoding="utf-8")
+    text = (SKILL_ROOT / "references" / "note-quality.md").read_text(encoding="utf-8")
     start = text.index("The note should usually include:")
     end = text.index("For non-trivial papers", start)
     sections: list[str] = []
@@ -152,8 +153,8 @@ def pdf_contract_docs() -> dict[str, str]:
     }
     docs.update(
         {
-            f"references/{path.name}": path.read_text(encoding="utf-8")
-            for path in sorted((PROJECT_ROOT / "references").glob("*.md"))
+            f"skills/deeppapernote/references/{path.name}": path.read_text(encoding="utf-8")
+            for path in sorted((SKILL_ROOT / "references").glob("*.md"))
         }
     )
     return docs
@@ -251,7 +252,7 @@ def test_bundle_exposes_depth_and_figure_decision_contracts_without_old_inputs()
 
 
 def test_paper_types_doc_uses_typed_profiles_without_legacy_common_subheadings() -> None:
-    text = (PROJECT_ROOT / "references" / "paper-types.md").read_text(encoding="utf-8")
+    text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "paper-types.md").read_text(encoding="utf-8")
 
     assert "Common subheadings" not in text
     assert "unless a section truly does not apply" not in text
@@ -266,7 +267,7 @@ def test_note_quality_structural_sections_match_canonical_contract() -> None:
 
 def test_note_plan_docs_make_json_file_canonical() -> None:
     for doc_name in NOTE_PLAN_REFERENCE_DOCS:
-        text = (PROJECT_ROOT / "references" / doc_name).read_text(encoding="utf-8")
+        text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / doc_name).read_text(encoding="utf-8")
 
         assert "canonical" in text.lower()
         assert "short JSON" in text
@@ -277,7 +278,7 @@ def test_note_plan_docs_make_json_file_canonical() -> None:
 
 def test_note_plan_xml_mentions_are_display_only() -> None:
     for doc_name in NOTE_PLAN_REFERENCE_DOCS:
-        lines = (PROJECT_ROOT / "references" / doc_name).read_text(encoding="utf-8").splitlines()
+        lines = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / doc_name).read_text(encoding="utf-8").splitlines()
 
         for line in lines:
             if "<note_plan>" in line:
@@ -288,7 +289,7 @@ def test_note_plan_xml_mentions_are_display_only() -> None:
 
 def test_note_plan_docs_do_not_offer_xml_or_temporary_files_as_alternatives() -> None:
     combined = "\n".join(
-        (PROJECT_ROOT / "references" / doc_name).read_text(encoding="utf-8")
+        (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / doc_name).read_text(encoding="utf-8")
         for doc_name in NOTE_PLAN_REFERENCE_DOCS
     )
 
@@ -313,8 +314,8 @@ def test_normal_execution_docs_do_not_force_broad_reference_reads() -> None:
         assert "Read [references/" not in text
         assert "Use [references/" not in text
 
-    skill_text = (PROJECT_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    model_synthesis_text = (PROJECT_ROOT / "references" / "model-synthesis.md").read_text(
+    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
+    model_synthesis_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "model-synthesis.md").read_text(
         encoding="utf-8"
     )
 
@@ -323,8 +324,8 @@ def test_normal_execution_docs_do_not_force_broad_reference_reads() -> None:
 
 
 def test_normal_execution_docs_require_obsidian_yaml_frontmatter() -> None:
-    skill_text = (PROJECT_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    final_writing_text = (PROJECT_ROOT / "references" / "final-writing.md").read_text(
+    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
+    final_writing_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "final-writing.md").read_text(
         encoding="utf-8"
     )
 
@@ -336,10 +337,10 @@ def test_normal_execution_docs_require_obsidian_yaml_frontmatter() -> None:
 
 
 def test_final_writing_defines_fixed_core_info_schema() -> None:
-    final_writing_text = (PROJECT_ROOT / "references" / "final-writing.md").read_text(
+    final_writing_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "final-writing.md").read_text(
         encoding="utf-8"
     )
-    obsidian_format_text = (PROJECT_ROOT / "references" / "obsidian-format.md").read_text(
+    obsidian_format_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "obsidian-format.md").read_text(
         encoding="utf-8"
     )
 
@@ -367,7 +368,7 @@ def test_final_writing_defines_fixed_core_info_schema() -> None:
 
 
 def test_final_writing_requires_tables_for_central_quantitative_comparisons() -> None:
-    final_writing_text = (PROJECT_ROOT / "references" / "final-writing.md").read_text(
+    final_writing_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "final-writing.md").read_text(
         encoding="utf-8"
     )
 
@@ -377,7 +378,7 @@ def test_final_writing_requires_tables_for_central_quantitative_comparisons() ->
 
 
 def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
-    text = (PROJECT_ROOT / "references" / "evidence-first.md").read_text(encoding="utf-8")
+    text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "evidence-first.md").read_text(encoding="utf-8")
 
     assert "```xml" not in text
     match = re.search(r"Recommended shape:\n\n```json\n(.*?)\n```", text, flags=re.DOTALL)
@@ -413,8 +414,8 @@ def test_pdf_contract_banned_phrase_matcher_catches_allowed_fallbacks() -> None:
 
 
 def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
-    skill_text = (PROJECT_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    workflow_text = (PROJECT_ROOT / "references" / "workflow.md").read_text(encoding="utf-8")
+    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
+    workflow_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "workflow.md").read_text(encoding="utf-8")
     readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     readme_zh_text = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
 

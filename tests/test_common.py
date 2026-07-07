@@ -41,7 +41,7 @@ from common import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-ENV_SCRIPT = PROJECT_ROOT / "scripts" / "check_environment.py"
+ENV_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "check_environment.py"
 
 
 class FakePdfPage:

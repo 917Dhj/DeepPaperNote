@@ -8,8 +8,8 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-WRITE_SCRIPT = PROJECT_ROOT / "scripts" / "write_obsidian_note.py"
-ENV_SCRIPT = PROJECT_ROOT / "scripts" / "check_environment.py"
+WRITE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
+ENV_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "check_environment.py"
 
 
 def test_write_note_falls_back_to_workspace(tmp_path: Path) -> None:

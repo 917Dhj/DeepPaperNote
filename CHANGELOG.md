@@ -12,6 +12,11 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+### Changed
+
+- Converted the repository to a dual-stack Claude Code and Codex plugin layout with the canonical skill under `skills/deeppapernote/`.
+- Updated the recommended install command to select the `deeppapernote` skill from the plugin repository.
+
 ### Fixed
 
 - Fixed Windows-style Obsidian subdirectories so `Research/Papers` is not duplicated in saved note paths.

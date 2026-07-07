@@ -138,7 +138,7 @@ def test_reference_hygiene_gate_flags_runtime_artifact_references(tmp_path) -> N
     )
     plan_path.write_text(json.dumps(_valid_plan_payload()), encoding="utf-8")
 
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "lint_note.py"
     result = subprocess.run(
         [
             sys.executable,
@@ -913,7 +913,7 @@ def test_core_info_issues_fail_basic_structure_gate(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "lint_note.py"
     result = subprocess.run(
         [
             sys.executable,
@@ -937,7 +937,7 @@ def test_note_plan_missing_fails_plan_gate(tmp_path) -> None:
     note_path = tmp_path / "Paper.md"
     note_path.write_text(_valid_note_text(), encoding="utf-8")
 
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "lint_note.py"
     result = subprocess.run(
         [sys.executable, str(script_path), "--input", str(note_path)],
         check=True,
@@ -995,7 +995,7 @@ def test_mechanical_translation_artifacts_fail_style_gate(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "lint_note.py"
     result = subprocess.run(
         [
             sys.executable,
@@ -1042,7 +1042,7 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "lint_note.py"
     result = subprocess.run(
         [sys.executable, str(script_path), "--input", str(note_path)],
         check=True,
@@ -1104,7 +1104,7 @@ def test_note_plan_explicit_not_reported_entries_pass_plan_gate(tmp_path) -> Non
         encoding="utf-8",
     )
 
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "lint_note.py"
     result = subprocess.run(
         [sys.executable, str(script_path), "--input", str(note_path)],
         check=True,
@@ -1132,7 +1132,7 @@ def test_write_obsidian_note_refuses_failed_plan_gate(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
     result = subprocess.run(
         [
             sys.executable,
@@ -1170,7 +1170,7 @@ def test_write_obsidian_note_reports_lint_warning_details(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
     result = subprocess.run(
         [
             sys.executable,
@@ -1255,7 +1255,7 @@ def test_real_image_embed_counts_as_figure_marker_in_full_lint(tmp_path) -> None
         encoding="utf-8",
     )
 
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "lint_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "lint_note.py"
     result = subprocess.run(
         [sys.executable, str(script_path), "--input", str(note_path)],
         check=True,
@@ -1289,7 +1289,7 @@ def test_write_obsidian_note_refuses_failed_substantive_gate(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
     result = subprocess.run(
         [
             sys.executable,
@@ -1346,7 +1346,7 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
         encoding="utf-8",
     )
     output_path = tmp_path / "write.json"
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
 
     result = subprocess.run(
         [
@@ -1404,7 +1404,7 @@ def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> N
         ),
         encoding="utf-8",
     )
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
 
     result = subprocess.run(
         [
@@ -1452,7 +1452,7 @@ def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) ->
         ),
         encoding="utf-8",
     )
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
 
     result = subprocess.run(
         [
@@ -1500,7 +1500,7 @@ def test_write_obsidian_note_rejects_unsafe_insert_filename(tmp_path) -> None:
         ),
         encoding="utf-8",
     )
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "write_obsidian_note.py"
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
 
     result = subprocess.run(
         [

@@ -10,7 +10,7 @@ import pytest
 from contracts import PAPER_TYPE_CONTRACTS, WRITING_CONTRACT_RULES
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-LINT_GROUNDING_SCRIPT = PROJECT_ROOT / "scripts" / "lint_grounding.py"
+LINT_GROUNDING_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "lint_grounding.py"
 
 
 def write_json(path: Path, payload: dict) -> Path:

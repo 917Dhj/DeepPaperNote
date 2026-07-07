@@ -36,7 +36,7 @@ jobs:
 
       - name: Run syntax check
         run: |
-          python -m compileall -q scripts
+          python -m compileall -q skills/deeppapernote/scripts
 
       - name: Run tests
         run: |

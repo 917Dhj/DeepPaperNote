@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DECISIONS_SCRIPT = PROJECT_ROOT / "scripts" / "plan_figure_table_decisions.py"
+DECISIONS_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "plan_figure_table_decisions.py"
 
 
 def write_json(path: Path, payload: dict) -> Path:

@@ -24,7 +24,7 @@ from common import load_json_file, resolve_obsidian_note_path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = PROJECT_ROOT / "scripts"
+SCRIPTS = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts"
 BOM = "﻿"
 
 

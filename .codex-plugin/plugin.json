@@ -1,0 +1,38 @@
+{
+  "name": "deeppapernote",
+  "version": "0.1.0",
+  "description": "Academic paper reading and Obsidian note generation skills for building a research WIKI.",
+  "author": {
+    "name": "917Dhj",
+    "url": "https://github.com/917Dhj"
+  },
+  "homepage": "https://github.com/917Dhj/DeepPaperNote",
+  "repository": "https://github.com/917Dhj/DeepPaperNote",
+  "license": "MIT",
+  "keywords": [
+    "academic-research",
+    "obsidian",
+    "paper-reading",
+    "research-paper",
+    "deep-reading"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "DeepPaperNote",
+    "shortDescription": "Generate deep-reading notes for research papers.",
+    "longDescription": "Turn one paper at a time into an evidence-first, Obsidian-oriented deep-reading note with metadata, figures, tables, formulas, limitations, and final quality checks.",
+    "developerName": "917Dhj",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/917Dhj/DeepPaperNote",
+    "defaultPrompt": [
+      "Generate a deep-reading note for this paper.",
+      "Turn this DOI or arXiv paper into an Obsidian note.",
+      "Read this local PDF and write a research note."
+    ],
+    "brandColor": "#7C3AED"
+  }
+}

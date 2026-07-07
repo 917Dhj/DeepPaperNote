@@ -16,7 +16,7 @@ import run_pipeline
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-RUN_PIPELINE_SCRIPT = PROJECT_ROOT / "scripts" / "run_pipeline.py"
+RUN_PIPELINE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "run_pipeline.py"
 
 
 def write_test_pdf(path: Path) -> None:
