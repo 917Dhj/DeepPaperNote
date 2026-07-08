@@ -3,11 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from plan_glossary import (
     find_occurrences,
     load_manifest_and_sections,
     load_terms,
     propose_candidates,
+    read_raw_sections,
     triage_terms,
 )
 
@@ -51,6 +54,36 @@ def test_loads_deeppapernote_manifest_raw_sections_contract(tmp_path: Path) -> N
 
     assert loaded_manifest["paper_id"] == "paper-1"
     assert [record["section_id"] for record in records] == ["sec:method", "sec:references"]
+
+
+def test_loads_relative_raw_sections_path_from_manifest_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = tmp_path / "paper_raw_sections.jsonl"
+    raw.write_text("\n".join(json.dumps(record, ensure_ascii=False) for record in _records()))
+    manifest = tmp_path / "paper_source_manifest.json"
+    manifest.write_text(
+        json.dumps({"paper_id": "paper-1", "raw_sections_path": raw.name}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    other_cwd = tmp_path / "other-cwd"
+    other_cwd.mkdir()
+    monkeypatch.chdir(other_cwd)
+
+    loaded_manifest, records = load_manifest_and_sections(str(manifest), "")
+
+    assert loaded_manifest["paper_id"] == "paper-1"
+    assert [record["section_id"] for record in records] == ["sec:method", "sec:references"]
+
+
+def test_read_raw_sections_rejects_malformed_jsonl(tmp_path: Path) -> None:
+    raw = tmp_path / "paper_raw_sections.jsonl"
+    raw.write_text(json.dumps(_records()[0], ensure_ascii=False) + "\n{not-json}\n")
+
+    with pytest.raises(SystemExit) as exc:
+        read_raw_sections(raw)
+
+    assert "Invalid raw sections JSONL" in str(exc.value)
 
 
 def test_term_found_in_paper_routes_to_anchor_only() -> None:

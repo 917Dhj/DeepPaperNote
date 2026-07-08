@@ -136,32 +136,52 @@ def load_record(value: str) -> dict[str, Any]:
 
 def read_raw_sections(path: Path) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8-sig").splitlines():
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8-sig").splitlines(), 1
+    ):
         line = line.strip()
         if not line:
             continue
         try:
             record = json.loads(line)
-        except json.JSONDecodeError:
-            continue
+        except json.JSONDecodeError as exc:
+            raise SystemExit(
+                f"Invalid raw sections JSONL at {path}:{line_number}: {exc.msg}"
+            ) from exc
         if isinstance(record, dict) and record.get("record_type", "section") == "section":
             records.append(record)
     return records
+
+
+def _record_path(value: str) -> Path | None:
+    raw = value.strip()
+    if raw.startswith("{"):
+        return None
+    path = Path(raw).expanduser()
+    return path.resolve() if path.is_file() else None
 
 
 def load_manifest_and_sections(
     source_manifest: str, raw_sections: str
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     manifest = load_record(source_manifest)
-    raw_path = _resolve_raw_path(manifest, raw_sections)
+    manifest_path = _record_path(source_manifest)
+    raw_path = _resolve_raw_path(
+        manifest, raw_sections, manifest_path.parent if manifest_path else None
+    )
     return manifest, read_raw_sections(raw_path)
 
 
-def _resolve_raw_path(manifest: dict[str, Any], explicit: str) -> Path:
+def _resolve_raw_path(
+    manifest: dict[str, Any], explicit: str, manifest_dir: Path | None = None
+) -> Path:
     raw_path_value = explicit or str(manifest.get("raw_sections_path", ""))
     if not raw_path_value:
         raise SystemExit("Pass --raw-sections or use a manifest with raw_sections_path.")
     raw_path = Path(raw_path_value).expanduser()
+    if not explicit and manifest_dir is not None and not raw_path.is_absolute():
+        raw_path = manifest_dir / raw_path
+    raw_path = raw_path.resolve()
     if not raw_path.is_file():
         raise SystemExit(f"Raw sections file not found: {raw_path}")
     return raw_path

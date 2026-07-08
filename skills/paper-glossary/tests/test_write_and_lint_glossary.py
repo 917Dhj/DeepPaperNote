@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lint_glossary import GLOSSARY_DISCLAIMER, lint_term_file_text
+import pytest
+
+from lint_glossary import GLOSSARY_DISCLAIMER, lint_term_file_text, main as lint_main
 from write_glossary_terms import (
     build_alias_index,
     render_term_file,
@@ -66,6 +68,39 @@ def test_upsert_idempotent_for_same_paper(tmp_path: Path) -> None:
     assert again["action"] == "unchanged"
     text = (terms_dir / f"{safe_term_filename(ENTRY['name'])}.md").read_text(encoding="utf-8")
     assert text.count("[[CAD-MoE]]") == 1
+
+
+def test_upsert_does_not_overwrite_sanitized_filename_collision(tmp_path: Path) -> None:
+    terms_dir = tmp_path / "terms"
+    index = build_alias_index(terms_dir)
+    first = {**ENTRY, "name": "A/B", "aliases": []}
+    second = {**ENTRY, "name": "A:B", "aliases": []}
+
+    r1 = upsert_term_file(first, "PaperOne", terms_dir, index)
+    r2 = upsert_term_file(second, "PaperTwo", terms_dir, index)
+
+    assert r1["file"] != r2["file"]
+    assert len(list(terms_dir.glob("*.md"))) == 2
+    assert "# A/B" in Path(r1["file"]).read_text(encoding="utf-8")
+    assert "# A:B" in Path(r2["file"]).read_text(encoding="utf-8")
+
+
+def test_lint_main_rejects_empty_terms_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "lint.json"
+    empty_terms = tmp_path / "empty"
+    empty_terms.mkdir()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["lint_glossary.py", "--terms-dir", str(empty_terms), "--output", str(output)],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        lint_main()
+
+    assert "No glossary markdown files found" in str(exc.value)
+    assert not output.exists()
 
 
 def test_lint_rejects_missing_required_term_note_fields() -> None:

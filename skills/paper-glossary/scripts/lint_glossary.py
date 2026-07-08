@@ -97,6 +97,8 @@ def main() -> None:
         files.append(Path(args.input).expanduser().resolve())
     if args.terms_dir:
         files.extend(sorted(Path(args.terms_dir).expanduser().resolve().glob("*.md")))
+    if not files:
+        raise SystemExit("No glossary markdown files found.")
 
     results: list[dict[str, Any]] = []
     for path in files:

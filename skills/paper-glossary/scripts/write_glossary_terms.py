@@ -34,6 +34,18 @@ def safe_term_filename(name: str) -> str:
     return cleaned or "term"
 
 
+def _unique_term_path(terms_dir: Path, stem: str) -> Path:
+    path = terms_dir / f"{stem}.md"
+    if not path.exists():
+        return path
+    counter = 2
+    while True:
+        candidate = terms_dir / f"{stem}-{counter}.md"
+        if not candidate.exists():
+            return candidate
+        counter += 1
+
+
 def _alias_forms(entry: dict[str, Any]) -> list[str]:
     forms = [normalize_whitespace(str(entry.get("name", "")))]
     aliases = entry.get("aliases", [])
@@ -156,10 +168,11 @@ def upsert_term_file(
 
     name = normalize_whitespace(str(entry.get("name", "")))
     terms_dir.mkdir(parents=True, exist_ok=True)
-    path = terms_dir / f"{safe_term_filename(name)}.md"
+    path = _unique_term_path(terms_dir, safe_term_filename(name))
     path.write_text(render_term_file(entry, paper_link), encoding="utf-8")
     for form in _alias_forms(entry):
         index.setdefault(form.lower(), path)
+    index.setdefault(path.stem.lower(), path)
     return {"name": name, "file": str(path), "action": "created", "link_stem": path.stem}
 
 
