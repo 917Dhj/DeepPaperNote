@@ -4,8 +4,10 @@ from pathlib import Path
 
 import pytest
 
+from glossary_contracts import GLOSSARY_OCCURRENCE_HEADING
 from lint_glossary import GLOSSARY_DISCLAIMER, lint_term_file_text, main as lint_main
 from write_glossary_terms import (
+    append_occurrence,
     build_alias_index,
     render_term_file,
     safe_term_filename,
@@ -70,6 +72,18 @@ def test_upsert_idempotent_for_same_paper(tmp_path: Path) -> None:
     assert text.count("[[CAD-MoE]]") == 1
 
 
+def test_upsert_rebuilt_index_dedupes_sanitized_filename(tmp_path: Path) -> None:
+    terms_dir = tmp_path / "terms"
+    entry = {**ENTRY, "name": "A/B", "aliases": []}
+
+    first = upsert_term_file(entry, "PaperOne", terms_dir, build_alias_index(terms_dir))
+    second = upsert_term_file(entry, "PaperOne", terms_dir, build_alias_index(terms_dir))
+
+    assert second["action"] == "unchanged"
+    assert second["file"] == first["file"]
+    assert sorted(path.name for path in terms_dir.glob("*.md")) == ["A B.md"]
+
+
 def test_upsert_does_not_overwrite_sanitized_filename_collision(tmp_path: Path) -> None:
     terms_dir = tmp_path / "terms"
     index = build_alias_index(terms_dir)
@@ -83,6 +97,32 @@ def test_upsert_does_not_overwrite_sanitized_filename_collision(tmp_path: Path) 
     assert len(list(terms_dir.glob("*.md"))) == 2
     assert "# A/B" in Path(r1["file"]).read_text(encoding="utf-8")
     assert "# A:B" in Path(r2["file"]).read_text(encoding="utf-8")
+
+
+def test_render_term_file_quotes_frontmatter_alias_strings() -> None:
+    entry = {
+        **ENTRY,
+        "name": "Term",
+        "aliases": ["foo: bar", "[bracket]", 'quote "value"'],
+    }
+
+    text = render_term_file(entry, "PaperOne")
+
+    assert '  - "foo: bar"' in text
+    assert '  - "[bracket]"' in text
+    assert '  - "quote \\"value\\""' in text
+
+
+def test_append_occurrence_inserts_inside_existing_occurrence_section() -> None:
+    text = render_term_file(ENTRY, "PaperOne") + "\n## Extra\nbody\n"
+
+    updated = append_occurrence(text, {"occurrence": "new evidence"}, "PaperTwo")
+
+    occurrence = updated.split(f"## {GLOSSARY_OCCURRENCE_HEADING}", 1)[1].split(
+        "\n## Extra", 1
+    )[0]
+    assert "[[PaperTwo]]" in occurrence
+    assert updated.index("[[PaperTwo]]") < updated.index("## Extra")
 
 
 def test_lint_main_rejects_empty_terms_dir(

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -46,6 +47,20 @@ def _unique_term_path(terms_dir: Path, stem: str) -> Path:
         counter += 1
 
 
+def _frontmatter_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _decode_frontmatter_scalar(value: str) -> str:
+    raw = normalize_whitespace(value)
+    if raw.startswith('"'):
+        try:
+            return normalize_whitespace(str(json.loads(raw)))
+        except json.JSONDecodeError:
+            pass
+    return normalize_whitespace(raw.strip("\"'"))
+
+
 def _alias_forms(entry: dict[str, Any]) -> list[str]:
     forms = [normalize_whitespace(str(entry.get("name", "")))]
     aliases = entry.get("aliases", [])
@@ -70,11 +85,16 @@ def _read_frontmatter_aliases(text: str) -> list[str]:
     block = text[3:end]
     inline = re.search(r"(?m)^aliases:\s*\[(.*?)\]\s*$", block)
     if inline:
-        return [
-            normalize_whitespace(item).strip("\"'")
-            for item in inline.group(1).split(",")
-            if item.strip()
-        ]
+        content = inline.group(1).strip()
+        try:
+            data = json.loads(f"[{content}]")
+        except json.JSONDecodeError:
+            return [
+                _decode_frontmatter_scalar(item)
+                for item in content.split(",")
+                if item.strip()
+            ]
+        return [normalize_whitespace(str(item)) for item in data if normalize_whitespace(str(item))]
     aliases: list[str] = []
     in_block = False
     for line in block.splitlines():
@@ -84,10 +104,15 @@ def _read_frontmatter_aliases(text: str) -> list[str]:
         if in_block:
             item = re.match(r"^\s*-\s*(.+?)\s*$", line)
             if item:
-                aliases.append(normalize_whitespace(item.group(1)).strip("\"'"))
+                aliases.append(_decode_frontmatter_scalar(item.group(1)))
             elif line.strip() and not line.startswith(" "):
                 break
     return aliases
+
+
+def _read_heading_name(text: str) -> str:
+    match = re.search(r"(?m)^#\s+(.+?)\s*$", text)
+    return normalize_whitespace(match.group(1)) if match else ""
 
 
 def build_alias_index(terms_dir: Path) -> dict[str, Path]:
@@ -97,10 +122,11 @@ def build_alias_index(terms_dir: Path) -> dict[str, Path]:
     for path in sorted(terms_dir.glob("*.md")):
         keys = {path.stem.lower()}
         try:
-            keys.update(
-                alias.lower()
-                for alias in _read_frontmatter_aliases(path.read_text(encoding="utf-8-sig"))
-            )
+            text = path.read_text(encoding="utf-8-sig")
+            keys.update(alias.lower() for alias in _read_frontmatter_aliases(text))
+            heading = _read_heading_name(text)
+            if heading:
+                keys.add(heading.lower())
         except OSError:
             pass
         for key in keys:
@@ -128,7 +154,7 @@ def render_term_file(entry: dict[str, Any], paper_link: str) -> str:
     name = normalize_whitespace(str(entry.get("name", "")))
     aliases = [alias for alias in _alias_forms(entry) if alias.lower() != name.lower()]
     front = ["---", "aliases:"]
-    front.extend(f"  - {alias}" for alias in aliases)
+    front.extend(f"  - {_frontmatter_string(alias)}" for alias in aliases)
     front.extend([f"tags: [{GLOSSARY_TERM_TAG}]", "---", ""])
     body = [f"# {name}", "", GLOSSARY_DISCLAIMER, ""]
     body.extend(_concept_zone(entry))
@@ -142,7 +168,17 @@ def append_occurrence(text: str, entry: dict[str, Any], paper_link: str) -> str:
     line = occurrence_line(entry, paper_link)
     heading = f"## {GLOSSARY_OCCURRENCE_HEADING}"
     if heading in text:
-        return text.rstrip("\n") + "\n" + line + "\n"
+        lines = text.rstrip("\n").splitlines()
+        start = next(index for index, value in enumerate(lines) if value.strip() == heading)
+        end = len(lines)
+        for index in range(start + 1, len(lines)):
+            if re.match(r"^##\s+", lines[index].strip()):
+                end = index
+                break
+        while end > start + 1 and not lines[end - 1].strip():
+            end -= 1
+        lines.insert(end, line)
+        return "\n".join(lines) + "\n"
     return text.rstrip("\n") + f"\n\n{heading}\n{line}\n"
 
 

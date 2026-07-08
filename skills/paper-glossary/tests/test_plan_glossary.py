@@ -119,6 +119,19 @@ def test_load_terms_accepts_json_list_and_delimited_string() -> None:
     assert load_terms('["MoE", "moe"]') == ["MoE"]
 
 
+def test_load_terms_rejects_malformed_json_list(tmp_path: Path) -> None:
+    terms = tmp_path / "terms.json"
+    terms.write_text('["MoE",', encoding="utf-8")
+
+    with pytest.raises(SystemExit) as inline_exc:
+        load_terms('["MoE",')
+    with pytest.raises(SystemExit) as file_exc:
+        load_terms(str(terms))
+
+    assert "Invalid terms JSON list" in str(inline_exc.value)
+    assert "Invalid terms JSON list" in str(file_exc.value)
+
+
 def test_propose_ranks_acronyms_model_names_and_keywords() -> None:
     records = [
         {

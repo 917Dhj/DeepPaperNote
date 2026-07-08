@@ -110,8 +110,8 @@ def _maybe_json_list(text: str) -> list[Any] | None:
         return None
     try:
         data = json.loads(text)
-    except json.JSONDecodeError:
-        return None
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Invalid terms JSON list: {exc.msg}") from exc
     return data if isinstance(data, list) else None
 
 
