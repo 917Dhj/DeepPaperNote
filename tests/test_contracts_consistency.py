@@ -83,6 +83,18 @@ def test_topic_references_do_not_redefine_canonical_workflow() -> None:
     assert "three-stage model-first pipeline" not in evidence_first
 
 
+def test_codex_adapter_stays_thin() -> None:
+    adapter = (SKILL_ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+
+    assert adapter == (
+        "interface:\n"
+        '  display_name: "DeepPaperNote"\n'
+        '  short_description: "Generate a high-quality deep-reading note for one paper with a '
+        'raw-source manifest workflow and Obsidian-oriented save semantics."\n'
+        '  default_prompt: "Use $deeppapernote to create the deep-reading note for this paper."\n'
+    )
+
+
 EXPECTED_PAPER_TYPE_SECTION_PROFILES = {
     "AI_method": {
         "section_semantics": {
