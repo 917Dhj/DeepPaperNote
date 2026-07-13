@@ -420,6 +420,22 @@ def test_skill_owns_note_plan_creation_and_grounding_gates() -> None:
     assert NOTE_PLAN_PROTOCOL_RE.search(model_first_rule) is None
 
 
+def test_skill_owns_formal_save_state_policy() -> None:
+    skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    obsidian_format_text = (SKILL_ROOT / "references" / "obsidian-format.md").read_text(
+        encoding="utf-8"
+    )
+
+    marker = "Formal Save states:"
+    assert skill_text.count(marker) == 1
+    assert marker not in obsidian_format_text
+    assert "After such a refusal" not in skill_text
+    assert "do not switch to workspace" in skill_text
+    assert "explicitly chooses not to use a vault" in skill_text
+    for policy_phrase in ("permission escalation", "workspace fallback", "explicit user consent"):
+        assert policy_phrase not in obsidian_format_text
+
+
 def test_topic_references_keep_separate_note_plan_responsibilities() -> None:
     evidence_first = (SKILL_ROOT / "references" / "evidence-first.md").read_text(
         encoding="utf-8"

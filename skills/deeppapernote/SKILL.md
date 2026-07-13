@@ -98,7 +98,6 @@ Non-negotiable rules:
 - mechanism depth: method, framework, and system papers should include `### 机制流程` under `方法主线`, normally as a 3 to 4 step numbered flow with input, operation, and output destination
 - placeholder-first figures: plan major figure/table placeholders first; replace one only when identity match and visual usability are both strong; otherwise keep the placeholder
 - final quality gates: lint is a floor; after lint passes, first run `final_quality_review` for analytical depth, then run `final_readability_review` for language polish, and rerun lint if either review edits the note
-- Obsidian-first save: if a vault is configured, treat it as the required target, create the paper-local `images/` directory, and never present a fallback/workspace write as a successful vault save
 
 Reference usage policy:
 - do not load every reference file by default
@@ -129,21 +128,16 @@ Local-library-first rule (applies only when the Zotero check above succeeds):
 
 ## Output Rules
 
-- The default output is a Markdown note written into the Obsidian vault when configured.
-- Workspace fallback is allowed only when no Obsidian vault is configured at all.
-- Before using workspace fallback, you must ask the user: "I don't see an Obsidian vault configured. Do you have a vault path you'd like me to save this note to? If yes, please provide the path. If no, I'll save to the current workspace instead." Do not write anywhere until the user responds.
-- If an Obsidian vault is configured, DeepPaperNote must treat that vault as the required save target rather than silently switching output roots.
-- If the configured vault or its paper-local subdirectories are outside the current writable scope, DeepPaperNote must ask the user for permission escalation instead of downgrading to workspace output.
-- If the user refuses that permission escalation, DeepPaperNote must clearly report that the note has not been saved into Obsidian yet.
-- After such a refusal, DeepPaperNote may save to the workspace only if it asks again and receives explicit user consent for that fallback.
-- By default, each paper should be written into its own same-name folder, with the note and images stored together.
-- The note should never default to the bare `Research/Papers` root. Choose a domain folder first.
-- Domain selection should be conservative: prefer an existing domain folder in the user's vault when there is a reasonable match; only create a new domain folder when no existing domain fits well.
+Formal Save states:
+
+| Save Target state | Required action |
+|---|---|
+| Vault configured or provided and usable | Perform the Formal Save to that vault. |
+| Vault configured or provided, but the Formal Save fails | Keep the current Save Target and attempt an in-scope recovery. If it still cannot complete, report `blocked`; do not switch to workspace. |
+| No vault configured or provided | Ask whether the user wants to provide one. Use workspace only after the user explicitly chooses not to use a vault. |
+
 - A normal note-generation request should complete in one pass: note text, figure placeholder decisions, image materialization when confident, and final save.
 - Do not stop after a text-only draft just to ask whether the user wants figures inserted. Finish the figure replacement decision inside the same task unless the user explicitly asked for text only.
-- Always create the paper-local `images/` folder during final save, even if no high-confidence images were materialized.
-- The `images/` folder is part of the required save protocol, not an optional cleanup step. If permission is missing, request it; do not skip the directory.
-- Do not present a workspace write as if the Obsidian save already succeeded.
 - The note must use real heading levels: `#`, `##`, and `###`.
 - Every final note must start with an Obsidian YAML properties block above the `#` title heading. Include at least a `tags` field with a `papers/<domain>` value and useful `aliases`; include `date`, `doi`, or `arxiv_id` when known, and omit unavailable fields rather than inventing placeholders.
 - `## 核心信息` must be a fixed metadata block only. Use only these fields, in this order, as `- 字段名: 值` bullets: `标题`, `标题翻译`, `作者`, `机构`, `发表时间`, `发表渠道`, `DOI`, `arXiv`, `论文链接`, `代码 / 项目`, `数据 / 资源`, `论文类型`. Omit unavailable fields; put any guide sentence, takeaway, or analysis in `一句话总结` or a later section instead.

@@ -13,7 +13,7 @@ import ssl
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 
@@ -1927,7 +1927,51 @@ def resolve_note_output_mode(config: dict[str, Any]) -> tuple[str, Path]:
         return ("obsidian", vault_path)
     workspace_root = Path.cwd().resolve()
     output_dir = str(config.get("workspace_output_dir", "DeepPaperNote_output")).strip() or "DeepPaperNote_output"
-    return ("workspace", workspace_root / output_dir)
+    output_path = workspace_root / Path(
+        *safe_relative_path_parts(output_dir, "workspace_output_dir")
+    )
+    return ("workspace", require_path_within(workspace_root, output_path, "workspace_output_dir"))
+
+
+def safe_relative_path_parts(value: str | Path, field: str) -> tuple[str, ...]:
+    raw = str(value).strip()
+    if not raw:
+        return ()
+    windows_path = PureWindowsPath(raw)
+    if Path(raw).is_absolute() or windows_path.is_absolute() or windows_path.drive:
+        raise RuntimeError(
+            f"Unsafe {field}: expected a relative path inside the Save Target: {raw}"
+        )
+    parts = tuple(part for part in re.split(r"[\\/]+", raw) if part and part != ".")
+    if ".." in parts:
+        raise RuntimeError(
+            f"Unsafe {field}: expected a relative path inside the Save Target: {raw}"
+        )
+    return parts
+
+
+def require_path_within(root: str | Path, path: str | Path, field: str) -> Path:
+    root_path = Path(root).expanduser().resolve()
+    candidate = Path(path).expanduser().resolve()
+    try:
+        candidate.relative_to(root_path)
+    except ValueError as exc:
+        raise RuntimeError(f"Unsafe {field}: path escapes the Save Target: {path}") from exc
+    return Path(path)
+
+
+def resolve_note_asset_dir(note_path: str | Path, asset_subdir: str) -> Path:
+    asset_subdir_parts = safe_relative_path_parts(asset_subdir, "asset_subdir")
+    if not asset_subdir_parts:
+        raise RuntimeError(
+            "Unsafe asset_subdir: expected a relative directory inside the Save Target"
+        )
+    note_dir = Path(note_path).parent
+    return require_path_within(
+        note_dir,
+        note_dir / Path(*asset_subdir_parts),
+        "asset_subdir",
+    )
 
 
 DOMAIN_RULES_PATH = Path(__file__).resolve().parents[1] / "references" / "domain_rules.yaml"
@@ -2504,11 +2548,6 @@ def resolve_obsidian_note_path(
     subdir: str = "",
     filename: str = "",
 ) -> Path:
-    def path_parts(value: str | Path) -> tuple[str, ...]:
-        return tuple(
-            part for part in re.split(r"[\\/]+", str(value).strip()) if part and part != "."
-        )
-
     def path_from_parts(parts: tuple[str, ...]) -> Path:
         return Path(*parts) if parts else Path()
 
@@ -2517,23 +2556,33 @@ def resolve_obsidian_note_path(
 
     output_mode, root_path = resolve_note_output_mode(config)
     papers_dir = str(config.get("papers_dir", "Research/Papers")).strip() or "Research/Papers"
-    papers_dir_parts = path_parts(papers_dir)
+    papers_dir_parts = safe_relative_path_parts(papers_dir, "papers_dir")
     relative_dir = path_from_parts(papers_dir_parts) if output_mode == "obsidian" else Path()
     if subdir:
-        subdir_parts = path_parts(subdir)
+        subdir_parts = safe_relative_path_parts(subdir, "subdir")
         subdir_path = path_from_parts(subdir_parts)
         if output_mode == "obsidian" and starts_with_parts(subdir_parts, papers_dir_parts):
             relative_dir = subdir_path
         else:
             relative_dir = relative_dir / subdir_path
     note_slug = slugify_filename(title)
-    target_name = filename or f"{note_slug}.md"
-    folder_name = Path(target_name).stem or note_slug
+    target_name = filename.strip() or f"{note_slug}.md"
+    target_name_parts = safe_relative_path_parts(target_name, "filename")
+    target_name_path = path_from_parts(target_name_parts)
+    folder_name = target_name_path.stem or note_slug
     folder_aliases = {folder_name, note_slug, slugify_filename(folder_name)}
     normalized_folder_aliases = {alias.lower() for alias in folder_aliases if alias}
     if relative_dir.name.lower() in normalized_folder_aliases:
-        return root_path / relative_dir / target_name
-    return root_path / relative_dir / folder_name / target_name
+        target_path = root_path / relative_dir / target_name_path
+    else:
+        target_path = root_path / relative_dir / folder_name / target_name_path
+    save_target = (
+        root_path / path_from_parts(papers_dir_parts)
+        if output_mode == "obsidian"
+        else root_path
+    )
+    require_path_within(root_path, save_target, "papers_dir")
+    return require_path_within(save_target, target_path, "note path")
 
 
 def default_pdf_path(record: dict[str, Any], dest_dir: str | None = None) -> Path:
