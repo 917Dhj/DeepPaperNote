@@ -5,8 +5,16 @@ import re
 from pathlib import Path
 
 from build_synthesis_bundle import bundle
-from contracts import NOTE_REQUIRED_SECTIONS, PAPER_TYPE_VALUES, WRITING_CONTRACT_RULES
-from lint_note import REQUIRED_SECTIONS
+from contracts import (
+    NOTE_PLAN_LIST_FIELDS,
+    NOTE_PLAN_REQUIRED_FIELDS,
+    NOTE_PLAN_STRING_FIELDS,
+    NOTE_REQUIRED_SECTIONS,
+    PAPER_TYPE_VALUES,
+    WRITING_CONTRACT_RULES,
+)
+from lint_grounding import validate_central_claims, validate_note_plan
+from lint_note import REQUIRED_SECTIONS, inspect_central_claims_plan, inspect_note_plan
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = PROJECT_ROOT / "skills" / "deeppapernote"
@@ -15,21 +23,8 @@ NOTE_PLAN_REFERENCE_DOCS = (
     "final-writing.md",
     "note-quality.md",
 )
-NOTE_PLAN_REQUIRED_FIELDS = (
-    "paper_type",
-    "paper_type_rationale",
-    "dominant_domain",
-    "must_cover",
-    "key_numbers",
-    "real_comparisons",
-    "central_claims",
-    "claim_boundaries",
-    "negative_or_limiting_results",
-    "mechanism_result_map",
-    "comparative_positioning",
-    "reuse_takeaways",
-    "followup_questions",
-    "section_plan",
+NOTE_PLAN_PROTOCOL_RE = re.compile(
+    r"<note>\.plan\.json|\*_note_plan\.json|scripts/lint_(?:note|grounding)\.py|<note_plan>"
 )
 REFERENCE_ROUTING_DOCS = (
     "skills/deeppapernote/SKILL.md",
@@ -252,6 +247,106 @@ def test_bundle_paper_type_contracts_expose_exact_section_profiles() -> None:
         assert typed_contract["boundary_questions"]
 
 
+def test_bundle_exposes_exact_note_plan_types_and_grounding_command() -> None:
+    writing_contract = bundle(
+        metadata={}, evidence_wrapper={}, figures_wrapper={}, assets_wrapper={}
+    )["writing_contract"]
+    note_plan_contract = writing_contract["note_plan_contract"]
+
+    assert note_plan_contract["field_types"] == {
+        **{field: "string" for field in NOTE_PLAN_STRING_FIELDS},
+        **{field: "array" for field in NOTE_PLAN_LIST_FIELDS},
+    }
+    assert note_plan_contract["required_field_checks"] == {
+        "string": {"non_empty": True},
+        "array": {"non_empty": True},
+    }
+    analysis_contract = writing_contract["analysis_coverage_contract"]
+    assert analysis_contract["central_claim_field_types"] == {
+        "claim": "string",
+        "supporting_evidence": "array",
+        "what_it_actually_proves": "string",
+        "what_it_does_not_prove": "string",
+    }
+    assert analysis_contract["central_claim_required_field_checks"] == (
+        note_plan_contract["required_field_checks"]
+    )
+    assert writing_contract["grounding_contract"]["lint_command"] == (
+        "scripts/lint_grounding.py --note-plan ... "
+        "--source-manifest ... --bundle-json ... --figure-decisions ..."
+    )
+
+
+def test_note_plan_validators_consume_required_field_checks(
+    tmp_path: Path, monkeypatch
+) -> None:
+    plan = {
+        **{field: "" for field in NOTE_PLAN_STRING_FIELDS},
+        **{field: [] for field in NOTE_PLAN_LIST_FIELDS},
+    }
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    _, lint_issues = inspect_note_plan(plan_path)
+    grounding_issues = validate_note_plan(plan, {})
+    assert any(issue.endswith("_empty") for issue in lint_issues)
+    assert any(issue["code"] == "note_plan_required_field_empty" for issue in grounding_issues)
+
+    monkeypatch.setitem(
+        WRITING_CONTRACT_RULES,
+        "note_plan_required_field_checks",
+        {"string": {"non_empty": False}, "array": {"non_empty": False}},
+    )
+    _, lint_issues = inspect_note_plan(plan_path)
+    grounding_issues = validate_note_plan(plan, {})
+    assert not any(issue.endswith("_empty") for issue in lint_issues)
+    assert not any(
+        issue["code"] == "note_plan_required_field_empty" for issue in grounding_issues
+    )
+
+
+def test_central_claim_validators_consume_analysis_contract(monkeypatch) -> None:
+    analysis_contract = WRITING_CONTRACT_RULES["analysis_coverage_contract"]
+    monkeypatch.setitem(
+        analysis_contract,
+        "central_claim_fields",
+        (*analysis_contract["central_claim_fields"], "new_required_field"),
+    )
+    monkeypatch.setitem(
+        analysis_contract,
+        "central_claim_field_types",
+        {
+            "claim": "string",
+            "supporting_evidence": "array",
+            "what_it_actually_proves": "string",
+            "what_it_does_not_prove": "string",
+            "new_required_field": "string",
+        },
+    )
+    monkeypatch.setitem(
+        analysis_contract,
+        "central_claim_required_field_checks",
+        {"string": {"non_empty": True}, "array": {"non_empty": True}},
+    )
+    claim = {
+        "claim": "claim",
+        "supporting_evidence": [{"section_id": "sec:result"}],
+        "what_it_actually_proves": "supported result",
+        "what_it_does_not_prove": "bounded result",
+    }
+
+    lint_issues = inspect_central_claims_plan([claim])
+    grounding_issues = validate_central_claims(
+        {"central_claims": [claim]}, {"sec:result"}, 1
+    )
+    assert "planning_central_claims_new_required_field_missing" in lint_issues
+    assert any(
+        issue["code"] == "central_claim_required_field_missing"
+        and issue["field"] == "new_required_field"
+        for issue in grounding_issues
+    )
+
+
 def test_bundle_exposes_depth_and_figure_decision_contracts_without_old_inputs() -> None:
     synthesis = bundle(
         metadata={},
@@ -304,46 +399,40 @@ def test_note_quality_structural_sections_match_canonical_contract() -> None:
     assert note_quality_structural_sections() == NOTE_REQUIRED_SECTIONS
 
 
-def test_note_plan_docs_make_json_file_canonical() -> None:
-    for doc_name in NOTE_PLAN_REFERENCE_DOCS:
-        text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / doc_name).read_text(encoding="utf-8")
+def test_skill_owns_note_plan_creation_and_grounding_gates() -> None:
+    text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    workflow = text.split("## Workflow", 1)[1].split("## Core Execution Contract", 1)[0]
+    non_negotiable_rules = text.split("Non-negotiable rules:", 1)[1].split(
+        "Reference usage policy:", 1
+    )[0]
+    model_first_rule = text.split("Model-first rule:", 1)[1].split(
+        "The topic references above", 1
+    )[0]
 
-        assert "canonical" in text.lower()
-        assert "short JSON" in text
-        assert "scripts/lint_note.py --plan-file ..." in text
-        assert "<note>.plan.json" in text
-        assert "*_note_plan.json" in text
+    assert workflow.count(
+        "create a short JSON `note_plan` that satisfies the generated bundle contract"
+    ) == 1
+    assert workflow.count(
+        "draft from the plan only after the grounding gate passes"
+    ) == 1
+    assert "lint the final note against the same `note_plan`" in workflow
+    assert NOTE_PLAN_PROTOCOL_RE.search(non_negotiable_rules) is None
+    assert NOTE_PLAN_PROTOCOL_RE.search(model_first_rule) is None
 
 
-def test_note_plan_xml_mentions_are_display_only() -> None:
-    for doc_name in NOTE_PLAN_REFERENCE_DOCS:
-        lines = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / doc_name).read_text(encoding="utf-8").splitlines()
-
-        for line in lines:
-            if "<note_plan>" in line:
-                normalized = line.lower()
-                assert "interactive" in normalized
-                assert "display-only" in normalized
-
-
-def test_note_plan_docs_do_not_offer_xml_or_temporary_files_as_alternatives() -> None:
-    combined = "\n".join(
-        (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / doc_name).read_text(encoding="utf-8")
-        for doc_name in NOTE_PLAN_REFERENCE_DOCS
+def test_topic_references_keep_separate_note_plan_responsibilities() -> None:
+    evidence_first = (SKILL_ROOT / "references" / "evidence-first.md").read_text(
+        encoding="utf-8"
     )
+    writing_and_rubric = [
+        (SKILL_ROOT / "references" / doc_name).read_text(encoding="utf-8")
+        for doc_name in ("final-writing.md", "note-quality.md")
+    ]
 
-    note_plan_tag = "`<note_" + "plan>...</note_" + "plan>`"
-    conjunction = "o" + "r"
-    banned_phrases = (
-        "equivalent temporary " + "planning file",
-        "equivalent temporary " + "plan file",
-        "dynamic internal note " + "plan",
-        "planning block such as " + note_plan_tag,
-        "planning artifact such as " + note_plan_tag,
-        "- a compact " + note_plan_tag + " block\n- " + conjunction,
-    )
-    for phrase in banned_phrases:
-        assert phrase not in combined
+    assert "Recommended shape:" in evidence_first
+    assert "scripts/lint_grounding.py --note-plan" in evidence_first
+    for text in writing_and_rubric:
+        assert NOTE_PLAN_PROTOCOL_RE.search(text) is None
 
 
 def test_normal_execution_docs_do_not_force_broad_reference_reads() -> None:
@@ -411,11 +500,24 @@ def test_final_writing_requires_tables_for_central_quantitative_comparisons() ->
     assert "loose bullet list" in final_writing_text
 
 
-def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
-    text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "evidence-first.md").read_text(encoding="utf-8")
+def test_evidence_first_is_only_note_plan_json_example() -> None:
+    json_examples: dict[str, list[str]] = {}
+    for doc_name in NOTE_PLAN_REFERENCE_DOCS:
+        text = (SKILL_ROOT / "references" / doc_name).read_text(encoding="utf-8")
+        matches = re.findall(r"```json\n(.*?)\n```", text, flags=re.DOTALL)
+        if matches:
+            json_examples[doc_name] = matches
 
-    assert "```xml" not in text
+    assert tuple(json_examples) == ("evidence-first.md",)
+    assert len(json_examples["evidence-first.md"]) == 1
+
+
+def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
+    text = (SKILL_ROOT / "references" / "evidence-first.md").read_text(
+        encoding="utf-8"
+    )
     match = re.search(r"Recommended shape:\n\n```json\n(.*?)\n```", text, flags=re.DOTALL)
+
     assert match is not None
     example = json.loads(match.group(1))
 

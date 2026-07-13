@@ -52,10 +52,10 @@ Follow this order:
 6. plan figure placement
 7. build the full figure/table decision table
 8. build the manifest synthesis bundle
-9. have the model read the bundle plus raw sections and plan the note
-10. run grounding lint on the note plan before drafting from it
+9. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract
+10. draft from the plan only after the grounding gate passes
 11. have the model write the note
-12. lint the final note — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 13, 14, or 15
+12. lint the final note against the same `note_plan` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 13, 14, or 15
 13. perform `final_quality_review` after lint passes
 14. perform `final_readability_review` after the quality review passes
 15. write into Obsidian
@@ -93,8 +93,6 @@ Non-negotiable rules:
 - raw-source authority: for ordinary PDFs, `*_raw_sections.jsonl` and `*_source_manifest.json` are the canonical reading material; old top-N evidence buckets, truncated `section_texts`, and `candidate_chunks` are not model-facing writing inputs
 - fail-closed: if a usable PDF or sufficient evidence cannot be obtained after supported acquisition paths, stop and ask for better source material rather than producing a finished degraded note
 - model-first: scripts structure evidence, but the model must decide emphasis, contribution, mechanism, limitations, and final Chinese prose
-- explicit planning: before drafting, save a compact JSON `note_plan` such as `<note>.plan.json` or `*_note_plan.json`; pass it to `scripts/lint_note.py --plan-file ...`
-- grounding gate: after the JSON `note_plan` exists, run `scripts/lint_grounding.py --note-plan ... --source-manifest ... --bundle-json ... --figure-decisions ...`; each substantive section must cite valid `section_id` values or valid page ranges
 - required structure: include the canonical required sections, with `原文摘要翻译` before `一句话总结` and a dedicated `创新点` section immediately after `原文摘要翻译`
 - abstract translation: when abstract metadata exists, `原文摘要翻译` is a faithful Chinese translation of the original abstract, not a bilingual block and not the model's own summary
 - mechanism depth: method, framework, and system papers should include `### 机制流程` under `方法主线`, normally as a 3 to 4 step numbered flow with input, operation, and output destination
@@ -181,18 +179,7 @@ Model-first rule:
 - scripts may gather and structure evidence
 - scripts must not be the primary mechanism for understanding the paper
 - final paper understanding and note writing belong to the model
-- before writing the final note, create an explicit short `note_plan` artifact rather than relying on hidden planning only
-- save `note_plan` as the canonical short JSON file outside the final note body, such as `<note>.plan.json` or a run-scoped `*_note_plan.json`
-- choose `note_plan.paper_type` from the synthesis bundle's allowed paper types before drafting; the bundle must not bind writing behavior to a script-selected summary paper type
-- keep the same 12 top-level note sections for every paper type, then use `contracts_by_paper_type[note_plan.paper_type].section_semantics` to interpret the typed meaning of those fixed sections and `contracts_by_paper_type[note_plan.paper_type].recommended_subsections` to draft `note_plan.section_plan`
-- the note plan must include the analysis coverage fields from the writing contract: `central_claims`, `claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, `reuse_takeaways`, and `followup_questions`
-- each `central_claims` item must state the claim, source-grounded supporting evidence, what the evidence actually proves, and what it does not prove
-- `mechanism_result_map` must connect paper-specific mechanisms, design choices, protocols, constructs, or data decisions to the exact result pattern or diagnostic evidence they explain
-- `comparative_positioning` must explain how the paper differs from strong baselines, prior routes, human/clinical references, or obvious alternatives, and why that difference changes interpretation
-- `followup_questions` must be concrete replication, engineering, research, or validity checks that a reader could reuse later
-- pass that JSON file to `scripts/lint_note.py --plan-file ...` when linting the final note; if omitted, lint looks for sibling `<note>.plan.json`
-- pass the same JSON plan to `scripts/lint_grounding.py` before using it for final drafting; broad references such as `synthesis_bundle.evidence.method_evidence` are invalid
-- interactive sessions may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file
+- use the generated bundle contract to choose the paper type, section semantics, evidence-backed claims, boundaries, comparisons, and reusable follow-up questions; script suggestions remain hints rather than writing authority
 - do not require or expose a long free-form `<thinking>` block
 - for technical papers, prefer replication-grade explanation over high-level summary
 - if formulas, objectives, or complexity expressions are central, include the key ones in the final note

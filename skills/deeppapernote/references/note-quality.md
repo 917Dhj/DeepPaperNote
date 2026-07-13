@@ -35,16 +35,10 @@ For non-trivial papers, it should usually also include multiple `###` subheading
 - `关键结果`
 - `深度分析`
 
-Before the final note is written, there should also be an explicit short planning artifact:
-- the canonical artifact is a short JSON file such as `<note>.plan.json` or a run-scoped `*_note_plan.json`
-- pass that file to `scripts/lint_note.py --plan-file ...`; if omitted, lint looks for a sibling `<note>.plan.json`
-- in interactive contexts, a compact `<note_plan>...</note_plan>` block may additionally be shown as display-only context, but it does not replace the JSON file
-- `note_plan.paper_type` is authoritative and should be justified with `paper_type_rationale`; script paper-type suggestions are hint-only
-- `note_plan.central_claims` should identify the main claims, supporting source evidence, what each claim proves, and what it does not prove
-- `note_plan.claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, `reuse_takeaways`, and `followup_questions` should be non-empty and paper-specific
+Before the final note is written, the run should already have an inspectable, grounded plan whose analytical commitments are paper-specific.
 
 Bad sign:
-- the model jumps directly to a polished final note with no JSON planning artifact at all
+- the model jumps directly to a polished final note with no grounded plan at all
 
 ## Depth Checks
 

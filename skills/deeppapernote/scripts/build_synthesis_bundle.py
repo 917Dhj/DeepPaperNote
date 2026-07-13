@@ -300,7 +300,7 @@ def compact_writing_contract() -> dict:
     )
     usable_insert_candidate = dict(WRITING_CONTRACT_RULES["usable_insert_candidate"])
     usable_insert_candidate["kinds"] = list(usable_insert_candidate["kinds"])
-    analysis_coverage = dict(WRITING_CONTRACT_RULES["analysis_coverage_contract"])
+    analysis_coverage = deepcopy(WRITING_CONTRACT_RULES["analysis_coverage_contract"])
     analysis_coverage["central_claim_fields"] = list(
         analysis_coverage["central_claim_fields"]
     )
@@ -320,6 +320,10 @@ def compact_writing_contract() -> dict:
         "must_include_sections": list(NOTE_REQUIRED_SECTIONS),
         "note_plan_contract": {
             "required_fields": list(NOTE_PLAN_REQUIRED_FIELDS),
+            "field_types": dict(WRITING_CONTRACT_RULES["note_plan_field_types"]),
+            "required_field_checks": deepcopy(
+                WRITING_CONTRACT_RULES["note_plan_required_field_checks"]
+            ),
             "artifact_preference": "short_json_planning_file",
             "grounding_field": "section_plan[*].evidence_sources",
             "analysis_coverage_field": "central_claims[*]",
@@ -346,7 +350,7 @@ def compact_writing_contract() -> dict:
             "reject_old_references": list(WRITING_CONTRACT_RULES["old_bundle_reference_prefixes"]),
             "lint_command": (
                 "scripts/lint_grounding.py --note-plan ... "
-                "--source-manifest ... --bundle-json ..."
+                "--source-manifest ... --bundle-json ... --figure-decisions ..."
             ),
         },
         "figure_table_contract": {

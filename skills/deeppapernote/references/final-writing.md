@@ -96,11 +96,9 @@ Scripts are not enough on their own for:
 - writing strong, natural Chinese analytical prose
 
 The language model should do all of the following:
-- choose `note_plan.paper_type` from the allowed bundle contract values after reading the raw source records
-- make an explicit short `note_plan` before drafting
+- use the grounded plan's selected paper type and section emphasis
+- carry its evidence-backed claims, boundaries, limiting results, mechanism-result links, comparisons, reusable takeaways, and follow-up questions into the prose
 - decide which sections need more weight
-- write `central_claims` so each major claim carries source-grounded evidence, what it actually proves, and what it does not prove
-- write `claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, `reuse_takeaways`, and `followup_questions` before drafting, so the final note has a planned place for judgment rather than only summary
 - decide where `###` subheadings are needed
 - select the truly central results
 - reconstruct the method or analysis flow
@@ -149,16 +147,7 @@ The final Chinese note must also pass a language-cleanliness check:
 For non-trivial papers, the note should usually not stop at only broad `##` sections.
 It should use meaningful `###` subheadings where they improve technical clarity.
 
-Before the final draft exists, there should already be a compact structured planning artifact.
-The canonical artifact is a short JSON file such as `<note>.plan.json` or a run-scoped `*_note_plan.json`.
-Pass that file to `scripts/lint_note.py --plan-file ...` when linting; if omitted, lint looks for a sibling `<note>.plan.json`.
-In interactive contexts, you may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file.
-The plan's `paper_type` is the authoritative paper-type selection; choose it from the allowed values in the synthesis bundle.
-Before drafting from the plan, run `scripts/lint_grounding.py` against the source manifest, bundle, and figure/table decisions so every substantive section cites valid `section_id` values or page ranges.
-The plan must include `central_claims`, `claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, `reuse_takeaways`, and `followup_questions`.
-Each `central_claims` item should contain `claim`, `supporting_evidence`, `what_it_actually_proves`, and `what_it_does_not_prove`.
-This plan should be short and inspectable.
-Do not require or expose a long free-form `<thinking>` block.
+Draft only from a note plan that has already passed grounding. Use its paper type, evidence-backed claims, boundaries, limiting results, mechanism-result links, comparisons, reusable takeaways, and follow-up questions as writing commitments rather than reopening the planning contract here.
 
 Examples:
 - `### 数据来源`
