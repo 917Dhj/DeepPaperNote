@@ -13,7 +13,6 @@
 [![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./skills/deeppapernote/SKILL.md)
 [![输出](https://img.shields.io/badge/output-Obsidian-16a34a)](./skills/deeppapernote/references/obsidian-format.md)
 [![图表](https://img.shields.io/badge/figures-image--first-f59e0b)](./skills/deeppapernote/references/figure-placement.md)
-[![写作](https://img.shields.io/badge/writing-model--first-7c3aed)](./skills/deeppapernote/references/model-synthesis.md)
 [![更新日志](https://img.shields.io/badge/changelog-latest-0f766e)](./CHANGELOG.md)
 
 </div>
@@ -390,23 +389,7 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 ## ⚙️ 工作流
 
-默认流程是：
-
-1. 解析论文身份
-2. 收集元数据
-3. 获取最佳可用 PDF
-4. 抽取完整原文与 source manifest
-5. 抽取结构化索引和 PDF 图像资产
-6. 规划图表位置
-7. 构建全量图表决策表
-8. 构建 manifest synthesis bundle
-9. 让模型读取 raw sections 并规划笔记
-10. 对 note_plan 运行 grounding lint
-11. 让模型写笔记
-12. 校验最终笔记
-13. 做最终内容质量复核
-14. 做最终可读性复核
-15. 写入 Obsidian
+DeepPaperNote 会解析单篇论文、构建可追溯的原文材料，让模型规划并撰写笔记，完成校验后保存到 Obsidian。规范执行契约以 [`SKILL.md`](./skills/deeppapernote/SKILL.md) 为准。
 
 核心原则：
 
@@ -416,9 +399,7 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 相关文档：
 
-- [工作流](./skills/deeppapernote/references/workflow.md)
 - [架构](./skills/deeppapernote/references/architecture.md)
-- [模型综合写作](./skills/deeppapernote/references/model-synthesis.md)
 
 ## 🖼️ 图表策略
 

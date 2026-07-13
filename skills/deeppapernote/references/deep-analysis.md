@@ -37,32 +37,18 @@ For a finished long-term note, require a usable PDF-backed evidence path.
 
 If you only have the abstract after the supported PDF acquisition paths have failed, stop and ask for a usable PDF, OCR, or source material rather than writing a provisional or abstract-only note.
 
-## Recommended Workflow
+## Analysis Checklist
 
-1. Resolve the paper and build the synthesis bundle.
-2. Read the bundle closely before writing.
-3. Infer the paper type yourself:
-   - `method`
-   - `system/framework`
-   - `benchmark/dataset`
-   - `clinical/psychology empirical`
-   - `survey/tutorial`
-   - `humanities/social science`
-4. Make a short explicit note plan before drafting.
-   The plan should decide:
-   - which sections deserve the most weight
-   - which details need `###` subheadings
-   - which 3 to 6 numbers matter most
-   - which central claims are supported by which source sections or pages
-   - what each central claim actually proves and does not prove
-   - which negative, weak, missing, or limiting results constrain the conclusion
-   - which research or engineering takeaways are specific enough to reuse
-   - which figure/table placeholders are essential
-   - whether the paper needs explicit formulas, objective functions, or complexity expressions
-5. Write the final note in Chinese.
-6. Lint it.
-7. Run the final readability review.
-8. Save into the Obsidian vault only after the note passes lint and the final readability review.
+Use the synthesis bundle's paper-type contract and decide:
+- which sections deserve the most weight
+- which details need `###` subheadings
+- which 3 to 6 numbers matter most
+- which central claims are supported by which source sections or pages
+- what each central claim actually proves and does not prove
+- which negative, weak, missing, or limiting results constrain the conclusion
+- which research or engineering takeaways are specific enough to reuse
+- which figure/table placeholders are essential
+- whether the paper needs explicit formulas, objective functions, or complexity expressions
 
 ## Writing Rules
 
@@ -71,7 +57,7 @@ If you only have the abstract after the supported PDF acquisition paths have fai
 - Prefer “这篇论文真正有价值的点是...” over “本文提出了...” style filler.
 - Avoid pasting long English sentences into Chinese sections.
 - Do not fabricate metrics, ablations, or claims not supported by evidence.
-- If evidence is weak, write a weak-but-honest note instead of pretending the paper was fully analyzed.
+- When an individual claim has weak evidence within an otherwise sufficient Source Corpus, narrow the wording and state the claim boundary explicitly.
 - For method papers, write like a replication-minded researcher rather than a summary assistant.
 
 ## Section Guide
@@ -238,5 +224,4 @@ Prefer a few stable, well-explained formulas over many noisy ones.
 
 ## Minimum Honesty Standard
 
-If the note is based mostly on abstract plus metadata, say so explicitly and soften the judgment.
-If the note uses full PDF evidence, figures, and key numbers, the judgment can be stronger.
+A finished note requires sufficient PDF-backed source coverage. Within that coverage, match each claim's strength to its evidence and state uncertainty explicitly.

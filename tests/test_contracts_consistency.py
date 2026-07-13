@@ -11,10 +11,8 @@ from lint_note import REQUIRED_SECTIONS
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = PROJECT_ROOT / "skills" / "deeppapernote"
 NOTE_PLAN_REFERENCE_DOCS = (
-    "workflow.md",
     "evidence-first.md",
     "final-writing.md",
-    "model-synthesis.md",
     "note-quality.md",
 )
 NOTE_PLAN_REQUIRED_FIELDS = (
@@ -35,7 +33,6 @@ NOTE_PLAN_REQUIRED_FIELDS = (
 )
 REFERENCE_ROUTING_DOCS = (
     "skills/deeppapernote/SKILL.md",
-    "skills/deeppapernote/references/model-synthesis.md",
 )
 PDF_CONTRACT_DOCS = (
     "skills/deeppapernote/SKILL.md",
@@ -56,6 +53,36 @@ PDF_FAIL_CLOSED_NEGATIONS = (
     "rather than",
     "instead of",
 )
+
+
+def test_deleted_reference_routers_stay_removed() -> None:
+    references = SKILL_ROOT / "references"
+
+    assert not (references / "workflow.md").exists()
+    assert not (references / "model-synthesis.md").exists()
+
+    for readme_name in ("README.md", "README.zh-CN.md"):
+        readme = (PROJECT_ROOT / readme_name).read_text(encoding="utf-8")
+        assert "references/workflow.md" not in readme
+        assert "references/model-synthesis.md" not in readme
+
+
+def test_topic_references_do_not_redefine_canonical_workflow() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    deep_analysis = (SKILL_ROOT / "references" / "deep-analysis.md").read_text(encoding="utf-8")
+    evidence_first = (SKILL_ROOT / "references" / "evidence-first.md").read_text(encoding="utf-8")
+
+    assert "every reported `passes_*` gate is `true`" in skill
+    assert "Preferred usage pattern:" not in skill
+    assert "## Recommended Workflow" not in deep_analysis
+    assert "- `method`" not in deep_analysis
+    assert "- `system/framework`" not in deep_analysis
+    assert "- `benchmark/dataset`" not in deep_analysis
+    assert "weak-but-honest note" not in deep_analysis
+    assert "based mostly on abstract plus metadata" not in deep_analysis
+    assert "three-stage model-first pipeline" not in evidence_first
+
+
 EXPECTED_PAPER_TYPE_SECTION_PROFILES = {
     "AI_method": {
         "section_semantics": {
@@ -315,12 +342,7 @@ def test_normal_execution_docs_do_not_force_broad_reference_reads() -> None:
         assert "Use [references/" not in text
 
     skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
-    model_synthesis_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "model-synthesis.md").read_text(
-        encoding="utf-8"
-    )
-
     assert "not a default reading checklist" in skill_text
-    assert "not a second router" in model_synthesis_text
 
 
 def test_normal_execution_docs_require_obsidian_yaml_frontmatter() -> None:
@@ -415,7 +437,6 @@ def test_pdf_contract_banned_phrase_matcher_catches_allowed_fallbacks() -> None:
 
 def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
     skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
-    workflow_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "workflow.md").read_text(encoding="utf-8")
     readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     readme_zh_text = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
 
@@ -431,12 +452,6 @@ def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
     ):
         assert required_source in skill_text[source_priority:stop_policy]
 
-    assert (
-        "Accepted inputs: title, DOI, URL, arXiv ID, local PDF path, Zotero item key."
-        in workflow_text
-    )
-    assert "Acquire the best available PDF" in workflow_text
-    assert "stop and report the blocked stage honestly" in workflow_text
     assert "A title, DOI, URL, arXiv ID, or local PDF all work." in readme_text
     assert "标题、DOI、URL、本地 PDF 都可以" in readme_zh_text
 

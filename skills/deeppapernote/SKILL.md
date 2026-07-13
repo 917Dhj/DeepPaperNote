@@ -55,7 +55,7 @@ Follow this order:
 9. have the model read the bundle plus raw sections and plan the note
 10. run grounding lint on the note plan before drafting from it
 11. have the model write the note
-12. lint the final note — if the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 13, 14, or 15
+12. lint the final note — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 13, 14, or 15
 13. perform `final_quality_review` after lint passes
 14. perform `final_readability_review` after the quality review passes
 15. write into Obsidian
@@ -104,7 +104,6 @@ Non-negotiable rules:
 
 Reference usage policy:
 - do not load every reference file by default
-- consult `references/workflow.md` only for detailed data contracts or pipeline debugging
 - consult `references/evidence-first.md`, `references/deep-analysis.md`, or `references/final-writing.md` only when the paper is complex or the draft is too shallow
 - consult `references/figure-placement.md` only for ambiguous figure/table placement or image replacement decisions
 - consult `references/obsidian-format.md` only for Markdown, vault, frontmatter, or reference-link formatting details
@@ -228,16 +227,6 @@ Use these bundled scripts rather than rebuilding the workflow from scratch:
 - `scripts/lint_note.py`
 - `scripts/materialize_figure_asset.py`
 - `scripts/write_obsidian_note.py`
-
-Preferred usage pattern:
-1. if local bibliography integration is available, search the local Zotero library first
-2. if the library resolves the paper, inspect child attachments; if needed use `scripts/locate_zotero_attachment.py` to find the local PDF
-3. use `scripts/create_input_record.py` to materialize a trusted JSON input record
-4. run `scripts/run_pipeline.py` on the JSON record or original exact source to produce the bundle
-5. read the bundle yourself
-6. write the note in your own words
-7. lint the note
-8. write it into Obsidian only after lint passes and the final readability review is complete
 
 Python interpreter rule:
 - DeepPaperNote requires Python `>=3.10`.

@@ -10,13 +10,6 @@ Do not write the finished note directly from:
 - one or two extracted snippets
 - fixed headings alone
 
-Instead, use a three-stage model-first pipeline:
-
-1. build raw-source artifacts and a manifest bundle
-2. create the canonical short JSON `note_plan` around source sections/pages
-3. run the grounding gate
-4. let the model write the note from the raw source, bundle, and plan
-
 ## Source Manifest Bundle
 
 The source manifest and bundle should answer:
