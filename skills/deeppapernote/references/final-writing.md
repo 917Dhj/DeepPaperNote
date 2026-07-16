@@ -217,52 +217,11 @@ Allowed line breaks:
 - figure callouts
 - fenced code or formula blocks
 
-## Figure Placeholders
+## Figures and Tables
 
-Start from placeholders, not from extracted images.
-The note should preserve the full figure/table structure even when image extraction is partial.
+Place a high-value visual near the analysis it directly supports, and explain the argument in prose rather than using the visual as a substitute for reasoning. Missing or partial image extraction must not erase textual coverage of the paper.
 
-If the bundle contains candidate figure pages or candidate image files:
-- use them as evidence for semantic matching
-- prefer the candidate with the strongest caption/page-context agreement
-- treat identity match and visual usability as separate gates
-- never treat a matching label or caption as sufficient approval to insert an image
-- reject caption-only crops, missing table bodies, table crops contaminated by running prose outside the table body or another Figure/Table caption, large text/title/abstract crops, and crops with very low visual body ratio
-- if visual quality is missing, ambiguous, or failed, keep the placeholder
-- still make the final decision yourself rather than trusting the candidate ranking blindly
-- for `usable_candidate` or `needs_visual_quality_check` / `review`, make that final decision only after opening and inspecting the actual candidate image file; do not say manual visual review found no reliable candidate unless that inspection actually happened
-- treat `reject_visual_quality` and `asset_candidate_missing` as automatic fail-closed script outcomes that do not require manual visual review
-- if a candidate is usable and has a real image path, insert it
-- do not keep a usable candidate as a placeholder merely because it is lower priority, supplemental, already summarized in text, or less central than another inserted figure/table
-- keep a placeholder only when there is a concrete visual defect, missing candidate, unresolved visual review, identity mismatch, contamination, or materialization/copy/write failure
-- never describe a missing image asset, empty `source_image_path`, `asset_candidate_missing`, or absent independent crop as a materialization/copy failure
-- if the crop contains a different Figure/Table caption or another figure body, describe that as contamination/visual defect or lack of an independent crop, not as a usable clean candidate
-- do not keep a usable candidate as a placeholder only because the note should stay light, the values were transcribed, the figure can be checked later, or it is convenient as a back-reference
-
-Final-note figure rules:
-- keep the original paper numbering, such as `Fig. 1`, `Fig. 3`, `Table 2`
-- do not rename them to `图 1`, `图 2` just because of note order
-- if you replace a placeholder with a real image, keep the same paper figure id in the caption
-- if you replace a placeholder with a real image, use the `relative_markdown_embed` from `figure_table_decisions.json`; let `write_obsidian_note.py --figure-decisions ...` copy the image during final save
-- if you replace a placeholder with a real image, render only the embed plus one italic caption line; do not keep a redundant `[!figure]` callout for that same figure
-- if `figure_table_decisions.json` marks an item as `insert`, the final note must reference its `images/<filename>` path and `write_obsidian_note.py` must be run with `--figure-decisions ...`
-- if an important figure cannot be confidently extracted, keep a placeholder with a short explanation
-- every kept placeholder must appear directly under its most relevant analytical section; do not create catch-all sections such as `剩余图表占位`, `未放置图表`, `Remaining figures`, or `Leftover figures`
-- every kept placeholder must use the standard `[!figure]` callout format; never use ordinary paragraph markers such as `[图表占位 | Fig. 1]`, `图表占位：Table 2`, or `Figure Placeholder | Fig. 3`
-- `[!figure]` callouts are only valid for kept placeholders, not for real images already inserted into the note
-- `reject_visual_quality` means the candidate image is unsafe to insert, not that the final note must keep a placeholder for that rejected candidate
-- for survey papers, summarize repetitive representative-work figures or appendix tables in prose when they do not materially help the reader as standalone callouts
-- text may be complete even when figures are partial; do not let missing images erase textual coverage
-- complete the figure decision inside the same task as the note generation
-- do not stop after the text draft and ask the user whether to continue with figures unless they explicitly asked for a staged workflow
-- prefer a stable figure callout format in the final note:
-  - `> [!figure] Fig. 3 ...`
-  - `> 建议位置：...`
-  - `> 放置原因：...`
-  - `> 当前状态：...`
-- prefer a stable inserted-image format in the final note:
-  - `![[.../images/page_003_img_01.png]]` or `![Fig. 2 ...](images/page_003_img_01.png)`
-  - `*论文原图编号：Fig. 2。...*`
+Use `figure-placement.md` for semantic placement, identity matching, and visual-usability judgment. Use `obsidian-format.md` for final placeholder and inserted-image rendering.
 
 ## Final Self-Review
 

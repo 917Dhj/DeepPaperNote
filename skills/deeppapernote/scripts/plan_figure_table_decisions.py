@@ -15,10 +15,11 @@ from common import (
     maybe_load_json_record,
     normalize_whitespace,
 )
+from contracts import WRITING_CONTRACT_RULES
 from source_corpus import SourceCorpusLoadError, load_source_corpus
 
-DECISION_VALUES = {"insert", "placeholder", "low_priority", "visual_defect", "skip"}
-INSERTABLE_KINDS = {"figure", "table"}
+DECISION_VALUES = set(WRITING_CONTRACT_RULES["figure_decision_values"])
+INSERTABLE_KINDS = set(WRITING_CONTRACT_RULES["usable_insert_candidate"]["kinds"])
 
 
 def parser() -> argparse.ArgumentParser:

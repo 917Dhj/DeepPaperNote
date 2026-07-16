@@ -15,6 +15,7 @@ from contracts import (
 )
 from lint_grounding import validate_central_claims, validate_note_plan
 from lint_note import REQUIRED_SECTIONS, inspect_central_claims_plan, inspect_note_plan
+from plan_figure_table_decisions import DECISION_VALUES, INSERTABLE_KINDS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = PROJECT_ROOT / "skills" / "deeppapernote"
@@ -383,6 +384,111 @@ def test_bundle_exposes_depth_and_figure_decision_contracts_without_old_inputs()
         "what_it_actually_proves",
         "what_it_does_not_prove",
     ]
+
+
+def test_figure_decision_script_consumes_canonical_contract() -> None:
+    decision_script = (
+        SKILL_ROOT / "scripts" / "plan_figure_table_decisions.py"
+    ).read_text(encoding="utf-8")
+
+    assert DECISION_VALUES == set(WRITING_CONTRACT_RULES["figure_decision_values"])
+    assert INSERTABLE_KINDS == set(
+        WRITING_CONTRACT_RULES["usable_insert_candidate"]["kinds"]
+    )
+    assert "from contracts import WRITING_CONTRACT_RULES" in decision_script
+    assert 'DECISION_VALUES = {"insert"' not in decision_script
+    assert 'INSERTABLE_KINDS = {"figure"' not in decision_script
+
+
+def test_bundle_exposes_complete_canonical_figure_contract() -> None:
+    figure_contract = bundle(
+        metadata={}, evidence_wrapper={}, figures_wrapper={}, assets_wrapper={}
+    )["writing_contract"]["figure_table_contract"]
+
+    assert figure_contract == {
+        "placeholder_first": True,
+        "visual_quality_gate": "fail_closed",
+        "decision_table_required": True,
+        "decision_values": list(WRITING_CONTRACT_RULES["figure_decision_values"]),
+        "usable_insert_candidate": {
+            "kinds": list(
+                WRITING_CONTRACT_RULES["usable_insert_candidate"]["kinds"]
+            ),
+            "visual_quality_status": WRITING_CONTRACT_RULES[
+                "usable_insert_candidate"
+            ]["visual_quality_status"],
+            "requires_source_image_path": WRITING_CONTRACT_RULES[
+                "usable_insert_candidate"
+            ]["requires_source_image_path"],
+        },
+        "allowed_usable_placeholder_reasons": list(
+            WRITING_CONTRACT_RULES["allowed_usable_placeholder_reasons"]
+        ),
+        "manual_visual_review_required_statuses": list(
+            WRITING_CONTRACT_RULES["manual_visual_review_required_statuses"]
+        ),
+        "automatic_fail_closed_visual_statuses": list(
+            WRITING_CONTRACT_RULES["automatic_fail_closed_visual_statuses"]
+        ),
+        "manual_review_claim_requires_image_inspection": True,
+    }
+
+
+def test_figure_protocol_docs_keep_single_owners() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    references = SKILL_ROOT / "references"
+    placement = (references / "figure-placement.md").read_text(encoding="utf-8")
+    final_writing = (references / "final-writing.md").read_text(encoding="utf-8")
+    obsidian_format = (references / "obsidian-format.md").read_text(encoding="utf-8")
+
+    assert "placeholder-first figures" in skill
+    assert "writing_contract.figure_table_contract" in skill
+    assert "complete figure/table decision table" in skill
+    assert "grounding and final-note figure gates" in skill
+    assert "Formal Save materializes the selected image" in skill
+    for duplicate in (
+        "needs_visual_quality_check",
+        "reject_visual_quality",
+        "asset_candidate_missing",
+        "relative_markdown_embed",
+        "write_obsidian_note.py --figure-decisions",
+    ):
+        assert duplicate not in skill
+
+    assert "writing_contract.figure_table_contract" in placement
+    assert "identity match" in placement
+    assert "visual usability" in placement
+    assert "asset_candidate_missing" in placement
+    for duplicate in (
+        "kept_placeholder_visual_defect",
+        "kept_placeholder_materialization_blocked",
+        "relative_markdown_embed",
+        "write_obsidian_note.py --figure-decisions",
+        "> [!figure]",
+        "```md",
+        "same note-generation task",
+        "text-only note first",
+        "final response",
+    ):
+        assert duplicate not in placement
+
+    assert "figure-placement.md" in final_writing
+    assert "obsidian-format.md" in final_writing
+    for duplicate in (
+        "usable_candidate",
+        "needs_visual_quality_check",
+        "reject_visual_quality",
+        "asset_candidate_missing",
+        "relative_markdown_embed",
+        "write_obsidian_note.py",
+        "> [!figure]",
+        "![[.../images",
+    ):
+        assert duplicate not in final_writing
+
+    assert "> [!figure]" in obsidian_format
+    assert "![[Research/Papers/DeepPaperNote/paper_slug/images/" in obsidian_format
+    assert "*论文原图编号：Fig. 2。" in obsidian_format
 
 
 def test_paper_types_doc_uses_typed_profiles_without_legacy_common_subheadings() -> None:
