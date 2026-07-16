@@ -1938,7 +1938,12 @@ def safe_relative_path_parts(value: str | Path, field: str) -> tuple[str, ...]:
     if not raw:
         return ()
     windows_path = PureWindowsPath(raw)
-    if Path(raw).is_absolute() or windows_path.is_absolute() or windows_path.drive:
+    if (
+        Path(raw).is_absolute()
+        or windows_path.is_absolute()
+        or windows_path.drive
+        or windows_path.root
+    ):
         raise RuntimeError(
             f"Unsafe {field}: expected a relative path inside the Save Target: {raw}"
         )

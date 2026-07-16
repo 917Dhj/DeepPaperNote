@@ -417,7 +417,9 @@ def test_resolve_note_output_mode_falls_back_to_workspace(tmp_path: Path, monkey
     assert root == tmp_path / "DeepPaperNote_output"
 
 
-@pytest.mark.parametrize("workspace_output_dir", ["../outside", "/outside", r"C:\outside"])
+@pytest.mark.parametrize(
+    "workspace_output_dir", ["../outside", "/outside", r"\outside", r"C:\outside"]
+)
 def test_resolve_note_output_mode_rejects_workspace_root_outside_save_target(
     tmp_path: Path,
     monkeypatch,
