@@ -1,72 +1,43 @@
 ---
 name: paper-glossary
-description: Use when building reusable glossary or term-library notes for research papers from an existing paper source manifest, raw_sections_path, *_source_manifest.json, or *_raw_sections.jsonl, especially when a reader wants terms triaged, grounded in paper occurrences, and written as shared Obsidian notes.
+description: Use when building reusable Obsidian glossary notes from an existing paper source manifest, optionally with a raw-sections override, especially when a reader needs a reviewed shortlist before glossary notes and article links are changed.
 ---
 
 # Paper Glossary
 
-## Overview
+Build shared glossary notes from `*_source_manifest.json`. `--source-manifest` is always required; `--raw-sections` only overrides its `raw_sections_path` with an explicit `*_raw_sections.jsonl`. This skill never runs or modifies a paper-reading workflow; the manifest and raw-sections file are its only paper-content boundary. See `references/file-contract.md` for JSON and CLI contracts.
 
-Build a companion glossary for a paper without changing the paper-reading workflow. Use the shared source files already produced by another paper pipeline: `*_source_manifest.json` with `raw_sections_path`, or an explicit `*_raw_sections.jsonl`.
+## Preview And Wait (Default)
 
-The scripts are deterministic support tools. They find candidate terms and paper anchors, but the model writes the actual concept explanations.
+1. **Show saved configuration** on first use per person/device. If absent, ask for a term directory inside an Obsidian vault and configure it; reuse valid configuration later. **Setup may create `~/.paper-glossary/config.json`**.
+2. **Require an explicit article Markdown path** when article links are requested. Validate it and the configured term directory are in the **same Obsidian vault**; never infer an article path.
+3. **Run deterministic proposal** from the effective body.
+4. **Perform exactly one grounded host semantic review**, bounded by `shortlist_limit`. It may **only drop or reorder candidates** and must preserve each retained proposal candidate's **exact `term` string**.
+5. **Record the reviewed shortlist** with `plan_glossary.py --review-proposal PROPOSAL --reviewed-terms NAMES`; this validates the saved proposal against the current paper source and preserves each full candidate, ordered `surface_forms`, and provenance.
+   If review produces an **empty reviewed shortlist**, report `no_candidates` and stop without presenting a selector.
+6. **Present every retained term** from that reviewed artifact as a numbered Markdown list. This is the terminal, Codex, and Claude Code interaction. Show the resolved term directory, the article Markdown path (or that none was requested), and that selection authorizes glossary writes/enrichment plus first-safe-occurrence article links when an article was supplied.
+7. State: **No glossary notes or article Markdown have been written before selection.** **End the response and wait.** Do not triage, inventory, generate, link, or lint during preview.
 
-## Boundary
+A broad request, manifest, raw sections path, or article path is not selection approval. A host-native selector is allowed only when it displays the complete same list in one interaction.
 
-- Do not run or modify a paper-reading pipeline from this skill.
-- Do not call any main paper workflow script from this skill.
-- Treat `*_source_manifest.json` and `*_raw_sections.jsonl` as the only collaboration contract.
-- Keep glossary outputs separate from the paper note unless the user explicitly asks to add links.
-- Keep world-knowledge explanations thin, labeled, and confidence-rated; keep paper-specific facts in the occurrence zone.
+## After Selection
 
-## Workflow
+**Accept only numbers**, exact term names, or `全部写入` from the immediately preceding numbered list. Resolve them to the exact displayed `term` strings before invoking a script; `全部写入` applies only to that list. Invalid selections receive the valid range and another wait. Triage requires both `--reviewed-shortlist REVIEW` and the resolved exact names in `--terms`; never use `--terms` alone or add alias syntax.
 
-1. Locate the source manifest for the paper. Prefer a file named like `paper_source_manifest.json`; it must contain `raw_sections_path`, or pass `--raw-sections` explicitly.
-2. Propose candidate terms:
+Pass the current `--source-manifest`, optional `--raw-sections`, and saved `--reviewed-shortlist` to inventory, writer, and linker. Inventory consumes the saved `--triage` artifact as its selected-term input; writer and linker must also receive that same saved `--triage`. They require exact ordered `term` and `surface_forms` equality with this independent authorization before any glossary or article write.
 
-   ```bash
-   python skills/paper-glossary/scripts/plan_glossary.py --propose --source-manifest paper_source_manifest.json --output glossary_candidates.json
-   ```
+1. **Triage** the selection; its selection identity binds each exact selected name and ordered paper-grounded forms.
+2. Run library **inventory** from that triage artifact; it recomputes the complete proposal/review/selection provenance chain and fails closed on mismatched paper, source, shortlist, or forms.
+3. Then **generate one action-aware batch**.
+4. **Run one writer invocation** against the **configured glossary directory**; it revalidates the same provenance chain and requires its ordered inventory results to match the authorized triage exactly, then performs **whole-batch preflight** followed by the **create/enrich/reuse commit**. The writer resolves device-local configuration (or an explicit `--config-path` for that device) and does not accept a standalone write destination. With `--article`, its backlink is **derived from the resolved article Markdown stem**. Without an article, the glossary-only backlink comes from the **validated manifest `paper_id`**. The successful artifact preserves `triage_sha256`, provenance, article context, ordered mappings, and their deterministic `mappings_sha256`; the mapping digest binds the triage identity.
+5. **Link each successful writer result** at its first safe occurrence **only if an article Markdown was supplied/requested**. The linker authenticates the writer provenance, context, digest, note paths, stems, and forms against the same current source/review, and rejects an artifact with **no bound article path**. **For a glossary-only request, skip `link_glossary_terms.py`**.
+6. **Lint writer-returned changed glossary note files** whose **`action` is `created`, `enriched`, or `updated`** in **one `lint_glossary.py` invocation with repeated `--input PATH`** arguments. **Do not pass article Markdown to `lint_glossary.py`**.
+7. **Report observable wall-clock timing** and statuses. **Time host-only phases separately**. **Each CLI emits top-level `elapsed_ms`** for its own complete invocation. The **single writer invocation includes whole-batch preflight and commit**. **Do not report separate preflight and commit timings**.
 
-3. Ask the reader which terms to keep, or accept a supplied list.
-4. Triage selected terms against the paper:
+`new` entries are created; `existing_thin` entries receive only missing structured fields and a missing occurrence; `existing_complete` entries may receive only a missing occurrence. **Do not overwrite** existing note content. See `references/file-contract.md` for `existing_thin`, entry operations, writer `forms`, and link statuses.
 
-   ```bash
-   python skills/paper-glossary/scripts/plan_glossary.py --terms '["MoE", "knowledge distillation|KD"]' --source-manifest paper_source_manifest.json --output glossary_plan.json
-   ```
+## Grounding
 
-5. Have the model write a glossary JSON with one entry per term. Follow `references/file-contract.md` for the schema.
-6. Write central term notes:
-
-   ```bash
-   python skills/paper-glossary/scripts/write_glossary_terms.py --glossary glossary_entries.json --terms-dir ./术语 --paper-link PaperNoteStem --output glossary_write.json
-   ```
-
-7. Lint the glossary note folder before reporting completion:
-
-   ```bash
-   python skills/paper-glossary/scripts/lint_glossary.py --terms-dir ./术语
-   ```
-
-## Model Responsibilities
-
-When writing `glossary_entries.json`, use the triage output this way:
-
-- `routing: "anchor_only"`: explain how this paper uses the term and keep the general definition short.
-- `routing: "needs_explanation"`: write a textbook-level explanation with a visible warning that it is background knowledge, not the paper's own claim.
-- Always include `name`, `aliases`, `definition`, `confidence`, and `occurrence`.
-- Use `confidence` as one of `高`, `中`, or `低`.
-
-## Resources
-
-- `scripts/plan_glossary.py`: propose terms and triage selected terms from raw sections.
-- `scripts/write_glossary_terms.py`: create or update one shared Markdown note per term.
-- `scripts/lint_glossary.py`: validate term-note structure.
-- `references/file-contract.md`: input and output schemas.
-
-## Common Mistakes
-
-- Do not count references-section-only occurrences as evidence that the paper explains a term.
-- Do not let an absent term look grounded; mark it as `needs_explanation`.
-- Do not duplicate existing term notes when an alias already exists.
-- Do not remove the warning, definition, confidence tier, or paper occurrence section from term notes.
+- `anchor_only`: concise paper use plus a thin general explanation.
+- `needs_explanation`: labeled background explanation with confidence and paper occurrence.
+- Exclude reference-only occurrences as evidence. Keep paper facts in `occurrence` and outside knowledge labeled.
