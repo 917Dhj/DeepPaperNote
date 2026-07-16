@@ -10,11 +10,11 @@ from typing import Any
 
 from common import caption_label_key, emit, maybe_load_json_record, normalize_whitespace
 from contracts import (
-    NOTE_PLAN_LIST_FIELDS,
+    NOTE_PLAN_FIELD_TYPES,
     NOTE_PLAN_REQUIRED_FIELDS,
-    NOTE_PLAN_STRING_FIELDS,
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
+    required_field_value_error,
 )
 from source_corpus import SourceCorpusLoadError, load_source_corpus
 
@@ -233,15 +233,14 @@ def validate_note_plan(
     source_manifest: dict[str, Any],
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
+    required_checks = WRITING_CONTRACT_RULES["note_plan_required_field_checks"]
     for field in NOTE_PLAN_REQUIRED_FIELDS:
         if field not in note_plan:
             issues.append(issue("note_plan_required_field_missing", field=field))
-    for field in NOTE_PLAN_STRING_FIELDS:
-        if field in note_plan and not normalize_whitespace(str(note_plan.get(field, ""))):
-            issues.append(issue("note_plan_required_field_empty", field=field))
-    for field in NOTE_PLAN_LIST_FIELDS:
-        value = note_plan.get(field)
-        if field in note_plan and (not isinstance(value, list) or not value):
+            continue
+        if required_field_value_error(
+            note_plan[field], NOTE_PLAN_FIELD_TYPES[field], required_checks
+        ):
             issues.append(issue("note_plan_required_field_empty", field=field))
 
     paper_type = normalize_whitespace(str(note_plan.get("paper_type", "")))
@@ -304,24 +303,30 @@ def validate_central_claims(
         return [issue("central_claims_invalid")]
 
     issues: list[dict[str, Any]] = []
-    required_text_fields = (
-        "claim",
-        "what_it_actually_proves",
-        "what_it_does_not_prove",
-    )
+    contract = WRITING_CONTRACT_RULES["analysis_coverage_contract"]
+    required_fields = contract["central_claim_fields"]
+    field_types = contract["central_claim_field_types"]
+    required_checks = contract["central_claim_required_field_checks"]
     for index, item in enumerate(central_claims):
         if not isinstance(item, dict):
             issues.append(issue("central_claim_item_invalid", index=index))
             continue
-        for field in required_text_fields:
-            if not normalize_whitespace(str(item.get(field, ""))):
+        supporting_evidence_missing = False
+        for field in required_fields:
+            field_value = item.get(field)
+            field_type = field_types[field]
+            if not required_field_value_error(field_value, field_type, required_checks):
+                continue
+            if field == "supporting_evidence":
+                supporting_evidence_missing = True
+                issues.append(issue("central_claim_supporting_evidence_missing", index=index))
+            else:
                 issues.append(
                     issue("central_claim_required_field_missing", index=index, field=field)
                 )
-        sources = item.get("supporting_evidence", [])
-        if not isinstance(sources, list) or not sources:
-            issues.append(issue("central_claim_supporting_evidence_missing", index=index))
+        if supporting_evidence_missing:
             continue
+        sources = item["supporting_evidence"]
         for source in sources:
             for code in source_grounding_errors(source, valid_ids, max_page):
                 issues.append(issue(code, section="central_claims", source=source, index=index))

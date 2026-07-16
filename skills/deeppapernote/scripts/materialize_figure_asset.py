@@ -10,7 +10,9 @@ from pathlib import Path
 from common import (
     emit,
     maybe_load_json_record,
+    require_path_within,
     resolve_domain_subdir,
+    resolve_note_asset_dir,
     resolve_note_output_mode,
     resolve_obsidian_note_path,
     runtime_config,
@@ -58,9 +60,9 @@ def main() -> None:
     if not source_image.exists():
         raise SystemExit(f"Source image does not exist: {source_image}")
 
-    asset_dir = note_path.parent / args.asset_subdir
+    asset_dir = resolve_note_asset_dir(note_path, args.asset_subdir)
     asset_dir.mkdir(parents=True, exist_ok=True)
-    dest_image = asset_dir / source_image.name
+    dest_image = require_path_within(asset_dir, asset_dir / source_image.name, "asset path")
     shutil.copy2(source_image, dest_image)
 
     output_mode, root_root = resolve_note_output_mode(config)

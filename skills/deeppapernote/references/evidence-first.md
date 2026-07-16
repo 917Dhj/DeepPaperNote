@@ -10,13 +10,6 @@ Do not write the finished note directly from:
 - one or two extracted snippets
 - fixed headings alone
 
-Instead, use a three-stage model-first pipeline:
-
-1. build raw-source artifacts and a manifest bundle
-2. create the canonical short JSON `note_plan` around source sections/pages
-3. run the grounding gate
-4. let the model write the note from the raw source, bundle, and plan
-
 ## Source Manifest Bundle
 
 The source manifest and bundle should answer:
@@ -38,10 +31,7 @@ In `DeepPaperNote`, use:
 
 Before drafting the final note, the agent should create an explicit short planning artifact rather than silently "thinking it through" and jumping straight to the final Markdown.
 
-Do **not** require or expose a long free-form chain-of-thought block such as `<thinking>...</thinking>`.
-Instead, require a compact and inspectable JSON planning file. The canonical artifact is a short JSON file such as `<note>.plan.json` or a run-scoped `*_note_plan.json`.
-Pass that file to `scripts/lint_note.py --plan-file ...` when linting; if omitted, lint looks for a sibling `<note>.plan.json`.
-In interactive contexts, you may additionally show a compact `<note_plan>...</note_plan>` block as display-only context, but it does not replace the JSON file.
+Require a compact and inspectable JSON plan that satisfies the generated bundle contract. The bundle is authoritative for required fields, allowed paper types, and grounding expectations; do not expose a long free-form chain-of-thought block.
 
 The plan should state:
 - which sections this paper actually deserves

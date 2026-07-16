@@ -417,6 +417,24 @@ def test_resolve_note_output_mode_falls_back_to_workspace(tmp_path: Path, monkey
     assert root == tmp_path / "DeepPaperNote_output"
 
 
+@pytest.mark.parametrize(
+    "workspace_output_dir", ["../outside", "/outside", r"\outside", r"C:\outside"]
+)
+def test_resolve_note_output_mode_rejects_workspace_root_outside_save_target(
+    tmp_path: Path,
+    monkeypatch,
+    workspace_output_dir: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    config = {
+        "obsidian_vault": "",
+        "workspace_output_dir": workspace_output_dir,
+    }
+
+    with pytest.raises(RuntimeError, match="workspace_output_dir"):
+        resolve_note_output_mode(config)
+
+
 def test_runtime_config_ignores_read_arxiv_obsidian_vault(tmp_path: Path, monkeypatch) -> None:
     legacy_vault = tmp_path / "legacy_vault"
     legacy_vault.mkdir()
@@ -454,6 +472,57 @@ def test_resolve_obsidian_note_path_in_vault_mode(tmp_path: Path) -> None:
     }
     path = resolve_obsidian_note_path(config, title="My Test Paper", subdir="心理健康")
     assert path == vault / "Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
+
+
+@pytest.mark.parametrize(
+    ("config_override", "path_args", "field"),
+    [
+        ({"papers_dir": "../outside"}, {}, "papers_dir"),
+        ({"papers_dir": "/outside"}, {}, "papers_dir"),
+        ({}, {"subdir": "../outside"}, "subdir"),
+        ({}, {"subdir": "/outside"}, "subdir"),
+        ({}, {"filename": "/outside.md"}, "filename"),
+        ({}, {"filename": r"C:\outside.md"}, "filename"),
+    ],
+)
+def test_resolve_obsidian_note_path_rejects_paths_outside_save_target(
+    tmp_path: Path,
+    config_override: dict[str, str],
+    path_args: dict[str, str],
+    field: str,
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    config = {
+        "obsidian_vault": str(vault),
+        "papers_dir": "Research/Papers",
+        "workspace_output_dir": "DeepPaperNote_output",
+        **config_override,
+    }
+
+    with pytest.raises(RuntimeError, match=field):
+        resolve_obsidian_note_path(config, title="Paper", **path_args)
+
+
+def test_resolve_obsidian_note_path_allows_nested_filename_inside_save_target(
+    tmp_path: Path,
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    config = {
+        "obsidian_vault": str(vault),
+        "papers_dir": "Research/Papers",
+        "workspace_output_dir": "DeepPaperNote_output",
+    }
+
+    path = resolve_obsidian_note_path(
+        config,
+        title="Paper",
+        subdir="Benchmark",
+        filename="nested/Paper.md",
+    )
+
+    assert path == vault / "Research/Papers/Benchmark/Paper/nested/Paper.md"
 
 
 def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_already_contains_slug(tmp_path: Path) -> None:

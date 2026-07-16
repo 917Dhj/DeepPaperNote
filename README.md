@@ -13,7 +13,6 @@
 [![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./skills/deeppapernote/SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a)](./skills/deeppapernote/references/obsidian-format.md)
 [![Figures](https://img.shields.io/badge/figures-image--first-f59e0b)](./skills/deeppapernote/references/figure-placement.md)
-[![Writing](https://img.shields.io/badge/writing-model--first-7c3aed)](./skills/deeppapernote/references/model-synthesis.md)
 [![Changelog](https://img.shields.io/badge/changelog-latest-0f766e)](./CHANGELOG.md)
 
 </div>
@@ -399,23 +398,7 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 
 ## ⚙️ Workflow
 
-The default path is:
-
-1. resolve the paper identity
-2. collect metadata
-3. fetch the best available PDF
-4. extract canonical raw source text and a source manifest
-5. extract structural indexes and PDF image assets
-6. plan figure placement
-7. build the full figure/table decision table
-8. build a manifest synthesis bundle
-9. let the model read the raw source records and plan the note
-10. run grounding lint on the plan
-11. let the model write the note
-12. lint the final note
-13. perform the final analytical quality review
-14. perform the final readability review
-15. write into Obsidian
+DeepPaperNote resolves one paper, builds grounded source artifacts, lets the model plan and write the note, validates the result, and saves it into Obsidian. The canonical execution contract lives in [`SKILL.md`](./skills/deeppapernote/SKILL.md).
 
 Core principle:
 
@@ -425,9 +408,7 @@ Core principle:
 
 Related docs:
 
-- [Workflow](./skills/deeppapernote/references/workflow.md)
 - [Architecture](./skills/deeppapernote/references/architecture.md)
-- [Model Synthesis](./skills/deeppapernote/references/model-synthesis.md)
 
 ## 🖼️ Figure Strategy
 

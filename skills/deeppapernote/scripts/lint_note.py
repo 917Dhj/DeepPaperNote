@@ -9,11 +9,12 @@ import re
 from pathlib import Path
 
 from contracts import (
-    NOTE_PLAN_LIST_FIELDS,
+    NOTE_PLAN_FIELD_TYPES,
     NOTE_PLAN_REQUIRED_FIELDS,
-    NOTE_PLAN_STRING_FIELDS,
     NOTE_REQUIRED_SECTIONS,
     PAPER_TYPE_VALUES,
+    WRITING_CONTRACT_RULES,
+    required_field_value_error,
 )
 
 REQUIRED_SECTIONS = NOTE_REQUIRED_SECTIONS
@@ -255,20 +256,21 @@ def inspect_note_plan(plan_path: Path) -> tuple[bool, list[str]]:
     if missing_fields:
         issues.append("planning_required_fields_missing")
 
+    required_checks = WRITING_CONTRACT_RULES["note_plan_required_field_checks"]
     has_invalid_fields = False
-    for field in NOTE_PLAN_STRING_FIELDS:
-        if field in plan and not isinstance(plan[field], str):
+    for field in NOTE_PLAN_REQUIRED_FIELDS:
+        if field not in plan:
+            continue
+        validation_error = required_field_value_error(
+            plan[field], NOTE_PLAN_FIELD_TYPES[field], required_checks
+        )
+        if validation_error == "invalid":
             has_invalid_fields = True
-        elif field in plan and not plan[field].strip():
+        elif validation_error == "empty":
             issues.append(f"planning_{field}_empty")
     if isinstance(plan.get("paper_type"), str) and plan["paper_type"].strip():
         if plan["paper_type"].strip() not in PAPER_TYPE_VALUES:
             issues.append("planning_paper_type_invalid")
-    for field in NOTE_PLAN_LIST_FIELDS:
-        if field in plan and not isinstance(plan[field], list):
-            has_invalid_fields = True
-        elif field in plan and not plan[field]:
-            issues.append(f"planning_{field}_empty")
     if has_invalid_fields:
         issues.append("planning_required_fields_invalid")
     issues.extend(inspect_central_claims_plan(plan.get("central_claims")))
@@ -283,12 +285,10 @@ def inspect_central_claims_plan(value: object) -> list[str]:
         return ["planning_central_claims_invalid"]
 
     issues: list[str] = []
-    required_fields = (
-        "claim",
-        "supporting_evidence",
-        "what_it_actually_proves",
-        "what_it_does_not_prove",
-    )
+    contract = WRITING_CONTRACT_RULES["analysis_coverage_contract"]
+    required_fields = contract["central_claim_fields"]
+    field_types = contract["central_claim_field_types"]
+    required_checks = contract["central_claim_required_field_checks"]
     for item in value:
         if not isinstance(item, dict):
             if "planning_central_claims_invalid" not in issues:
@@ -296,14 +296,13 @@ def inspect_central_claims_plan(value: object) -> list[str]:
             continue
         for field in required_fields:
             field_value = item.get(field)
-            if field == "supporting_evidence":
-                if not isinstance(field_value, list) or not field_value:
-                    code = "planning_central_claims_supporting_evidence_missing"
-                    if code not in issues:
-                        issues.append(code)
-                continue
-            if not isinstance(field_value, str) or not field_value.strip():
-                code = f"planning_central_claims_{field}_missing"
+            field_type = field_types[field]
+            if required_field_value_error(field_value, field_type, required_checks):
+                code = (
+                    "planning_central_claims_supporting_evidence_missing"
+                    if field == "supporting_evidence"
+                    else f"planning_central_claims_{field}_missing"
+                )
                 if code not in issues:
                     issues.append(code)
     return issues

@@ -23,7 +23,6 @@ Default file name:
 - do not save new papers directly into the bare papers root
 - always create the paper-local `images/` directory during final save, even if no real image is inserted
 - the paper-local `images/` directory is part of the required note layout, not an optional optimization
-- if the target is an Obsidian vault but the current environment cannot create that directory yet, request permission escalation rather than omitting it
 
 If the user already has a vault convention, preserve it.
 

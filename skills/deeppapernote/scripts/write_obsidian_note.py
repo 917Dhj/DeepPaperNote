@@ -15,6 +15,7 @@ from common import (
     ensure_parent,
     maybe_load_json_record,
     resolve_domain_subdir,
+    resolve_note_asset_dir,
     resolve_note_output_mode,
     resolve_obsidian_note_path,
     runtime_config,
@@ -229,8 +230,9 @@ def main() -> None:
         subdir=resolved_subdir,
         filename=args.filename,
     )
+    asset_dir = resolve_note_asset_dir(target_path, args.asset_subdir)
+    asset_subdir = asset_dir.relative_to(target_path.parent).as_posix()
     ensure_parent(target_path)
-    asset_dir = target_path.parent / args.asset_subdir
     figure_decisions = maybe_load_json_record(args.figure_decisions) if args.figure_decisions else {}
     if args.figure_decisions and figure_decisions is None:
         raise SystemExit(f"Expected JSON object for --figure-decisions: {args.figure_decisions}")
@@ -239,7 +241,7 @@ def main() -> None:
             note_text,
             target_path,
             figure_decisions,
-            args.asset_subdir,
+            asset_subdir,
         )
         if figure_decisions
         else []

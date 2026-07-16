@@ -49,6 +49,36 @@ NOTE_PLAN_LIST_FIELDS: tuple[str, ...] = (
 )
 
 NOTE_PLAN_REQUIRED_FIELDS: tuple[str, ...] = NOTE_PLAN_STRING_FIELDS + NOTE_PLAN_LIST_FIELDS
+NOTE_PLAN_FIELD_TYPES: dict[str, str] = {
+    **dict.fromkeys(NOTE_PLAN_STRING_FIELDS, "string"),
+    **dict.fromkeys(NOTE_PLAN_LIST_FIELDS, "array"),
+}
+REQUIRED_FIELD_CHECKS: dict[str, dict[str, bool]] = {
+    "string": {"non_empty": True},
+    "array": {"non_empty": True},
+}
+CENTRAL_CLAIM_FIELD_TYPES: dict[str, str] = {
+    "claim": "string",
+    "supporting_evidence": "array",
+    "what_it_actually_proves": "string",
+    "what_it_does_not_prove": "string",
+}
+
+
+def required_field_value_error(
+    value: Any,
+    field_type: str,
+    checks: dict[str, dict[str, bool]],
+) -> str:
+    if field_type == "string":
+        if not isinstance(value, str):
+            return "invalid"
+        return "empty" if checks["string"]["non_empty"] and not value.strip() else ""
+    if field_type == "array":
+        if not isinstance(value, list):
+            return "invalid"
+        return "empty" if checks["array"]["non_empty"] and not value else ""
+    return "invalid"
 
 PAPER_TYPE_SECTION_PROFILES: dict[str, dict[str, dict[str, Any]]] = {
     "AI_method": {
@@ -243,6 +273,8 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
     "required_sections": NOTE_REQUIRED_SECTIONS,
     "paper_type_values": PAPER_TYPE_VALUES,
     "note_plan_required_fields": NOTE_PLAN_REQUIRED_FIELDS,
+    "note_plan_field_types": NOTE_PLAN_FIELD_TYPES,
+    "note_plan_required_field_checks": REQUIRED_FIELD_CHECKS,
     "grounding_required_sections": (
         "研究问题",
         "数据与任务定义",
@@ -315,12 +347,9 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
         ),
     },
     "analysis_coverage_contract": {
-        "central_claim_fields": (
-            "claim",
-            "supporting_evidence",
-            "what_it_actually_proves",
-            "what_it_does_not_prove",
-        ),
+        "central_claim_fields": tuple(CENTRAL_CLAIM_FIELD_TYPES),
+        "central_claim_field_types": CENTRAL_CLAIM_FIELD_TYPES,
+        "central_claim_required_field_checks": REQUIRED_FIELD_CHECKS,
         "required_plan_fields": (
             "central_claims",
             "claim_boundaries",
