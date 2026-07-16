@@ -12,18 +12,33 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+### Added
+
+- Added `paper-glossary` as an optional companion skill. It builds reusable Obsidian terminology notes from saved DeepPaperNote source artifacts, previews a reviewed shortlist before writing, and can link selected terms back to an explicitly supplied paper note.
+- Added a canonical single-paper Source Corpus so downstream reading stages use the complete validated raw text and source manifest instead of relying on truncated candidate chunks.
+- Added explicit paper-identity verification and bounded repair before PDF acquisition. Ambiguous or mismatched identities now fail closed instead of silently continuing with the wrong paper.
+- Added a reproducible note-quality regression workflow, evaluator prompt, and rubric under `evals/` for contributor validation.
+
 ### Changed
 
 - Converted the repository to a dual-stack Claude Code and Codex plugin layout with the canonical skill under `skills/deeppapernote/`.
-- Updated the recommended install command to select the `deeppapernote` skill from the plugin repository.
+- Simplified installation guidance to the interactive repository command `npx skills add 917Dhj/DeepPaperNote`, which lets users choose skills and target agents.
+- Reused acquisition artifacts across pipeline stages to avoid repeating successful paper resolution, metadata, and PDF work.
+- Formalized Obsidian save behavior: workspace output requires explicit user choice, failed vault saves no longer switch destinations silently, and final note and image paths must stay inside the authorized save target.
+- Aligned figure and table decisions with the generated writing contract so planned insertions and retained placeholders remain consistent through final save.
 
 ### Fixed
 
+- Improved PDF acquisition failures and lint feedback so blocked stages report actionable causes instead of producing incomplete-looking success states.
 - Fixed Windows-style Obsidian subdirectories so `Research/Papers` is not duplicated in saved note paths.
 - Cross-platform (Windows) path and encoding robustness: read files with `utf-8-sig` so a UTF-8 BOM (as written by PowerShell/Notepad) no longer crashes JSON loading or corrupts saved notes; tolerate CRLF line endings in note linting; and compare/emit paths without assuming `/` so the vault folder and Markdown image links resolve correctly on Windows. No behavior change on Linux/macOS.
+- Rejected Windows-rooted workspace output paths that could escape the configured workspace save boundary on non-Windows hosts.
+- Hardened glossary selection, link-stem handling, and confidence validation so invalid or stale glossary artifacts fail before modifying Obsidian notes.
 
 ### Contributors
 
+- Added the `paper-glossary` companion skill and its selection workflow from PRs #8 and #11 by jiang4wqy.
+- Incorporated the paper-fetching and lint-feedback improvements from PR #3 by Zebang Cheng.
 - Incorporated the Windows Obsidian path normalization fix from PR #4 by KumamuKuma.
 - Incorporated the Windows path/encoding robustness fix from PR #5 by jiang4wqy.
 
