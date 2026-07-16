@@ -12,6 +12,8 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+## v2.1.0
+
 ### Added
 
 - Added `paper-glossary` as an optional companion skill. It builds reusable Obsidian terminology notes from saved DeepPaperNote source artifacts, previews a reviewed shortlist before writing, and can link selected terms back to an explicitly supplied paper note.

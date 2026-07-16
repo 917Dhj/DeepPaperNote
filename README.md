@@ -18,6 +18,10 @@
 
 [![DeepPaperNote Hero](./assets/hero-academic.svg)](https://917dhj.github.io/DeepPaperNote/)
 
+<p align="center">
+  <em>Read one paper deeply. Add one durable page to your academic wiki.</em>
+</p>
+
 **Do you know this situation? You sit down to study an important paper, but the exhausting part is not simply reading it. It is turning what you understood into a note you can still use later.** The time usually disappears into work like this:
 
 - switching between the PDF, Zotero, web pages, and your note app
@@ -26,6 +30,8 @@
 - ending up with something that looks complete but is not a note you actually want to revisit
 
 DeepPaperNote takes over that repetitive, mechanical, and surprisingly expensive layer of paper reading. It gathers the material, builds the structure, places figures in context, and shapes the final note so you can keep your attention on the paper's real ideas.
+
+In other words, you can think of DeepPaperNote as the **single-paper ingestion layer for an LLM-maintained academic wiki**: it reads one paper deeply and turns its research question, methods, evidence, results, and figures into a durable page that people can read and agents can reuse. Obsidian is where those pages live, connect, and grow; DeepPaperNote is how a paper reliably enters the wiki.
 
 DeepPaperNote is an agent skill for reading **one paper at a time**. The same core skill runs in Claude Code and Codex, and it focuses on the questions that distinguish a deep-reading note from an abstract rewrite:
 
@@ -37,35 +43,13 @@ DeepPaperNote is an agent skill for reading **one paper at a time**. The same co
 > [!tip]
 > If you already use Obsidian or Zotero, DeepPaperNote automates the most time-consuming and error-prone parts of evidence gathering, organization, and note production.
 
-## 🎯 Why DeepPaperNote?
-
-![DeepPaperNote usage example](./assets/usage-example.png)
-
-| You may be dealing with... | DeepPaperNote helps by... |
-| --- | --- |
-| 📄 **You finished the paper, but your notes are still a pile of fragments** | Rebuilding the research question, method chain, central experiments, and limitations into one note you can actually read again |
-| 🧠 **You do not want another polished-looking AI summary** | Preserving the formulas, numbers, figure context, and evidence boundaries that make the paper worth understanding |
-| 🗂️ **You read many papers, but they never become a knowledge base** | Saving the note and local figures into Obsidian as searchable, linkable, reusable research assets |
-| 📚 **The paper is already in Zotero, and you do not want to match or download it again** | Preferring local records and attachments when available, reducing repeated work and paper mismatches |
-
 ## 📰 News
 
 - **[2026-07-16]** 🧩 Added [`paper-glossary`](./skills/paper-glossary/README.md), an optional companion skill for building reusable Obsidian terminology notes.
-- **[2026-07-16]** 🔌 DeepPaperNote is now distributed as a Claude Code and Codex plugin with multiple selectable skills. [PR #12](https://github.com/917Dhj/DeepPaperNote/pull/12)
+- **[2026-07-16]** 🔌 DeepPaperNote is now distributed as a plugin for multiple agents, with support for selecting multiple skills from the repository. [PR #12](https://github.com/917Dhj/DeepPaperNote/pull/12)
 - **[v2.0.0]** 🚀 Released a deeper evidence-first paper-reading workflow with stronger note planning and figure handling. [Release notes](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.0.0)
 
 News lists only the three most recent user-facing milestones. See the [changelog](./CHANGELOG.md) and [GitHub Releases](https://github.com/917Dhj/DeepPaperNote/releases) for the full history.
-
-## 🧩 Skills
-
-DeepPaperNote remains the main product. The repository also includes an optional companion skill that works from DeepPaperNote's saved paper artifacts without taking over or rerunning the paper-reading workflow.
-
-| Skill | Role | When to use it |
-| --- | --- | --- |
-| [`deeppapernote`](./skills/deeppapernote/SKILL.md) | **Core product · recommended** | Read one paper deeply and produce a structured, evidence-based Obsidian note with figures, results, and limitations |
-| [`paper-glossary`](./skills/paper-glossary/SKILL.md) | Optional companion | Select terms from existing paper artifacts, create reusable Obsidian glossary notes, and optionally link them back to the paper note |
-
-You do not need to install every skill. Choose the ones that match your workflow during installation.
 
 ## 🚀 Quick Start
 
@@ -95,6 +79,28 @@ Turn this paper into an Obsidian note: <paper>
 ```
 
 DeepPaperNote currently generates Chinese notes by default, and its writing and validation rules are optimized for Chinese output.
+
+## 🎯 Why DeepPaperNote?
+
+![DeepPaperNote usage example](./assets/usage-example.png)
+
+| You may be dealing with... | DeepPaperNote helps by... |
+| --- | --- |
+| 📄 **You finished the paper, but your notes are still a pile of fragments** | Rebuilding the research question, method chain, central experiments, and limitations into one note you can actually read again |
+| 🧠 **You do not want another polished-looking AI summary** | Preserving the formulas, numbers, figure context, and evidence boundaries that make the paper worth understanding |
+| 🗂️ **You keep reading papers, but they never become your academic wiki** | Turning each paper into a searchable, linkable, reusable Obsidian knowledge page so your academic wiki grows one paper at a time |
+| 📚 **The paper is already in Zotero, and you do not want to match or download it again** | Preferring local records and attachments when available, reducing repeated work and paper mismatches |
+
+## 🧩 Skills
+
+DeepPaperNote remains the main product. The repository also includes an optional companion skill that works from DeepPaperNote's saved paper artifacts without taking over or rerunning the paper-reading workflow.
+
+| Skill | Role | When to use it |
+| --- | --- | --- |
+| [`deeppapernote`](./skills/deeppapernote/SKILL.md) | **Core product · recommended** | Read one paper deeply and produce a structured, evidence-based Obsidian note with figures, results, and limitations |
+| [`paper-glossary`](./skills/paper-glossary/SKILL.md) | Optional companion | Select terms from existing paper artifacts, create reusable Obsidian glossary notes, and optionally link them back to the paper note |
+
+You do not need to install every skill. Choose the ones that match your workflow during installation.
 
 ## ✅ Quality Promise
 
