@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_legacy_script_side_chinese_rewrite_helpers_are_removed() -> None:
-    common_source = (PROJECT_ROOT / "scripts" / "common.py").read_text(encoding="utf-8")
+    common_source = (PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "common.py").read_text(encoding="utf-8")
 
     legacy_names = (
         "TERM_REPLACEMENTS",

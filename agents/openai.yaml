@@ -1,7 +1,0 @@
-interface:
-  display_name: "DeepPaperNote"
-  short_description: "Generate a high-quality deep-reading note for one paper with a raw-source manifest workflow and Obsidian-oriented save semantics."
-  default_prompt: "Use $DeepPaperNote when the user wants to turn a single paper into a high-quality Markdown deep-reading note. Follow the bundled DeepPaperNote workflow to resolve the paper, extract canonical raw source text and a source manifest, plan figure and table placeholders plus decisions, ground the note plan against source sections/pages, write the final Chinese note, run lint plus final quality/readability reviews, and save it into the configured Obsidian-style vault or, after asking for a vault path, the workspace fallback when no vault is configured."
-
-policy:
-  allow_implicit_invocation: true

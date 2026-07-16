@@ -10,7 +10,15 @@ permissions:
 
 jobs:
   test:
-    runs-on: macos-latest
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: "1"
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
 
     steps:
       - name: Checkout repository
@@ -30,7 +38,7 @@ jobs:
 
       - name: Run syntax check
         run: |
-          python -m py_compile scripts/*.py
+          python -m compileall -q skills/deeppapernote/scripts
 
       - name: Run tests
         run: |

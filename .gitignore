@@ -13,8 +13,11 @@ htmlcov/
 venv/
 dist/
 build/
+site/
 *.egg-info/
 .agent-work/
 tmp/
 DESIGN.md
+CONTEXT.md
 .claude/
+docs/

@@ -5,39 +5,33 @@ import re
 from pathlib import Path
 
 from build_synthesis_bundle import bundle
-from contracts import NOTE_REQUIRED_SECTIONS, PAPER_TYPE_VALUES
-from lint_note import REQUIRED_SECTIONS
+from contracts import (
+    NOTE_PLAN_LIST_FIELDS,
+    NOTE_PLAN_REQUIRED_FIELDS,
+    NOTE_PLAN_STRING_FIELDS,
+    NOTE_REQUIRED_SECTIONS,
+    PAPER_TYPE_VALUES,
+    WRITING_CONTRACT_RULES,
+)
+from lint_grounding import validate_central_claims, validate_note_plan
+from lint_note import REQUIRED_SECTIONS, inspect_central_claims_plan, inspect_note_plan
+from plan_figure_table_decisions import DECISION_VALUES, INSERTABLE_KINDS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SKILL_ROOT = PROJECT_ROOT / "skills" / "deeppapernote"
 NOTE_PLAN_REFERENCE_DOCS = (
-    "workflow.md",
     "evidence-first.md",
     "final-writing.md",
-    "model-synthesis.md",
     "note-quality.md",
 )
-NOTE_PLAN_REQUIRED_FIELDS = (
-    "paper_type",
-    "paper_type_rationale",
-    "dominant_domain",
-    "must_cover",
-    "key_numbers",
-    "real_comparisons",
-    "central_claims",
-    "claim_boundaries",
-    "negative_or_limiting_results",
-    "mechanism_result_map",
-    "comparative_positioning",
-    "reuse_takeaways",
-    "followup_questions",
-    "section_plan",
+NOTE_PLAN_PROTOCOL_RE = re.compile(
+    r"<note>\.plan\.json|\*_note_plan\.json|scripts/lint_(?:note|grounding)\.py|<note_plan>"
 )
 REFERENCE_ROUTING_DOCS = (
-    "SKILL.md",
-    "references/model-synthesis.md",
+    "skills/deeppapernote/SKILL.md",
 )
 PDF_CONTRACT_DOCS = (
-    "SKILL.md",
+    "skills/deeppapernote/SKILL.md",
     "README.md",
     "README.zh-CN.md",
 )
@@ -55,6 +49,48 @@ PDF_FAIL_CLOSED_NEGATIONS = (
     "rather than",
     "instead of",
 )
+
+
+def test_deleted_reference_routers_stay_removed() -> None:
+    references = SKILL_ROOT / "references"
+
+    assert not (references / "workflow.md").exists()
+    assert not (references / "model-synthesis.md").exists()
+
+    for readme_name in ("README.md", "README.zh-CN.md"):
+        readme = (PROJECT_ROOT / readme_name).read_text(encoding="utf-8")
+        assert "references/workflow.md" not in readme
+        assert "references/model-synthesis.md" not in readme
+
+
+def test_topic_references_do_not_redefine_canonical_workflow() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    deep_analysis = (SKILL_ROOT / "references" / "deep-analysis.md").read_text(encoding="utf-8")
+    evidence_first = (SKILL_ROOT / "references" / "evidence-first.md").read_text(encoding="utf-8")
+
+    assert "every reported `passes_*` gate is `true`" in skill
+    assert "Preferred usage pattern:" not in skill
+    assert "## Recommended Workflow" not in deep_analysis
+    assert "- `method`" not in deep_analysis
+    assert "- `system/framework`" not in deep_analysis
+    assert "- `benchmark/dataset`" not in deep_analysis
+    assert "weak-but-honest note" not in deep_analysis
+    assert "based mostly on abstract plus metadata" not in deep_analysis
+    assert "three-stage model-first pipeline" not in evidence_first
+
+
+def test_codex_adapter_stays_thin() -> None:
+    adapter = (SKILL_ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+
+    assert adapter == (
+        "interface:\n"
+        '  display_name: "DeepPaperNote"\n'
+        '  short_description: "Generate a high-quality deep-reading note for one paper with a '
+        'raw-source manifest workflow and Obsidian-oriented save semantics."\n'
+        '  default_prompt: "Use $deeppapernote to create the deep-reading note for this paper."\n'
+    )
+
+
 EXPECTED_PAPER_TYPE_SECTION_PROFILES = {
     "AI_method": {
         "section_semantics": {
@@ -134,7 +170,7 @@ EXPECTED_PAPER_TYPE_SECTION_PROFILES = {
 
 
 def note_quality_structural_sections() -> tuple[str, ...]:
-    text = (PROJECT_ROOT / "references" / "note-quality.md").read_text(encoding="utf-8")
+    text = (SKILL_ROOT / "references" / "note-quality.md").read_text(encoding="utf-8")
     start = text.index("The note should usually include:")
     end = text.index("For non-trivial papers", start)
     sections: list[str] = []
@@ -152,8 +188,8 @@ def pdf_contract_docs() -> dict[str, str]:
     }
     docs.update(
         {
-            f"references/{path.name}": path.read_text(encoding="utf-8")
-            for path in sorted((PROJECT_ROOT / "references").glob("*.md"))
+            f"skills/deeppapernote/references/{path.name}": path.read_text(encoding="utf-8")
+            for path in sorted((SKILL_ROOT / "references").glob("*.md"))
         }
     )
     return docs
@@ -212,6 +248,106 @@ def test_bundle_paper_type_contracts_expose_exact_section_profiles() -> None:
         assert typed_contract["boundary_questions"]
 
 
+def test_bundle_exposes_exact_note_plan_types_and_grounding_command() -> None:
+    writing_contract = bundle(
+        metadata={}, evidence_wrapper={}, figures_wrapper={}, assets_wrapper={}
+    )["writing_contract"]
+    note_plan_contract = writing_contract["note_plan_contract"]
+
+    assert note_plan_contract["field_types"] == {
+        **{field: "string" for field in NOTE_PLAN_STRING_FIELDS},
+        **{field: "array" for field in NOTE_PLAN_LIST_FIELDS},
+    }
+    assert note_plan_contract["required_field_checks"] == {
+        "string": {"non_empty": True},
+        "array": {"non_empty": True},
+    }
+    analysis_contract = writing_contract["analysis_coverage_contract"]
+    assert analysis_contract["central_claim_field_types"] == {
+        "claim": "string",
+        "supporting_evidence": "array",
+        "what_it_actually_proves": "string",
+        "what_it_does_not_prove": "string",
+    }
+    assert analysis_contract["central_claim_required_field_checks"] == (
+        note_plan_contract["required_field_checks"]
+    )
+    assert writing_contract["grounding_contract"]["lint_command"] == (
+        "scripts/lint_grounding.py --note-plan ... "
+        "--source-manifest ... --bundle-json ... --figure-decisions ..."
+    )
+
+
+def test_note_plan_validators_consume_required_field_checks(
+    tmp_path: Path, monkeypatch
+) -> None:
+    plan = {
+        **{field: "" for field in NOTE_PLAN_STRING_FIELDS},
+        **{field: [] for field in NOTE_PLAN_LIST_FIELDS},
+    }
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    _, lint_issues = inspect_note_plan(plan_path)
+    grounding_issues = validate_note_plan(plan, {})
+    assert any(issue.endswith("_empty") for issue in lint_issues)
+    assert any(issue["code"] == "note_plan_required_field_empty" for issue in grounding_issues)
+
+    monkeypatch.setitem(
+        WRITING_CONTRACT_RULES,
+        "note_plan_required_field_checks",
+        {"string": {"non_empty": False}, "array": {"non_empty": False}},
+    )
+    _, lint_issues = inspect_note_plan(plan_path)
+    grounding_issues = validate_note_plan(plan, {})
+    assert not any(issue.endswith("_empty") for issue in lint_issues)
+    assert not any(
+        issue["code"] == "note_plan_required_field_empty" for issue in grounding_issues
+    )
+
+
+def test_central_claim_validators_consume_analysis_contract(monkeypatch) -> None:
+    analysis_contract = WRITING_CONTRACT_RULES["analysis_coverage_contract"]
+    monkeypatch.setitem(
+        analysis_contract,
+        "central_claim_fields",
+        (*analysis_contract["central_claim_fields"], "new_required_field"),
+    )
+    monkeypatch.setitem(
+        analysis_contract,
+        "central_claim_field_types",
+        {
+            "claim": "string",
+            "supporting_evidence": "array",
+            "what_it_actually_proves": "string",
+            "what_it_does_not_prove": "string",
+            "new_required_field": "string",
+        },
+    )
+    monkeypatch.setitem(
+        analysis_contract,
+        "central_claim_required_field_checks",
+        {"string": {"non_empty": True}, "array": {"non_empty": True}},
+    )
+    claim = {
+        "claim": "claim",
+        "supporting_evidence": [{"section_id": "sec:result"}],
+        "what_it_actually_proves": "supported result",
+        "what_it_does_not_prove": "bounded result",
+    }
+
+    lint_issues = inspect_central_claims_plan([claim])
+    grounding_issues = validate_central_claims(
+        {"central_claims": [claim]}, {"sec:result"}, 1
+    )
+    assert "planning_central_claims_new_required_field_missing" in lint_issues
+    assert any(
+        issue["code"] == "central_claim_required_field_missing"
+        and issue["field"] == "new_required_field"
+        for issue in grounding_issues
+    )
+
+
 def test_bundle_exposes_depth_and_figure_decision_contracts_without_old_inputs() -> None:
     synthesis = bundle(
         metadata={},
@@ -223,10 +359,11 @@ def test_bundle_exposes_depth_and_figure_decision_contracts_without_old_inputs()
     )
     writing_contract = synthesis["writing_contract"]
 
-    assert "evidence" not in synthesis
-    assert "candidate_chunks" not in synthesis
-    assert "section_texts" not in synthesis
-    assert "summary" not in synthesis
+    for old_key in WRITING_CONTRACT_RULES["excluded_model_input_fields"]:
+        assert old_key not in synthesis
+    assert writing_contract["grounding_contract"]["excluded_model_input_fields"] == list(
+        WRITING_CONTRACT_RULES["excluded_model_input_fields"]
+    )
     assert (
         writing_contract["grounding_contract"]["note_plan_depth_requirements"][
             "required_section_focus_min_chars"
@@ -249,8 +386,113 @@ def test_bundle_exposes_depth_and_figure_decision_contracts_without_old_inputs()
     ]
 
 
+def test_figure_decision_script_consumes_canonical_contract() -> None:
+    decision_script = (
+        SKILL_ROOT / "scripts" / "plan_figure_table_decisions.py"
+    ).read_text(encoding="utf-8")
+
+    assert DECISION_VALUES == set(WRITING_CONTRACT_RULES["figure_decision_values"])
+    assert INSERTABLE_KINDS == set(
+        WRITING_CONTRACT_RULES["usable_insert_candidate"]["kinds"]
+    )
+    assert "from contracts import WRITING_CONTRACT_RULES" in decision_script
+    assert 'DECISION_VALUES = {"insert"' not in decision_script
+    assert 'INSERTABLE_KINDS = {"figure"' not in decision_script
+
+
+def test_bundle_exposes_complete_canonical_figure_contract() -> None:
+    figure_contract = bundle(
+        metadata={}, evidence_wrapper={}, figures_wrapper={}, assets_wrapper={}
+    )["writing_contract"]["figure_table_contract"]
+
+    assert figure_contract == {
+        "placeholder_first": True,
+        "visual_quality_gate": "fail_closed",
+        "decision_table_required": True,
+        "decision_values": list(WRITING_CONTRACT_RULES["figure_decision_values"]),
+        "usable_insert_candidate": {
+            "kinds": list(
+                WRITING_CONTRACT_RULES["usable_insert_candidate"]["kinds"]
+            ),
+            "visual_quality_status": WRITING_CONTRACT_RULES[
+                "usable_insert_candidate"
+            ]["visual_quality_status"],
+            "requires_source_image_path": WRITING_CONTRACT_RULES[
+                "usable_insert_candidate"
+            ]["requires_source_image_path"],
+        },
+        "allowed_usable_placeholder_reasons": list(
+            WRITING_CONTRACT_RULES["allowed_usable_placeholder_reasons"]
+        ),
+        "manual_visual_review_required_statuses": list(
+            WRITING_CONTRACT_RULES["manual_visual_review_required_statuses"]
+        ),
+        "automatic_fail_closed_visual_statuses": list(
+            WRITING_CONTRACT_RULES["automatic_fail_closed_visual_statuses"]
+        ),
+        "manual_review_claim_requires_image_inspection": True,
+    }
+
+
+def test_figure_protocol_docs_keep_single_owners() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    references = SKILL_ROOT / "references"
+    placement = (references / "figure-placement.md").read_text(encoding="utf-8")
+    final_writing = (references / "final-writing.md").read_text(encoding="utf-8")
+    obsidian_format = (references / "obsidian-format.md").read_text(encoding="utf-8")
+
+    assert "placeholder-first figures" in skill
+    assert "writing_contract.figure_table_contract" in skill
+    assert "complete figure/table decision table" in skill
+    assert "grounding and final-note figure gates" in skill
+    assert "Formal Save materializes the selected image" in skill
+    for duplicate in (
+        "needs_visual_quality_check",
+        "reject_visual_quality",
+        "asset_candidate_missing",
+        "relative_markdown_embed",
+        "write_obsidian_note.py --figure-decisions",
+    ):
+        assert duplicate not in skill
+
+    assert "writing_contract.figure_table_contract" in placement
+    assert "identity match" in placement
+    assert "visual usability" in placement
+    assert "asset_candidate_missing" in placement
+    for duplicate in (
+        "kept_placeholder_visual_defect",
+        "kept_placeholder_materialization_blocked",
+        "relative_markdown_embed",
+        "write_obsidian_note.py --figure-decisions",
+        "> [!figure]",
+        "```md",
+        "same note-generation task",
+        "text-only note first",
+        "final response",
+    ):
+        assert duplicate not in placement
+
+    assert "figure-placement.md" in final_writing
+    assert "obsidian-format.md" in final_writing
+    for duplicate in (
+        "usable_candidate",
+        "needs_visual_quality_check",
+        "reject_visual_quality",
+        "asset_candidate_missing",
+        "relative_markdown_embed",
+        "write_obsidian_note.py",
+        "> [!figure]",
+        "![[.../images",
+    ):
+        assert duplicate not in final_writing
+
+    assert "> [!figure]" in obsidian_format
+    assert "![[Research/Papers/DeepPaperNote/paper_slug/images/" in obsidian_format
+    assert "*论文原图编号：Fig. 2。" in obsidian_format
+
+
 def test_paper_types_doc_uses_typed_profiles_without_legacy_common_subheadings() -> None:
-    text = (PROJECT_ROOT / "references" / "paper-types.md").read_text(encoding="utf-8")
+    text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "paper-types.md").read_text(encoding="utf-8")
 
     assert "Common subheadings" not in text
     assert "unless a section truly does not apply" not in text
@@ -263,46 +505,56 @@ def test_note_quality_structural_sections_match_canonical_contract() -> None:
     assert note_quality_structural_sections() == NOTE_REQUIRED_SECTIONS
 
 
-def test_note_plan_docs_make_json_file_canonical() -> None:
-    for doc_name in NOTE_PLAN_REFERENCE_DOCS:
-        text = (PROJECT_ROOT / "references" / doc_name).read_text(encoding="utf-8")
+def test_skill_owns_note_plan_creation_and_grounding_gates() -> None:
+    text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    workflow = text.split("## Workflow", 1)[1].split("## Core Execution Contract", 1)[0]
+    non_negotiable_rules = text.split("Non-negotiable rules:", 1)[1].split(
+        "Reference usage policy:", 1
+    )[0]
+    model_first_rule = text.split("Model-first rule:", 1)[1].split(
+        "The topic references above", 1
+    )[0]
 
-        assert "canonical" in text.lower()
-        assert "short JSON" in text
-        assert "scripts/lint_note.py --plan-file ..." in text
-        assert "<note>.plan.json" in text
-        assert "*_note_plan.json" in text
+    assert workflow.count(
+        "create a short JSON `note_plan` that satisfies the generated bundle contract"
+    ) == 1
+    assert workflow.count(
+        "draft from the plan only after the grounding gate passes"
+    ) == 1
+    assert "lint the final note against the same `note_plan`" in workflow
+    assert NOTE_PLAN_PROTOCOL_RE.search(non_negotiable_rules) is None
+    assert NOTE_PLAN_PROTOCOL_RE.search(model_first_rule) is None
 
 
-def test_note_plan_xml_mentions_are_display_only() -> None:
-    for doc_name in NOTE_PLAN_REFERENCE_DOCS:
-        lines = (PROJECT_ROOT / "references" / doc_name).read_text(encoding="utf-8").splitlines()
-
-        for line in lines:
-            if "<note_plan>" in line:
-                normalized = line.lower()
-                assert "interactive" in normalized
-                assert "display-only" in normalized
-
-
-def test_note_plan_docs_do_not_offer_xml_or_temporary_files_as_alternatives() -> None:
-    combined = "\n".join(
-        (PROJECT_ROOT / "references" / doc_name).read_text(encoding="utf-8")
-        for doc_name in NOTE_PLAN_REFERENCE_DOCS
+def test_skill_owns_formal_save_state_policy() -> None:
+    skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    obsidian_format_text = (SKILL_ROOT / "references" / "obsidian-format.md").read_text(
+        encoding="utf-8"
     )
 
-    note_plan_tag = "`<note_" + "plan>...</note_" + "plan>`"
-    conjunction = "o" + "r"
-    banned_phrases = (
-        "equivalent temporary " + "planning file",
-        "equivalent temporary " + "plan file",
-        "dynamic internal note " + "plan",
-        "planning block such as " + note_plan_tag,
-        "planning artifact such as " + note_plan_tag,
-        "- a compact " + note_plan_tag + " block\n- " + conjunction,
+    marker = "Formal Save states:"
+    assert skill_text.count(marker) == 1
+    assert marker not in obsidian_format_text
+    assert "After such a refusal" not in skill_text
+    assert "do not switch to workspace" in skill_text
+    assert "explicitly chooses not to use a vault" in skill_text
+    for policy_phrase in ("permission escalation", "workspace fallback", "explicit user consent"):
+        assert policy_phrase not in obsidian_format_text
+
+
+def test_topic_references_keep_separate_note_plan_responsibilities() -> None:
+    evidence_first = (SKILL_ROOT / "references" / "evidence-first.md").read_text(
+        encoding="utf-8"
     )
-    for phrase in banned_phrases:
-        assert phrase not in combined
+    writing_and_rubric = [
+        (SKILL_ROOT / "references" / doc_name).read_text(encoding="utf-8")
+        for doc_name in ("final-writing.md", "note-quality.md")
+    ]
+
+    assert "Recommended shape:" in evidence_first
+    assert "scripts/lint_grounding.py --note-plan" in evidence_first
+    for text in writing_and_rubric:
+        assert NOTE_PLAN_PROTOCOL_RE.search(text) is None
 
 
 def test_normal_execution_docs_do_not_force_broad_reference_reads() -> None:
@@ -312,18 +564,13 @@ def test_normal_execution_docs_do_not_force_broad_reference_reads() -> None:
         assert "Read [references/" not in text
         assert "Use [references/" not in text
 
-    skill_text = (PROJECT_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    model_synthesis_text = (PROJECT_ROOT / "references" / "model-synthesis.md").read_text(
-        encoding="utf-8"
-    )
-
+    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
     assert "not a default reading checklist" in skill_text
-    assert "not a second router" in model_synthesis_text
 
 
 def test_normal_execution_docs_require_obsidian_yaml_frontmatter() -> None:
-    skill_text = (PROJECT_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    final_writing_text = (PROJECT_ROOT / "references" / "final-writing.md").read_text(
+    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
+    final_writing_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "final-writing.md").read_text(
         encoding="utf-8"
     )
 
@@ -335,10 +582,10 @@ def test_normal_execution_docs_require_obsidian_yaml_frontmatter() -> None:
 
 
 def test_final_writing_defines_fixed_core_info_schema() -> None:
-    final_writing_text = (PROJECT_ROOT / "references" / "final-writing.md").read_text(
+    final_writing_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "final-writing.md").read_text(
         encoding="utf-8"
     )
-    obsidian_format_text = (PROJECT_ROOT / "references" / "obsidian-format.md").read_text(
+    obsidian_format_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "obsidian-format.md").read_text(
         encoding="utf-8"
     )
 
@@ -366,7 +613,7 @@ def test_final_writing_defines_fixed_core_info_schema() -> None:
 
 
 def test_final_writing_requires_tables_for_central_quantitative_comparisons() -> None:
-    final_writing_text = (PROJECT_ROOT / "references" / "final-writing.md").read_text(
+    final_writing_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "final-writing.md").read_text(
         encoding="utf-8"
     )
 
@@ -375,11 +622,24 @@ def test_final_writing_requires_tables_for_central_quantitative_comparisons() ->
     assert "loose bullet list" in final_writing_text
 
 
-def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
-    text = (PROJECT_ROOT / "references" / "evidence-first.md").read_text(encoding="utf-8")
+def test_evidence_first_is_only_note_plan_json_example() -> None:
+    json_examples: dict[str, list[str]] = {}
+    for doc_name in NOTE_PLAN_REFERENCE_DOCS:
+        text = (SKILL_ROOT / "references" / doc_name).read_text(encoding="utf-8")
+        matches = re.findall(r"```json\n(.*?)\n```", text, flags=re.DOTALL)
+        if matches:
+            json_examples[doc_name] = matches
 
-    assert "```xml" not in text
+    assert tuple(json_examples) == ("evidence-first.md",)
+    assert len(json_examples["evidence-first.md"]) == 1
+
+
+def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
+    text = (SKILL_ROOT / "references" / "evidence-first.md").read_text(
+        encoding="utf-8"
+    )
     match = re.search(r"Recommended shape:\n\n```json\n(.*?)\n```", text, flags=re.DOTALL)
+
     assert match is not None
     example = json.loads(match.group(1))
 
@@ -412,8 +672,7 @@ def test_pdf_contract_banned_phrase_matcher_catches_allowed_fallbacks() -> None:
 
 
 def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
-    skill_text = (PROJECT_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    workflow_text = (PROJECT_ROOT / "references" / "workflow.md").read_text(encoding="utf-8")
+    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
     readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     readme_zh_text = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
 
@@ -429,11 +688,42 @@ def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
     ):
         assert required_source in skill_text[source_priority:stop_policy]
 
-    assert (
-        "Accepted inputs: title, DOI, URL, arXiv ID, local PDF path, Zotero item key."
-        in workflow_text
-    )
-    assert "Acquire the best available PDF" in workflow_text
-    assert "stop and report the blocked stage honestly" in workflow_text
     assert "A title, DOI, URL, arXiv ID, or local PDF all work." in readme_text
     assert "标题、DOI、URL、本地 PDF 都可以" in readme_zh_text
+
+
+def test_regression_workflow_documents_acquisition_identity_audit_contract() -> None:
+    texts = [
+        (PROJECT_ROOT / "evals" / "regression-workflow.md").read_text(encoding="utf-8"),
+        (PROJECT_ROOT / "evals" / "regression-workflow-zh.md").read_text(encoding="utf-8"),
+    ]
+
+    for text in texts:
+        for artifact in (
+            "resolve",
+            "metadata",
+            "fetch",
+            "canonical identity",
+            "repair trace",
+        ):
+            assert artifact in text.lower()
+        for verdict in ("pass", "partial", "fail", "unknown"):
+            assert f"`{verdict}`" in text
+        for scenario in (
+            "repaired identity",
+            "accepted-with-warnings identity",
+            "repair-exhausted failure",
+            "equivalent manifestation",
+        ):
+            assert scenario in text.lower()
+        for downstream_failure in (
+            "wrong identity",
+            "wrong PDF",
+            "metadata contradiction",
+            "missing source evidence",
+            "broken path",
+            "citation damage",
+        ):
+            assert downstream_failure.lower() in text.lower()
+        assert "`architectural_improvement_only`" in text
+        assert "note-visible" in text.lower()

@@ -1,0 +1,10 @@
+{
+  "name": "deeppapernote",
+  "description": "Academic paper reading and Obsidian note generation skills for building a research WIKI.",
+  "version": "0.1.0",
+  "author": {
+    "name": "917Dhj"
+  },
+  "repository": "https://github.com/917Dhj/DeepPaperNote",
+  "license": "MIT"
+}

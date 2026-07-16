@@ -10,10 +10,9 @@
 [![状态](https://img.shields.io/badge/status-stable-16a34a)](https://github.com/917Dhj/DeepPaperNote)
 [![版本](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.0.0)
 [![许可证](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
-[![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./SKILL.md)
-[![输出](https://img.shields.io/badge/output-Obsidian-16a34a)](./references/obsidian-format.md)
-[![图表](https://img.shields.io/badge/figures-image--first-f59e0b)](./references/figure-placement.md)
-[![写作](https://img.shields.io/badge/writing-model--first-7c3aed)](./references/model-synthesis.md)
+[![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./skills/deeppapernote/SKILL.md)
+[![输出](https://img.shields.io/badge/output-Obsidian-16a34a)](./skills/deeppapernote/references/obsidian-format.md)
+[![图表](https://img.shields.io/badge/figures-image--first-f59e0b)](./skills/deeppapernote/references/figure-placement.md)
 [![更新日志](https://img.shields.io/badge/changelog-latest-0f766e)](./CHANGELOG.md)
 
 </div>
@@ -100,16 +99,16 @@ DeepPaperNote 同时支持 Claude Code 和 Codex。
 大多数情况下，可以直接用 npx 安装。在终端运行：
 
 ```bash
-npx skills add 917Dhj/DeepPaperNote
+npx skills add 917Dhj/DeepPaperNote --skill deeppapernote
 ```
 
-此命令会默认安装到共享的`.agents/skills`目录，这个目录中的 skill 可以被 Codex 等大部分 agent 识别并使用。如果你也想在 Claude Code 里使用，在 **Additional agents** 提示中选择 Claude Code即可。
+此命令会从 DeepPaperNote plugin 仓库安装 `deeppapernote` skill。共享的 `.agents/skills` 目录中的 skill 可以被 Codex 等大部分 agent 识别并使用。如果你也想在 Claude Code 里使用，在 **Additional agents** 提示中选择 Claude Code 即可。
 
 你也可以直接指定安装给某个 agent：
 
 ```bash
-npx skills add 917Dhj/DeepPaperNote -a codex
-npx skills add 917Dhj/DeepPaperNote -a claude-code
+npx skills add 917Dhj/DeepPaperNote --skill deeppapernote -a codex
+npx skills add 917Dhj/DeepPaperNote --skill deeppapernote -a claude-code
 ```
 
 ##### 更新
@@ -120,23 +119,24 @@ npx skills add 917Dhj/DeepPaperNote -a claude-code
 
 如果你更习惯手动安装，推荐去 [release](https://github.com/917Dhj/DeepPaperNote/releases) 页面下载最新版本的 zip 包并解压。
 
-Codex 用户可以把解压出来的 `DeepPaperNote` 文件夹放到：
+Codex 用户可以把解压出来的 `skills/deeppapernote` 文件夹放到：
 
 ```bash
-~/.codex/skills/DeepPaperNote
+~/.codex/skills/deeppapernote
 ```
 
-Claude Code 用户可以把解压出来的 `DeepPaperNote` 文件夹放到：
+Claude Code 用户可以把解压出来的 `skills/deeppapernote` 文件夹放到：
 
 ```bash
-~/.claude/skills/DeepPaperNote
+~/.claude/skills/deeppapernote
 ```
 
-也可以直接 `git clone`：
+如果你直接 `git clone` 源码仓库，可以从 checkout 中安装 skill 目录：
 
 ```bash
-git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
-git clone https://github.com/917Dhj/DeepPaperNote.git ~/.claude/skills/DeepPaperNote
+git clone https://github.com/917Dhj/DeepPaperNote.git
+cp -R DeepPaperNote/skills/deeppapernote ~/.codex/skills/deeppapernote
+cp -R DeepPaperNote/skills/deeppapernote ~/.claude/skills/deeppapernote
 ```
 
 安装完成后，重启你的 agent 让技能生效。
@@ -258,7 +258,7 @@ setx DEEPPAPERNOTE_PAPERS_DIR "Research/Papers"
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   如果你希望中间产物统一落在一个固定位置，方便调试、清理或做实验，这个配置会比较有用。
 
-领域路由由 `references/domain_rules.yaml` 中的可编辑分类表控制。DeepPaperNote 会先判断应用领域，再回退到方法领域；只有标题或摘要能提供相对保守的证据时，才会复用已有的 Obsidian 一级领域目录。
+领域路由由 `skills/deeppapernote/references/domain_rules.yaml` 中的可编辑分类表控制。DeepPaperNote 会先判断应用领域，再回退到方法领域；只有标题或摘要能提供相对保守的证据时，才会复用已有的 Obsidian 一级领域目录。
 
 ### 可选：用于本地文献库优先工作流的 Zotero
 
@@ -389,23 +389,7 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 ## ⚙️ 工作流
 
-默认流程是：
-
-1. 解析论文身份
-2. 收集元数据
-3. 获取最佳可用 PDF
-4. 抽取完整原文与 source manifest
-5. 抽取结构化索引和 PDF 图像资产
-6. 规划图表位置
-7. 构建全量图表决策表
-8. 构建 manifest synthesis bundle
-9. 让模型读取 raw sections 并规划笔记
-10. 对 note_plan 运行 grounding lint
-11. 让模型写笔记
-12. 校验最终笔记
-13. 做最终内容质量复核
-14. 做最终可读性复核
-15. 写入 Obsidian
+DeepPaperNote 会解析单篇论文、构建可追溯的原文材料，让模型规划并撰写笔记，完成校验后保存到 Obsidian。规范执行契约以 [`SKILL.md`](./skills/deeppapernote/SKILL.md) 为准。
 
 核心原则：
 
@@ -415,9 +399,7 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 
 相关文档：
 
-- [工作流](./references/workflow.md)
-- [架构](./references/architecture.md)
-- [模型综合写作](./references/model-synthesis.md)
+- [架构](./skills/deeppapernote/references/architecture.md)
 
 ## 🖼️ 图表策略
 
@@ -441,7 +423,7 @@ DeepPaperNote 把”图片是否插入”和”是否保留占位”当作两个
 > 当前状态：保留占位；当前提取结果只拿到局部子图，无法稳定恢复成可独立解释的完整原图。
 ```
 
-详见 [图表放置规则](./references/figure-placement.md)。
+详见 [图表放置规则](./skills/deeppapernote/references/figure-placement.md)。
 
 ## ✅ 质量标准
 
@@ -464,61 +446,35 @@ DeepPaperNote 对“什么算一篇合格笔记”有明确门槛。
 
 相关文档：
 
-- [证据优先](./references/evidence-first.md)
-- [深度分析](./references/deep-analysis.md)
-- [最终写作](./references/final-writing.md)
-- [笔记质量标准](./references/note-quality.md)
+- [证据优先](./skills/deeppapernote/references/evidence-first.md)
+- [深度分析](./skills/deeppapernote/references/deep-analysis.md)
+- [最终写作](./skills/deeppapernote/references/final-writing.md)
+- [笔记质量标准](./skills/deeppapernote/references/note-quality.md)
 
 ## 🗂️ 仓库结构
 
 ```text
 DeepPaperNote/
-├── SKILL.md
+├── .claude-plugin/
+│   └── plugin.json
+├── .codex-plugin/
+│   └── plugin.json
 ├── README.md
 ├── README.zh-CN.md
 ├── CHANGELOG.md
 ├── LICENSE
 ├── pyproject.toml
-├── agents/
-│   └── openai.yaml
 ├── assets/
 │   ├── hero-academic.svg
-│   ├── usage-example.png
-│   └── note_template.md
-├── references/
-│   ├── architecture.md
-│   ├── deep-analysis.md
-│   ├── domain_rules.yaml
-│   ├── evidence-first.md
-│   ├── figure-placement.md
-│   ├── final-writing.md
-│   ├── metadata-sources.md
-│   ├── model-synthesis.md
-│   ├── note-quality.md
-│   ├── obsidian-format.md
-│   ├── paper-types.md
-│   └── workflow.md
-└── scripts/
-    ├── build_synthesis_bundle.py
-    ├── check_environment.py
-    ├── citation_links.py
-    ├── collect_metadata.py
-    ├── common.py
-    ├── contracts.py
-    ├── create_input_record.py
-    ├── extract_evidence.py
-    ├── extract_pdf_assets.py
-    ├── extract_source_text.py
-    ├── fetch_pdf.py
-    ├── lint_grounding.py
-    ├── lint_note.py
-    ├── locate_zotero_attachment.py
-    ├── materialize_figure_asset.py
-    ├── plan_figure_table_decisions.py
-    ├── plan_figures.py
-    ├── resolve_paper.py
-    ├── run_pipeline.py
-    └── write_obsidian_note.py
+│   └── usage-example.png
+├── skills/
+│   └── deeppapernote/
+│       ├── SKILL.md
+│       ├── agents/
+│       │   └── openai.yaml
+│       ├── references/
+│       └── scripts/
+└── tests/
 ```
 
 ## 🧰 推荐环境

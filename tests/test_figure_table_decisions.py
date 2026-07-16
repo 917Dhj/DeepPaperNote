@@ -6,11 +6,23 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DECISIONS_SCRIPT = PROJECT_ROOT / "scripts" / "plan_figure_table_decisions.py"
+DECISIONS_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "plan_figure_table_decisions.py"
 
 
 def write_json(path: Path, payload: dict) -> Path:
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+def write_raw_sections(path: Path) -> Path:
+    record = {
+        "section_id": "sec:method",
+        "title": "Method",
+        "page_start": 1,
+        "page_end": 3,
+        "text": "Figure 1. Overview.\n\nTable 1. Main results.",
+    }
+    path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
     return path
 
 
@@ -87,6 +99,53 @@ def test_figure_table_decisions_cover_every_caption(tmp_path: Path) -> None:
     assert decisions["Table 1"]["decision"] == "placeholder"
     assert decisions["Figure 2"]["decision"] == "low_priority"
     assert payload["summary"]["total_items"] == 3
+
+
+def test_figure_table_decisions_cover_source_corpus_captions(tmp_path: Path) -> None:
+    write_raw_sections(tmp_path / "raw_sections.jsonl")
+    source_manifest = {
+        "paper_id": "paper:source-corpus-figures",
+        "raw_sections_path": "raw_sections.jsonl",
+        "coverage": {"total_pages": 3},
+        "sections": [
+            {
+                "section_id": "sec:method",
+                "title": "Method",
+                "page_start": 1,
+                "page_end": 3,
+            }
+        ],
+        "pages": [{"page": 1, "section_ids": ["sec:method"]}],
+        "captions": {
+            "figures": [
+                {"id": "Figure 1", "caption": "Overview", "page": 1, "section_id": "sec:method"}
+            ],
+            "tables": [
+                {"id": "Table 1", "caption": "Main results", "page": 2, "section_id": "sec:method"}
+            ],
+        },
+    }
+    figures = {
+        "figure_plan": {
+            "figures": [
+                {
+                    "id": "Fig. 1",
+                    "kind": "method_overview",
+                    "section": "方法主线",
+                    "reason": "method overview",
+                    "priority": 1,
+                }
+            ]
+        }
+    }
+
+    payload = run_decisions(tmp_path, source_manifest, figures)
+    decisions = {item["source_id"]: item for item in payload["decisions"]}
+
+    assert set(decisions) == {"Figure 1", "Table 1"}
+    assert decisions["Figure 1"]["target_section"] == "方法主线"
+    assert decisions["Table 1"]["decision"] == "low_priority"
+    assert decisions["Table 1"]["reason"] == "caption_detected_but_not_selected_by_figure_plan"
 
 
 def test_figure_table_decisions_fail_closed_on_visual_defect(tmp_path: Path) -> None:

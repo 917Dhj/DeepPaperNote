@@ -29,7 +29,7 @@ from extract_pdf_assets import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXTRACT_PDF_ASSETS_SCRIPT = PROJECT_ROOT / "scripts" / "extract_pdf_assets.py"
+EXTRACT_PDF_ASSETS_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "extract_pdf_assets.py"
 
 
 def write_test_pdf(path: Path, pages: list[str]) -> None:

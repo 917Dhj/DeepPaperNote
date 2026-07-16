@@ -10,10 +10,9 @@
 [![Status](https://img.shields.io/badge/status-stable-16a34a)](https://github.com/917Dhj/DeepPaperNote)
 [![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.0.0)
 [![License](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
-[![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./SKILL.md)
-[![Output](https://img.shields.io/badge/output-Obsidian-16a34a)](./references/obsidian-format.md)
-[![Figures](https://img.shields.io/badge/figures-image--first-f59e0b)](./references/figure-placement.md)
-[![Writing](https://img.shields.io/badge/writing-model--first-7c3aed)](./references/model-synthesis.md)
+[![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./skills/deeppapernote/SKILL.md)
+[![Output](https://img.shields.io/badge/output-Obsidian-16a34a)](./skills/deeppapernote/references/obsidian-format.md)
+[![Figures](https://img.shields.io/badge/figures-image--first-f59e0b)](./skills/deeppapernote/references/figure-placement.md)
 [![Changelog](https://img.shields.io/badge/changelog-latest-0f766e)](./CHANGELOG.md)
 
 </div>
@@ -100,16 +99,16 @@ DeepPaperNote supports both Claude Code and Codex.
 For most users, install directly with npx. Run in your terminal:
 
 ```bash
-npx skills add 917Dhj/DeepPaperNote
+npx skills add 917Dhj/DeepPaperNote --skill deeppapernote
 ```
 
-This command installs to the shared `.agents/skills` directory by default. Skills in that directory can be recognized and used by Codex and most other agents. If you also want to use DeepPaperNote in Claude Code, choose Claude Code in the **Additional agents** prompt.
+This command installs the `deeppapernote` skill from the DeepPaperNote plugin repository. Skills in the shared `.agents/skills` directory can be recognized and used by Codex and most other agents. If you also want to use DeepPaperNote in Claude Code, choose Claude Code in the **Additional agents** prompt.
 
 You can also install for a specific agent directly:
 
 ```bash
-npx skills add 917Dhj/DeepPaperNote -a codex
-npx skills add 917Dhj/DeepPaperNote -a claude-code
+npx skills add 917Dhj/DeepPaperNote --skill deeppapernote -a codex
+npx skills add 917Dhj/DeepPaperNote --skill deeppapernote -a claude-code
 ```
 
 ##### Update
@@ -120,23 +119,24 @@ To update an existing DeepPaperNote installation, rerun the same command; it wil
 
 If you prefer the manual path, download the latest [release](https://github.com/917Dhj/DeepPaperNote/releases) zip and extract it.
 
-For Codex, place the extracted `DeepPaperNote` folder into:
+For Codex, place the extracted `skills/deeppapernote` folder into:
 
 ```bash
-~/.codex/skills/DeepPaperNote
+~/.codex/skills/deeppapernote
 ```
 
-For Claude Code, place the extracted `DeepPaperNote` folder into:
+For Claude Code, place the extracted `skills/deeppapernote` folder into:
 
 ```bash
-~/.claude/skills/DeepPaperNote
+~/.claude/skills/deeppapernote
 ```
 
-You can also clone the source repository directly:
+If you clone the source repository directly, install the skill directory from the checkout:
 
 ```bash
-git clone https://github.com/917Dhj/DeepPaperNote.git ~/.codex/skills/DeepPaperNote
-git clone https://github.com/917Dhj/DeepPaperNote.git ~/.claude/skills/DeepPaperNote
+git clone https://github.com/917Dhj/DeepPaperNote.git
+cp -R DeepPaperNote/skills/deeppapernote ~/.codex/skills/deeppapernote
+cp -R DeepPaperNote/skills/deeppapernote ~/.claude/skills/deeppapernote
 ```
 
 After installation, restart your agent so the skill is loaded.
@@ -263,7 +263,7 @@ Why the optional path settings can help:
 - `DEEPPAPERNOTE_OUTPUT_DIR`
   Useful if you want all intermediate artifacts in a predictable location for debugging, cleanup, or experimentation.
 
-Domain routing is controlled by the editable taxonomy in `references/domain_rules.yaml`. DeepPaperNote checks application domains before fallback method domains, and it only reuses an existing first-level Obsidian folder when the title or abstract provides conservative evidence for that folder.
+Domain routing is controlled by the editable taxonomy in `skills/deeppapernote/references/domain_rules.yaml`. DeepPaperNote checks application domains before fallback method domains, and it only reuses an existing first-level Obsidian folder when the title or abstract provides conservative evidence for that folder.
 
 ### Optional: Zotero for local-library-first workflows
 
@@ -398,23 +398,7 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 
 ## ⚙️ Workflow
 
-The default path is:
-
-1. resolve the paper identity
-2. collect metadata
-3. fetch the best available PDF
-4. extract canonical raw source text and a source manifest
-5. extract structural indexes and PDF image assets
-6. plan figure placement
-7. build the full figure/table decision table
-8. build a manifest synthesis bundle
-9. let the model read the raw source records and plan the note
-10. run grounding lint on the plan
-11. let the model write the note
-12. lint the final note
-13. perform the final analytical quality review
-14. perform the final readability review
-15. write into Obsidian
+DeepPaperNote resolves one paper, builds grounded source artifacts, lets the model plan and write the note, validates the result, and saves it into Obsidian. The canonical execution contract lives in [`SKILL.md`](./skills/deeppapernote/SKILL.md).
 
 Core principle:
 
@@ -424,9 +408,7 @@ Core principle:
 
 Related docs:
 
-- [Workflow](./references/workflow.md)
-- [Architecture](./references/architecture.md)
-- [Model Synthesis](./references/model-synthesis.md)
+- [Architecture](./skills/deeppapernote/references/architecture.md)
 
 ## 🖼️ Figure Strategy
 
@@ -450,7 +432,7 @@ When a placeholder is needed, DeepPaperNote keeps the semantic position, explana
 > Current status: Placeholder kept; current extraction only recovered partial subpanels and cannot yet reconstruct the full original figure reliably.
 ```
 
-See [figure placement rules](./references/figure-placement.md).
+See [figure placement rules](./skills/deeppapernote/references/figure-placement.md).
 
 ## ✅ Quality Bar
 
@@ -473,62 +455,36 @@ If the evidence is not strong enough, the workflow should degrade gracefully or 
 
 Related docs:
 
-- [Evidence First](./references/evidence-first.md)
-- [Deep Analysis](./references/deep-analysis.md)
-- [Note Quality](./references/note-quality.md)
-- [Final Writing](./references/final-writing.md)
-- [Figure Placement](./references/figure-placement.md)
+- [Evidence First](./skills/deeppapernote/references/evidence-first.md)
+- [Deep Analysis](./skills/deeppapernote/references/deep-analysis.md)
+- [Note Quality](./skills/deeppapernote/references/note-quality.md)
+- [Final Writing](./skills/deeppapernote/references/final-writing.md)
+- [Figure Placement](./skills/deeppapernote/references/figure-placement.md)
 
 ## 🗂️ Repository Layout
 
 ```text
 DeepPaperNote/
-├── SKILL.md
+├── .claude-plugin/
+│   └── plugin.json
+├── .codex-plugin/
+│   └── plugin.json
 ├── README.md
 ├── README.zh-CN.md
 ├── CHANGELOG.md
 ├── LICENSE
 ├── pyproject.toml
-├── agents/
-│   └── openai.yaml
 ├── assets/
 │   ├── hero-academic.svg
-│   ├── usage-example.png
-│   └── note_template.md
-├── references/
-│   ├── architecture.md
-│   ├── deep-analysis.md
-│   ├── domain_rules.yaml
-│   ├── evidence-first.md
-│   ├── figure-placement.md
-│   ├── final-writing.md
-│   ├── metadata-sources.md
-│   ├── model-synthesis.md
-│   ├── note-quality.md
-│   ├── obsidian-format.md
-│   ├── paper-types.md
-│   └── workflow.md
-└── scripts/
-    ├── build_synthesis_bundle.py
-    ├── check_environment.py
-    ├── citation_links.py
-    ├── collect_metadata.py
-    ├── common.py
-    ├── contracts.py
-    ├── create_input_record.py
-    ├── extract_evidence.py
-    ├── extract_pdf_assets.py
-    ├── extract_source_text.py
-    ├── fetch_pdf.py
-    ├── lint_grounding.py
-    ├── lint_note.py
-    ├── locate_zotero_attachment.py
-    ├── materialize_figure_asset.py
-    ├── plan_figure_table_decisions.py
-    ├── plan_figures.py
-    ├── resolve_paper.py
-    ├── run_pipeline.py
-    └── write_obsidian_note.py
+│   └── usage-example.png
+├── skills/
+│   └── deeppapernote/
+│       ├── SKILL.md
+│       ├── agents/
+│       │   └── openai.yaml
+│       ├── references/
+│       └── scripts/
+└── tests/
 ```
 
 ## 🧰 Recommended Environment

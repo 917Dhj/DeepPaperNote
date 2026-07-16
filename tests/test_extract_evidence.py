@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -15,10 +16,11 @@ except ImportError:  # pragma: no cover
 from build_synthesis_bundle import bundle
 from common import extract_caption_lines
 from contracts import NOTE_REQUIRED_SECTIONS
+import extract_evidence
 from extract_evidence import build_appendix_evidence, evidence_quality, extract_equation_candidates
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXTRACT_EVIDENCE_SCRIPT = PROJECT_ROOT / "scripts" / "extract_evidence.py"
+EXTRACT_EVIDENCE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "extract_evidence.py"
 
 
 def write_test_pdf(path: Path, pages: list[str]) -> None:
@@ -32,6 +34,156 @@ def write_test_pdf(path: Path, pages: list[str]) -> None:
         doc.save(path)
     finally:
         doc.close()
+
+
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def write_json(path: Path, payload: dict) -> Path:
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+def write_jsonl(path: Path, records: list[dict]) -> Path:
+    path.write_text(
+        "\n".join(json.dumps(record, ensure_ascii=False) for record in records) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def write_source_corpus_for_evidence(tmp_path: Path) -> Path:
+    raw_sections = [
+        {
+            "record_type": "section",
+            "section_id": "sec:introduction",
+            "kind": "introduction",
+            "title": "Introduction",
+            "page_start": 1,
+            "page_end": 1,
+            "text": "We introduce a source-corpus evidence path for paper reading.",
+        },
+        {
+            "record_type": "section",
+            "section_id": "sec:method",
+            "kind": "method",
+            "title": "Method",
+            "page_start": 2,
+            "page_end": 2,
+            "text": (
+                "The method builds a deterministic framework and computes "
+                "L_i = -\\log p_i for training."
+            ),
+        },
+        {
+            "record_type": "section",
+            "section_id": "sec:experiment",
+            "kind": "experiment",
+            "title": "Experiments",
+            "page_start": 3,
+            "page_end": 3,
+            "text": "The experiment improves accuracy to 91.2 and reports stable results.",
+        },
+        {
+            "record_type": "section",
+            "section_id": "sec:appendix",
+            "kind": "appendix",
+            "title": "Appendix A",
+            "page_start": 4,
+            "page_end": 4,
+            "text": (
+                "Without replay, F1 drops by 4.1 points. "
+                "We use learning rate 1e-4 and batch size 32."
+            ),
+        },
+    ]
+    for record in raw_sections:
+        record["char_count"] = len(record["text"])
+        record["text_hash_sha256"] = sha256_text(record["text"])
+
+    raw_sections_path = tmp_path / "paper_raw_sections.jsonl"
+    write_jsonl(raw_sections_path, raw_sections)
+    full_text = "\n\n".join(record["text"] for record in raw_sections)
+    manifest = {
+        "status": "ok",
+        "script": "extract_source_text.py",
+        "schema_version": 1,
+        "paper_id": "paper:source-corpus-evidence",
+        "title": "Source Corpus Evidence Paper",
+        "abstract": "We introduce a source-corpus evidence path for paper reading.",
+        "source_kind": "pdf_text",
+        "raw_sections_path": str(raw_sections_path),
+        "coverage": {
+            "total_pages": 4,
+            "text_max_pages": None,
+            "text_pages_extracted": 4,
+            "text_pages_scanned": 4,
+            "text_truncated": False,
+            "truncated_due_to_page_limit": False,
+            "appendix_detected": True,
+            "appendix_start_page": 4,
+        },
+        "sections": [
+            {
+                key: record[key]
+                for key in (
+                    "section_id",
+                    "kind",
+                    "title",
+                    "page_start",
+                    "page_end",
+                    "char_count",
+                    "text_hash_sha256",
+                )
+            }
+            for record in raw_sections
+        ],
+        "pages": [
+            {"page": 1, "char_count": 62, "section_ids": ["sec:introduction"]},
+            {"page": 2, "char_count": 84, "section_ids": ["sec:method"]},
+            {"page": 3, "char_count": 67, "section_ids": ["sec:experiment"]},
+            {"page": 4, "char_count": 75, "section_ids": ["sec:appendix"]},
+        ],
+        "captions": {
+            "figures": [
+                {
+                    "id": "Figure 1",
+                    "caption": "Source corpus evidence flow.",
+                    "page": 2,
+                    "pages": [2],
+                    "section_id": "sec:method",
+                }
+            ],
+            "tables": [
+                {
+                    "id": "Table 1",
+                    "caption": "Main source-corpus results.",
+                    "page": 3,
+                    "pages": [3],
+                    "section_id": "sec:experiment",
+                }
+            ],
+        },
+        "math_index": [
+            {
+                "text": "L_i = -\\log p_i",
+                "section_id": "sec:method",
+                "page_start": 2,
+                "page_end": 2,
+            }
+        ],
+        "appendix_index": {
+            "appendix_detected": True,
+            "start_page": 4,
+            "sections": [{"title": "Appendix A", "page": 4}],
+            "figure_captions": [],
+            "table_captions": [],
+        },
+        "language_hint": "zh",
+        "text_hash_sha256": sha256_text(full_text),
+    }
+    return write_json(tmp_path / "paper_source_manifest.json", manifest)
 
 
 def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
@@ -74,6 +226,106 @@ def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
     assert payload["summary"]["mechanism_signals"]
     assert payload["summary"]["paper_type"] == "AI_method"
     assert payload["evidence_pack"]["reference_candidates"] == []
+
+
+def test_extract_evidence_source_corpus_mode_uses_corpus_views(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = write_source_corpus_for_evidence(tmp_path)
+    output_path = tmp_path / "evidence.json"
+
+    def fail_pdf_helper(*_args, **_kwargs):
+        raise AssertionError("Source Corpus mode must not call PDF text-structure helpers")
+
+    monkeypatch.setattr(extract_evidence, "pdf_coverage_summary", fail_pdf_helper)
+    monkeypatch.setattr(extract_evidence, "extract_pdf_sections", fail_pdf_helper)
+    monkeypatch.setattr(extract_evidence, "extract_pdf_text", fail_pdf_helper)
+    monkeypatch.setattr(extract_evidence, "extract_appendix_index", fail_pdf_helper)
+    monkeypatch.setattr(extract_evidence, "extract_appendix_page_texts", fail_pdf_helper)
+    monkeypatch.setattr(extract_evidence, "extract_caption_lines", fail_pdf_helper)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "extract_evidence.py",
+            "--source-manifest",
+            str(manifest_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    extract_evidence.main()
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    pack = payload["evidence_pack"]
+    assert payload["status"] == "ok"
+    assert payload["summary"]["source_corpus_used"] is True
+    assert payload["summary"]["pdf_used"] is False
+    assert pack["section_texts"]["method"].startswith("The method builds")
+    assert pack["candidate_chunks"]["method"][0]["actual_source_section"] == "method"
+    assert pack["figure_captions"][:1] == [
+        {
+            "id": "Figure 1",
+            "caption": "Source corpus evidence flow.",
+            "page_hint": "p.2",
+            "section_id": "sec:method",
+        }
+    ]
+    assert pack["table_captions"][:1] == [
+        {
+            "id": "Table 1",
+            "caption": "Main source-corpus results.",
+            "page_hint": "p.3",
+            "section_id": "sec:experiment",
+        }
+    ]
+    assert "drops by 4.1 points" in pack["appendix_evidence"]["ablation"][0]["evidence"]
+    assert "learning rate 1e-4" in pack["appendix_evidence"]["implementation_details"][0]["evidence"]
+    assert pack["pdf_coverage"]["total_pages"] == 4
+    assert pack["pdf_coverage"]["truncated_due_to_page_limit"] is False
+    assert pack["language_hint"] == "zh"
+    assert pack["reference_candidates"] == []
+
+
+def test_extract_evidence_source_corpus_validation_fails_closed(tmp_path: Path) -> None:
+    manifest_path = write_json(
+        tmp_path / "paper_source_manifest.json",
+        {
+            "paper_id": "paper:invalid-source-corpus",
+            "title": "Invalid Source Corpus Paper",
+            "raw_sections_path": str(tmp_path / "missing_raw_sections.jsonl"),
+            "sections": [],
+            "pages": [],
+            "captions": {"figures": [], "tables": []},
+            "coverage": {"total_pages": 1},
+        },
+    )
+    output_path = tmp_path / "evidence.json"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_EVIDENCE_SCRIPT),
+            "--source-manifest",
+            str(manifest_path),
+            "--output",
+            str(output_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["status"] == "error"
+    assert payload["error"] == "source_corpus_invalid"
+    assert {
+        issue["code"]
+        for issue in payload["source_corpus_issues"]
+    } >= {"source_corpus_raw_sections_missing", "source_corpus_empty_text"}
 
 
 def test_extract_evidence_outputs_pdf_coverage_for_truncated_pdf(tmp_path: Path) -> None:

@@ -1,0 +1,4 @@
+interface:
+  display_name: "DeepPaperNote"
+  short_description: "Generate a high-quality deep-reading note for one paper with a raw-source manifest workflow and Obsidian-oriented save semantics."
+  default_prompt: "Use $deeppapernote to create the deep-reading note for this paper."

@@ -36,11 +36,12 @@ from common import (
     resolve_note_output_mode,
     resolve_obsidian_note_path,
     semantic_scholar_headers,
+    choose_local_pdf_corrected_title,
 )
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-ENV_SCRIPT = PROJECT_ROOT / "scripts" / "check_environment.py"
+ENV_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "check_environment.py"
 
 
 class FakePdfPage:
@@ -365,6 +366,46 @@ def test_resolve_reference_local_pdf_uses_extracted_hints(tmp_path: Path, monkey
     assert resolved["arxiv_id"] == "2302.13971"
 
 
+def test_local_pdf_low_confidence_title_uses_external_identity_match() -> None:
+    corrected = choose_local_pdf_corrected_title(
+        {
+            "title": "Provided proper attribution is provided, Google hereby grants permission to",
+            "local_pdf_title_source": "first_page_title_used",
+            "arxiv_id": "1706.03762",
+            "doi": "10.48550/arXiv.1706.03762",
+        },
+        [
+            {
+                "title": "Attention Is All You Need",
+                "arxiv_id": "1706.03762",
+                "doi": "10.48550/arXiv.1706.03762",
+                "metadata_sources": ["arxiv"],
+            }
+        ],
+    )
+
+    assert corrected == "Attention Is All You Need"
+
+
+def test_local_pdf_good_title_does_not_use_unrelated_external_title() -> None:
+    corrected = choose_local_pdf_corrected_title(
+        {
+            "title": "A Careful Local PDF Title",
+            "local_pdf_title_source": "first_page_title_used",
+            "arxiv_id": "1706.03762",
+        },
+        [
+            {
+                "title": "Attention Is All You Need",
+                "arxiv_id": "1706.03762",
+                "metadata_sources": ["arxiv"],
+            }
+        ],
+    )
+
+    assert corrected == ""
+
+
 def test_resolve_note_output_mode_falls_back_to_workspace(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     config = {
@@ -374,6 +415,24 @@ def test_resolve_note_output_mode_falls_back_to_workspace(tmp_path: Path, monkey
     mode, root = resolve_note_output_mode(config)
     assert mode == "workspace"
     assert root == tmp_path / "DeepPaperNote_output"
+
+
+@pytest.mark.parametrize(
+    "workspace_output_dir", ["../outside", "/outside", r"\outside", r"C:\outside"]
+)
+def test_resolve_note_output_mode_rejects_workspace_root_outside_save_target(
+    tmp_path: Path,
+    monkeypatch,
+    workspace_output_dir: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    config = {
+        "obsidian_vault": "",
+        "workspace_output_dir": workspace_output_dir,
+    }
+
+    with pytest.raises(RuntimeError, match="workspace_output_dir"):
+        resolve_note_output_mode(config)
 
 
 def test_runtime_config_ignores_read_arxiv_obsidian_vault(tmp_path: Path, monkeypatch) -> None:
@@ -413,6 +472,57 @@ def test_resolve_obsidian_note_path_in_vault_mode(tmp_path: Path) -> None:
     }
     path = resolve_obsidian_note_path(config, title="My Test Paper", subdir="心理健康")
     assert path == vault / "Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
+
+
+@pytest.mark.parametrize(
+    ("config_override", "path_args", "field"),
+    [
+        ({"papers_dir": "../outside"}, {}, "papers_dir"),
+        ({"papers_dir": "/outside"}, {}, "papers_dir"),
+        ({}, {"subdir": "../outside"}, "subdir"),
+        ({}, {"subdir": "/outside"}, "subdir"),
+        ({}, {"filename": "/outside.md"}, "filename"),
+        ({}, {"filename": r"C:\outside.md"}, "filename"),
+    ],
+)
+def test_resolve_obsidian_note_path_rejects_paths_outside_save_target(
+    tmp_path: Path,
+    config_override: dict[str, str],
+    path_args: dict[str, str],
+    field: str,
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    config = {
+        "obsidian_vault": str(vault),
+        "papers_dir": "Research/Papers",
+        "workspace_output_dir": "DeepPaperNote_output",
+        **config_override,
+    }
+
+    with pytest.raises(RuntimeError, match=field):
+        resolve_obsidian_note_path(config, title="Paper", **path_args)
+
+
+def test_resolve_obsidian_note_path_allows_nested_filename_inside_save_target(
+    tmp_path: Path,
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    config = {
+        "obsidian_vault": str(vault),
+        "papers_dir": "Research/Papers",
+        "workspace_output_dir": "DeepPaperNote_output",
+    }
+
+    path = resolve_obsidian_note_path(
+        config,
+        title="Paper",
+        subdir="Benchmark",
+        filename="nested/Paper.md",
+    )
+
+    assert path == vault / "Research/Papers/Benchmark/Paper/nested/Paper.md"
 
 
 def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_already_contains_slug(tmp_path: Path) -> None:
@@ -467,6 +577,27 @@ def test_resolve_obsidian_note_path_avoids_double_folder_when_subdir_is_title_sl
         / "Benchmark"
         / "SWE_bench_Can_Language_Models_Resolve_Real_World_GitHub_Issues"
         / "SWE-bench - Can Language Models Resolve Real-World GitHub Issues.md"
+    )
+
+
+def test_resolve_obsidian_note_path_accepts_windows_style_papers_relative_subdir(
+    tmp_path: Path,
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    config = {
+        "obsidian_vault": str(vault),
+        "papers_dir": "Research/Papers",
+        "workspace_output_dir": "DeepPaperNote_output",
+    }
+    path = resolve_obsidian_note_path(
+        config,
+        title="My Test Paper",
+        subdir=r"Research\Papers\Benchmark\My_Test_Paper",
+    )
+    assert (
+        path
+        == vault / "Research/Papers" / "Benchmark" / "My_Test_Paper" / "My_Test_Paper.md"
     )
 
 

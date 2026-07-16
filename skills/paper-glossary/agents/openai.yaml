@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Glossary"
+  short_description: "Build reusable glossary notes from paper raw sections."
+  default_prompt: "Use $paper-glossary in preview-and-wait mode: propose candidates from this paper manifest and raw sections, perform semantic review, record the reviewed artifact, present its complete numbered shortlist, then stop and wait for my explicit selection before writing glossary notes or article links; triage starts only after selection."

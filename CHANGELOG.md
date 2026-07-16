@@ -12,7 +12,20 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
-No unreleased user-facing changes yet.
+### Changed
+
+- Converted the repository to a dual-stack Claude Code and Codex plugin layout with the canonical skill under `skills/deeppapernote/`.
+- Updated the recommended install command to select the `deeppapernote` skill from the plugin repository.
+
+### Fixed
+
+- Fixed Windows-style Obsidian subdirectories so `Research/Papers` is not duplicated in saved note paths.
+- Cross-platform (Windows) path and encoding robustness: read files with `utf-8-sig` so a UTF-8 BOM (as written by PowerShell/Notepad) no longer crashes JSON loading or corrupts saved notes; tolerate CRLF line endings in note linting; and compare/emit paths without assuming `/` so the vault folder and Markdown image links resolve correctly on Windows. No behavior change on Linux/macOS.
+
+### Contributors
+
+- Incorporated the Windows Obsidian path normalization fix from PR #4 by KumamuKuma.
+- Incorporated the Windows path/encoding robustness fix from PR #5 by jiang4wqy.
 
 ## v2.0.0
 

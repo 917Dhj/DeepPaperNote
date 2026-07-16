@@ -2,11 +2,11 @@
 
 ## Claude Code Integration
 
-The root `SKILL.md` is both the canonical workflow definition and the Claude Code skill entrypoint.
-There is no separate Claude Code wrapper — `SKILL.md` is loaded directly when the skill is invoked.
+`skills/deeppapernote/SKILL.md` is both the canonical workflow definition and the Claude Code skill entrypoint.
+`.claude-plugin/plugin.json` identifies the plugin, but it must not restate the workflow.
 
 - Do not fork or restate the DeepPaperNote workflow in any Claude-only file.
-- All workflow logic stays in the root `SKILL.md`.
+- All workflow logic stays in `skills/deeppapernote/SKILL.md`.
 
 ### Skill Invocation
 
