@@ -66,7 +66,7 @@ def _field_value(body: str, label: str) -> str:
 
 def _has_valid_confidence(body: str) -> bool:
     value = _field_value(body, GLOSSARY_LABEL_CONFIDENCE)
-    return any(level in value for level in GLOSSARY_CONFIDENCE_VALUES)
+    return value in GLOSSARY_CONFIDENCE_VALUES
 
 
 def lint_term_file_text(text: str) -> dict[str, Any]:

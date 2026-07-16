@@ -20,6 +20,24 @@ CONCEPT_FIELDS = {
     "distinction": "\u4e0e\u76f8\u90bb\u6982\u5ff5\u7684\u533a\u522b\uff1a",
     "confidence": GLOSSARY_LABEL_CONFIDENCE,
 }
+
+OBSIDIAN_LINK_STEM_TRANSLATION = str.maketrans(
+    {
+        "#": "＃",
+        "^": "＾",
+        "[": "［",
+        "]": "］",
+        "|": "｜",
+        ":": "：",
+        "%": "％",
+    }
+)
+
+
+def obsidian_safe_link_stem(value: str) -> str:
+    return value.translate(OBSIDIAN_LINK_STEM_TRANSLATION)
+
+
 OPTIONAL_CONCEPT_FIELDS = ("elaboration", "intuition", "distinction")
 
 
@@ -330,6 +348,12 @@ def inspect_selected_terms(selected: list[dict[str, Any]], terms_dir: Path) -> l
                 }
             )
             continue
+        safe_stem = obsidian_safe_link_stem(path.stem)
+        if safe_stem != path.stem:
+            raise SystemExit(
+                f"Existing glossary note has an Obsidian-unsafe filename: {path.name}; "
+                f"rename it to {safe_stem}.md before continuing."
+            )
         text = read_glossary_note(path)
         state, missing = note_state(text)
         results.append(

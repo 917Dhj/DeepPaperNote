@@ -143,6 +143,8 @@ Both modes revalidate the current source and saved review before loading generat
 
 `action` is `created`, `enriched`, `updated`, or `unchanged`. Entry `aliases` may be written to note metadata and participate in logical collision checks, but they are never added to writer `forms`. Generated names and aliases are checked against the full library's NFKC/casefold alias index before any write; an existing form is allowed only for the same validated target. Grounded inventory forms need not be repeated in entry `aliases`. Existing notes are never replaced, only missing fields and an absent occurrence may be added. `triage_sha256` deterministically identifies the authorized triage's paper, provenance, and terms. `mappings_sha256` binds that triage identity, validated provenance, derived context, and exact ordered `name`, `forms`, `file`, and `link_stem` mappings.
 
+Before filesystem-invalid-character cleanup, the writer translates Obsidian wikilink syntax characters `# ^ [ ] | : %` in generated filename stems to their fullwidth equivalents. When the allocated `link_stem` differs from the exact term, the note keeps that exact term as an alias and visible H1, so article links use forms such as `[[C＃|C#]]`. Inventory rejects a selected existing note whose filename still contains those unsafe ASCII characters and asks the user to replace its filename; it never changes user-owned note paths automatically.
+
 Run the linker **only if an article Markdown was supplied/requested**:
 
 ```text

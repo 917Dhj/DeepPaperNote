@@ -83,6 +83,23 @@ def test_linker_links_first_safe_alias_and_skips_all_protected_regions(
     assert result["summary"] == {"linked": 1, "already_linked": 0, "not_found": 0}
 
 
+def test_linker_uses_safe_stem_and_does_not_duplicate_link(tmp_path: Path) -> None:
+    article = tmp_path / "Paper.md"
+    article.write_text("C# is a programming language.\n", encoding="utf-8")
+    mappings = [{"link_stem": "C＃", "forms": ["C#"]}]
+
+    first = link_article_terms(article, mappings, digest(article))
+    second = link_article_terms(article, mappings, digest(article))
+
+    assert article.read_text(encoding="utf-8") == (
+        "[[C＃|C#]] is a programming language.\n"
+    )
+    assert first["results"] == [{"link_stem": "C＃", "status": "linked"}]
+    assert second["results"] == [
+        {"link_stem": "C＃", "status": "already_linked"}
+    ]
+
+
 def test_linker_rejects_stale_article_hash_before_writing(tmp_path: Path) -> None:
     article = tmp_path / "Paper.md"
     original = b"ReAct text\n"

@@ -67,6 +67,138 @@ def test_safe_term_filename_strips_illegal_chars() -> None:
     assert safe_term_filename("KL 散度") == "KL 散度"
 
 
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("C#", "C＃"),
+        ("term^block", "term＾block"),
+        ("[term]", "［term］"),
+        ("left|right", "left｜right"),
+        ("key:value", "key：value"),
+        ("100%", "100％"),
+    ],
+)
+def test_safe_term_filename_translates_obsidian_link_syntax(
+    name: str, expected: str
+) -> None:
+    assert safe_term_filename(name) == expected
+
+
+def test_writer_preserves_exact_name_when_safe_link_stem_differs(tmp_path: Path) -> None:
+    terms_dir = tmp_path / "terms"
+    selected = [{"term": "C#", "surface_forms": ["C#"]}]
+    inventory = _inventory(inspect_selected_terms(selected, terms_dir))
+
+    result = write_glossary_entries(
+        {
+            "entries": [
+                {
+                    "name": "C#",
+                    "operation": "create",
+                    "definition": "A programming language.",
+                    "confidence": "高",
+                    "occurrence": "Paper evidence.",
+                }
+            ]
+        },
+        inventory,
+        terms_dir,
+        "Paper",
+    )
+
+    note = terms_dir / "C＃.md"
+    assert result["results"][0]["link_stem"] == "C＃"
+    assert note.is_file()
+    text = note.read_text(encoding="utf-8")
+    assert '  - "C#"' in text
+    assert "# C#\n" in text
+    existing = inspect_selected_terms(selected, terms_dir)[0]
+    assert existing["file"] == str(note)
+    assert existing["link_stem"] == "C＃"
+
+
+def test_writer_rejects_unsafe_existing_stem_before_batch_write(tmp_path: Path) -> None:
+    terms_dir = tmp_path / "terms"
+    terms_dir.mkdir()
+    unsafe = terms_dir / "C#.md"
+    unsafe.write_text(
+        render_term_file({**ENTRY, "name": "C#", "aliases": []}, "Paper"),
+        encoding="utf-8",
+    )
+    before = unsafe.read_bytes()
+    inventory = _inventory(
+        [
+            {
+                "term": "Created",
+                "surface_forms": ["Created"],
+                "state": "new",
+                "file": "",
+                "link_stem": "Created",
+                "missing_fields": [],
+            },
+            {
+                "term": "C#",
+                "surface_forms": ["C#"],
+                "state": "existing_complete",
+                "file": str(unsafe),
+                "link_stem": "C#",
+                "missing_fields": [],
+            },
+        ]
+    )
+
+    with pytest.raises(SystemExit, match=r"rename.*C＃\.md"):
+        write_glossary_entries(
+            {
+                "entries": [
+                    {
+                        "name": name,
+                        "operation": "create" if name == "Created" else "reuse",
+                        "definition": "definition",
+                        "confidence": "高",
+                        "occurrence": "evidence",
+                    }
+                    for name in ("Created", "C#")
+                ]
+            },
+            inventory,
+            terms_dir,
+            "Paper",
+        )
+
+    assert unsafe.read_bytes() == before
+    assert not (terms_dir / "Created.md").exists()
+    assert not (terms_dir / "C＃.md").exists()
+
+
+def test_writer_and_lint_require_exact_confidence_value(tmp_path: Path) -> None:
+    terms_dir = tmp_path / "terms"
+    selected = [{"term": "ReAct", "surface_forms": ["ReAct"]}]
+    inventory = _inventory(inspect_selected_terms(selected, terms_dir))
+
+    with pytest.raises(SystemExit, match="valid confidence"):
+        write_glossary_entries(
+            {
+                "entries": [
+                    {
+                        "name": "ReAct",
+                        "operation": "create",
+                        "definition": "Reasoning and acting.",
+                        "confidence": "不高",
+                        "occurrence": "Paper evidence.",
+                    }
+                ]
+            },
+            inventory,
+            terms_dir,
+            "Paper",
+        )
+
+    invalid = render_term_file({**ENTRY, "confidence": "不高"}, "Paper")
+    assert "term_confidence_invalid" in _codes(lint_term_file_text(invalid))
+    assert not terms_dir.exists()
+
+
 def test_upsert_creates_then_dedupes_by_alias(tmp_path: Path) -> None:
     terms_dir = tmp_path / "术语"
     index = build_alias_index(terms_dir)
@@ -1478,7 +1610,7 @@ def test_writer_allocates_sanitized_create_collisions_and_reports_actual_stems(
     terms_dir = tmp_path / "terms"
     selected = [
         {"term": "A/B", "surface_forms": ["A/B"]},
-        {"term": "A:B", "surface_forms": ["A:B"]},
+        {"term": r"A\B", "surface_forms": [r"A\B"]},
     ]
     inventory = _inventory(inspect_selected_terms(selected, terms_dir))
     entries = {
@@ -1498,6 +1630,9 @@ def test_writer_allocates_sanitized_create_collisions_and_reports_actual_stems(
 
     assert [item["link_stem"] for item in result["results"]] == ["A B", "A B-2"]
     assert sorted(path.name for path in terms_dir.glob("*.md")) == ["A B-2.md", "A B.md"]
+    second = (terms_dir / "A B-2.md").read_text(encoding="utf-8")
+    assert '  - "A\\\\B"' in second
+    assert "# A\\B\n" in second
 
 
 def test_append_occurrence_ignores_same_paper_link_outside_occurrence_section() -> None:

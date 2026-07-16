@@ -37,6 +37,7 @@ from glossary_library import (
     build_alias_index as _library_build_alias_index,
     inspect_selected_terms,
     note_state,
+    obsidian_safe_link_stem,
     read_frontmatter_aliases as _read_frontmatter_aliases,
     read_heading_name as _read_heading_name,
 )
@@ -70,7 +71,7 @@ def parser() -> argparse.ArgumentParser:
 
 
 def safe_term_filename(name: str) -> str:
-    raw = str(name)
+    raw = obsidian_safe_link_stem(str(name))
     if not raw or raw in (".", "..") or raw.endswith((" ", ".")):
         raise SystemExit(f"Unsafe glossary filename: {raw!r}")
     cleaned = ILLEGAL_FILENAME_CHARS.sub(" ", raw)
@@ -140,9 +141,14 @@ def occurrence_line(entry: dict[str, Any], paper_link: str) -> str:
     return f"- [[{paper_link}]]{suffix}"
 
 
-def render_term_file(entry: dict[str, Any], paper_link: str) -> str:
+def render_term_file(
+    entry: dict[str, Any], paper_link: str, link_stem: str | None = None
+) -> str:
     name = normalize_whitespace(str(entry.get("name", "")))
-    aliases = [alias for alias in _alias_forms(entry) if alias.lower() != name.lower()]
+    actual_stem = name if link_stem is None else link_stem
+    aliases = [
+        alias for alias in _alias_forms(entry) if alias.casefold() != actual_stem.casefold()
+    ]
     front = ["---", "aliases:"]
     front.extend(f"  - {_frontmatter_string(alias)}" for alias in aliases)
     front.extend([f"tags: [{GLOSSARY_TERM_TAG}]", "---", ""])
@@ -175,7 +181,7 @@ def upsert_term_file(
     name = normalize_whitespace(str(entry.get("name", "")))
     terms_dir.mkdir(parents=True, exist_ok=True)
     path = _unique_term_path(terms_dir, safe_term_filename(name))
-    path.write_text(render_term_file(entry, paper_link), encoding="utf-8")
+    path.write_text(render_term_file(entry, paper_link, path.stem), encoding="utf-8")
     for form in _alias_forms(entry):
         index.setdefault(form.lower(), path)
     index.setdefault(path.stem.lower(), path)
@@ -359,7 +365,7 @@ def _entry_patch(entry: dict[str, Any]) -> dict[str, Any]:
 
 def _valid_confidence(value: Any) -> bool:
     normalized = normalize_whitespace(str(value))
-    return any(level in normalized for level in GLOSSARY_CONFIDENCE_VALUES)
+    return normalized in GLOSSARY_CONFIDENCE_VALUES
 
 
 def _preflight_entries(
@@ -480,7 +486,7 @@ def _prepare_write_plans(
             path = _allocate_create_path(
                 root, safe_term_filename(str(entry.get("name", ""))), reserved
             )
-            text = render_term_file(entry, paper_link)
+            text = render_term_file(entry, paper_link, path.stem)
             had_bom = False
             original_bytes = None
             identity = None
