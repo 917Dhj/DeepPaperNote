@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import re
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from glossary_contracts import (
@@ -16,7 +17,7 @@ from glossary_contracts import (
     GLOSSARY_LABEL_DEFINITION,
     GLOSSARY_OCCURRENCE_HEADING,
 )
-from glossary_common import emit
+from glossary_common import elapsed_ms, emit
 
 DISCLAIMER_KEYPHRASE = "非某篇论文"
 OCCURRENCE_LINK_RE = re.compile(r"(?m)^\s*-\s*\[\[[^\]]+\]\]")
@@ -24,7 +25,12 @@ OCCURRENCE_LINK_RE = re.compile(r"(?m)^\s*-\s*\[\[[^\]]+\]\]")
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "lint glossary notes")
-    p.add_argument("--input", default="", help="Single term note Markdown path.")
+    p.add_argument(
+        "--input",
+        action="append",
+        default=[],
+        help="Term note Markdown path. Repeat for multiple changed notes.",
+    )
     p.add_argument("--terms-dir", default="", help="Folder of term notes to lint.")
     p.add_argument("--output", default="", help="Output JSON path.")
     return p
@@ -60,7 +66,7 @@ def _field_value(body: str, label: str) -> str:
 
 def _has_valid_confidence(body: str) -> bool:
     value = _field_value(body, GLOSSARY_LABEL_CONFIDENCE)
-    return any(level in value for level in GLOSSARY_CONFIDENCE_VALUES)
+    return value in GLOSSARY_CONFIDENCE_VALUES
 
 
 def lint_term_file_text(text: str) -> dict[str, Any]:
@@ -88,15 +94,27 @@ def lint_term_file_text(text: str) -> dict[str, Any]:
 
 
 def main() -> None:
+    started = perf_counter()
     args = parser().parse_args()
     if not args.input and not args.terms_dir:
         raise SystemExit("lint_glossary.py requires --input or --terms-dir.")
 
     files: list[Path] = []
-    if args.input:
-        files.append(Path(args.input).expanduser().resolve())
+    seen: set[Path] = set()
+    for value in args.input:
+        path = Path(value).expanduser().resolve()
+        if path not in seen:
+            seen.add(path)
+            files.append(path)
     if args.terms_dir:
-        files.extend(sorted(Path(args.terms_dir).expanduser().resolve().glob("*.md")))
+        terms_dir = Path(args.terms_dir).expanduser().resolve()
+        if not terms_dir.is_dir():
+            raise SystemExit(f"--terms-dir must be an existing directory: {terms_dir}")
+        for path in sorted(terms_dir.glob("*.md")):
+            path = path.resolve()
+            if path not in seen:
+                seen.add(path)
+                files.append(path)
     if not files:
         raise SystemExit("No glossary markdown files found.")
 
@@ -113,6 +131,7 @@ def main() -> None:
             "passes_glossary": all(result["passes"] for result in results),
             "files": results,
             "summary": {"total": len(results), "passed": passed, "failed": len(results) - passed},
+            "elapsed_ms": elapsed_ms(started),
         },
         args.output,
     )
