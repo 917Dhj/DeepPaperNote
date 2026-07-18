@@ -147,13 +147,7 @@ Pull requests should target `develop`, not `main`. Changes that may affect final
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=917Dhj%2FDeepPaperNote&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=917Dhj/DeepPaperNote&type=date&theme=dark&legend=top-left&sealed_token=kAnUJ2TywAGCCM_w7PwP3YipfkfnbMAKoC4YyYEHTU9Zbsxeji8m-rQ7HcHg7QD8CYnAwUfgje405CPTfmKYBlPPCZZDRCz_bXekWyK-VERr1SGXzeOjgLCGiXCgTf1BAdnDn7oQ7b_-PC91F_DySCY4kkQ23MabDoKE6acumkRXDfz1u4NJlqP_Z1c6" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=917Dhj/DeepPaperNote&type=date&legend=top-left&sealed_token=kAnUJ2TywAGCCM_w7PwP3YipfkfnbMAKoC4YyYEHTU9Zbsxeji8m-rQ7HcHg7QD8CYnAwUfgje405CPTfmKYBlPPCZZDRCz_bXekWyK-VERr1SGXzeOjgLCGiXCgTf1BAdnDn7oQ7b_-PC91F_DySCY4kkQ23MabDoKE6acumkRXDfz1u4NJlqP_Z1c6" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=917Dhj/DeepPaperNote&type=date&legend=top-left&sealed_token=kAnUJ2TywAGCCM_w7PwP3YipfkfnbMAKoC4YyYEHTU9Zbsxeji8m-rQ7HcHg7QD8CYnAwUfgje405CPTfmKYBlPPCZZDRCz_bXekWyK-VERr1SGXzeOjgLCGiXCgTf1BAdnDn7oQ7b_-PC91F_DySCY4kkQ23MabDoKE6acumkRXDfz1u4NJlqP_Z1c6" />
- </picture>
-</a>
+[![Star History Chart](./assets/star-history.svg)](https://www.star-history.com/?repos=917Dhj%2FDeepPaperNote&type=date&legend=top-left)
 
 <p align="center">
   <em>Thanks for reading, using, and supporting DeepPaperNote. May your paper-reading days be a little clearer, calmer, and more rewarding.</em>
