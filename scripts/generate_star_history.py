@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Generate a repository-local star-history SVG from GitHub timestamps."""
+"""Update a repository-local star-history SVG from public star-count samples."""
 
 from __future__ import annotations
 
-import collections
 import datetime as dt
 import html
 import json
@@ -17,10 +16,18 @@ from pathlib import Path
 
 GITHUB_API = "https://api.github.com"
 
-def github_json(url: str, token: str, retries: int = 3) -> object:
+
+def update_history(
+    history: list[tuple[dt.date, int]], sample_day: dt.date, total: int
+) -> list[tuple[dt.date, int]]:
+    if history and history[-1][0] == sample_day:
+        return [*history[:-1], (sample_day, total)]
+    return [*history, (sample_day, total)]
+
+
+def github_json(url: str, retries: int = 3) -> object:
     headers = {
-        "Accept": "application/vnd.github.star+json",
-        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
         "User-Agent": "deeppapernote-static-star-history",
         "X-GitHub-Api-Version": "2022-11-28",
     }
@@ -36,31 +43,25 @@ def github_json(url: str, token: str, retries: int = 3) -> object:
     raise AssertionError("unreachable")
 
 
-def fetch_star_dates(repo: str, token: str) -> list[dt.date]:
-    dates: list[dt.date] = []
-    page = 1
-    while True:
-        data = github_json(f"{GITHUB_API}/repos/{repo}/stargazers?per_page=100&page={page}", token)
-        if not isinstance(data, list):
-            raise RuntimeError(f"Unexpected stargazers response for {repo}")
-        for item in data:
-            starred_at = item.get("starred_at") if isinstance(item, dict) else None
-            if not starred_at:
-                raise RuntimeError("GitHub response omitted starred_at timestamps")
-            dates.append(dt.datetime.fromisoformat(starred_at.replace("Z", "+00:00")).date())
-        if len(data) < 100:
-            return sorted(dates)
-        page += 1
+def fetch_star_count(repo: str) -> int:
+    data = github_json(f"{GITHUB_API}/repos/{repo}")
+    if not isinstance(data, dict) or not isinstance(data.get("stargazers_count"), int):
+        raise RuntimeError(f"GitHub response omitted stargazers_count for {repo}")
+    return data["stargazers_count"]
 
 
-def _daily_points(starred_dates: list[dt.date]) -> list[tuple[dt.date, int]]:
-    counts = collections.Counter(starred_dates)
-    running = 0
-    points = []
-    for day in sorted(counts):
-        running += counts[day]
-        points.append((day, running))
-    return points
+def load_history(path: Path) -> list[tuple[dt.date, int]]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return [(dt.date.fromisoformat(item["date"]), int(item["stars"])) for item in data]
+
+
+def atomic_write(path: Path, content: str) -> None:
+    with tempfile.NamedTemporaryFile(
+        "w", dir=path.parent, delete=False, encoding="utf-8"
+    ) as handle:
+        handle.write(content)
+        temporary = Path(handle.name)
+    temporary.replace(path)
 
 
 def _nice_step(maximum: int) -> int:
@@ -75,12 +76,11 @@ def _nice_step(maximum: int) -> int:
 
 def render_svg(
     repo: str,
-    starred_dates: list[dt.date],
+    points: list[tuple[dt.date, int]],
     *,
     generated_at: dt.datetime,
 ) -> str:
-    points = _daily_points(starred_dates)
-    total = len(starred_dates)
+    total = points[-1][1] if points else 0
     generated_at = generated_at.astimezone(dt.timezone.utc)
     fallback_day = generated_at.date()
     start = points[0][0] if points else fallback_day
@@ -149,7 +149,7 @@ def render_svg(
     <text x="{right}" y="82" text-anchor="end" font-size="13" font-weight="700"
       fill="#d69a4a">{total:,} {star_word}</text>
     <text x="82" y="542" font-size="12" fill="#7085ab">
-      GitHub Stargazers API · static repository snapshot
+      GitHub repository metadata · sampled every three days
     </text>
   </g>
 </svg>
@@ -159,24 +159,20 @@ def render_svg(
 def main() -> int:
     repo = os.environ.get("GITHUB_REPOSITORY", "917Dhj/DeepPaperNote")
     output = Path("assets/star-history.svg")
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        raise SystemExit("GitHub token required via GITHUB_TOKEN")
-    starred_dates = fetch_star_dates(repo, token)
-    latest_day = max(starred_dates, default=dt.date(1970, 1, 1))
+    history_path = Path("assets/star-history.json")
+    sample_day = dt.datetime.now(dt.timezone.utc).date()
+    history = update_history(load_history(history_path), sample_day, fetch_star_count(repo))
     svg = render_svg(
         repo,
-        starred_dates,
-        generated_at=dt.datetime.combine(latest_day, dt.time.min, tzinfo=dt.timezone.utc),
+        history,
+        generated_at=dt.datetime.combine(sample_day, dt.time.min, tzinfo=dt.timezone.utc),
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        "w", dir=output.parent, delete=False, encoding="utf-8"
-    ) as handle:
-        handle.write(svg)
-        temporary = Path(handle.name)
-    temporary.replace(output)
-    print(f"Wrote {output}")
+    atomic_write(history_path, json.dumps(
+        [{"date": day.isoformat(), "stars": stars} for day, stars in history],
+        indent=2,
+    ) + "\n")
+    atomic_write(output, svg)
+    print(f"Wrote {history_path} and {output}")
     return 0
 
 
