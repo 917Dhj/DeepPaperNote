@@ -9,6 +9,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from _zotero_local import probe_zotero_local_api
 from common import emit, env_config_value, runtime_config
 
 
@@ -68,6 +69,7 @@ def find_local_zotero_hints() -> list[str]:
 def main() -> None:
     args = parser().parse_args()
     config = runtime_config()
+    zotero_local_api = probe_zotero_local_api()
 
     obsidian_vault = str(config.get("obsidian_vault", "")).strip()
     obsidian_vault_exists = bool(obsidian_vault) and Path(obsidian_vault).expanduser().exists()
@@ -98,13 +100,24 @@ def main() -> None:
             "available": True,
             "current_working_directory": str(Path.cwd().resolve()),
             "workspace_output_dir": str(config.get("workspace_output_dir", "DeepPaperNote_output")),
-            "note": "If no Obsidian vault is configured, DeepPaperNote can still save notes under the current working directory.",
+            "note": (
+                "If no Obsidian vault is configured, DeepPaperNote can still save notes under "
+                "the current working directory."
+            ),
         },
         "zotero": {
             "local_hints": find_local_zotero_hints(),
+            "local_api": zotero_local_api,
+            "local_api_available": bool(zotero_local_api.get("ready")),
+            "local_api_status": str(zotero_local_api.get("status", "error")),
+            "local_api_version": str(zotero_local_api.get("api_version", "")),
+            "local_api_schema_version": str(zotero_local_api.get("schema_version", "")),
             "mcp_available_from_script": False,
             "session_integration_checked_by_script": False,
-            "note": "Session-scoped library integrations must be checked by the active agent at runtime, not by this script.",
+            "note": (
+                "The built-in read-only Local API check is reported here. Session-scoped "
+                "library integrations must still be checked by the active agent at runtime."
+            ),
         },
         "ocr": {
             "tesseract_installed": bool(tesseract_path),
@@ -117,8 +130,10 @@ def main() -> None:
         "metadata": {
             "maintenance_utility": True,
             "semantic_scholar_api_key_configured": bool(
-                env_config_value("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY", "SEMANTIC_SCHOLAR_API_KEY")
-            )
+                env_config_value(
+                    "DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY", "SEMANTIC_SCHOLAR_API_KEY"
+                )
+            ),
         },
     }
     emit(payload, args.output)

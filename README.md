@@ -268,14 +268,30 @@ Domain routing is controlled by the editable taxonomy in `skills/deeppapernote/r
 ### Optional: Zotero for local-library-first workflows
 
 DeepPaperNote can work without Zotero.
-But if you want the agent to search your local Zotero library first, you should expose a Zotero integration that your agent runtime can actually use.
+If you already keep papers in Zotero, DeepPaperNote now has a built-in, read-only integration with the desktop [Zotero Local API](https://www.zotero.org/support/dev/web_api/v3/local_api). It queries only the loopback API at `127.0.0.1:23119`, requires no API key or third-party Python package, and never reads the Zotero SQLite database directly.
 
 This is most worth setting up if you already use Zotero as your main paper-management or reading workflow.
 
-Recommended ways to think about it:
+To enable it:
+
+1. Keep the Zotero desktop app running.
+2. In Zotero, enable **Settings → Advanced → Allow other applications on this computer to communicate with Zotero**.
+
+DeepPaperNote probes the Local API automatically during paper resolution. Its `--zotero-mode` policy has three options:
+
+| Mode | Behavior |
+| --- | --- |
+| `auto` (default) | Prefer a unique local item; retain web fallback for title, DOI, and arXiv queries when Zotero is unavailable or has no match |
+| `off` | Make no Zotero Local API request and preserve the previous resolution path |
+| `required` | Stop unless Zotero uniquely resolves the reference; a missing local PDF does not invalidate confirmed Zotero metadata |
+
+An ambiguous local match always fails closed instead of choosing an arbitrary item. An explicit Zotero key also fails closed when it cannot be verified locally because it has no safe web fallback. Explicit local PDFs and trusted JSON artifacts bypass the lookup in every mode.
+
+Compatible agent-runtime or MCP integrations remain optional alternatives:
 
 | 🧩 Option | 🎯 Best for | 📝 Notes |
 | --- | --- | --- |
+| Built-in Local API | Normal local-library-first use | Recommended path; read-only, offline-capable, no API key, and no extra integration layer |
 | [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | Lightweight read access | Closer to a minimal Zotero MCP server for search, metadata, and text access, but it usually still needs some adaptation for your agent runtime |
 | [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | Richer research workflow features | More feature-rich, but stable use usually still requires some integration work on your side |
 
@@ -290,9 +306,10 @@ Why it matters:
 
 Important note:
 
-- DeepPaperNote does **not** require one specific Zotero integration
-- for DeepPaperNote, the key capability is that the agent can search Zotero items, inspect metadata, and ideally read local PDF attachments
-- the two routes above are **not** always plug-and-play, so stable use may still require some adaptation on your side
+- the built-in client sends only read-only `GET` requests and does not expose or forward Zotero's unauthenticated loopback port
+- the built-in client currently targets the logged-in user's personal library; group-library select links are rejected instead of silently querying the wrong library
+- no local PDF is required for a successful Zotero identity match; DeepPaperNote can keep the confirmed metadata and use its normal PDF acquisition fallback
+- third-party runtime integrations are **not** always plug-and-play and are not required by the built-in workflow
 
 ### Optional: Semantic Scholar API key
 
@@ -394,7 +411,7 @@ For release-level updates, see [CHANGELOG.md](./CHANGELOG.md).
 | v0.3.0-alpha | ✅ Released | Major quality upgrade: dedicated innovation section, explicit mechanism flow, stronger workflow discipline, final readability review, math syntax gate, and the new `Original Abstract Translation` front-matter block |
 | v0.2.0-alpha | ✅ Released | Replication-oriented note-writing upgrade: explicit `note_plan`, equation-aware output, stricter final self-review, bilingual abstract handling, and stronger formatting checks |
 | v0.1.0-alpha | ✅ Released | First public alpha: evidence-bundle workflow, Zotero-first helpers, placeholder-first figure handling, workspace fallback, OCR fallback, tests, and CI |
-| Unreleased | 🕒 No new release-level changes yet | There are currently no additional public release notes beyond v2.0.0 |
+| Unreleased | 🛠️ In development | Built-in read-only Zotero Local API resolution, safe attachment reuse, explicit lookup policies, and environment diagnostics |
 
 ## ⚙️ Workflow
 
@@ -495,7 +512,7 @@ DeepPaperNote/
 | Python 3.10+ | Required | Runs the helper scripts |
 | PyMuPDF | Required | Core PDF dependency; install it with `python3 -m pip install PyMuPDF` |
 | Local Obsidian vault | Recommended | Writes directly into a long-term note system; otherwise uses the current workspace's fallback output folder |
-| Zotero integration | Optional | Helpful for local-library-first paper workflows |
+| Zotero Local API / compatible integration | Optional | Reuses local metadata and PDF attachments before web resolution |
 | OCR tools | Optional | Improves handling of scanned PDFs |
 
 ## 🧭 Design Principles

@@ -263,16 +263,32 @@ setx DEEPPAPERNOTE_PAPERS_DIR "Research/Papers"
 ### 可选：用于本地文献库优先工作流的 Zotero
 
 DeepPaperNote 不依赖 Zotero 才能工作。
-但如果你本来就用 Zotero 做文献管理，配置一个你的 agent 真的能用的 Zotero 集成会很值。
+如果你本来就在 Zotero 里管理论文，DeepPaperNote 现在可以直接使用桌面端的只读 [Zotero Local API](https://www.zotero.org/support/dev/web_api/v3/local_api)。它只访问本机回环地址 `127.0.0.1:23119`，不需要 API key 或额外 Python 包，也不会直接读取 Zotero 的 SQLite 数据库。
 
 它最适合这样的人：
 - 你本来就用 Zotero 做文献管理
 - 你平时主要在 Zotero 里读论文、整理附件和元数据
 
-可以这样理解不同路线：
+启用方法：
+
+1. 保持 Zotero 桌面应用运行。
+2. 在 Zotero 中启用 **设置 → 高级 → 允许此计算机上的其他应用程序与 Zotero 通信**。
+
+DeepPaperNote 会在论文解析时自动探测 Local API。其 `--zotero-mode` 策略有三个选项：
+
+| 模式 | 行为 |
+| --- | --- |
+| `auto`（默认） | 优先采用唯一的本地条目；标题、DOI 和 arXiv 查询在 Zotero 不可用或未命中时保留联网回退 |
+| `off` | 不请求 Zotero Local API，完整保留以前的解析路径 |
+| `required` | 只有 Zotero 唯一解析出论文时才继续；没有本地 PDF 不会否定已经确认的 Zotero 元数据 |
+
+如果本地出现多个同样可信的候选，解析会明确失败，而不是随意选一个。明确给出的 Zotero key 也必须在本地验证；它没有安全的联网回退。用户明确提供的本地 PDF 和可信 JSON artifact 在所有模式下都会直接使用。
+
+agent runtime 或 MCP 提供的兼容集成仍可作为可选替代路线：
 
 | 🧩 方案 | 🎯 更适合什么场景 | 📝 说明 |
 | --- | --- | --- |
+| 内置 Local API | 常规的本地文献库优先工作流 | 推荐路线；只读、可离线工作、不需要 API key，也不需要额外集成层 |
 | [kujenga/zotero-mcp](https://github.com/kujenga/zotero-mcp) | 轻量的只读访问 | 更接近一个最小化 Zotero MCP 服务，适合搜索条目、读元数据、读文本，但通常仍需要你自己做一点适配 |
 | [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) | 更完整的研究工作流能力 | 功能更丰富，但稳定接进你的 agent 环境时通常也需要额外改造 |
 
@@ -287,9 +303,10 @@ DeepPaperNote 不依赖 Zotero 才能工作。
 
 ⚠️需要特别说明的是：
 
-- DeepPaperNote **不强依赖某一个固定的 Zotero 集成仓库**
-- 对 DeepPaperNote 来说，需要的关键能力是：让 agent 能搜索 Zotero 条目、查看元数据、最好还能读取本地 PDF 附件
-- 上面提到的两条路线目前都**不一定是即插即用方案**，如果你想稳定使用，通常还需要自己做一层适配或改造
+- 内置客户端只发送只读 `GET` 请求，不会暴露或转发 Zotero 无认证的本机回环端口
+- 内置客户端目前只查询已登录用户的个人文献库；遇到 group library 的选择链接会明确拒绝，不会静默查询错误的库
+- Zotero 身份命中不要求一定存在本地 PDF；DeepPaperNote 可以保留确认过的元数据，再走正常的 PDF 获取回退
+- 第三方 runtime 集成**不一定即插即用**，内置工作流也不依赖它们
 
 ### 可选：Semantic Scholar API Key
 
@@ -385,7 +402,7 @@ python3 -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 | v0.3.0-alpha | ✅ 已发布 | 一次较大的质量升级：新增固定创新点章节、显式机制流程、更强的整条 workflow 约束、最终可读性质检、公式语法检查，以及新的 `原文摘要翻译` 前置区块 |
 | v0.2.0-alpha | ✅ 已发布 | 复现级技术笔记写作升级：显式 `note_plan`、公式感知输出、更强的最终自检、摘要中英双写，以及更严格的格式校验 |
 | v0.1.0-alpha | ✅ 已发布 | 第一个公开 alpha 版：综合证据包流程、Zotero 优先辅助能力、占位优先图表处理、工作区回退输出、OCR 回退、测试与 CI |
-| 未发布 | 🕒 暂无新的 release 级变化 | 当前还没有下一版 release 的公开更新内容，最新版本为 v2.0.0 |
+| 未发布 | 🛠️ 开发中 | 内置只读 Zotero Local API 解析、安全复用本地附件、显式查询策略和环境诊断 |
 
 ## ⚙️ 工作流
 
@@ -485,7 +502,7 @@ DeepPaperNote/
 | Python 3.10+ | 必需 | 运行辅助脚本 |
 | PyMuPDF | 必需 | 核心 PDF 依赖，可用 `python3 -m pip install PyMuPDF` 安装 |
 | 本地 Obsidian 库 | 推荐 | 配好后可直接写入长期笔记体系；未配置时使用当前工作区下的回退输出目录 |
-| Zotero 集成 | 可选 | 对本地论文库工作流很有帮助 |
+| Zotero Local API / 兼容集成 | 可选 | 联网解析前优先复用本地元数据和 PDF 附件 |
 | OCR 工具 | 可选 | 对扫描版 PDF 更友好 |
 
 ## 🧭 设计原则

@@ -12,6 +12,10 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+### Added
+
+- Added a built-in, read-only Zotero Local API integration with exact DOI, arXiv, title, and item-key matching, safe local PDF attachment discovery, `auto` / `off` / `required` resolution policies, and environment diagnostics.
+
 ### Changed
 
 - Converted the repository to a dual-stack Claude Code and Codex plugin layout with the canonical skill under `skills/deeppapernote/`.

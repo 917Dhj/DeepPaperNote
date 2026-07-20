@@ -116,14 +116,15 @@ Prefer the strongest available source in this order:
 4. arXiv or open-access PDF sources
 5. Semantic Scholar or OpenAlex for metadata backfill
 
-Before resolving the paper, actively check Zotero integration: attempt to call the Zotero MCP tool (for example, search for the paper title or list libraries). If the tool responds without error, Zotero is available and the local-library-first rule below applies. If the call fails or the tool is not present, record "Zotero not available" and proceed without it. Do not skip this check — the check itself determines whether local-library-first applies.
+Before web resolution, use the bundled `scripts/resolve_paper.py` Zotero Local API path to check the desktop library. Its default `--zotero-mode auto` prefers a unique local match and falls back to the existing providers when Zotero is unavailable or has no match. An explicit Zotero key has no safe web fallback and must be verified locally. Use `off` to make no Local API request, or `required` when the reference must resolve through Zotero. A trusted JSON artifact or explicit local PDF remains authoritative and bypasses this lookup. A compatible session-scoped Zotero/MCP integration may still provide a trusted input artifact when available, but it is not required for the built-in path.
 
-Local-library-first rule (applies only when the Zotero check above succeeds):
-- search the local Zotero library first using the paper title, DOI, or arXiv id
+Local-library-first rule:
+- search the local Zotero library first using the paper title, DOI, arXiv id, or exact Zotero item key
 - If Zotero finds the paper, treat that result as the canonical identity resolution step.
-- If the attachment path is not exposed by the integration, use `scripts/locate_zotero_attachment.py` with the attachment key and filename to find the local PDF under the user's Zotero storage.
+- Prefer the safe local attachment path returned by the built-in Local API. If another compatible integration exposes only an attachment key and filename, use `scripts/locate_zotero_attachment.py` to find the PDF under the user's Zotero storage.
 - If a local attachment path is available, pass it forward as the preferred PDF source.
 - If no local attachment is found, still use the library-resolved metadata to avoid title ambiguity, then fall back to network PDF acquisition only for the file itself.
+- If multiple local items are equally plausible, fail closed and request a DOI, arXiv id, or exact Zotero key rather than selecting one arbitrarily.
 - Do not let a weaker title-only internet match override a confident local-library hit.
 
 ## Output Rules
