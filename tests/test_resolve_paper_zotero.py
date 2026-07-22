@@ -348,3 +348,55 @@ def test_web_enrichment_does_not_override_zotero_identity(
     assert enriched["local_pdf_path"] == record["local_pdf_path"]
     assert enriched["abstract"] == "Useful missing abstract."
     assert enriched["metadata_sources"] == ["zotero", "crossref"]
+
+
+def test_title_enrichment_rejects_an_unvalidated_doi_for_a_zotero_item(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    record = local_record()
+    record.pop("doi")
+    record["paper_id"] = "zotero:PARENT01"
+    candidate = {
+        "title": "Local Canonical Title",
+        "authors": ["Different Author"],
+        "year": "2023",
+        "doi": "10.5555/different-paper",
+        "abstract": "Abstract from the wrong same-title paper.",
+        "metadata_sources": ["semantic_scholar"],
+    }
+    monkeypatch.setattr(common, "search_semantic_scholar", lambda *args, **kwargs: [candidate])
+    monkeypatch.setattr(common, "search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(common, "search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+
+    enriched = common.enrich_metadata(record)
+
+    assert "doi" not in enriched
+    assert enriched["paper_id"] == "zotero:PARENT01"
+    assert "abstract" not in enriched
+
+
+def test_title_enrichment_accepts_a_doi_after_zotero_author_and_year_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    record = local_record()
+    record.pop("doi")
+    record.pop("paper_id")
+    candidate = {
+        "title": "Local Canonical Title",
+        "authors": ["Local Author", "Second Author"],
+        "year": "2024",
+        "doi": "10.5555/validated",
+        "abstract": "Validated enrichment.",
+        "metadata_sources": ["semantic_scholar"],
+    }
+    monkeypatch.setattr(common, "search_semantic_scholar", lambda *args, **kwargs: [candidate])
+    monkeypatch.setattr(common, "search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(common, "search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+
+    enriched = common.enrich_metadata(record)
+
+    assert enriched["doi"] == "10.5555/validated"
+    assert enriched["paper_id"] == "doi:10.5555/validated"
+    assert enriched["abstract"] == "Validated enrichment."
