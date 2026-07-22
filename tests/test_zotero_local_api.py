@@ -340,6 +340,20 @@ def test_matcher_supports_nfkc_unicode_title_and_detects_ties() -> None:
     assert tied["status"] == "ambiguous"
 
 
+def test_matcher_rejects_a_non_exact_title_without_independent_identity_evidence() -> None:
+    match = _match_search_results(
+        [zotero_item(title="Deep Learning for Dogs")],
+        match_kind="title",
+        query="Deep Learning for Cats",
+    )
+
+    assert match == {
+        "status": "not_found",
+        "match_kind": "title",
+        "candidate_count": 0,
+    }
+
+
 def test_lookup_by_key_returns_parent_metadata_and_existing_pdf(tmp_path: Path) -> None:
     pdf_path = tmp_path / "论文 附件.pdf"
     pdf_path.write_bytes(b"%PDF-1.4\n")

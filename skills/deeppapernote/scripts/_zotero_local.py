@@ -12,7 +12,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from difflib import SequenceMatcher
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Mapping
 
@@ -562,14 +561,6 @@ def normalize_lookup_title(title: str) -> str:
     return normalize_whitespace(normalized)
 
 
-def _title_score(left: str, right: str) -> float:
-    left_norm = normalize_lookup_title(left)
-    right_norm = normalize_lookup_title(right)
-    if not left_norm or not right_norm:
-        return 0.0
-    return SequenceMatcher(None, left_norm, right_norm).ratio()
-
-
 def _match_search_results(
     raw_items: list[dict[str, Any]],
     *,
@@ -590,29 +581,11 @@ def _match_search_results(
         matches = [item for item in candidates if item.get("arxiv_id") == expected]
     else:
         expected_title = normalize_lookup_title(query)
-        exact = [
+        matches = [
             item
             for item in candidates
             if normalize_lookup_title(str(item.get("title", ""))) == expected_title
         ]
-        if exact:
-            matches = exact
-        else:
-            ranked = sorted(
-                ((_title_score(query, str(item.get("title", ""))), item) for item in candidates),
-                key=lambda pair: pair[0],
-                reverse=True,
-            )
-            if not ranked or ranked[0][0] < 0.84:
-                matches = []
-            elif len(ranked) > 1 and ranked[0][0] - ranked[1][0] < 0.08:
-                return {
-                    "status": "ambiguous",
-                    "match_kind": match_kind,
-                    "candidate_count": 2,
-                }
-            else:
-                matches = [ranked[0][1]]
     if not matches:
         return {"status": "not_found", "match_kind": match_kind, "candidate_count": 0}
     if len(matches) > 1:
