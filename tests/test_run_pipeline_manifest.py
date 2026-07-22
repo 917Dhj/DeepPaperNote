@@ -14,7 +14,6 @@ except ImportError:  # pragma: no cover
 
 import run_pipeline
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RUN_PIPELINE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "run_pipeline.py"
 
@@ -147,36 +146,30 @@ def test_run_pipeline_does_not_materialize_before_final_save(
     identity_call = calls[2]
     fetch_call = calls[3]
     assert resolve_call[resolve_call.index("--input") + 1] == "paper.pdf"
-    assert (
-        metadata_call[metadata_call.index("--input") + 1]
-        == str((workdir / "paper_resolve.json").resolve())
+    assert resolve_call[resolve_call.index("--zotero-mode") + 1] == "auto"
+    assert metadata_call[metadata_call.index("--input") + 1] == str(
+        (workdir / "paper_resolve.json").resolve()
     )
-    assert (
-        identity_call[identity_call.index("--input") + 1]
-        == str((workdir / "paper_metadata.json").resolve())
+    assert identity_call[identity_call.index("--input") + 1] == str(
+        (workdir / "paper_metadata.json").resolve()
     )
-    assert (
-        identity_call[identity_call.index("--resolve") + 1]
-        == str((workdir / "paper_resolve.json").resolve())
+    assert identity_call[identity_call.index("--resolve") + 1] == str(
+        (workdir / "paper_resolve.json").resolve()
     )
-    assert (
-        identity_call[identity_call.index("--trace-output") + 1]
-        == str((workdir / "paper_identity_repair_trace.json").resolve())
+    assert identity_call[identity_call.index("--trace-output") + 1] == str(
+        (workdir / "paper_identity_repair_trace.json").resolve()
     )
-    assert (
-        fetch_call[fetch_call.index("--input") + 1]
-        == str((workdir / "paper_metadata.json").resolve())
+    assert fetch_call[fetch_call.index("--input") + 1] == str(
+        (workdir / "paper_metadata.json").resolve()
     )
-    assert (
-        fetch_call[fetch_call.index("--identity") + 1]
-        == str((workdir / "paper_identity.json").resolve())
+    assert fetch_call[fetch_call.index("--identity") + 1] == str(
+        (workdir / "paper_identity.json").resolve()
     )
 
     evidence_call = calls[5]
     assert "--source-manifest" in evidence_call
-    assert (
-        evidence_call[evidence_call.index("--source-manifest") + 1]
-        == str((workdir / "paper_source_manifest.json").resolve())
+    assert evidence_call[evidence_call.index("--source-manifest") + 1] == str(
+        (workdir / "paper_source_manifest.json").resolve()
     )
 
 
@@ -216,3 +209,34 @@ def test_run_pipeline_stops_before_fetch_when_identity_repair_is_exhausted(
         "collect_metadata.py",
         "build_identity_contract.py",
     ]
+
+
+def test_run_pipeline_forwards_required_zotero_mode_only_to_resolve(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], check: bool = True, **kwargs) -> object:
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(run_pipeline.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pipeline.py",
+            "--input",
+            "10.5555/local",
+            "--workdir",
+            str(tmp_path / "run"),
+            "--zotero-mode",
+            "required",
+        ],
+    )
+
+    run_pipeline.main()
+
+    assert calls[0][calls[0].index("--zotero-mode") + 1] == "required"
+    assert all("--zotero-mode" not in call for call in calls[1:])

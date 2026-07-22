@@ -12,6 +12,14 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+### Added
+
+- Added a built-in, read-only Zotero Local API integration with local attachment discovery, explicit `auto` / `off` / `required` resolution policies, and environment diagnostics.
+
+### Contributors
+
+- Added the Zotero Local API integration from PR #13 by KumamuKuma.
+
 ## v2.1.0
 
 ### Added

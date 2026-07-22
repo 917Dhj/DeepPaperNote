@@ -1719,6 +1719,51 @@ def choose_best_title_match(title: str, candidates: list[dict[str, Any]]) -> dic
     return best
 
 
+def _record_publication_year(record: dict[str, Any]) -> str:
+    for key in ("year", "published"):
+        match = re.search(r"(?<!\d)((?:18|19|20|21)\d{2})(?!\d)", _string_field(record, key))
+        if match:
+            return match.group(1)
+    return ""
+
+
+def _has_strong_work_identifier(record: dict[str, Any]) -> bool:
+    paper_id = _string_field(record, "paper_id").lower()
+    return bool(
+        extract_doi(_string_field(record, "doi"))
+        or extract_doi(_string_field(record, "source_url"))
+        or _record_arxiv_id(record)
+        or paper_id.startswith(("doi:", "arxiv:"))
+    )
+
+
+def _title_enrichment_candidate_is_identity_safe(
+    base: dict[str, Any],
+    candidate: dict[str, Any],
+) -> bool:
+    is_zotero_record = _string_field(base, "source_type") == "zotero" or bool(
+        _string_field(base, "zotero_key")
+    )
+    if (
+        not is_zotero_record
+        or _has_strong_work_identifier(base)
+        or not _has_strong_work_identifier(candidate)
+    ):
+        return True
+
+    author_evidence = _leading_author_status(base, candidate)
+    base_year = _record_publication_year(base)
+    candidate_year = _record_publication_year(candidate)
+    return bool(
+        title_similarity(_string_field(base, "title"), _string_field(candidate, "title"))
+        >= 0.82
+        and author_evidence
+        and author_evidence["status"] == "match"
+        and base_year
+        and base_year == candidate_year
+    )
+
+
 def resolve_reference(value: str) -> dict[str, Any]:
     source_type = infer_source_type(value)
     stripped = (value or "").strip()
@@ -1856,16 +1901,19 @@ def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
 
     if title:
         sem = choose_best_title_match(title, search_semantic_scholar(title, limit=5))
-        if sem:
+        if sem and _title_enrichment_candidate_is_identity_safe(base, sem):
             candidates.append(sem)
         oa = choose_best_title_match(title, search_openalex_by_title(title, limit=5))
-        if oa:
+        if oa and _title_enrichment_candidate_is_identity_safe(base, oa):
             candidates.append(oa)
         cross = choose_best_title_match(title, search_crossref_by_title(title, limit=5))
-        if cross:
+        if cross and _title_enrichment_candidate_is_identity_safe(base, cross):
             candidates.append(cross)
-        arxiv = choose_best_title_match(title, safe_fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5))
-        if arxiv:
+        arxiv = choose_best_title_match(
+            title,
+            safe_fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5),
+        )
+        if arxiv and _title_enrichment_candidate_is_identity_safe(base, arxiv):
             candidates.append(arxiv)
 
     merged = merge_metadata_records(*candidates)

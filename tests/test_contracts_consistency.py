@@ -692,6 +692,29 @@ def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
     assert "标题、DOI、URL、本地 PDF 都可以" in readme_zh_text
 
 
+def test_zotero_local_api_contract_is_consistent_across_docs() -> None:
+    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    metadata_text = (
+        PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "metadata-sources.md"
+    ).read_text(encoding="utf-8")
+    readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    readme_zh_text = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+
+    for text in (skill_text, readme_text):
+        assert "Zotero Local API" in text
+        assert "auto" in text
+        assert "off" in text
+        assert "required" in text
+
+    assert "read-only Zotero Local API" in metadata_text
+    assert "Zotero Local API" in readme_zh_text
+    assert "`auto`（默认）" in readme_zh_text
+    assert "ambiguous local match always fails closed" in readme_text
+    assert "兼容集成仍可作为可选替代路线" in readme_zh_text
+
+
 def test_regression_workflow_documents_acquisition_identity_audit_contract() -> None:
     texts = [
         (PROJECT_ROOT / "evals" / "regression-workflow.md").read_text(encoding="utf-8"),
