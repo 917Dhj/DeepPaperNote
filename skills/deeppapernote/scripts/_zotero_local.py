@@ -476,6 +476,18 @@ def is_pdf_attachment(attachment: Mapping[str, Any]) -> bool:
     )
 
 
+def _split_attachment_url(raw_url: str) -> urllib.parse.SplitResult:
+    try:
+        parsed = urllib.parse.urlsplit(raw_url)
+        _ = parsed.port, parsed.hostname
+    except ValueError as exc:
+        raise ZoteroLocalError(
+            "zotero_unsafe_file_url",
+            "Zotero attachment URL contained an invalid network location.",
+        ) from exc
+    return parsed
+
+
 def file_url_to_local_path(raw_url: str, *, platform: str | None = None) -> str:
     """Convert a safe local ``file://`` URL without touching the filesystem."""
 
@@ -485,14 +497,8 @@ def file_url_to_local_path(raw_url: str, *, platform: str | None = None) -> str:
             "zotero_unsafe_file_url",
             "Zotero returned an empty or invalid attachment file URL.",
         )
-    parsed = urllib.parse.urlsplit(value)
-    try:
-        port = parsed.port
-    except ValueError as exc:
-        raise ZoteroLocalError(
-            "zotero_unsafe_file_url",
-            "Zotero attachment URL contained an invalid network location.",
-        ) from exc
+    parsed = _split_attachment_url(value)
+    port = parsed.port
     if (
         parsed.scheme.lower() != "file"
         or parsed.username is not None
@@ -671,14 +677,19 @@ def _attach_local_pdf(
         record["zotero_attachment_status"] = "ambiguous"
         return record
 
-    pdf_urls = sorted(
-        {
-            str(item.get("url", ""))
-            for item in candidates
-            if urllib.parse.urlsplit(str(item.get("url", ""))).scheme == "https"
-            and urllib.parse.urlsplit(str(item.get("url", ""))).path.lower().endswith(".pdf")
-        }
-    )
+    remote_pdf_urls: set[str] = set()
+    for item in candidates:
+        attachment_url = str(item.get("url", ""))
+        if not attachment_url:
+            continue
+        try:
+            parsed_url = _split_attachment_url(attachment_url)
+        except ZoteroLocalError as exc:
+            attachment_errors.append(exc.code)
+            continue
+        if parsed_url.scheme == "https" and parsed_url.path.lower().endswith(".pdf"):
+            remote_pdf_urls.add(attachment_url)
+    pdf_urls = sorted(remote_pdf_urls)
     if len(pdf_urls) == 1:
         record["pdf_url"] = pdf_urls[0]
         record["zotero_attachment_status"] = "remote_only"

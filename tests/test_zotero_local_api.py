@@ -292,6 +292,7 @@ def test_file_url_parser_handles_posix_and_rejects_remote_or_web_urls() -> None:
         "file:///tmp/bad\x00name.pdf",
         "file:///tmp/bad%00name.pdf",
         "file:///tmp/bad%FFname.pdf",
+        "file://[invalid/paper.pdf",
     ):
         with pytest.raises(ZoteroLocalError) as exc:
             file_url_to_local_path(unsafe, platform="posix")
@@ -563,6 +564,52 @@ def test_lookup_preserves_parent_metadata_when_children_endpoint_fails() -> None
     assert result["status"] == "match"
     assert result["record"]["zotero_attachment_status"] == "unavailable"
     assert result["record"]["zotero_attachment_error"] == "zotero_server_error"
+
+
+def test_lookup_preserves_parent_metadata_when_attachment_file_url_is_malformed() -> None:
+    routes = base_routes()
+    routes["/api/users/0/items/PARENT01"] = json_result(zotero_item())
+    routes["/api/users/0/items/PARENT01/children"] = json_result([zotero_attachment()])
+    routes["/api/users/0/items/ATTACH01/file/view/url"] = text_result(
+        "file://[invalid/paper.pdf"
+    )
+    transport, _ = routed_transport(routes)
+
+    result = lookup_zotero_local(
+        "PARENT01",
+        client=ZoteroLocalClient(transport=transport),
+    )
+
+    assert result["status"] == "match"
+    assert result["record"]["title"] == "Attention Is All You Need"
+    assert result["record"]["paper_id"] == "doi:10.5555/example"
+    assert result["record"]["zotero_attachment_status"] == "unavailable"
+    assert result["record"]["zotero_attachment_error"] == "zotero_unsafe_file_url"
+
+
+def test_lookup_preserves_parent_metadata_when_remote_attachment_url_is_malformed(
+    tmp_path: Path,
+) -> None:
+    routes = base_routes()
+    routes["/api/users/0/items/PARENT01"] = json_result(zotero_item())
+    routes["/api/users/0/items/PARENT01/children"] = json_result(
+        [zotero_attachment(url="https://[invalid/paper.pdf")]
+    )
+    routes["/api/users/0/items/ATTACH01/file/view/url"] = text_result(
+        (tmp_path / "missing.pdf").as_uri()
+    )
+    transport, _ = routed_transport(routes)
+
+    result = lookup_zotero_local(
+        "PARENT01",
+        client=ZoteroLocalClient(transport=transport),
+    )
+
+    assert result["status"] == "match"
+    assert result["record"]["title"] == "Attention Is All You Need"
+    assert result["record"]["paper_id"] == "doi:10.5555/example"
+    assert result["record"]["zotero_attachment_status"] == "unavailable"
+    assert result["record"]["zotero_attachment_error"] == "zotero_unsafe_file_url"
 
 
 def test_lookup_reports_not_found_for_missing_key() -> None:
