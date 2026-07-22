@@ -45,15 +45,34 @@ def write_test_pdf(path: Path, pages: list[str]) -> None:
         doc.close()
 
 
+def write_fetch_input(path: Path, pdf_path: Path, *, title: str) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "fetch_pdf.py",
+                "paper_id": "paper:test",
+                "title": title,
+                "pdf_path": str(pdf_path),
+                "identity_contract": {
+                    "artifact_type": "canonical_identity",
+                    "schema_version": 2,
+                    "paper_id": "paper:test",
+                    "identity_verdict": "accepted",
+                    "work_level_identity": {"title": title},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_extract_pdf_assets_emits_asset_coverage(tmp_path: Path) -> None:
     pdf_path = tmp_path / "paper.pdf"
     write_test_pdf(pdf_path, ["Page 1", "Page 2", "Page 3"])
     input_path = tmp_path / "input.json"
     output_path = tmp_path / "assets.json"
-    input_path.write_text(
-        json.dumps({"paper_id": "paper:test", "title": "Coverage Paper", "pdf_path": str(pdf_path)}),
-        encoding="utf-8",
-    )
+    write_fetch_input(input_path, pdf_path, title="Coverage Paper")
 
     subprocess.run(
         [
@@ -85,10 +104,7 @@ def test_extract_pdf_assets_default_scans_short_pdf_without_truncation(tmp_path:
     write_test_pdf(pdf_path, ["Page 1", "Page 2", "Page 3"])
     input_path = tmp_path / "input.json"
     output_path = tmp_path / "assets.json"
-    input_path.write_text(
-        json.dumps({"paper_id": "paper:test", "title": "Coverage Paper", "pdf_path": str(pdf_path)}),
-        encoding="utf-8",
-    )
+    write_fetch_input(input_path, pdf_path, title="Coverage Paper")
 
     subprocess.run(
         [
@@ -118,10 +134,7 @@ def test_extract_pdf_assets_default_truncates_after_40_pages(tmp_path: Path) -> 
     write_test_pdf(pdf_path, [f"Page {index}" for index in range(1, 42)])
     input_path = tmp_path / "input.json"
     output_path = tmp_path / "assets.json"
-    input_path.write_text(
-        json.dumps({"paper_id": "paper:test", "title": "Long Coverage Paper", "pdf_path": str(pdf_path)}),
-        encoding="utf-8",
-    )
+    write_fetch_input(input_path, pdf_path, title="Long Coverage Paper")
 
     subprocess.run(
         [

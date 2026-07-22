@@ -13,7 +13,7 @@ try:
 except ImportError:  # pragma: no cover
     fitz = None
 
-from build_synthesis_bundle import bundle
+from build_synthesis_bundle import bundle as build_synthesis_bundle
 from common import extract_caption_lines
 from contracts import NOTE_REQUIRED_SECTIONS
 import extract_evidence
@@ -21,6 +21,25 @@ from extract_evidence import build_appendix_evidence, evidence_quality, extract_
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXTRACT_EVIDENCE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "extract_evidence.py"
+
+
+def bundle(*, metadata: dict, source_manifest: dict | None = None, **kwargs) -> dict:
+    manifest = dict(source_manifest or {})
+    if "identity_contract" not in manifest:
+        title = str(metadata.get("title", ""))
+        manifest["identity_contract"] = {
+            "artifact_type": "canonical_identity",
+            "schema_version": 2,
+            "paper_id": str(metadata.get("paper_id", "paper:test")),
+            "identity_verdict": "accepted",
+            "work_level_identity": {"title": title},
+            "accepted_metadata": dict(metadata),
+        }
+    return build_synthesis_bundle(
+        metadata=metadata,
+        source_manifest=manifest,
+        **kwargs,
+    )
 
 
 def write_test_pdf(path: Path, pages: list[str]) -> None:
@@ -43,6 +62,20 @@ def sha256_text(text: str) -> str:
 def write_json(path: Path, payload: dict) -> Path:
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     return path
+
+
+def write_fetch_json(path: Path, payload: dict) -> Path:
+    artifact = dict(payload)
+    artifact["status"] = "ok"
+    artifact["script"] = "fetch_pdf.py"
+    artifact["identity_contract"] = {
+        "artifact_type": "canonical_identity",
+        "schema_version": 2,
+        "paper_id": artifact.get("paper_id", "paper:test"),
+        "identity_verdict": "accepted",
+        "work_level_identity": {"title": artifact.get("title", "")},
+    }
+    return write_json(path, artifact)
 
 
 def write_jsonl(path: Path, records: list[dict]) -> Path:
@@ -199,7 +232,7 @@ def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
     }
     input_path = tmp_path / "input.json"
     output_path = tmp_path / "evidence.json"
-    input_path.write_text(json.dumps(input_payload, ensure_ascii=False), encoding="utf-8")
+    write_fetch_json(input_path, input_payload)
 
     result = subprocess.run(
         [
@@ -353,7 +386,7 @@ def test_extract_evidence_outputs_pdf_coverage_for_truncated_pdf(tmp_path: Path)
     }
     input_path = tmp_path / "input.json"
     output_path = tmp_path / "evidence.json"
-    input_path.write_text(json.dumps(input_payload, ensure_ascii=False), encoding="utf-8")
+    write_fetch_json(input_path, input_payload)
 
     result = subprocess.run(
         [
@@ -421,17 +454,14 @@ def test_extract_evidence_keeps_later_main_result_captions(tmp_path: Path) -> No
 
     input_path = tmp_path / "input.json"
     output_path = tmp_path / "evidence.json"
-    input_path.write_text(
-        json.dumps(
-            {
-                "paper_id": "paper:many-figures",
-                "title": "Many Figures Paper",
-                "abstract": "We study a system.",
-                "pdf_path": str(pdf_path),
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
+    write_fetch_json(
+        input_path,
+        {
+            "paper_id": "paper:many-figures",
+            "title": "Many Figures Paper",
+            "abstract": "We study a system.",
+            "pdf_path": str(pdf_path),
+        },
     )
 
     result = subprocess.run(
@@ -496,17 +526,14 @@ def test_extract_evidence_default_scans_short_pdf_without_truncation(tmp_path: P
 
     input_path = tmp_path / "input.json"
     output_path = tmp_path / "evidence.json"
-    input_path.write_text(
-        json.dumps(
-            {
-                "paper_id": "paper:default-coverage",
-                "title": "Default Coverage Paper",
-                "abstract": "We propose a coverage-aware extraction test.",
-                "pdf_path": str(pdf_path),
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
+    write_fetch_json(
+        input_path,
+        {
+            "paper_id": "paper:default-coverage",
+            "title": "Default Coverage Paper",
+            "abstract": "We propose a coverage-aware extraction test.",
+            "pdf_path": str(pdf_path),
+        },
     )
 
     subprocess.run(
@@ -542,17 +569,14 @@ def test_extract_evidence_default_truncates_after_32_pages(tmp_path: Path) -> No
 
     input_path = tmp_path / "input.json"
     output_path = tmp_path / "evidence.json"
-    input_path.write_text(
-        json.dumps(
-            {
-                "paper_id": "paper:default-truncated",
-                "title": "Default Truncated Paper",
-                "abstract": "We propose a coverage-aware extraction test.",
-                "pdf_path": str(pdf_path),
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
+    write_fetch_json(
+        input_path,
+        {
+            "paper_id": "paper:default-truncated",
+            "title": "Default Truncated Paper",
+            "abstract": "We propose a coverage-aware extraction test.",
+            "pdf_path": str(pdf_path),
+        },
     )
 
     subprocess.run(
@@ -611,7 +635,7 @@ def test_extract_evidence_outputs_appendix_index_and_selective_evidence(tmp_path
     }
     input_path = tmp_path / "input.json"
     output_path = tmp_path / "evidence.json"
-    input_path.write_text(json.dumps(input_payload, ensure_ascii=False), encoding="utf-8")
+    write_fetch_json(input_path, input_payload)
 
     subprocess.run(
         [

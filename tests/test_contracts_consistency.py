@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from build_synthesis_bundle import bundle
+from build_synthesis_bundle import bundle as build_synthesis_bundle
 from contracts import (
     NOTE_PLAN_LIST_FIELDS,
     NOTE_PLAN_REQUIRED_FIELDS,
@@ -49,6 +49,19 @@ PDF_FAIL_CLOSED_NEGATIONS = (
     "rather than",
     "instead of",
 )
+
+
+def bundle(**kwargs: object) -> dict:
+    source_manifest = dict(kwargs.pop("source_manifest", {}) or {})
+    source_manifest["identity_contract"] = {
+        "artifact_type": "canonical_identity",
+        "schema_version": 2,
+        "paper_id": "paper:contract-test",
+        "identity_verdict": "accepted",
+        "work_level_identity": {"paper_id": "paper:contract-test"},
+        "accepted_metadata": {"paper_id": "paper:contract-test"},
+    }
+    return build_synthesis_bundle(source_manifest=source_manifest, **kwargs)
 
 
 def test_deleted_reference_routers_stay_removed() -> None:

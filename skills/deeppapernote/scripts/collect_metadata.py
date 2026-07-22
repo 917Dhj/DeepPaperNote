@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from common import (
     base_parser,
+    collect_metadata_observations,
     emit,
-    enrich_metadata,
     maybe_load_json_record,
     paper_id_for_record,
     require_ok_input_artifact,
@@ -27,7 +27,8 @@ def main() -> None:
     else:
         record = resolve_reference(args.input)
 
-    metadata = enrich_metadata(record)
+    metadata = dict(record)
+    metadata["identity_observations"] = collect_metadata_observations(record)
     metadata["paper_id"] = args.paper_id or metadata.get("paper_id") or paper_id_for_record(metadata)
     metadata["status"] = "ok"
     metadata["script"] = "collect_metadata.py"

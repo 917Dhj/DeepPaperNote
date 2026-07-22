@@ -26,7 +26,57 @@ def local_record() -> dict:
     }
 
 
-def test_auto_mode_prefers_unique_local_match_without_web_resolution(
+def test_resolve_title_keeps_input_as_anchor_without_provider_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_provider(*args: object, **kwargs: object) -> object:
+        raise AssertionError("resolve stage must not query metadata providers")
+
+    monkeypatch.setattr(common, "search_semantic_scholar", fail_provider)
+    monkeypatch.setattr(common, "search_crossref_by_title", fail_provider)
+    monkeypatch.setattr(common, "search_openalex_by_title", fail_provider)
+    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", fail_provider)
+
+    resolved = resolve_paper.resolve_scalar_reference(
+        "Reliable C++ Agents",
+        zotero_mode="off",
+    )
+
+    assert resolved["source_type"] == "title_query"
+    assert resolved["title"] == "Reliable C++ Agents"
+    assert resolved["metadata_sources"] == ["title_query"]
+    assert "doi" not in resolved
+    assert "pdf_url" not in resolved
+
+
+@pytest.mark.parametrize(
+    ("reference", "expected_source_type", "expected_field", "expected_value"),
+    [
+        ("10.1234/trusted", "doi", "doi", "10.1234/trusted"),
+        ("2401.00001", "arxiv_id", "arxiv_id", "2401.00001"),
+    ],
+)
+def test_resolve_strong_reference_keeps_input_as_anchor_without_provider_selection(
+    monkeypatch: pytest.MonkeyPatch,
+    reference: str,
+    expected_source_type: str,
+    expected_field: str,
+    expected_value: str,
+) -> None:
+    def fail_provider(*args: object, **kwargs: object) -> object:
+        raise AssertionError("resolve stage must not query metadata providers")
+
+    monkeypatch.setattr(common, "fetch_crossref_by_doi", fail_provider)
+    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", fail_provider)
+
+    resolved = resolve_paper.resolve_scalar_reference(reference, zotero_mode="off")
+
+    assert resolved["source_type"] == expected_source_type
+    assert resolved[expected_field] == expected_value
+    assert resolved["paper_id"].endswith(expected_value)
+
+
+def test_auto_mode_preserves_input_anchor_and_emits_zotero_observation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -46,13 +96,32 @@ def test_auto_mode_prefers_unique_local_match_without_web_resolution(
     monkeypatch.setattr(
         resolve_paper,
         "resolve_reference",
-        lambda reference: pytest.fail("web resolution must not run after a Zotero match"),
+        lambda reference: {
+            "status": "ok",
+            "source_type": "doi",
+            "doi": reference,
+            "paper_id": f"doi:{reference}",
+            "metadata_sources": ["doi"],
+        },
     )
 
     resolved = resolve_paper.resolve_scalar_reference("10.5555/local")
 
-    assert resolved["title"] == "Local Canonical Title"
-    assert resolved["zotero_key"] == "PARENT01"
+    assert resolved["source_type"] == "doi"
+    assert resolved["doi"] == "10.5555/local"
+    assert "title" not in resolved
+    assert resolved["identity_observations"] == [
+        {
+            "provider": "zotero",
+            "retrieved_by": {"kind": "doi", "value": "10.5555/local"},
+            "relation": {
+                "kind": "zotero_lookup",
+                "match_kind": "doi",
+                "match_resolution": "unique_exact",
+            },
+            "record": local_record(),
+        }
+    ]
     assert resolved["zotero_lookup"] == {
         "mode": "auto",
         "status": "match",
@@ -60,6 +129,44 @@ def test_auto_mode_prefers_unique_local_match_without_web_resolution(
         "api_status": "available",
         "api_version": "3",
         "schema_version": "37",
+    }
+
+
+def test_required_title_lookup_still_emits_an_observation_for_adjudication(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        resolve_paper,
+        "lookup_zotero_local",
+        lambda reference, reference_type: {
+            "status": "match",
+            "match_kind": "title",
+            "record": local_record(),
+        },
+    )
+    monkeypatch.setattr(
+        resolve_paper,
+        "resolve_reference",
+        lambda reference: {
+            "status": "ok",
+            "source_type": "title_query",
+            "title": reference,
+            "paper_id": "title:query",
+            "metadata_sources": ["title_query"],
+        },
+    )
+
+    resolved = resolve_paper.resolve_scalar_reference(
+        "Local Canonical Title",
+        zotero_mode="required",
+    )
+
+    assert resolved["source_type"] == "title_query"
+    assert resolved["identity_observations"][0]["provider"] == "zotero"
+    assert resolved["identity_observations"][0]["relation"] == {
+        "kind": "zotero_lookup",
+        "match_kind": "title",
+        "match_resolution": "unique_exact",
     }
 
 
@@ -346,8 +453,8 @@ def test_web_enrichment_does_not_override_zotero_identity(
     assert enriched["doi"] == "10.5555/local"
     assert enriched["venue"] == "Local Venue"
     assert enriched["local_pdf_path"] == record["local_pdf_path"]
-    assert enriched["abstract"] == "Useful missing abstract."
-    assert enriched["metadata_sources"] == ["zotero", "crossref"]
+    assert "abstract" not in enriched
+    assert enriched["metadata_sources"] == ["zotero"]
 
 
 def test_title_enrichment_rejects_an_unvalidated_doi_for_a_zotero_item(

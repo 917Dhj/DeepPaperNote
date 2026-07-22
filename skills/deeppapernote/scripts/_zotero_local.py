@@ -7,7 +7,6 @@ import json
 import os
 import re
 import socket
-import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -21,6 +20,7 @@ from common import (
     extract_arxiv_id,
     extract_doi,
     infer_source_type,
+    normalize_identity_title,
     normalize_whitespace,
     paper_id_for_record,
 )
@@ -425,8 +425,16 @@ def normalize_zotero_item(raw: Mapping[str, Any]) -> dict[str, Any]:
         "",
     )
     source_url = normalize_whitespace(str(data.get("url", "")))
-    if urllib.parse.urlsplit(source_url).scheme.lower() not in {"http", "https"}:
-        source_url = ""
+    parent_url_error = ""
+    if source_url:
+        try:
+            parsed_source_url = _split_attachment_url(source_url)
+        except ZoteroLocalError as exc:
+            source_url = ""
+            parent_url_error = exc.code
+        else:
+            if parsed_source_url.scheme.lower() not in {"http", "https"}:
+                source_url = ""
     if not source_url and doi:
         source_url = f"https://doi.org/{doi}"
 
@@ -449,6 +457,8 @@ def normalize_zotero_item(raw: Mapping[str, Any]) -> dict[str, Any]:
     version = raw.get("version")
     if version not in (None, ""):
         record["zotero_version"] = version
+    if parent_url_error:
+        record["zotero_parent_url_error"] = parent_url_error
     return record
 
 
@@ -562,9 +572,7 @@ def existing_pdf_from_file_url(raw_url: str) -> str:
 
 
 def normalize_lookup_title(title: str) -> str:
-    normalized = unicodedata.normalize("NFKC", normalize_whitespace(title)).casefold()
-    normalized = "".join(char if char.isalnum() or char.isspace() else " " for char in normalized)
-    return normalize_whitespace(normalized)
+    return normalize_identity_title(title)
 
 
 def _match_search_results(

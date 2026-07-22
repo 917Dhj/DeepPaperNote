@@ -326,7 +326,7 @@ def test_matcher_supports_nfkc_unicode_title_and_detects_ties() -> None:
     unique = _match_search_results(
         [zotero_item(title="深度学习：方法Ａ")],
         match_kind="title",
-        query="深度学习 方法A",
+        query="深度学习:方法A",
     )
     assert unique["status"] == "match"
 
@@ -349,6 +349,17 @@ def test_matcher_rejects_a_non_exact_title_without_independent_identity_evidence
     )
 
     assert match == {
+        "status": "not_found",
+        "match_kind": "title",
+        "candidate_count": 0,
+    }
+
+    symbol_difference = _match_search_results(
+        [zotero_item(title="Reliable C Agents")],
+        match_kind="title",
+        query="Reliable C++ Agents",
+    )
+    assert symbol_difference == {
         "status": "not_found",
         "match_kind": "title",
         "candidate_count": 0,
@@ -585,6 +596,32 @@ def test_lookup_preserves_parent_metadata_when_attachment_file_url_is_malformed(
     assert result["record"]["paper_id"] == "doi:10.5555/example"
     assert result["record"]["zotero_attachment_status"] == "unavailable"
     assert result["record"]["zotero_attachment_error"] == "zotero_unsafe_file_url"
+
+
+def test_lookup_preserves_parent_identity_when_parent_url_is_malformed(
+    tmp_path: Path,
+) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\ntrusted")
+    parent = zotero_item()
+    parent["data"]["url"] = "https://[invalid/paper"
+    routes = base_routes()
+    routes["/api/users/0/items/PARENT01"] = json_result(parent)
+    routes["/api/users/0/items/PARENT01/children"] = json_result([zotero_attachment()])
+    routes["/api/users/0/items/ATTACH01/file/view/url"] = text_result(pdf_path.as_uri())
+    transport, _ = routed_transport(routes)
+
+    result = lookup_zotero_local(
+        "PARENT01",
+        client=ZoteroLocalClient(transport=transport),
+    )
+
+    assert result["status"] == "match"
+    assert result["record"]["title"] == "Attention Is All You Need"
+    assert result["record"]["paper_id"] == "doi:10.5555/example"
+    assert result["record"]["source_url"] == "https://doi.org/10.5555/example"
+    assert result["record"]["local_pdf_path"] == str(pdf_path.resolve())
+    assert result["record"]["zotero_parent_url_error"] == "zotero_unsafe_file_url"
 
 
 def test_lookup_preserves_parent_metadata_when_remote_attachment_url_is_malformed(

@@ -18,30 +18,38 @@ from common import (
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "build identity contract")
     p.add_argument("--input", required=True, help="Metadata JSON path or JSON string.")
-    p.add_argument("--resolve", default="", help="Resolve artifact path for provenance.")
+    p.add_argument("--resolve", required=True, help="Resolve artifact path for provenance.")
     p.add_argument("--trace-output", required=True, help="Identity repair trace JSON output path.")
     p.add_argument("--output", required=True, help="Canonical Identity Artifact JSON output path.")
     return p
 
 
-def load_required_record(value: str, consumer: str) -> dict:
+def load_required_record(value: str, consumer: str, *, producer: str) -> dict:
     record = maybe_load_json_record(value)
     if record is None:
         raise SystemExit(f"{consumer} requires a JSON acquisition artifact input.")
-    return dict(require_ok_input_artifact(record, consumer))
-
-
-def load_optional_record(value: str, consumer: str) -> dict | None:
-    record = maybe_load_json_record(value)
-    if record is None:
-        return None
-    return dict(require_ok_input_artifact(record, consumer))
+    accepted = dict(require_ok_input_artifact(record, consumer))
+    if str(accepted.get("script", "")) != producer:
+        raise SystemExit(f"{consumer} requires a {producer} producer artifact.")
+    return accepted
 
 
 def main() -> None:
     args = parser().parse_args()
-    metadata = load_required_record(args.input, "build_identity_contract.py")
-    source_record = load_optional_record(args.resolve, "build_identity_contract.py")
+    metadata = load_required_record(
+        args.input,
+        "build_identity_contract.py",
+        producer="collect_metadata.py",
+    )
+    if not isinstance(metadata.get("identity_observations"), list):
+        raise SystemExit(
+            "build_identity_contract.py requires metadata identity_observations."
+        )
+    source_record = load_required_record(
+        args.resolve,
+        "build_identity_contract.py",
+        producer="resolve_paper.py",
+    )
 
     trace = build_identity_repair_trace(
         metadata,

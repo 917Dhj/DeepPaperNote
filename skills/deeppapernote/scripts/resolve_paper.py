@@ -131,8 +131,30 @@ def resolve_scalar_reference(reference: str, *, zotero_mode: str = "auto") -> di
                 },
             }
         else:
-            resolved = dict(record)
-            resolved["zotero_lookup"] = zotero_lookup_summary(lookup, mode=zotero_mode)
+            if explicit_zotero_reference:
+                resolved = dict(record)
+                resolved["zotero_lookup"] = zotero_lookup_summary(
+                    lookup,
+                    mode=zotero_mode,
+                )
+                return resolved
+            resolved = resolve_reference(reference)
+            resolved["identity_observations"] = [
+                {
+                    "provider": "zotero",
+                    "retrieved_by": {"kind": source_type, "value": reference.strip()},
+                    "relation": {
+                        "kind": "zotero_lookup",
+                        "match_kind": str(lookup.get("match_kind", source_type)),
+                        "match_resolution": "unique_exact",
+                    },
+                    "record": dict(record),
+                }
+            ]
+            resolved["zotero_lookup"] = zotero_lookup_summary(
+                lookup,
+                mode=zotero_mode,
+            )
             return resolved
 
     if lookup_status == "ambiguous" or zotero_mode == "required" or explicit_zotero_reference:

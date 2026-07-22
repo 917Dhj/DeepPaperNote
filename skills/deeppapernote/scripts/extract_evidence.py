@@ -11,7 +11,6 @@ from typing import Any
 from common import (
     SECTION_ALIASES,
     emit,
-    enrich_metadata,
     extract_appendix_index,
     extract_appendix_page_texts,
     extract_caption_lines,
@@ -28,7 +27,7 @@ from common import (
     paper_id_for_record,
     pick_sentences_by_keywords,
     pdf_coverage_summary,
-    resolve_reference,
+    require_accepted_fetch_artifact,
     split_sentences,
 )
 from contracts import empty_evidence_pack
@@ -49,10 +48,9 @@ APPENDIX_EVIDENCE_CATEGORIES = (
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "extract evidence")
-    p.add_argument("--input", default="", help="Metadata JSON path, fetch_pdf JSON path, JSON string, or raw paper reference.")
+    p.add_argument("--input", default="", help="Successful fetch JSON path or JSON artifact.")
     p.add_argument("--source-manifest", default="", help="Source Corpus source_manifest.json path.")
     p.add_argument("--output", default="", help="Output JSON path.")
-    p.add_argument("--paper-id", default="", help="Canonical paper id if already known.")
     p.add_argument("--max-pages", type=int, default=32, help="Maximum number of PDF pages to scan.")
     p.add_argument("--max-chunks-per-section", type=int, default=12, help="Maximum number of candidate chunks to keep per section.")
     return p
@@ -60,9 +58,9 @@ def parser() -> argparse.ArgumentParser:
 
 def ensure_record(input_value: str) -> dict:
     record = maybe_load_json_record(input_value)
-    if record is not None:
-        return dict(record)
-    return enrich_metadata(resolve_reference(input_value))
+    if record is None:
+        raise SystemExit("extract_evidence.py requires a JSON acquisition artifact.")
+    return dict(require_accepted_fetch_artifact(record, "extract_evidence.py"))
 
 
 def build_items(sentences: list[str], section: str) -> list[dict]:
@@ -834,7 +832,7 @@ def main() -> None:
     ) or [chunk["text"] for chunk in candidates.get("conclusion", [])[:3]]
 
     pack = empty_evidence_pack()
-    pack["paper_id"] = args.paper_id or record.get("paper_id") or paper_id_for_record(record)
+    pack["paper_id"] = record.get("paper_id") or paper_id_for_record(record)
     pack["problem_evidence"] = build_items(problem_sentences, "introduction")
     pack["task_evidence"] = build_items(task_sentences, "task")
     pack["data_evidence"] = build_items(data_sentences, "data")
