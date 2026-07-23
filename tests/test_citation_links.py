@@ -4,7 +4,6 @@ from pathlib import Path
 
 import citation_links
 import build_synthesis_bundle
-from build_synthesis_bundle import bundle
 from citation_links import extract_reference_candidates_from_pdf, resolve_reference_links
 
 
@@ -284,7 +283,7 @@ def test_bundle_exposes_reference_candidates_under_references(monkeypatch) -> No
         lambda: {"obsidian_vault": "", "papers_dir": "Research/Papers"},
     )
 
-    synthesis = bundle(
+    synthesis = build_synthesis_bundle.bundle(
         metadata={"title": "Citation Paper"},
         evidence_wrapper={
             "evidence_pack": {
@@ -298,6 +297,16 @@ def test_bundle_exposes_reference_candidates_under_references(monkeypatch) -> No
         },
         figures_wrapper={},
         assets_wrapper={},
+        source_manifest={
+            "identity_contract": {
+                "artifact_type": "canonical_identity",
+                "schema_version": 2,
+                "paper_id": "paper:citation-test",
+                "identity_verdict": "accepted",
+                "work_level_identity": {"title": "Citation Paper"},
+                "accepted_metadata": {"title": "Citation Paper"},
+            }
+        },
     )
 
     candidates = synthesis["references"]["candidates"]

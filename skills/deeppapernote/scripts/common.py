@@ -4,18 +4,18 @@
 from __future__ import annotations
 
 import argparse
-from copy import deepcopy
 import hashlib
 import json
 import os
 import re
 import ssl
+import unicodedata
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from copy import deepcopy
 from pathlib import Path, PureWindowsPath
 from typing import Any
-
 
 ARXIV_NS = {
     "atom": "http://www.w3.org/2005/Atom",
@@ -26,6 +26,21 @@ SEMANTIC_SCHOLAR_SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/se
 OPENALEX_WORKS_URL = "https://api.openalex.org/works"
 CROSSREF_WORKS_URL = "https://api.crossref.org/works"
 DEFAULT_USER_AGENT = "DeepPaperNote/0.1"
+PROVENANCE_FIELDS = (
+    "title",
+    "translated_title",
+    "authors",
+    "affiliations",
+    "year",
+    "venue",
+    "doi",
+    "arxiv_id",
+    "zotero_key",
+    "abstract",
+    "source_url",
+    "pdf_url",
+    "local_pdf_path",
+)
 SHELL_CONFIG_FILES = [
     Path.home() / ".zshenv",
     Path.home() / ".zprofile",
@@ -541,6 +556,40 @@ def _author_key(name: str) -> str:
     return parts[-1]
 
 
+def normalize_identity_title(title: str) -> str:
+    return normalize_whitespace(unicodedata.normalize("NFKC", title).casefold())
+
+
+def _author_identity_parts(name: str) -> list[str]:
+    normalized = unicodedata.normalize("NFKC", normalize_whitespace(name)).casefold()
+    if "," in normalized:
+        family, given = normalized.split(",", 1)
+        normalized = f"{given} {family}"
+    return re.findall(r"[^\W_]+", normalized, flags=re.UNICODE)
+
+
+def _full_leading_author_matches(
+    source_record: dict[str, Any],
+    work_record: dict[str, Any],
+) -> bool:
+    source_authors = _dedupe_string_list(source_record.get("authors", []))
+    work_authors = _dedupe_string_list(work_record.get("authors", []))
+    if not source_authors or not work_authors:
+        return False
+    source_parts = _author_identity_parts(source_authors[0])
+    work_parts = _author_identity_parts(work_authors[0])
+    if len(source_parts) < 2 or len(work_parts) < 2:
+        return False
+    if source_parts[-1] != work_parts[-1]:
+        return False
+    source_given = source_parts[:-1]
+    work_given = work_parts[:-1]
+    return len(source_given) == len(work_given) and all(
+        left == right
+        for left, right in zip(source_given, work_given)
+    )
+
+
 def _leading_author_status(
     source_record: dict[str, Any],
     work_record: dict[str, Any],
@@ -583,7 +632,7 @@ def _shared_identifier_evidence(
 
     if source_doi and work_doi and source_doi == work_doi:
         shared.append({"kind": "shared_identifier", "value": f"doi:{work_doi}"})
-    elif source_doi and work_doi and not (source_arxiv and source_arxiv == work_arxiv):
+    elif source_doi and work_doi:
         conflicts.append(
             {
                 "kind": "identifier",
@@ -1027,13 +1076,386 @@ def _warning_scoped_metadata_uncertainty(
     return warnings
 
 
+def _identity_observation_record(observation: dict[str, Any]) -> dict[str, Any]:
+    record = observation.get("record")
+    if isinstance(record, dict):
+        return deepcopy(record)
+    return {
+        key: deepcopy(value)
+        for key, value in observation.items()
+        if key not in {"provider", "retrieved_by", "diagnostics", "relation"}
+    }
+
+
+def _identity_observation_summary(
+    observation: dict[str, Any],
+    *,
+    status: str,
+    reason: str,
+) -> dict[str, Any]:
+    record = _identity_observation_record(observation)
+    summary = {
+        "provider": _string_field(observation, "provider")
+        or _string_field(record, "source_type")
+        or "unknown",
+        "retrieved_by": deepcopy(observation.get("retrieved_by", {}) or {}),
+        "status": status,
+        "reason": reason,
+        "record": record,
+    }
+    for key in ("relation", "diagnostics"):
+        value = observation.get(key)
+        if value not in (None, "", [], {}):
+            summary[key] = deepcopy(value)
+    return summary
+
+
+def _append_bound_source(
+    sources: list[dict[str, str]],
+    *,
+    kind: str,
+    value: str,
+    provider: str,
+    binding_reason: str,
+) -> None:
+    cleaned = normalize_whitespace(value)
+    if not cleaned or any(item["kind"] == kind and item["value"] == cleaned for item in sources):
+        return
+    sources.append(
+        {
+            "kind": kind,
+            "value": cleaned,
+            "provider": provider or "unknown",
+            "binding_reason": binding_reason,
+        }
+    )
+
+
+def _bound_sources_from_record(
+    record: dict[str, Any],
+    *,
+    provider: str,
+    binding_reason: str,
+) -> list[dict[str, str]]:
+    sources: list[dict[str, str]] = []
+    local_pdf = _string_field(record, "local_pdf_path")
+    if local_pdf:
+        _append_bound_source(
+            sources,
+            kind="local_pdf",
+            value=_path_string(local_pdf),
+            provider=provider,
+            binding_reason=binding_reason,
+        )
+    pdf_url = _string_field(record, "pdf_url")
+    if pdf_url:
+        _append_bound_source(
+            sources,
+            kind="pdf_url",
+            value=pdf_url,
+            provider=provider,
+            binding_reason=binding_reason,
+        )
+    source_url = _string_field(record, "source_url")
+    if source_url.lower().endswith(".pdf"):
+        _append_bound_source(
+            sources,
+            kind="pdf_url",
+            value=source_url,
+            provider=provider,
+            binding_reason=binding_reason,
+        )
+    arxiv_id = _record_arxiv_id(record)
+    if arxiv_id:
+        _append_bound_source(
+            sources,
+            kind="pdf_url",
+            value=f"https://arxiv.org/pdf/{arxiv_id}.pdf",
+            provider=provider,
+            binding_reason="accepted_identifier_derived",
+        )
+    doi = extract_doi(_string_field(record, "doi")) or ""
+    if doi.lower().startswith("10.3389/"):
+        _append_bound_source(
+            sources,
+            kind="pdf_url",
+            value=f"https://www.frontiersin.org/articles/{doi}/pdf",
+            provider=provider,
+            binding_reason="accepted_identifier_derived",
+        )
+    return sources
+
+
+def _merge_admitted_observation(
+    accepted: dict[str, Any],
+    observation: dict[str, Any],
+    provider: str,
+) -> dict[str, Any]:
+    merged = deepcopy(accepted)
+    for key, value in observation.items():
+        if value in ("", None, [], {}):
+            continue
+        if key == "metadata_sources":
+            sources = _dedupe_string_list(merged.get(key, []))
+            for source in _dedupe_string_list(value):
+                if source not in sources:
+                    sources.append(source)
+            merged[key] = sources
+            continue
+        if merged.get(key) in ("", None, [], {}):
+            merged[key] = deepcopy(value)
+    sources = _dedupe_string_list(merged.get("metadata_sources", []))
+    if provider != "unknown" and provider not in sources:
+        sources.append(provider)
+    if sources:
+        merged["metadata_sources"] = sources
+    merged["paper_id"] = _paper_id_for_effective_identity(merged)
+    return merged
+
+
+def _is_unique_exact_zotero_title_observation(
+    anchor: dict[str, Any],
+    item: dict[str, Any],
+    observation: dict[str, Any],
+) -> bool:
+    relation = item.get("relation")
+    if not isinstance(relation, dict):
+        return False
+    anchor_title = normalize_identity_title(_string_field(anchor, "title"))
+    observation_title = normalize_identity_title(_string_field(observation, "title"))
+    return bool(
+        _string_field(item, "provider").lower() == "zotero"
+        and _string_field(relation, "kind") == "zotero_lookup"
+        and _string_field(relation, "match_kind") == "title"
+        and _string_field(relation, "match_resolution") == "unique_exact"
+        and _string_field(observation, "zotero_key")
+        and anchor_title
+        and anchor_title == observation_title
+    )
+
+
+def adjudicate_identity_observations(
+    anchor: dict[str, Any],
+    observations: list[Any],
+) -> dict[str, Any]:
+    accepted_metadata = deepcopy(anchor)
+    accepted_metadata.pop("identity_observations", None)
+    accepted_observations: list[dict[str, Any]] = []
+    rejected_observations: list[dict[str, Any]] = []
+    repair_attempts: list[dict[str, Any]] = []
+    anchor_provider = _string_field(anchor, "source_type") or "input"
+    field_provenance = {
+        field: {
+            "provider": anchor_provider,
+            "retrieved_by": {"kind": "input", "value": _string_field(anchor, "paper_id")},
+        }
+        for field in PROVENANCE_FIELDS
+        if anchor.get(field) not in ("", None, [], {})
+    }
+    bound_sources = _bound_sources_from_record(
+        anchor,
+        provider=_string_field(anchor, "source_type") or "input",
+        binding_reason="trusted_input",
+    )
+
+    for item in observations:
+        if not isinstance(item, dict):
+            continue
+        observation = _identity_observation_record(item)
+        adjudication_anchor = accepted_metadata
+        shared_identifiers, identifier_conflicts = _shared_identifier_evidence(
+            adjudication_anchor,
+            observation,
+        )
+        if identifier_conflicts:
+            summary = _identity_observation_summary(
+                item,
+                status="rejected",
+                reason="conflicting_strong_identifier",
+            )
+            rejected_observations.append(summary)
+            repair_attempts.append(
+                {
+                    "attempt": len(repair_attempts) + 1,
+                    "action": "reject_conflicting_provider_observation",
+                    "status": "rejected",
+                    "evidence_used": _repair_evidence_used(adjudication_anchor),
+                    "rejected_candidate_identity": work_level_identity_from_record(
+                        observation
+                    ),
+                    "accepted_correction": work_level_identity_from_record(
+                        adjudication_anchor
+                    ),
+                    "conflicting_anchors": identifier_conflicts,
+                }
+            )
+            continue
+        anchor_year = _record_publication_year(adjudication_anchor)
+        observation_year = _record_publication_year(observation)
+        title_author_year_match = bool(
+            normalize_identity_title(_string_field(adjudication_anchor, "title"))
+            and normalize_identity_title(_string_field(adjudication_anchor, "title"))
+            == normalize_identity_title(_string_field(observation, "title"))
+            and _full_leading_author_matches(adjudication_anchor, observation)
+            and anchor_year
+            and anchor_year == observation_year
+        )
+        unique_exact_zotero_title_match = _is_unique_exact_zotero_title_observation(
+            anchor,
+            item,
+            observation,
+        )
+        if not title_author_year_match and not shared_identifiers:
+            observation_provider = (
+                _string_field(item, "provider")
+                or _string_field(observation, "source_type")
+            ).lower()
+            for other_item in observations:
+                if other_item is item or not isinstance(other_item, dict):
+                    continue
+                other = _identity_observation_record(other_item)
+                other_provider = (
+                    _string_field(other_item, "provider")
+                    or _string_field(other, "source_type")
+                ).lower()
+                anchor_title = normalize_identity_title(
+                    _string_field(anchor, "title")
+                )
+                observation_title = normalize_identity_title(
+                    _string_field(observation, "title")
+                )
+                other_title = normalize_identity_title(
+                    _string_field(other, "title")
+                )
+                _, provider_conflicts = _shared_identifier_evidence(
+                    observation,
+                    other,
+                )
+                if (
+                    observation_provider
+                    and other_provider
+                    and observation_provider != other_provider
+                    and not provider_conflicts
+                    and anchor_title
+                    and anchor_title == observation_title == other_title
+                    and _full_leading_author_matches(observation, other)
+                    and observation_year
+                    and observation_year == _record_publication_year(other)
+                ):
+                    title_author_year_match = True
+                    break
+        if (
+            not shared_identifiers
+            and not title_author_year_match
+            and not unique_exact_zotero_title_match
+        ):
+            rejected_observations.append(
+                _identity_observation_summary(
+                    item,
+                    status="rejected",
+                    reason="insufficient_equivalence_evidence",
+                )
+            )
+            continue
+
+        if shared_identifiers:
+            acceptance_reason = "shared_identifier"
+        elif unique_exact_zotero_title_match:
+            acceptance_reason = "unique_exact_zotero_title"
+        else:
+            acceptance_reason = "title_author_year"
+        summary = _identity_observation_summary(
+            item,
+            status="accepted",
+            reason=acceptance_reason,
+        )
+        accepted_observations.append(summary)
+        provider = summary["provider"]
+        observation.setdefault("metadata_sources", [])
+        if provider != "unknown" and provider not in observation["metadata_sources"]:
+            observation["metadata_sources"].append(provider)
+        previous_metadata = deepcopy(accepted_metadata)
+        accepted_metadata = _merge_admitted_observation(
+            accepted_metadata,
+            observation,
+            provider,
+        )
+        retrieved_by = deepcopy(item.get("retrieved_by", {}) or {})
+        for field in PROVENANCE_FIELDS:
+            value = observation.get(field)
+            if value in ("", None, [], {}):
+                continue
+            if accepted_metadata.get(field) != value:
+                continue
+            if previous_metadata.get(field) not in ("", None, [], {}):
+                continue
+            field_provenance[field] = {
+                "provider": provider,
+                "retrieved_by": retrieved_by,
+            }
+        for source in _bound_sources_from_record(
+            observation,
+            provider=provider,
+            binding_reason=acceptance_reason,
+        ):
+            _append_bound_source(sources=bound_sources, **source)
+        promoted_identifiers = {
+            key: _string_field(observation, key)
+            for key in ("doi", "arxiv_id", "zotero_key")
+            if not _string_field(previous_metadata, key)
+            and _string_field(observation, key)
+        }
+        if promoted_identifiers:
+            repair_attempts.append(
+                {
+                    "attempt": len(repair_attempts) + 1,
+                    "action": "accept_identity_promotion",
+                    "status": "accepted",
+                    "evidence_used": deepcopy(shared_identifiers)
+                    or [
+                        {
+                            "kind": "title_author_year",
+                            "value": _string_field(observation, "title"),
+                            "source": provider,
+                        }
+                    ],
+                    "rejected_candidate_identity": work_level_identity_from_record(
+                        previous_metadata
+                    ),
+                    "accepted_correction": work_level_identity_from_record(
+                        accepted_metadata
+                    ),
+                    "promoted_identifiers": promoted_identifiers,
+                    "previous_paper_id": _string_field(previous_metadata, "paper_id"),
+                    "accepted_paper_id": _string_field(accepted_metadata, "paper_id"),
+                }
+            )
+
+    return {
+        "accepted_metadata": apply_identity_confidence(accepted_metadata),
+        "accepted_observations": accepted_observations,
+        "rejected_observations": rejected_observations,
+        "bound_sources": bound_sources,
+        "repair_attempts": repair_attempts,
+        "field_provenance": field_provenance,
+    }
+
+
 def identity_repair_decision(
     metadata: dict[str, Any],
     *,
     resolve_record: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    effective = deepcopy(metadata)
-    repair_attempts: list[dict[str, Any]] = []
+    observations = metadata.get("identity_observations", []) or []
+    observation_decision = adjudicate_identity_observations(
+        resolve_record or metadata,
+        observations if isinstance(observations, list) else [],
+    )
+    effective = observation_decision["accepted_metadata"]
+    for diagnostic_key in ("provider_unavailable", "provider_status"):
+        if metadata.get(diagnostic_key) not in (None, "", False):
+            effective[diagnostic_key] = deepcopy(metadata[diagnostic_key])
+    repair_attempts = list(observation_decision["repair_attempts"])
     identity_verdict = "accepted"
     failure_class = ""
     unresolved_risks: list[str] = []
@@ -1082,6 +1504,7 @@ def identity_repair_decision(
     if failure_class:
         unresolved_risks.append(failure_class)
 
+    bound_sources = list(observation_decision["bound_sources"])
     return {
         "record": effective,
         "identity_verdict": identity_verdict,
@@ -1089,6 +1512,11 @@ def identity_repair_decision(
         "repair_attempts": repair_attempts,
         "warnings": [],
         "unresolved_risks": unresolved_risks,
+        "accepted_metadata": deepcopy(effective),
+        "accepted_observations": observation_decision["accepted_observations"],
+        "rejected_observations": observation_decision["rejected_observations"],
+        "bound_sources": bound_sources,
+        "field_provenance": observation_decision["field_provenance"],
     }
 
 
@@ -1163,7 +1591,10 @@ def identity_contract_state(
     decision = identity_repair_decision(metadata, resolve_record=source_record)
     effective = decision["record"]
     source_record = source_record or effective
-    paper_id = effective.get("paper_id") or paper_id_for_record(effective)
+    paper_id = _paper_id_for_effective_identity(effective)
+    effective["paper_id"] = paper_id
+    accepted_metadata = deepcopy(decision["accepted_metadata"])
+    accepted_metadata["paper_id"] = paper_id
     equivalence_decision = manifestation_equivalence_decision(effective, source_record)
     identity_verdict = identity_verdict_from_equivalence(equivalence_decision)
     warnings = []
@@ -1203,6 +1634,11 @@ def identity_contract_state(
         "repair_attempts": repair_attempts,
         "failed": failed,
         "unresolved_risks": unresolved_risks,
+        "accepted_metadata": accepted_metadata,
+        "accepted_observations": decision["accepted_observations"],
+        "rejected_observations": decision["rejected_observations"],
+        "bound_sources": decision["bound_sources"],
+        "field_provenance": decision["field_provenance"],
     }
 
 
@@ -1221,11 +1657,15 @@ def build_identity_repair_trace(
         "run_status": "failed" if failed else "ok",
         "script": "build_identity_contract.py",
         "artifact_type": "identity_repair_trace",
-        "schema_version": 1,
+        "schema_version": 2,
         "paper_id": state["paper_id"],
         "identity_verdict": state["identity_verdict"],
         "identity_failure_class": failure_class,
         "repair_attempts": state["repair_attempts"],
+        "accepted_observations": state["accepted_observations"],
+        "rejected_observations": state["rejected_observations"],
+        "bound_sources": state["bound_sources"],
+        "field_provenance": state["field_provenance"],
         "selected_identity_evidence": state["selected_identity_evidence"],
         "equivalence_decision": state["equivalence_decision"],
         "warnings": state["warnings"],
@@ -1257,13 +1697,18 @@ def build_canonical_identity_artifact(
         "script": "build_identity_contract.py",
         "producer": "build_identity_contract.py",
         "artifact_type": "canonical_identity",
-        "schema_version": 1,
+        "schema_version": 2,
         "paper_id": state["paper_id"],
         "identity_verdict": state["identity_verdict"],
         "identity_failure_class": failure_class,
         "failure_summary": identity_failure_summary(failure_class) if failed else "",
         "work_level_identity": work_level_identity_from_record(effective),
         "source_manifestation": source_manifestation_from_record(source_record, effective),
+        "accepted_metadata": state["accepted_metadata"],
+        "bound_sources": state["bound_sources"],
+        "accepted_observations": state["accepted_observations"],
+        "rejected_observations": state["rejected_observations"],
+        "field_provenance": state["field_provenance"],
         "selected_identity_evidence": state["selected_identity_evidence"],
         "equivalence_decision": state["equivalence_decision"],
         "warnings": state["warnings"],
@@ -1281,33 +1726,63 @@ def build_canonical_identity_artifact(
     }
 
 
+def canonical_identity_acceptance_error(record: dict[str, Any]) -> str:
+    artifact_type = _string_field(record, "artifact_type")
+    if artifact_type != "canonical_identity":
+        return f"non-canonical identity artifact: {artifact_type}"
+    if record.get("schema_version") != 2:
+        return "canonical identity must use schema v2"
+    verdict = _string_field(record, "identity_verdict").lower().replace("-", "_")
+    if verdict not in {"accepted", "accepted_with_warnings"}:
+        return f"unaccepted canonical identity: identity_verdict={verdict}"
+    return ""
+
+
 def require_accepted_canonical_identity(record: dict[str, Any], consumer: str) -> dict[str, Any]:
     identity = dict(require_ok_input_artifact(record, consumer))
-    artifact_type = _string_field(identity, "artifact_type")
-    verdict = _string_field(identity, "identity_verdict").lower()
-    if artifact_type != "canonical_identity":
-        raise SystemExit(f"{consumer} refuses non-canonical identity artifact: {artifact_type}")
-    normalized_verdict = verdict.replace("-", "_")
-    if normalized_verdict not in {"accepted", "accepted_with_warnings"}:
-        raise SystemExit(
-            f"{consumer} refuses unaccepted canonical identity: identity_verdict={verdict}"
-        )
+    error = canonical_identity_acceptance_error(identity)
+    if error:
+        raise SystemExit(f"{consumer} refuses {error}")
     return identity
 
 
 def canonical_identity_summary(identity: dict[str, Any]) -> dict[str, Any]:
     return {
         "artifact_type": _string_field(identity, "artifact_type"),
+        "schema_version": identity.get("schema_version", 0),
         "paper_id": _string_field(identity, "paper_id"),
         "identity_verdict": _string_field(identity, "identity_verdict"),
         "work_level_identity": deepcopy(identity.get("work_level_identity", {}) or {}),
         "source_manifestation": deepcopy(identity.get("source_manifestation", {}) or {}),
-        "selected_identity_evidence": deepcopy(identity.get("selected_identity_evidence", []) or []),
+        "accepted_metadata": deepcopy(identity.get("accepted_metadata", {}) or {}),
+        "bound_sources": deepcopy(identity.get("bound_sources", []) or []),
+        "field_provenance": deepcopy(identity.get("field_provenance", {}) or {}),
+        "selected_identity_evidence": deepcopy(
+            identity.get("selected_identity_evidence", []) or []
+        ),
         "equivalence_decision": deepcopy(identity.get("equivalence_decision", {}) or {}),
         "warnings": deepcopy(identity.get("warnings", []) or []),
         "repair_trace_path": _string_field(identity, "repair_trace_path"),
         "provenance": deepcopy(identity.get("provenance", {}) or {}),
     }
+
+
+def require_accepted_fetch_artifact(
+    record: dict[str, Any],
+    consumer: str,
+) -> dict[str, Any]:
+    artifact = dict(require_ok_input_artifact(record, consumer))
+    if _string_field(artifact, "script") != "fetch_pdf.py":
+        raise SystemExit(f"{consumer} requires a fetch_pdf.py artifact.")
+    identity = artifact.get("identity_contract")
+    if not isinstance(identity, dict):
+        raise SystemExit(f"{consumer} requires an embedded canonical identity contract.")
+    require_accepted_canonical_identity(identity, consumer)
+    canonical_paper_id = _string_field(identity, "paper_id")
+    artifact_paper_id = _string_field(artifact, "paper_id")
+    if not canonical_paper_id or artifact_paper_id != canonical_paper_id:
+        raise SystemExit(f"{consumer} requires fetch paper_id to match canonical identity.")
+    return artifact
 
 
 def fetch_record_from_canonical_identity(identity: dict[str, Any]) -> dict[str, Any]:
@@ -1719,6 +2194,24 @@ def choose_best_title_match(title: str, candidates: list[dict[str, Any]]) -> dic
     return best
 
 
+def _record_publication_year(record: dict[str, Any]) -> str:
+    for key in ("year", "published"):
+        match = re.search(r"(?<!\d)((?:18|19|20|21)\d{2})(?!\d)", _string_field(record, key))
+        if match:
+            return match.group(1)
+    return ""
+
+
+def _has_strong_work_identifier(record: dict[str, Any]) -> bool:
+    paper_id = _string_field(record, "paper_id").lower()
+    return bool(
+        extract_doi(_string_field(record, "doi"))
+        or extract_doi(_string_field(record, "source_url"))
+        or _record_arxiv_id(record)
+        or paper_id.startswith(("doi:", "arxiv:"))
+    )
+
+
 def resolve_reference(value: str) -> dict[str, Any]:
     source_type = infer_source_type(value)
     stripped = (value or "").strip()
@@ -1747,30 +2240,21 @@ def resolve_reference(value: str) -> dict[str, Any]:
         return apply_identity_confidence(paper)
     if source_type == "arxiv_id":
         arxiv_id = extract_arxiv_id(stripped) or ""
-        papers = safe_fetch_arxiv_entries(id_list=arxiv_id, max_results=1)
-        if papers:
-            paper = papers[0]
-            paper["paper_id"] = paper_id_for_record(paper)
-            paper["status"] = "ok"
-            return apply_identity_confidence(paper)
         if arxiv_id:
             return fallback_arxiv_record(arxiv_id, "arxiv_id")
     if source_type == "arxiv_url":
         arxiv_id = extract_arxiv_id(stripped) or ""
-        papers = safe_fetch_arxiv_entries(id_list=arxiv_id, max_results=1)
-        if papers:
-            paper = papers[0]
-            paper["paper_id"] = paper_id_for_record(paper)
-            paper["status"] = "ok"
-            return apply_identity_confidence(paper)
         if arxiv_id:
             return fallback_arxiv_record(arxiv_id, "arxiv_url", source_url=stripped)
     if source_type in {"doi", "doi_url"}:
         doi = extract_doi(stripped) or ""
-        paper = fetch_crossref_by_doi(doi) or {"doi": doi, "source_url": f"https://doi.org/{doi}"}
-        paper["source_type"] = "doi"
-        paper["source_url"] = paper.get("source_url") or f"https://doi.org/{doi}"
-        paper["status"] = "ok"
+        paper = {
+            "status": "ok",
+            "source_type": "doi",
+            "source_url": f"https://doi.org/{doi}",
+            "doi": doi,
+            "metadata_sources": ["doi"],
+        }
         paper["paper_id"] = paper_id_for_record(paper)
         return apply_identity_confidence(paper)
     if source_type == "pdf_url":
@@ -1809,17 +2293,6 @@ def resolve_reference(value: str) -> dict[str, Any]:
         return apply_identity_confidence(paper)
 
     title = stripped
-    candidates = (
-        search_semantic_scholar(title, limit=5)
-        + search_crossref_by_title(title, limit=5)
-        + search_openalex_by_title(title, limit=5)
-        + safe_fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5)
-    )
-    best = choose_best_title_match(title, candidates)
-    if best:
-        best = merge_metadata_records({"title": title, "source_type": "title_query", "source_url": "", "metadata_sources": ["title_query"]}, best)
-        best["status"] = "ok"
-        return apply_identity_confidence(best)
     paper = {
         "status": "ok",
         "source_type": "title_query",
@@ -1831,44 +2304,61 @@ def resolve_reference(value: str) -> dict[str, Any]:
     return apply_identity_confidence(paper)
 
 
-def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
+def collect_metadata_observations(record: dict[str, Any]) -> list[dict[str, Any]]:
     base = dict(record)
-    candidates: list[dict[str, Any]] = [base]
+    observations = [
+        deepcopy(item)
+        for item in base.get("identity_observations", []) or []
+        if isinstance(item, dict)
+    ]
     doi = normalize_whitespace(str(base.get("doi", "")))
     title = normalize_whitespace(str(base.get("title", "")))
     arxiv_id = normalize_whitespace(str(base.get("arxiv_id", "")))
 
+    def append(provider: str, kind: str, value: str, candidate: dict[str, Any] | None) -> None:
+        if not candidate:
+            return
+        observation = {
+            "provider": provider,
+            "retrieved_by": {"kind": kind, "value": value},
+            "record": deepcopy(candidate),
+        }
+        if observation not in observations:
+            observations.append(observation)
+
     if doi:
         crossref = fetch_crossref_by_doi(doi)
-        if crossref:
-            candidates.append(crossref)
+        append("crossref", "doi", doi, crossref)
         openalex = fetch_openalex_by_doi(doi)
-        if openalex:
-            candidates.append(openalex)
+        append("openalex", "doi", doi, openalex)
         sem = choose_best_title_match(title or doi, search_semantic_scholar(doi, limit=3))
-        if sem:
-            candidates.append(sem)
+        append("semantic_scholar", "doi", doi, sem)
 
     if arxiv_id:
         arxiv = safe_fetch_arxiv_entries(id_list=arxiv_id, max_results=1)
         if arxiv:
-            candidates.append(arxiv[0])
+            append("arxiv", "arxiv_id", arxiv_id, arxiv[0])
 
     if title:
         sem = choose_best_title_match(title, search_semantic_scholar(title, limit=5))
-        if sem:
-            candidates.append(sem)
+        append("semantic_scholar", "title", title, sem)
         oa = choose_best_title_match(title, search_openalex_by_title(title, limit=5))
-        if oa:
-            candidates.append(oa)
+        append("openalex", "title", title, oa)
         cross = choose_best_title_match(title, search_crossref_by_title(title, limit=5))
-        if cross:
-            candidates.append(cross)
-        arxiv = choose_best_title_match(title, safe_fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5))
-        if arxiv:
-            candidates.append(arxiv)
+        append("crossref", "title", title, cross)
+        arxiv = choose_best_title_match(
+            title,
+            safe_fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5),
+        )
+        append("arxiv", "title", title, arxiv)
 
-    merged = merge_metadata_records(*candidates)
+    return observations
+
+
+def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
+    base = dict(record)
+    observations = collect_metadata_observations(base)
+    merged = adjudicate_identity_observations(base, observations)["accepted_metadata"]
     if not merged.get("year") and merged.get("published") and re.match(r"^\d{4}", str(merged["published"])):
         merged["year"] = str(merged["published"])[:4]
     if merged.get("doi") and not merged.get("source_url"):
@@ -1877,17 +2367,6 @@ def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
         merged["pdf_url"] = f"https://arxiv.org/pdf/{merged['arxiv_id']}.pdf"
     if merged.get("arxiv_id") and not merged.get("doi"):
         merged["doi"] = f"10.48550/arXiv.{merged['arxiv_id']}"
-    if base.get("source_type") == "local_pdf":
-        if base.get("local_pdf_title_source"):
-            merged["local_pdf_title_source"] = base["local_pdf_title_source"]
-        elif is_probable_local_pdf_artifact_title(str(base.get("title", ""))):
-            merged["local_pdf_title_source"] = "local_pdf_stem_used"
-        if base.get("local_pdf_artifact_title") or is_probable_local_pdf_artifact_title(str(base.get("title", ""))):
-            merged["local_pdf_artifact_title"] = True
-        corrected_title = choose_local_pdf_corrected_title(base, candidates[1:])
-        if corrected_title:
-            merged["title"] = corrected_title
-            merged["title_corrected_from_external_metadata"] = True
     merged["paper_id"] = paper_id_for_record(merged)
     return apply_identity_confidence(merged)
 

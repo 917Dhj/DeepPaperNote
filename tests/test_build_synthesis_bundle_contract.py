@@ -2,8 +2,20 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from build_synthesis_bundle import bundle
 from contracts import WRITING_CONTRACT_RULES
+
+
+def test_bundle_refuses_raw_metadata_without_an_identity_contract() -> None:
+    with pytest.raises(ValueError, match="accepted canonical identity contract"):
+        bundle(
+            metadata={"title": "Raw Candidate"},
+            evidence_wrapper={"evidence_pack": {}},
+            figures_wrapper={},
+            assets_wrapper={},
+        )
 
 
 def test_bundle_compact_writing_contract_keeps_depth_rules_without_old_bundle_fields() -> None:
@@ -14,6 +26,14 @@ def test_bundle_compact_writing_contract_keeps_depth_rules_without_old_bundle_fi
         assets_wrapper={},
         source_manifest={
             "paper_id": "paper:contract",
+            "identity_contract": {
+                "artifact_type": "canonical_identity",
+                "schema_version": 2,
+                "paper_id": "paper:contract",
+                "identity_verdict": "accepted",
+                "work_level_identity": {"title": "Contract Paper"},
+                "accepted_metadata": {"title": "Contract Paper"},
+            },
             "coverage": {"total_pages": 8, "text_truncated": False},
             "sections": [
                 {
@@ -98,6 +118,14 @@ def test_bundle_truncation_warnings_use_source_manifest_not_evidence_pack() -> N
         figures_wrapper={},
         assets_wrapper={},
         source_manifest={
+            "identity_contract": {
+                "artifact_type": "canonical_identity",
+                "schema_version": 2,
+                "paper_id": "paper:coverage",
+                "identity_verdict": "accepted",
+                "work_level_identity": {"title": "Coverage Paper"},
+                "accepted_metadata": {"title": "Coverage Paper"},
+            },
             "coverage": {
                 "total_pages": 4,
                 "text_truncated": False,
@@ -123,6 +151,7 @@ def test_bundle_preserves_identity_equivalence_and_source_manifestation() -> Non
         source_manifest={
             "identity_contract": {
                 "artifact_type": "canonical_identity",
+                "schema_version": 2,
                 "paper_id": "doi:10.1234/published",
                 "identity_verdict": "accepted",
                 "work_level_identity": {
@@ -161,6 +190,108 @@ def test_bundle_preserves_identity_equivalence_and_source_manifestation() -> Non
     assert identity_contract["equivalence_decision"]["location_binding"] == "source_manifestation"
 
 
+def test_bundle_uses_only_canonical_accepted_metadata_for_model_input() -> None:
+    synthesis = bundle(
+        metadata={
+            "paper_id": "doi:10.9999/rejected",
+            "title": "Rejected Candidate",
+            "doi": "10.9999/rejected",
+            "abstract": "Rejected abstract must not reach the model.",
+            "pdf_url": "https://example.test/rejected.pdf",
+        },
+        evidence_wrapper={"evidence_pack": {}},
+        figures_wrapper={},
+        assets_wrapper={},
+        source_manifest={
+            "paper_id": "doi:10.1234/accepted",
+            "title": "Accepted Paper",
+            "identity_contract": {
+                "artifact_type": "canonical_identity",
+                "schema_version": 2,
+                "schema_version": 2,
+                "paper_id": "doi:10.1234/accepted",
+                "identity_verdict": "accepted",
+                "work_level_identity": {
+                    "title": "Accepted Paper",
+                    "doi": "10.1234/accepted",
+                },
+                "accepted_metadata": {
+                    "paper_id": "doi:10.1234/accepted",
+                    "title": "Accepted Paper",
+                    "authors": ["Alice Example"],
+                    "year": "2026",
+                    "doi": "10.1234/accepted",
+                    "abstract": "Accepted abstract.",
+                    "metadata_sources": ["zotero", "crossref"],
+                },
+                "source_manifestation": {
+                    "source_kind": "local_pdf",
+                    "local_pdf_path": "/tmp/accepted.pdf",
+                },
+                "bound_sources": [],
+                "accepted_observations": [],
+                "rejected_observations": [
+                    {
+                        "provider": "crossref",
+                        "reason": "conflicting_strong_identifier",
+                        "record": {
+                            "doi": "10.9999/rejected",
+                            "pdf_url": "https://example.test/rejected.pdf",
+                        },
+                    }
+                ],
+                "selected_identity_evidence": [],
+                "equivalence_decision": {"status": "equivalent"},
+                "warnings": [],
+            },
+        },
+    )
+
+    assert synthesis["paper_id"] == "doi:10.1234/accepted"
+    assert synthesis["title"] == "Accepted Paper"
+    assert synthesis["metadata"] == {
+        "title": "Accepted Paper",
+        "translated_title": "",
+        "authors": ["Alice Example"],
+        "affiliations": [],
+        "year": "2026",
+        "venue": "",
+        "doi": "10.1234/accepted",
+        "source_url": "",
+        "abstract": "Accepted abstract.",
+        "arxiv_id": "",
+        "zotero_key": "",
+        "metadata_sources": ["zotero", "crossref"],
+        "identity_confidence": "",
+        "identity_confidence_reasons": [],
+    }
+    serialized_model_input = json.dumps(synthesis, ensure_ascii=False)
+    assert "Rejected abstract must not reach the model" not in serialized_model_input
+    assert "https://example.test/rejected.pdf" not in serialized_model_input
+
+
+def test_bundle_rejects_noncanonical_artifact_disguised_as_schema_v2() -> None:
+    with pytest.raises(ValueError, match="canonical identity"):
+        bundle(
+            metadata={"title": "Untrusted Paper"},
+            evidence_wrapper={"evidence_pack": {}},
+            figures_wrapper={},
+            assets_wrapper={},
+            source_manifest={
+                "identity_contract": {
+                    "artifact_type": "raw_metadata",
+                    "schema_version": 2,
+                    "paper_id": "doi:10.9999/untrusted",
+                    "identity_verdict": "accepted",
+                    "accepted_metadata": {
+                        "title": "Untrusted Paper",
+                        "doi": "10.9999/untrusted",
+                    },
+                }
+            },
+        )
+
+
 def test_bundle_preserves_identity_warnings_without_body_writing_instruction() -> None:
     warning = {
         "reason": "source_manifestation_year_differs_from_work_identity",
@@ -175,6 +306,7 @@ def test_bundle_preserves_identity_warnings_without_body_writing_instruction() -
         source_manifest={
             "identity_contract": {
                 "artifact_type": "canonical_identity",
+                "schema_version": 2,
                 "paper_id": "doi:10.1234/published",
                 "identity_verdict": "accepted_with_warnings",
                 "work_level_identity": {

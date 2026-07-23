@@ -939,7 +939,7 @@ def test_fetch_arxiv_entries_returns_empty_on_invalid_xml(monkeypatch) -> None:
     assert fetch_arxiv_entries(search_query='ti:"test"', max_results=1) == []
 
 
-def test_resolve_reference_title_survives_arxiv_failure(monkeypatch) -> None:
+def test_resolve_reference_title_defers_provider_selection(monkeypatch) -> None:
     semantic_match = {
         "title": "Example Paper",
         "authors": ["Alice Example"],
@@ -957,9 +957,9 @@ def test_resolve_reference_title_survives_arxiv_failure(monkeypatch) -> None:
 
     assert resolved["status"] == "ok"
     assert resolved["title"] == "Example Paper"
-    assert "semantic_scholar" in (resolved.get("metadata_sources") or [])
-    assert resolved["identity_confidence"] == "medium"
-    assert "external_metadata_title_match" in resolved["identity_confidence_reasons"]
+    assert resolved["metadata_sources"] == ["title_query"]
+    assert resolved["identity_confidence"] == "low"
+    assert "title_query_unmatched" in resolved["identity_confidence_reasons"]
 
 
 def test_resolve_reference_doi_sets_high_identity_confidence(monkeypatch) -> None:
@@ -1031,7 +1031,7 @@ def test_resolve_reference_local_pdf_artifact_stem_sets_low_identity_confidence(
     assert "local_pdf_stem_used" in resolved["identity_confidence_reasons"]
 
 
-def test_enrich_metadata_survives_arxiv_failure(monkeypatch) -> None:
+def test_enrich_metadata_rejects_unlinked_doi_when_arxiv_provider_fails(monkeypatch) -> None:
     semantic_match = {
         "title": "Example Paper",
         "authors": ["Alice Example", "Bob Example"],
@@ -1049,10 +1049,10 @@ def test_enrich_metadata_survives_arxiv_failure(monkeypatch) -> None:
     enriched = enrich_metadata({"title": "Example Paper", "arxiv_id": "2501.00001", "metadata_sources": ["seed_record"]})
 
     assert enriched["title"] == "Example Paper"
-    assert enriched["doi"] == "10.1000/example"
-    assert enriched["venue"] == "ExampleConf"
-    assert enriched["year"] == "2025"
-    assert enriched["abstract"] == "Strong abstract"
+    assert enriched["doi"] == "10.48550/arXiv.2501.00001"
+    assert "venue" not in enriched
+    assert "year" not in enriched
+    assert "abstract" not in enriched
 
 
 def test_normalize_openalex_keeps_landing_page_out_of_pdf_url() -> None:
@@ -1075,7 +1075,7 @@ def test_normalize_openalex_keeps_landing_page_out_of_pdf_url() -> None:
     assert normalized["source_url"] == "https://doi.org/10.3389/fpubh.2019.00399"
 
 
-def test_enrich_metadata_local_pdf_corrects_artifact_title_and_fills_arxiv(monkeypatch) -> None:
+def test_enrich_metadata_does_not_promote_filename_only_local_pdf(monkeypatch) -> None:
     semantic_match = {
         "title": "LLaMA: Open and Efficient Foundation Language Models",
         "authors": ["Hugo Touvron", "Thibaut Lavril"],
@@ -1102,15 +1102,15 @@ def test_enrich_metadata_local_pdf_corrects_artifact_title_and_fills_arxiv(monke
         }
     )
 
-    assert enriched["title"] == "LLaMA: Open and Efficient Foundation Language Models"
-    assert enriched["doi"] == "10.48550/arXiv.2302.13971"
-    assert enriched["arxiv_id"] == "2302.13971"
-    assert "semantic_scholar" in enriched["metadata_sources"]
-    assert enriched["identity_confidence"] == "high"
-    assert "arxiv_id_present" in enriched["identity_confidence_reasons"]
+    assert enriched["title"].startswith("Touvron 等 - 2023")
+    assert "doi" not in enriched
+    assert "arxiv_id" not in enriched
+    assert enriched["metadata_sources"] == ["local_pdf"]
 
 
-def test_enrich_metadata_local_pdf_corrected_title_sets_medium_identity_confidence(monkeypatch) -> None:
+def test_enrich_metadata_keeps_low_confidence_without_independent_local_pdf_evidence(
+    monkeypatch,
+) -> None:
     semantic_match = {
         "title": "A Strong External Metadata Title For Testing",
         "authors": ["Alice Example"],
@@ -1137,12 +1137,14 @@ def test_enrich_metadata_local_pdf_corrected_title_sets_medium_identity_confiden
         }
     )
 
-    assert enriched["title"] == "A Strong External Metadata Title For Testing"
-    assert enriched["identity_confidence"] == "medium"
-    assert "external_metadata_title_match" in enriched["identity_confidence_reasons"]
+    assert enriched["title"].startswith("Li 等 - 2025")
+    assert enriched["identity_confidence"] == "low"
+    assert "local_pdf_artifact_title" in enriched["identity_confidence_reasons"]
 
 
-def test_enrich_metadata_local_pdf_prefers_published_doi_over_preprint(monkeypatch) -> None:
+def test_enrich_metadata_does_not_choose_published_doi_from_filename_only_match(
+    monkeypatch,
+) -> None:
     published = {
         "title": "Identifying psychiatric manifestations in outpatients with depression and anxiety: a large language model-based approach",
         "authors": ["Shihao Xu"],
@@ -1179,9 +1181,9 @@ def test_enrich_metadata_local_pdf_prefers_published_doi_over_preprint(monkeypat
         }
     )
 
-    assert enriched["title"] == "Identifying psychiatric manifestations in outpatients with depression and anxiety: a large language model-based approach"
-    assert enriched["doi"] == "10.1038/s44184-025-00175-1"
-    assert enriched["venue"] == "npj Mental Health Research"
+    assert enriched["title"].startswith("Xu 等 - 2025")
+    assert "doi" not in enriched
+    assert "venue" not in enriched
 
 
 def test_enrich_metadata_backfills_arxiv_doi_when_missing(monkeypatch) -> None:

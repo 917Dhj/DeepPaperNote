@@ -20,7 +20,14 @@ import io
 import re
 from pathlib import Path
 
-from common import default_assets_dir, emit, enrich_metadata, fitz, maybe_load_json_record, normalize_whitespace, resolve_reference
+from common import (
+    default_assets_dir,
+    emit,
+    fitz,
+    maybe_load_json_record,
+    normalize_whitespace,
+    require_accepted_fetch_artifact,
+)
 
 try:
     from PIL import Image  # type: ignore
@@ -223,7 +230,7 @@ def _classify_caption_kind(label: str) -> str:
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "extract pdf assets")
-    p.add_argument("--input", required=True, help="Fetch JSON path, metadata JSON path, JSON string, or raw paper reference.")
+    p.add_argument("--input", required=True, help="Successful fetch JSON path or JSON artifact.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--assets-dir", default="", help="Optional explicit assets directory.")
     p.add_argument("--max-pages", type=int, default=40, help="Maximum pages to scan.")
@@ -235,9 +242,9 @@ def parser() -> argparse.ArgumentParser:
 
 def ensure_record(input_value: str) -> dict:
     record = maybe_load_json_record(input_value)
-    if record is not None:
-        return dict(record)
-    return enrich_metadata(resolve_reference(input_value))
+    if record is None:
+        raise SystemExit("extract_pdf_assets.py requires a JSON acquisition artifact.")
+    return dict(require_accepted_fetch_artifact(record, "extract_pdf_assets.py"))
 
 
 def save_image_bytes(path: Path, data: bytes) -> None:

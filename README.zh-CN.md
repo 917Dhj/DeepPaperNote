@@ -132,6 +132,16 @@ export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian/库/绝对路径"
 | Semantic Scholar API | 改善部分难以识别论文的元数据获取 |
 | OCR 工具 | 从扫描版或文本质量较差的 PDF 中恢复页面文字 |
 
+### Zotero Local API
+
+内置的只读 Zotero Local API 集成提供三种解析模式：
+
+- `auto`（默认）：优先使用唯一的本地条目，同时保留联网回退
+- `off`：跳过 Zotero 查询
+- `required`：只有 Zotero 唯一解析出目标论文时才继续
+
+本地匹配存在歧义时，流程会明确失败，而不是任意选择条目。Agent runtime 或 MCP 提供的兼容集成仍可作为可选替代路线。
+
 实际需要其中某项能力时，可以让 Agent 检查当前环境，并针对这台机器引导配置。
 
 ## 🧭 致谢与灵感

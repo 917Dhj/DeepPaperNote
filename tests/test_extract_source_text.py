@@ -31,6 +31,18 @@ def write_test_pdf(path: Path, pages: list[str]) -> None:
 
 
 def run_extract_source(input_path: Path, output_path: Path, *extra: str) -> dict:
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    if "identity_contract" not in payload:
+        payload["status"] = "ok"
+        payload["script"] = "fetch_pdf.py"
+        payload["identity_contract"] = {
+            "artifact_type": "canonical_identity",
+            "schema_version": 2,
+            "paper_id": payload.get("paper_id", "paper:test"),
+            "identity_verdict": "accepted",
+            "work_level_identity": {"title": payload.get("title", "")},
+        }
+        input_path.write_text(json.dumps(payload), encoding="utf-8")
     subprocess.run(
         [
             sys.executable,
@@ -162,6 +174,7 @@ def test_extract_source_text_binds_locations_to_source_manifestation(tmp_path: P
                 "pdf_path": str(pdf_path),
                 "identity_contract": {
                     "artifact_type": "canonical_identity",
+                    "schema_version": 2,
                     "paper_id": "doi:10.1234/published",
                     "identity_verdict": "accepted_with_warnings",
                     "work_level_identity": {

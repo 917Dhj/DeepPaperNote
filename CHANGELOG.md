@@ -12,6 +12,20 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+## v2.1.1
+
+### Added
+
+- Added a built-in, read-only Zotero Local API integration with local attachment discovery, explicit `auto` / `off` / `required` resolution policies, and environment diagnostics.
+
+### Fixed
+
+- Enforced a canonical paper-identity boundary across metadata collection, PDF acquisition, evidence extraction, and synthesis so conflicting or ambiguous identities fail closed.
+
+### Contributors
+
+- Added the Zotero Local API integration from PR #13 by [@KumamuKuma](https://github.com/KumamuKuma).
+
 ## v2.1.0
 
 ### Added

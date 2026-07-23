@@ -8,7 +8,12 @@ from copy import deepcopy
 from pathlib import Path
 
 from citation_links import resolve_reference_links
-from common import maybe_load_json_record, normalize_whitespace, runtime_config
+from common import (
+    canonical_identity_acceptance_error,
+    maybe_load_json_record,
+    normalize_whitespace,
+    runtime_config,
+)
 from contracts import (
     NOTE_PLAN_REQUIRED_FIELDS,
     NOTE_REQUIRED_SECTIONS,
@@ -239,10 +244,14 @@ def identity_contract_summary(metadata: dict, source_manifest: dict) -> dict:
         return {}
     return {
         "artifact_type": contract.get("artifact_type", ""),
+        "schema_version": contract.get("schema_version", 1),
         "paper_id": contract.get("paper_id", ""),
         "identity_verdict": contract.get("identity_verdict", ""),
         "work_level_identity": deepcopy(contract.get("work_level_identity", {}) or {}),
         "source_manifestation": deepcopy(contract.get("source_manifestation", {}) or {}),
+        "accepted_metadata": deepcopy(contract.get("accepted_metadata", {}) or {}),
+        "bound_sources": deepcopy(contract.get("bound_sources", []) or []),
+        "field_provenance": deepcopy(contract.get("field_provenance", {}) or {}),
         "selected_identity_evidence": deepcopy(
             contract.get("selected_identity_evidence", []) or []
         ),
@@ -251,6 +260,22 @@ def identity_contract_summary(metadata: dict, source_manifest: dict) -> dict:
         "repair_trace_path": contract.get("repair_trace_path", ""),
         "provenance": deepcopy(contract.get("provenance", {}) or {}),
     }
+
+
+def accepted_bundle_metadata(metadata: dict, identity_contract: dict) -> dict:
+    if not identity_contract:
+        raise ValueError("synthesis requires an accepted canonical identity contract")
+    error = canonical_identity_acceptance_error(identity_contract)
+    if error:
+        raise ValueError(f"synthesis requires an accepted canonical identity: {error}")
+    accepted = deepcopy(identity_contract.get("accepted_metadata", {}) or {})
+    work_identity = identity_contract.get("work_level_identity", {}) or {}
+    if not accepted:
+        accepted = deepcopy(work_identity)
+    for key, value in work_identity.items():
+        if value not in ("", None, [], {}):
+            accepted[key] = deepcopy(value)
+    return accepted
 
 
 def figure_table_manifest(
@@ -394,31 +419,43 @@ def bundle(
     )
     source_manifest = source_manifest or {}
     figure_decisions_wrapper = figure_decisions_wrapper or {}
+    identity_contract = identity_contract_summary(metadata, source_manifest)
+    canonical_metadata = accepted_bundle_metadata(metadata, identity_contract)
 
     return {
         "status": "ok",
         "script": "build_synthesis_bundle.py",
-        "paper_id": metadata.get("paper_id") or evidence_wrapper.get("paper_id", ""),
-        "title": metadata.get("title") or evidence_wrapper.get("title", ""),
-        "identity_contract": identity_contract_summary(metadata, source_manifest),
+        "paper_id": identity_contract.get("paper_id")
+        or canonical_metadata.get("paper_id")
+        or evidence_wrapper.get("paper_id", ""),
+        "title": canonical_metadata.get("title") or evidence_wrapper.get("title", ""),
+        "identity_contract": identity_contract,
         "metadata": {
-            "title": metadata.get("title", ""),
-            "translated_title": metadata.get("translated_title", ""),
-            "authors": metadata.get("authors", []),
-            "affiliations": metadata.get("affiliations", []),
-            "year": metadata.get("year", ""),
-            "venue": metadata.get("venue", ""),
-            "doi": metadata.get("doi", ""),
-            "source_url": metadata.get("source_url", ""),
-            "abstract": metadata.get("abstract", ""),
-            "arxiv_id": metadata.get("arxiv_id", ""),
-            "zotero_key": metadata.get("zotero_key", ""),
-            "metadata_sources": metadata.get("metadata_sources", []),
-            "identity_confidence": metadata.get("identity_confidence", ""),
-            "identity_confidence_reasons": metadata.get("identity_confidence_reasons", []) or [],
+            "title": canonical_metadata.get("title", ""),
+            "translated_title": canonical_metadata.get("translated_title", ""),
+            "authors": canonical_metadata.get("authors", []),
+            "affiliations": canonical_metadata.get("affiliations", []),
+            "year": canonical_metadata.get("year", ""),
+            "venue": canonical_metadata.get("venue", ""),
+            "doi": canonical_metadata.get("doi", ""),
+            "source_url": canonical_metadata.get("source_url", ""),
+            "abstract": canonical_metadata.get("abstract", ""),
+            "arxiv_id": canonical_metadata.get("arxiv_id", ""),
+            "zotero_key": canonical_metadata.get("zotero_key", ""),
+            "metadata_sources": canonical_metadata.get("metadata_sources", []),
+            "identity_confidence": canonical_metadata.get("identity_confidence", ""),
+            "identity_confidence_reasons": canonical_metadata.get(
+                "identity_confidence_reasons", []
+            )
+            or [],
         },
         "evidence_quality": evidence_pack.get("evidence_quality", "unknown"),
-        "coverage": coverage_summary(evidence_pack, metadata, assets_wrapper, source_manifest),
+        "coverage": coverage_summary(
+            evidence_pack,
+            canonical_metadata,
+            assets_wrapper,
+            source_manifest,
+        ),
         "source_manifest": {
             "paper_id": source_manifest.get("paper_id", ""),
             "title": source_manifest.get("title", ""),

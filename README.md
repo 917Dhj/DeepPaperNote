@@ -132,6 +132,16 @@ None of these are required for ordinary digital PDFs.
 | Semantic Scholar API | Improves metadata lookup for papers that are difficult to resolve |
 | OCR tooling | Recovers page text from scanned or low-quality PDFs |
 
+### Zotero Local API
+
+The built-in, read-only Zotero Local API integration supports three resolution modes:
+
+- `auto` (default): prefer a unique local item and retain web fallback
+- `off`: skip Zotero lookup
+- `required`: stop unless Zotero uniquely resolves the reference
+
+An ambiguous local match always fails closed instead of selecting an arbitrary item. Compatible agent-runtime or MCP integrations remain optional alternatives.
+
 When one of these capabilities is needed, ask your agent to inspect the current environment and guide the setup for that machine.
 
 ## 🧭 Inspirations

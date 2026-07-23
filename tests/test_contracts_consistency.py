@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from build_synthesis_bundle import bundle
+from build_synthesis_bundle import bundle as build_synthesis_bundle
 from contracts import (
     NOTE_PLAN_LIST_FIELDS,
     NOTE_PLAN_REQUIRED_FIELDS,
@@ -49,6 +49,19 @@ PDF_FAIL_CLOSED_NEGATIONS = (
     "rather than",
     "instead of",
 )
+
+
+def bundle(**kwargs: object) -> dict:
+    source_manifest = dict(kwargs.pop("source_manifest", {}) or {})
+    source_manifest["identity_contract"] = {
+        "artifact_type": "canonical_identity",
+        "schema_version": 2,
+        "paper_id": "paper:contract-test",
+        "identity_verdict": "accepted",
+        "work_level_identity": {"paper_id": "paper:contract-test"},
+        "accepted_metadata": {"paper_id": "paper:contract-test"},
+    }
+    return build_synthesis_bundle(source_manifest=source_manifest, **kwargs)
 
 
 def test_deleted_reference_routers_stay_removed() -> None:
@@ -690,6 +703,29 @@ def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
 
     assert "A title, DOI, URL, arXiv ID, or local PDF all work." in readme_text
     assert "标题、DOI、URL、本地 PDF 都可以" in readme_zh_text
+
+
+def test_zotero_local_api_contract_is_consistent_across_docs() -> None:
+    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    metadata_text = (
+        PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "metadata-sources.md"
+    ).read_text(encoding="utf-8")
+    readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    readme_zh_text = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+
+    for text in (skill_text, readme_text):
+        assert "Zotero Local API" in text
+        assert "auto" in text
+        assert "off" in text
+        assert "required" in text
+
+    assert "read-only Zotero Local API" in metadata_text
+    assert "Zotero Local API" in readme_zh_text
+    assert "`auto`（默认）" in readme_zh_text
+    assert "ambiguous local match always fails closed" in readme_text
+    assert "兼容集成仍可作为可选替代路线" in readme_zh_text
 
 
 def test_regression_workflow_documents_acquisition_identity_audit_contract() -> None:

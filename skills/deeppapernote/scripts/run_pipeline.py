@@ -22,6 +22,12 @@ def parser() -> argparse.ArgumentParser:
         help="Directory for intermediate artifacts.",
     )
     p.add_argument("--prefix", default="run", help="Filename prefix for artifacts.")
+    p.add_argument(
+        "--zotero-mode",
+        choices=("auto", "off", "required"),
+        default="auto",
+        help="Local Zotero lookup policy used by the resolve stage.",
+    )
     return p
 
 
@@ -55,6 +61,8 @@ def main() -> None:
             str(scripts_dir / "resolve_paper.py"),
             "--input",
             args.input,
+            "--zotero-mode",
+            args.zotero_mode,
             "--output",
             str(resolve_json),
         ]

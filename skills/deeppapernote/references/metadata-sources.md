@@ -32,8 +32,10 @@ Use the strongest available source first, but backfill aggressively.
 
 ## Rules
 
-- If the paper is already in the local Zotero library, treat Zotero as the identity anchor before doing title-based web resolution.
+- Use the bundled read-only Zotero Local API client first when the desktop API is enabled; compatible runtime or MCP integrations may provide the same trusted local metadata as an optional alternative.
+- If the paper is already in the local Zotero library, treat a unique Zotero match as the identity anchor before doing title-based web resolution.
 - If Zotero resolves the paper but does not expose a local attachment path, still use the Zotero metadata to avoid title ambiguity.
+- Distinguish an ambiguous local identity from an unavailable attachment: never guess between equally plausible items, but keep a uniquely resolved parent item's metadata even when no local PDF is accessible.
 - Do not let a weaker internet title match override a confident Zotero hit.
 - Do not invent missing metadata.
 - If a Chinese title is assistant-generated, mark it as a translation.

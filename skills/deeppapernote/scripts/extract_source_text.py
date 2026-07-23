@@ -13,7 +13,6 @@ from typing import Any
 from common import (
     clean_pdf_line,
     emit,
-    enrich_metadata,
     ensure_parent,
     extract_appendix_index,
     extract_caption_lines,
@@ -24,7 +23,7 @@ from common import (
     normalize_whitespace,
     paper_id_for_record,
     pdf_coverage_summary,
-    resolve_reference,
+    require_accepted_fetch_artifact,
     stop_section_reason,
 )
 
@@ -38,7 +37,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--input",
         required=True,
-        help="Fetch JSON path, metadata JSON path, local PDF path, JSON string, or reference.",
+        help="Successful fetch JSON path or JSON artifact.",
     )
     p.add_argument("--output", default="", help="Source manifest JSON output path.")
     p.add_argument(
@@ -47,7 +46,6 @@ def parser() -> argparse.ArgumentParser:
         help="Canonical raw sections JSONL output path.",
     )
     p.add_argument("--full-text-output", default="", help="Optional derived Markdown output path.")
-    p.add_argument("--paper-id", default="", help="Canonical paper id if already known.")
     p.add_argument(
         "--max-pages",
         type=int,
@@ -59,17 +57,9 @@ def parser() -> argparse.ArgumentParser:
 
 def ensure_record(input_value: str) -> dict[str, Any]:
     record = maybe_load_json_record(input_value)
-    if record is not None:
-        return dict(record)
-    path = Path(input_value).expanduser()
-    if path.exists() and path.is_file() and path.suffix.lower() == ".pdf":
-        return {
-            "paper_id": f"local:{path.stem}",
-            "title": path.stem,
-            "pdf_path": str(path.resolve()),
-            "source_type": "local_pdf",
-        }
-    return enrich_metadata(resolve_reference(input_value))
+    if record is None:
+        raise SystemExit("extract_source_text.py requires a JSON acquisition artifact.")
+    return dict(require_accepted_fetch_artifact(record, "extract_source_text.py"))
 
 
 def resolve_pdf_path(record: dict[str, Any]) -> Path | None:
@@ -359,7 +349,7 @@ def build_manifest(
 def main() -> None:
     args = parser().parse_args()
     record = ensure_record(args.input)
-    record["paper_id"] = args.paper_id or record.get("paper_id") or paper_id_for_record(record)
+    record["paper_id"] = record.get("paper_id") or paper_id_for_record(record)
     pdf_path = resolve_pdf_path(record)
     if pdf_path is None:
         raise SystemExit("extract_source_text.py requires a resolvable local PDF path.")
