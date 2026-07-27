@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -1322,11 +1323,29 @@ def passing_lint_payload() -> dict:
     }
 
 
+def reviewed_insert_fields(source_image: Path) -> dict:
+    digest = hashlib.sha256(source_image.read_bytes()).hexdigest()
+    return {
+        "source_image_sha256": digest,
+        "visual_review": {
+            "status": "pass",
+            "reviewed_asset_sha256": digest,
+            "preserved_scientific_elements": ["complete figure"],
+            "omitted_scientific_elements": [],
+            "notes": "Caption-free visual body.",
+            "failure_reason": "",
+            "repair_attempts": 0,
+            "revised_bbox": [],
+        },
+    }
+
+
 def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
+    digest = hashlib.sha256(b"fake-png").hexdigest()
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
@@ -1339,6 +1358,17 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
                         "decision": "insert",
                         "source_image_path": str(source_image),
                         "source_image_filename": source_image.name,
+                        "source_image_sha256": digest,
+                        "visual_review": {
+                            "status": "pass",
+                            "reviewed_asset_sha256": digest,
+                            "preserved_scientific_elements": ["complete figure"],
+                            "omitted_scientific_elements": [],
+                            "notes": "Caption-free visual body.",
+                            "failure_reason": "",
+                            "repair_attempts": 0,
+                            "revised_bbox": [],
+                        },
                     }
                 ]
             }
@@ -1381,6 +1411,72 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
     assert Path(materialized["dest_image_path"]).read_bytes() == b"fake-png"
 
 
+def test_write_obsidian_note_rejects_stale_reviewed_insert_bytes(tmp_path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    source_image = tmp_path / "page_001_fig_figure_1.png"
+    reviewed_digest = hashlib.sha256(b"reviewed").hexdigest()
+    source_image.write_bytes(b"changed-after-review")
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
+    decisions_path = tmp_path / "figure_decisions.json"
+    decisions_path.write_text(
+        json.dumps(
+            {
+                "decisions": [
+                    {
+                        "source_id": "Figure 1",
+                        "decision": "insert",
+                        "source_image_path": str(source_image),
+                        "source_image_filename": source_image.name,
+                        "source_image_sha256": reviewed_digest,
+                        "visual_review": {
+                            "status": "pass",
+                            "reviewed_asset_sha256": reviewed_digest,
+                            "preserved_scientific_elements": ["complete figure"],
+                            "omitted_scientific_elements": [],
+                            "notes": "Caption-free visual body.",
+                            "failure_reason": "",
+                            "repair_attempts": 0,
+                            "revised_bbox": [],
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    script_path = (
+        Path(__file__).resolve().parents[1]
+        / "skills"
+        / "deeppapernote"
+        / "scripts"
+        / "write_obsidian_note.py"
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--title",
+            "Stale Figure Review",
+            "--content",
+            "# Stale Figure Review\n\n![Figure 1](images/page_001_fig_figure_1.png)\n*Fig. 1 caption.*\n",
+            "--lint-json",
+            str(lint_path),
+            "--figure-decisions",
+            str(decisions_path),
+            "--vault",
+            str(vault),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "reviewed asset SHA-256" in result.stderr
+
+
 def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
@@ -1398,6 +1494,7 @@ def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> N
                         "decision": "insert",
                         "source_image_path": str(source_image),
                         "source_image_filename": source_image.name,
+                        **reviewed_insert_fields(source_image),
                     }
                 ]
             }
@@ -1446,6 +1543,7 @@ def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) ->
                         "decision": "insert",
                         "source_image_path": str(source_image),
                         "source_image_filename": source_image.name,
+                        **reviewed_insert_fields(source_image),
                     }
                 ]
             }
@@ -1494,6 +1592,7 @@ def test_write_obsidian_note_rejects_unsafe_insert_filename(tmp_path) -> None:
                         "decision": "insert",
                         "source_image_path": str(source_image),
                         "source_image_filename": "../escaped.png",
+                        **reviewed_insert_fields(source_image),
                     }
                 ]
             }

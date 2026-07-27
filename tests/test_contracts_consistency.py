@@ -417,6 +417,15 @@ def test_bundle_exposes_complete_canonical_figure_contract() -> None:
     figure_contract = bundle(
         metadata={}, evidence_wrapper={}, figures_wrapper={}, assets_wrapper={}
     )["writing_contract"]["figure_table_contract"]
+    visual_review = dict(WRITING_CONTRACT_RULES["visual_review_contract"])
+    for field in (
+        "review_fields",
+        "review_status_values",
+        "review_evidence_fields",
+        "repairable_failure_reasons",
+        "terminal_failure_reasons",
+    ):
+        visual_review[field] = list(visual_review[field])
 
     assert figure_contract == {
         "placeholder_first": True,
@@ -444,6 +453,7 @@ def test_bundle_exposes_complete_canonical_figure_contract() -> None:
             WRITING_CONTRACT_RULES["automatic_fail_closed_visual_statuses"]
         ),
         "manual_review_claim_requires_image_inspection": True,
+        "visual_review": visual_review,
     }
 
 
@@ -459,6 +469,7 @@ def test_figure_protocol_docs_keep_single_owners() -> None:
     assert "complete figure/table decision table" in skill
     assert "grounding and final-note figure gates" in skill
     assert "Formal Save materializes the selected image" in skill
+    assert "Figure/Table Decision Freeze" in skill
     for duplicate in (
         "needs_visual_quality_check",
         "reject_visual_quality",
@@ -472,6 +483,10 @@ def test_figure_protocol_docs_keep_single_owners() -> None:
     assert "identity match" in placement
     assert "visual usability" in placement
     assert "asset_candidate_missing" in placement
+    assert "Visual-Body Crop" in placement
+    assert "complete source page" in placement
+    assert "Bounded Crop Repair" in placement
+    assert "before `note_plan`" in placement
     for duplicate in (
         "kept_placeholder_visual_defect",
         "kept_placeholder_materialization_blocked",

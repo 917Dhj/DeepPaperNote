@@ -13,6 +13,7 @@ from pathlib import Path
 from common import (
     emit,
     ensure_parent,
+    file_sha256,
     maybe_load_json_record,
     resolve_domain_subdir,
     resolve_note_asset_dir,
@@ -114,6 +115,18 @@ def materialize_insert_decisions(
         if not source_value or not source_image.is_file():
             label = item.get("source_id") or item.get("label") or item.get("item_id") or "unknown"
             raise SystemExit(f"Insert decision source image does not exist for {label}: {source_value}")
+        current_sha256 = file_sha256(source_image)
+        review = item.get("visual_review", {})
+        if (
+            not isinstance(review, dict)
+            or str(review.get("status", "")).strip() != "pass"
+            or str(review.get("reviewed_asset_sha256", "")).strip() != current_sha256
+            or str(item.get("source_image_sha256", "")).strip() != current_sha256
+        ):
+            label = item.get("source_id") or item.get("label") or item.get("item_id") or "unknown"
+            raise SystemExit(
+                f"Insert decision for {label} does not match its reviewed asset SHA-256."
+            )
         filename = safe_image_filename(
             str(item.get("source_image_filename", "")),
             source_image,
@@ -130,12 +143,17 @@ def materialize_insert_decisions(
             raise SystemExit(f"Unsafe figure image destination: {dest_image}")
         if source_image.resolve() != dest_image.resolve():
             shutil.copy2(source_image, dest_image)
+        if file_sha256(dest_image) != current_sha256:
+            raise SystemExit(
+                f"Materialized image bytes do not match the reviewed asset SHA-256: {filename}"
+            )
         materialized.append(
             {
                 "source_id": item.get("source_id") or item.get("label") or item.get("item_id") or "",
                 "source_image": str(source_image.resolve()),
                 "dest_image_path": str(dest_image),
                 "relative_markdown_path": expected_relative,
+                "reviewed_asset_sha256": current_sha256,
             }
         )
     return materialized

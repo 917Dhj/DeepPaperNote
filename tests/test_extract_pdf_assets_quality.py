@@ -67,6 +67,72 @@ def write_fetch_input(path: Path, pdf_path: Path, *, title: str) -> None:
     )
 
 
+def write_captioned_figure_pdf(path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for PDF asset integration tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.draw_rect(fitz.Rect(80.0, 80.0, 520.0, 300.0), width=2.0)
+        page.draw_line(fitz.Point(90.0, 280.0), fitz.Point(500.0, 100.0), width=2.0)
+        page.insert_text((88.0, 98.0), "panel A", fontsize=10)
+        page.insert_text((45.0, 190.0), "axis title", fontsize=10)
+        page.insert_text((466.0, 292.0), "edge label", fontsize=10)
+        page.insert_text(
+            (80.0, 340.0),
+            "Figure 1. Architecture overview with a long external caption.",
+            fontsize=10,
+        )
+        page.insert_text(
+            (80.0, 372.0),
+            "Surrounding paper prose must not become image pixels.",
+            fontsize=10,
+        )
+        doc.save(path)
+    finally:
+        doc.close()
+
+
+def write_tables_with_captions_above_and_below(path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for PDF asset integration tests.")
+    doc = fitz.open()
+    try:
+        for caption_above in (True, False):
+            page = doc.new_page(width=600.0, height=800.0)
+            caption_y = 80.0 if caption_above else 230.0
+            table_top = 110.0 if caption_above else 70.0
+            page.insert_text(
+                (80.0, caption_y),
+                (
+                    f"Table {1 if caption_above else 2}. Main benchmark results across "
+                    "methods, scores, compute costs, and all evaluation settings."
+                ),
+                fontsize=10,
+            )
+            rows = [
+                ("Method", "Score", "Cost"),
+                ("Alpha", "91.2", "8.0"),
+                ("Beta", "89.4", "5.5"),
+                ("Gamma", "87.1", "4.2"),
+            ]
+            for row_index, row in enumerate(rows):
+                baseline = table_top + row_index * 24.0
+                for column_index, value in enumerate(row):
+                    page.insert_text(
+                        (90.0 + column_index * 150.0, baseline),
+                        value,
+                        fontsize=10,
+                    )
+            page.draw_rect(
+                fitz.Rect(80.0, table_top - 14.0, 500.0, table_top + 80.0),
+                width=1.0,
+            )
+        doc.save(path)
+    finally:
+        doc.close()
+
+
 def test_extract_pdf_assets_emits_asset_coverage(tmp_path: Path) -> None:
     pdf_path = tmp_path / "paper.pdf"
     write_test_pdf(pdf_path, ["Page 1", "Page 2", "Page 3"])
@@ -97,6 +163,83 @@ def test_extract_pdf_assets_emits_asset_coverage(tmp_path: Path) -> None:
         "asset_pages_scanned": 2,
         "truncated_due_to_asset_page_limit": True,
     }
+
+
+def test_extract_pdf_assets_emits_caption_free_visual_body_and_page_preview(
+    tmp_path: Path,
+) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    write_captioned_figure_pdf(pdf_path)
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "assets.json"
+    write_fetch_input(input_path, pdf_path, title="Caption Free Figure")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_PDF_ASSETS_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--assets-dir",
+            str(tmp_path / "assets"),
+            "--figure-dpi",
+            "72",
+        ],
+        check=True,
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    asset = payload["figure_assets"][0]
+    assert asset["label"] == "Figure 1"
+    assert asset["bbox_pt"][0] <= 45.0
+    assert asset["bbox_pt"][2] >= 520.0
+    assert asset["bbox_pt"][3] < 329.0
+    assert asset["caption_text"].startswith("Figure 1.")
+    assert Path(asset["page_preview_path"]).is_file()
+
+
+def test_extract_pdf_assets_excludes_table_captions_above_and_below(
+    tmp_path: Path,
+) -> None:
+    pdf_path = tmp_path / "tables.pdf"
+    write_tables_with_captions_above_and_below(pdf_path)
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "assets.json"
+    write_fetch_input(input_path, pdf_path, title="Caption Free Tables")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_PDF_ASSETS_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--assets-dir",
+            str(tmp_path / "assets"),
+            "--figure-dpi",
+            "72",
+        ],
+        check=True,
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    tables = {item["label"]: item for item in payload["figure_assets"]}
+    assert set(tables) == {"Table 1", "Table 2"}
+
+    doc = fitz.open(pdf_path)
+    try:
+        first_caption = _find_caption_blocks(doc[0])[0]["bbox"]
+        second_caption = _find_caption_blocks(doc[1])[0]["bbox"]
+    finally:
+        doc.close()
+
+    assert tables["Table 1"]["bbox_pt"][1] > first_caption[3]
+    assert tables["Table 1"]["bbox_pt"][1] <= 100.0
+    assert tables["Table 2"]["bbox_pt"][3] < second_caption[1]
+    assert tables["Table 2"]["bbox_pt"][3] >= 150.0
 
 
 def test_extract_pdf_assets_default_scans_short_pdf_without_truncation(tmp_path: Path) -> None:
@@ -314,7 +457,7 @@ def test_restrict_row_to_caption_column_skips_near_mid_opposite_row() -> None:
     assert restricted is None
 
 
-def test_figure_bbox_uses_caption_width_for_narrow_vector_figure() -> None:
+def test_figure_bbox_does_not_use_caption_width_to_rescue_narrow_visual() -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for figure bbox tests.")
     doc = fitz.open()
@@ -335,10 +478,7 @@ def test_figure_bbox_uses_caption_width_for_narrow_vector_figure() -> None:
 
         bbox = _estimate_figure_bbox_above_caption(page, anchor, None, page.rect)
 
-        assert bbox is not None
-        assert bbox[0] <= anchor["bbox"][0]
-        assert bbox[2] >= anchor["bbox"][2]
-        assert bbox[2] < 300.0
+        assert bbox is None
     finally:
         doc.close()
 

@@ -95,6 +95,25 @@ def test_bundle_compact_writing_contract_keeps_depth_rules_without_old_bundle_fi
         WRITING_CONTRACT_RULES["automatic_fail_closed_visual_statuses"]
     )
     assert contract["figure_table_contract"]["manual_review_claim_requires_image_inspection"] is True
+    review_contract = contract["figure_table_contract"]["visual_review"]
+    assert review_contract["selected_render_dpi"] == 300
+    assert review_contract["page_preview_dpi"] == 96
+    assert review_contract["repair_limit"] == 1
+    assert review_contract["repairable_failure_reasons"] == [
+        "caption_contamination",
+        "surrounding_prose_contamination",
+        "scientific_content_clipped",
+        "insufficient_safety_margin",
+    ]
+    assert review_contract["terminal_failure_reasons"] == [
+        "identity_mismatch",
+        "caption_inseparable",
+        "ambiguous_visual_body",
+        "unreadable_source",
+        "scientific_content_missing",
+        "repair_limit_exhausted",
+    ]
+    assert "review_pending" in contract["figure_table_contract"]["decision_values"]
     assert contract["note_plan_contract"]["analysis_coverage_field"] == "central_claims[*]"
     assert contract["analysis_coverage_contract"]["required_plan_fields"] == list(
         WRITING_CONTRACT_RULES["analysis_coverage_contract"]["required_plan_fields"]
