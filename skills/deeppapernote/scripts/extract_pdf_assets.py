@@ -39,7 +39,8 @@ try:
 except ImportError:  # pragma: no cover
     pytesseract = None
 
-FIGURE_RENDER_DPI = 200
+FIGURE_RENDER_DPI = 96
+PAGE_PREVIEW_DPI = 96
 MIN_FIGURE_HEIGHT_PT = 60
 MIN_FIGURE_WIDTH_PT = 100
 
@@ -628,8 +629,6 @@ def _estimate_figure_bbox_above_caption(
        the nearest body-text block above and the caption.
     """
     caption_y_top = caption_anchor["bbox"][1]
-    caption_y_bottom = caption_anchor["bbox"][3]
-
     upper_bound = 0.0
     if prev_anchor is not None:
         upper_bound = prev_anchor["bbox"][3] + 2.0
@@ -647,10 +646,32 @@ def _estimate_figure_bbox_above_caption(
                 relevant.append((r[0], r[1], r[2], clipped_y1))
 
     if relevant:
-        caption_x0, _, caption_x1, _ = caption_anchor["bbox"]
-        x0 = min([r[0] for r in relevant] + [caption_x0])
+        visual_bbox = (
+            min(r[0] for r in relevant),
+            min(r[1] for r in relevant),
+            max(r[2] for r in relevant),
+            max(r[3] for r in relevant),
+        )
+        for line in _collect_text_lines(page):
+            text = normalize_whitespace(str(line.get("text", "")))
+            bb = tuple(line.get("bbox", ()))
+            if (
+                len(bb) != 4
+                or len(text) > 80
+                or CAPTION_RE.match(text)
+                or bb[1] >= caption_y_top - 1.0
+                or bb[3] <= upper_bound
+            ):
+                continue
+            horizontal_gap = max(visual_bbox[0] - bb[2], bb[0] - visual_bbox[2], 0.0)
+            vertical_gap = max(visual_bbox[1] - bb[3], bb[1] - visual_bbox[3], 0.0)
+            if (vertical_gap == 0.0 and horizontal_gap <= 36.0) or (
+                horizontal_gap == 0.0 and vertical_gap <= 12.0
+            ):
+                relevant.append((bb[0], bb[1], bb[2], min(bb[3], caption_y_top - 2.0)))
+        x0 = min(r[0] for r in relevant)
         y0 = min(r[1] for r in relevant)
-        x1 = max([r[2] for r in relevant] + [caption_x1])
+        x1 = max(r[2] for r in relevant)
         y1 = max(r[3] for r in relevant)
     else:
         body_blocks = _find_body_text_blocks(page)
@@ -663,9 +684,8 @@ def _estimate_figure_bbox_above_caption(
         x1 = page_rect.x1
         y1 = caption_y_top - 2.0
 
-    y1 = max(y1, caption_y_bottom + 2.0)
-
     bbox = _clip_to_page((x0, y0, x1, y1), page_rect)
+    bbox = (bbox[0], bbox[1], bbox[2], min(bbox[3], caption_y_top - 1.0))
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
     if width < MIN_FIGURE_WIDTH_PT or height < MIN_FIGURE_HEIGHT_PT:
@@ -927,13 +947,13 @@ def _finalize_table_bbox(
     caption_anchor: dict,
     extra_rects: list[tuple[float, float, float, float]],
     page_rect,
+    *,
+    direction: str,
 ) -> tuple[float, float, float, float] | None:
     if not extra_rects:
         return None
-    caption_x0, caption_y0, caption_x1, caption_y1 = caption_anchor["bbox"]
-    accepted: list[tuple[float, float, float, float]] = list(extra_rects) + [
-        (caption_x0, caption_y0, caption_x1, caption_y1)
-    ]
+    _, caption_y0, _, caption_y1 = caption_anchor["bbox"]
+    accepted: list[tuple[float, float, float, float]] = list(extra_rects)
 
     y0 = min(b[1] for b in accepted)
     y1 = max(b[3] for b in accepted)
@@ -954,6 +974,10 @@ def _finalize_table_bbox(
     y1 = max(b[3] for b in accepted)
 
     bbox = _clip_to_page((x0, y0, x1, y1), page_rect, padding=6.0)
+    if direction == "down":
+        bbox = (bbox[0], max(bbox[1], caption_y1 + 1.0), bbox[2], bbox[3])
+    else:
+        bbox = (bbox[0], bbox[1], bbox[2], min(bbox[3], caption_y0 - 1.0))
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
     if width < MIN_FIGURE_WIDTH_PT or height < MIN_FIGURE_HEIGHT_PT:
@@ -998,7 +1022,6 @@ def _estimate_table_bbox_with_rows(
     the same y-range, in case the paper places company-logo plots inside a
     table cell.
     """
-    caption_y0 = caption_anchor["bbox"][1]
     caption_y1 = caption_anchor["bbox"][3]
 
     upper_bound = page_rect.y0
@@ -1040,11 +1063,19 @@ def _estimate_table_bbox_with_rows(
     if up_data > down_data:
         chosen = up_lines
         chosen_data_rows = up_data
+        direction = "up"
     else:
         chosen = down_lines
         chosen_data_rows = down_data
+        direction = "down"
 
-    bbox = _finalize_table_bbox(page, caption_anchor, chosen, page_rect)
+    bbox = _finalize_table_bbox(
+        page,
+        caption_anchor,
+        chosen,
+        page_rect,
+        direction=direction,
+    )
     if bbox is None:
         return None
     return bbox, chosen_data_rows
@@ -1176,6 +1207,7 @@ def main() -> None:
 
     asset_root = Path(args.assets_dir).expanduser().resolve() if args.assets_dir else default_assets_dir(record)
     images_dir = asset_root / "images"
+    previews_dir = asset_root / "page_previews"
     images_dir.mkdir(parents=True, exist_ok=True)
 
     figure_dpi = args.figure_dpi
@@ -1209,6 +1241,20 @@ def main() -> None:
             image_assets.extend(page_images)
 
             page_figures = extract_figure_regions(page, page_number, images_dir, dpi=figure_dpi)
+            page_preview_path = ""
+            if page_figures:
+                preview_path = previews_dir / f"page_{page_number:03d}.png"
+                save_image_bytes(
+                    preview_path,
+                    _render_crop(
+                        page,
+                        (page.rect.x0, page.rect.y0, page.rect.x1, page.rect.y1),
+                        PAGE_PREVIEW_DPI,
+                    ),
+                )
+                page_preview_path = str(preview_path)
+                for figure in page_figures:
+                    figure["page_preview_path"] = page_preview_path
             figure_assets.extend(page_figures)
 
             page_records.append(
@@ -1219,6 +1265,7 @@ def main() -> None:
                     "ocr_used": extraction_method == "ocr",
                     "image_count": len(page_images),
                     "figure_count": len(page_figures),
+                    "page_preview_path": page_preview_path,
                     "page_text": text or ocr_text,
                     "text_preview": (text or ocr_text)[:240],
                 }

@@ -325,6 +325,15 @@ def compact_writing_contract() -> dict:
     )
     usable_insert_candidate = dict(WRITING_CONTRACT_RULES["usable_insert_candidate"])
     usable_insert_candidate["kinds"] = list(usable_insert_candidate["kinds"])
+    visual_review_contract = deepcopy(WRITING_CONTRACT_RULES["visual_review_contract"])
+    for field in (
+        "review_fields",
+        "review_status_values",
+        "review_evidence_fields",
+        "repairable_failure_reasons",
+        "terminal_failure_reasons",
+    ):
+        visual_review_contract[field] = list(visual_review_contract[field])
     analysis_coverage = deepcopy(WRITING_CONTRACT_RULES["analysis_coverage_contract"])
     analysis_coverage["central_claim_fields"] = list(
         analysis_coverage["central_claim_fields"]
@@ -394,6 +403,7 @@ def compact_writing_contract() -> dict:
                 WRITING_CONTRACT_RULES["automatic_fail_closed_visual_statuses"]
             ),
             "manual_review_claim_requires_image_inspection": True,
+            "visual_review": visual_review_contract,
         },
         "analysis_coverage_contract": analysis_coverage,
     }

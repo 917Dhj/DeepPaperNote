@@ -72,6 +72,17 @@ def ensure_parent(path: str | Path) -> None:
     Path(path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
 
 
+def file_sha256(path: str | Path) -> str:
+    candidate = Path(path).expanduser()
+    if not candidate.is_file():
+        return ""
+    digest = hashlib.sha256()
+    with candidate.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def emit(payload: dict[str, Any], output_path: str | None = None) -> None:
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     if output_path:

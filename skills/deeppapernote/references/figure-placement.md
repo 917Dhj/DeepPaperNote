@@ -67,7 +67,35 @@ Figure/table insertion has two separate gates:
 - visual usability: the crop actually contains the visual body needed by the reader
 
 A label or caption match is not insertion approval.
+Deterministic signals may reject an obvious defect, but only an actual image inspection may approve insertion.
 Fail closed when visual usability is weak: keep the placeholder instead of inserting the candidate.
+
+Every selected candidate begins as `review_pending`. Review it after the synthesis bundle exists and before `note_plan`:
+
+1. Open the exact candidate crop and its complete source page preview.
+2. Compare them with the matched Figure/Table identity and external caption.
+3. Confirm that the crop is a Visual-Body Crop: the complete scientific visual is present, all internal labels remain readable, and the external caption and surrounding paper prose are absent.
+4. Record the review in that candidate's existing decision entry using the generated `writing_contract.figure_table_contract.visual_review` fields and values.
+
+A passing review is valid only for the decision entry's current asset SHA-256. Any asset change returns the item to `review_pending`. Complete the Figure/Table Decision Freeze before planning or drafting; grounding must reject an unresolved or stale review.
+
+## Visual-Body Crop Boundary
+
+Keep axes, tick labels, legends, color bars, scale bars, panel letters, table headers, method labels, and other text that belongs inside the scientific visual. Keep a small safety margin so edge labels are not clipped. Exclude the source caption and unrelated running prose from the image pixels while retaining the caption as metadata and later Markdown explanation.
+
+If the external caption cannot be separated without damaging the scientific visual, fail closed and keep the placeholder. The first implementation reviews complete Figure/Table bodies only; do not split panels into separate assets.
+
+## Bounded Crop Repair
+
+Use a Bounded Crop Repair only for a geometry-only failure allowed by the generated contract. Put the page-relative normalized bbox and repair request into the same decision entry, then run:
+
+```bash
+python3 scripts/plan_figure_table_decisions.py \
+  --review-decisions <figure_table_decisions.json> \
+  --output <figure_table_decisions.json>
+```
+
+The script validates the bbox, rerenders once from the source PDF at the contract's 300 dpi, refreshes the asset SHA-256, and returns the item to `review_pending` for a full fresh review. A terminal defect or a failed repaired crop remains a placeholder; never request a second recrop.
 
 Reject candidates that are:
 - caption-only crops

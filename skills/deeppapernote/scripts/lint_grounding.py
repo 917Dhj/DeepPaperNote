@@ -8,7 +8,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from common import caption_label_key, emit, maybe_load_json_record, normalize_whitespace
+from common import (
+    caption_label_key,
+    emit,
+    file_sha256,
+    maybe_load_json_record,
+    normalize_whitespace,
+)
 from contracts import (
     NOTE_PLAN_FIELD_TYPES,
     NOTE_PLAN_REQUIRED_FIELDS,
@@ -17,6 +23,148 @@ from contracts import (
     required_field_value_error,
 )
 from source_corpus import SourceCorpusLoadError, load_source_corpus
+
+
+def visual_review_is_valid(review: Any) -> bool:
+    contract = WRITING_CONTRACT_RULES["visual_review_contract"]
+    if not isinstance(review, dict):
+        return False
+    if set(review) != set(contract["review_fields"]):
+        return False
+    status = normalize_whitespace(str(review.get("status", "")))
+    if status not in set(contract["review_status_values"]):
+        return False
+    reviewed_sha256 = review.get("reviewed_asset_sha256")
+    if not isinstance(reviewed_sha256, str):
+        return False
+    if not all(
+        isinstance(review.get(field), list)
+        and all(isinstance(value, str) for value in review[field])
+        for field in ("preserved_scientific_elements", "omitted_scientific_elements")
+    ):
+        return False
+    if not isinstance(review.get("notes"), str) or not isinstance(
+        review.get("failure_reason"), str
+    ):
+        return False
+    failure_reason = normalize_whitespace(review["failure_reason"])
+    attempts = review.get("repair_attempts")
+    if not isinstance(attempts, int) or isinstance(attempts, bool):
+        return False
+    if attempts < 0 or attempts > int(contract["repair_limit"]):
+        return False
+    bbox = review.get("revised_bbox")
+    if not isinstance(bbox, list):
+        return False
+    if bbox:
+        if len(bbox) != 4 or not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool)
+            for value in bbox
+        ):
+            return False
+        x0, y0, x1, y1 = (float(value) for value in bbox)
+        if not (0.0 <= x0 < x1 <= 1.0 and 0.0 <= y0 < y1 <= 1.0):
+            return False
+    repairable = set(contract["repairable_failure_reasons"])
+    terminal = set(contract["terminal_failure_reasons"])
+    if status == "pending":
+        return not reviewed_sha256 and not failure_reason
+    if status == "pass":
+        return bool(
+            reviewed_sha256
+            and not failure_reason
+            and not review["omitted_scientific_elements"]
+        )
+    if status == "repair_requested":
+        return bool(
+            reviewed_sha256
+            and failure_reason in repairable
+            and bbox
+            and attempts < int(contract["repair_limit"])
+        )
+    if status == "fail":
+        return bool(
+            reviewed_sha256
+            and (
+                failure_reason in terminal
+                or (
+                    attempts >= int(contract["repair_limit"])
+                    and failure_reason in repairable
+                )
+            )
+        )
+    return True
+
+
+def visual_review_evidence_is_valid(item: dict[str, Any]) -> bool:
+    evidence = item.get("review_evidence", {})
+    contract = WRITING_CONTRACT_RULES["visual_review_contract"]
+    if not isinstance(evidence, dict):
+        return False
+    if set(evidence) != set(contract["review_evidence_fields"]):
+        return False
+    source_path = Path(str(item.get("source_image_path", ""))).expanduser()
+    candidate_path = Path(str(evidence.get("candidate_path", ""))).expanduser()
+    preview_path = Path(str(evidence.get("page_preview_path", ""))).expanduser()
+    pdf_path = Path(str(evidence.get("source_pdf_path", ""))).expanduser()
+    if not (
+        source_path.is_file()
+        and candidate_path.is_file()
+        and source_path.resolve() == candidate_path.resolve()
+        and preview_path.is_file()
+        and pdf_path.is_file()
+    ):
+        return False
+    if not isinstance(evidence.get("source_page"), int) or int(
+        evidence.get("source_page", 0)
+    ) <= 0:
+        return False
+    if not isinstance(evidence.get("caption"), str):
+        return False
+    bbox_pt = evidence.get("bbox_pt")
+    if not isinstance(bbox_pt, list) or len(bbox_pt) != 4 or not all(
+        isinstance(value, (int, float)) and not isinstance(value, bool)
+        for value in bbox_pt
+    ):
+        return False
+    x0, y0, x1, y1 = (float(value) for value in bbox_pt)
+    if not (x0 < x1 and y0 < y1):
+        return False
+    normalized = evidence.get("normalized_bbox")
+    if not isinstance(normalized, list) or len(normalized) != 4 or not all(
+        isinstance(value, (int, float)) and not isinstance(value, bool)
+        for value in normalized
+    ):
+        return False
+    nx0, ny0, nx1, ny1 = (float(value) for value in normalized)
+    if not (0.0 <= nx0 < nx1 <= 1.0 and 0.0 <= ny0 < ny1 <= 1.0):
+        return False
+    return evidence.get("render_dpi") == contract["selected_render_dpi"]
+
+
+def final_visual_failure_is_valid(item: dict[str, Any]) -> bool:
+    if normalize_whitespace(str(item.get("decision", ""))) != "visual_defect":
+        return False
+    review = item.get("visual_review", {})
+    if not visual_review_is_valid(review) or not visual_review_evidence_is_valid(item):
+        return False
+    if normalize_whitespace(str(review.get("status", ""))) != "fail":
+        return False
+    failure_reason = normalize_whitespace(str(review.get("failure_reason", "")))
+    contract = WRITING_CONTRACT_RULES["visual_review_contract"]
+    allowed = set(contract["terminal_failure_reasons"])
+    if int(review.get("repair_attempts", 0) or 0) >= int(contract["repair_limit"]):
+        allowed.update(contract["repairable_failure_reasons"])
+    source_path = normalize_whitespace(str(item.get("source_image_path", "")))
+    current_sha256 = file_sha256(source_path)
+    return bool(
+        failure_reason in allowed
+        and current_sha256
+        and normalize_whitespace(str(item.get("source_image_sha256", "")))
+        == current_sha256
+        and normalize_whitespace(str(review.get("reviewed_asset_sha256", "")))
+        == current_sha256
+    )
 
 
 def parser() -> argparse.ArgumentParser:
@@ -411,6 +559,13 @@ def validate_figure_decisions(
                     source_id=item.get("source_id") or item.get("label") or "",
                 )
             )
+        if decision == "review_pending":
+            issues.append(
+                issue(
+                    "figure_visual_review_unresolved",
+                    source_id=item.get("source_id") or item.get("label") or "",
+                )
+            )
         if decision == "insert" and not normalize_whitespace(
             str(item.get("source_image_path", ""))
         ):
@@ -420,13 +575,57 @@ def validate_figure_decisions(
                     source_id=item.get("source_id") or item.get("label") or "",
                 )
             )
+        if decision == "insert":
+            source_path = normalize_whitespace(str(item.get("source_image_path", "")))
+            current_sha256 = file_sha256(source_path)
+            review = item.get("visual_review", {})
+            if not visual_review_evidence_is_valid(item):
+                issues.append(
+                    issue(
+                        "figure_visual_review_evidence_invalid",
+                        source_id=item.get("source_id") or item.get("label") or "",
+                    )
+                )
+            if not visual_review_is_valid(review):
+                issues.append(
+                    issue(
+                        "figure_visual_review_invalid",
+                        source_id=item.get("source_id") or item.get("label") or "",
+                    )
+                )
+            reviewed_sha256 = (
+                normalize_whitespace(str(review.get("reviewed_asset_sha256", "")))
+                if isinstance(review, dict)
+                else ""
+            )
+            recorded_sha256 = normalize_whitespace(
+                str(item.get("source_image_sha256", ""))
+            )
+            if (
+                not isinstance(review, dict)
+                or not visual_review_is_valid(review)
+                or normalize_whitespace(str(review.get("status", ""))) != "pass"
+                or not current_sha256
+                or reviewed_sha256 != current_sha256
+                or recorded_sha256 != current_sha256
+            ):
+                issues.append(
+                    issue(
+                        "figure_visual_review_stale",
+                        source_id=item.get("source_id") or item.get("label") or "",
+                    )
+                )
         is_required_insert_candidate = (
             normalize_whitespace(str(item.get("kind", ""))) in insertable_kinds
             and normalize_whitespace(str(item.get("visual_quality_status", "")))
             == usable_insert["visual_quality_status"]
             and normalize_whitespace(str(item.get("source_image_path", "")))
         )
-        if is_required_insert_candidate and decision != "insert":
+        if (
+            is_required_insert_candidate
+            and decision not in {"insert", "review_pending"}
+            and not final_visual_failure_is_valid(item)
+        ):
             skip_reason = normalize_whitespace(str(item.get("skip_reason", "")))
             issues.append(
                 issue(

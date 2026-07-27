@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -28,6 +29,23 @@ def write_raw_sections(path: Path) -> Path:
     }
     path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
     return path
+
+
+def visual_review_evidence(tmp_path: Path, source_image: Path) -> dict:
+    page_preview = tmp_path / "page_preview.png"
+    page_preview.write_bytes(b"page-preview")
+    source_pdf = tmp_path / "source.pdf"
+    source_pdf.write_bytes(b"source-pdf")
+    return {
+        "candidate_path": str(source_image),
+        "page_preview_path": str(page_preview),
+        "source_pdf_path": str(source_pdf),
+        "source_page": 4,
+        "caption": "Architecture",
+        "bbox_pt": [10.0, 20.0, 190.0, 220.0],
+        "normalized_bbox": [0.05, 0.05, 0.95, 0.55],
+        "render_dpi": 300,
+    }
 
 
 def run_lint_grounding(
@@ -428,6 +446,342 @@ def test_lint_grounding_rejects_invalid_figure_table_decision_value(
 
     assert result["passes_grounding"] is False
     assert "figure_table_decision_value_invalid" in codes
+
+
+def test_lint_grounding_rejects_unresolved_visual_review(tmp_path: Path) -> None:
+    source_image = tmp_path / "figure.png"
+    source_image.write_bytes(b"review-pending")
+    manifest = source_manifest()
+    manifest["captions"] = {
+        "figures": [{"id": "Figure 1", "caption": "Architecture", "page": 4}],
+        "tables": [],
+    }
+    decisions = {
+        "decisions": [
+            {
+                "source_id": "Figure 1",
+                "kind": "figure",
+                "decision": "review_pending",
+                "visual_quality_status": "usable_candidate",
+                "source_image_path": str(source_image),
+                "source_image_sha256": hashlib.sha256(b"review-pending").hexdigest(),
+                "visual_review": {
+                    "status": "pending",
+                    "reviewed_asset_sha256": "",
+                    "preserved_scientific_elements": [],
+                    "omitted_scientific_elements": [],
+                    "notes": "",
+                    "failure_reason": "",
+                    "repair_attempts": 0,
+                    "revised_bbox": [],
+                },
+            }
+        ]
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        manifest,
+        slim_bundle(),
+        decisions,
+    )
+    codes = {issue["code"] for issue in result["issues"]}
+
+    assert result["passes_grounding"] is False
+    assert "figure_visual_review_unresolved" in codes
+
+
+def test_lint_grounding_rejects_stale_visual_review(tmp_path: Path) -> None:
+    source_image = tmp_path / "figure.png"
+    source_image.write_bytes(b"changed-after-review")
+    manifest = source_manifest()
+    manifest["captions"] = {
+        "figures": [{"id": "Figure 1", "caption": "Architecture", "page": 4}],
+        "tables": [],
+    }
+    decisions = {
+        "decisions": [
+            {
+                "source_id": "Figure 1",
+                "kind": "figure",
+                "decision": "insert",
+                "visual_quality_status": "usable_candidate",
+                "source_image_path": str(source_image),
+                "source_image_sha256": hashlib.sha256(b"original-candidate").hexdigest(),
+                "visual_review": {
+                    "status": "pass",
+                    "reviewed_asset_sha256": hashlib.sha256(b"original-candidate").hexdigest(),
+                    "preserved_scientific_elements": ["axes", "legend", "panel labels"],
+                    "omitted_scientific_elements": [],
+                    "notes": "Complete visual body; external caption excluded.",
+                    "failure_reason": "",
+                    "repair_attempts": 0,
+                    "revised_bbox": [],
+                },
+            }
+        ]
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        manifest,
+        slim_bundle(),
+        decisions,
+    )
+    codes = {issue["code"] for issue in result["issues"]}
+
+    assert result["passes_grounding"] is False
+    assert "figure_visual_review_stale" in codes
+
+
+def test_lint_grounding_accepts_current_passing_visual_review(tmp_path: Path) -> None:
+    source_image = tmp_path / "figure.png"
+    source_image.write_bytes(b"reviewed-candidate")
+    digest = hashlib.sha256(b"reviewed-candidate").hexdigest()
+    decisions = {
+        "decisions": [
+            {
+                "source_id": "Figure 1",
+                "kind": "figure",
+                "decision": "insert",
+                "visual_quality_status": "usable_candidate",
+                "source_image_path": str(source_image),
+                "source_image_sha256": digest,
+                "review_evidence": visual_review_evidence(tmp_path, source_image),
+                "visual_review": {
+                    "status": "pass",
+                    "reviewed_asset_sha256": digest,
+                    "preserved_scientific_elements": ["axes", "legend", "panel labels"],
+                    "omitted_scientific_elements": [],
+                    "notes": "Complete visual body; external caption excluded.",
+                    "failure_reason": "",
+                    "repair_attempts": 0,
+                    "revised_bbox": [],
+                },
+            }
+        ]
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        source_manifest(),
+        slim_bundle(),
+        decisions,
+    )
+
+    assert result["passes_grounding"] is True
+
+
+def test_lint_grounding_rejects_insert_without_visual_review_evidence(
+    tmp_path: Path,
+) -> None:
+    source_image = tmp_path / "figure.png"
+    source_image.write_bytes(b"reviewed-candidate")
+    digest = hashlib.sha256(b"reviewed-candidate").hexdigest()
+    decisions = {
+        "decisions": [
+            {
+                "source_id": "Figure 1",
+                "kind": "figure",
+                "decision": "insert",
+                "visual_quality_status": "usable_candidate",
+                "source_image_path": str(source_image),
+                "source_image_sha256": digest,
+                "visual_review": {
+                    "status": "pass",
+                    "reviewed_asset_sha256": digest,
+                    "preserved_scientific_elements": ["complete figure"],
+                    "omitted_scientific_elements": [],
+                    "notes": "Caption-free visual body.",
+                    "failure_reason": "",
+                    "repair_attempts": 0,
+                    "revised_bbox": [],
+                },
+            }
+        ]
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        source_manifest(),
+        slim_bundle(),
+        decisions,
+    )
+    codes = {issue["code"] for issue in result["issues"]}
+
+    assert result["passes_grounding"] is False
+    assert "figure_visual_review_evidence_invalid" in codes
+
+
+def test_lint_grounding_rejects_malformed_visual_review(tmp_path: Path) -> None:
+    source_image = tmp_path / "figure.png"
+    source_image.write_bytes(b"reviewed-candidate")
+    digest = hashlib.sha256(b"reviewed-candidate").hexdigest()
+    decisions = {
+        "decisions": [
+            {
+                "source_id": "Figure 1",
+                "kind": "figure",
+                "decision": "insert",
+                "visual_quality_status": "usable_candidate",
+                "source_image_path": str(source_image),
+                "source_image_sha256": digest,
+                "visual_review": {
+                    "status": "approved",
+                    "reviewed_asset_sha256": digest,
+                    "preserved_scientific_elements": "axes and legend",
+                    "omitted_scientific_elements": [],
+                    "notes": "",
+                    "failure_reason": "",
+                    "repair_attempts": 0,
+                    "revised_bbox": [],
+                    "self_certified": True,
+                },
+            }
+        ]
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        source_manifest(),
+        slim_bundle(),
+        decisions,
+    )
+    codes = {issue["code"] for issue in result["issues"]}
+
+    assert result["passes_grounding"] is False
+    assert "figure_visual_review_invalid" in codes
+
+
+def test_lint_grounding_rejects_inconsistent_passing_visual_review(
+    tmp_path: Path,
+) -> None:
+    source_image = tmp_path / "figure.png"
+    source_image.write_bytes(b"reviewed-candidate")
+    digest = hashlib.sha256(b"reviewed-candidate").hexdigest()
+    decisions = {
+        "decisions": [
+            {
+                "source_id": "Figure 1",
+                "kind": "figure",
+                "decision": "insert",
+                "visual_quality_status": "usable_candidate",
+                "source_image_path": str(source_image),
+                "source_image_sha256": digest,
+                "review_evidence": visual_review_evidence(tmp_path, source_image),
+                "visual_review": {
+                    "status": "pass",
+                    "reviewed_asset_sha256": digest,
+                    "preserved_scientific_elements": ["complete figure"],
+                    "omitted_scientific_elements": [],
+                    "notes": "",
+                    "failure_reason": "identity_mismatch",
+                    "repair_attempts": 0,
+                    "revised_bbox": [],
+                },
+            }
+        ]
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        source_manifest(),
+        slim_bundle(),
+        decisions,
+    )
+    codes = {issue["code"] for issue in result["issues"]}
+
+    assert result["passes_grounding"] is False
+    assert "figure_visual_review_invalid" in codes
+
+
+def test_lint_grounding_rejects_passing_review_with_omitted_scientific_elements(
+    tmp_path: Path,
+) -> None:
+    source_image = tmp_path / "figure.png"
+    source_image.write_bytes(b"reviewed-candidate")
+    digest = hashlib.sha256(b"reviewed-candidate").hexdigest()
+    decisions = {
+        "decisions": [
+            {
+                "source_id": "Figure 1",
+                "kind": "figure",
+                "decision": "insert",
+                "visual_quality_status": "usable_candidate",
+                "source_image_path": str(source_image),
+                "source_image_sha256": digest,
+                "review_evidence": visual_review_evidence(tmp_path, source_image),
+                "visual_review": {
+                    "status": "pass",
+                    "reviewed_asset_sha256": digest,
+                    "preserved_scientific_elements": ["plot body"],
+                    "omitted_scientific_elements": ["axis title"],
+                    "notes": "",
+                    "failure_reason": "",
+                    "repair_attempts": 0,
+                    "revised_bbox": [],
+                },
+            }
+        ]
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        source_manifest(),
+        slim_bundle(),
+        decisions,
+    )
+    codes = {issue["code"] for issue in result["issues"]}
+
+    assert result["passes_grounding"] is False
+    assert "figure_visual_review_invalid" in codes
+
+
+def test_lint_grounding_accepts_terminal_visual_defect(tmp_path: Path) -> None:
+    source_image = tmp_path / "figure.png"
+    source_image.write_bytes(b"wrong-figure")
+    digest = hashlib.sha256(b"wrong-figure").hexdigest()
+    decisions = {
+        "decisions": [
+            {
+                "source_id": "Figure 1",
+                "kind": "figure",
+                "decision": "visual_defect",
+                "visual_quality_status": "usable_candidate",
+                "source_image_path": str(source_image),
+                "source_image_sha256": digest,
+                "skip_reason": "identity_mismatch",
+                "review_evidence": visual_review_evidence(tmp_path, source_image),
+                "visual_review": {
+                    "status": "fail",
+                    "reviewed_asset_sha256": digest,
+                    "preserved_scientific_elements": [],
+                    "omitted_scientific_elements": ["matched Figure 1 visual body"],
+                    "notes": "The crop belongs to another figure.",
+                    "failure_reason": "identity_mismatch",
+                    "repair_attempts": 0,
+                    "revised_bbox": [],
+                },
+            }
+        ]
+    }
+
+    result = run_lint_grounding(
+        tmp_path,
+        grounded_note_plan(),
+        source_manifest(),
+        slim_bundle(),
+        decisions,
+    )
+
+    assert result["passes_grounding"] is True
 
 
 def test_lint_grounding_rejects_placeholder_decision_for_usable_candidate(tmp_path: Path) -> None:
