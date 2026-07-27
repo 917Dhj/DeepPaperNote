@@ -12,6 +12,19 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+## v2.2.0
+
+### Improved
+
+- Figures and tables are now cropped to the scientific visual body, keeping axes, legends, panel labels, table headers, and other internal labels while excluding external captions and surrounding paper prose.
+- Selected visual assets are rendered at 300 dpi and reviewed with full-page context before insertion, improving readability and reducing incomplete or mismatched crops.
+- Recoverable crop-boundary problems can receive one bounded correction and a fresh review instead of immediately losing an otherwise useful figure or table.
+
+### Fixed
+
+- Unreviewed, incomplete, malformed, or outdated visual approvals now fail closed instead of allowing an unreliable image into the final note.
+- Formal Save now verifies that the image copied into the paper-local `images/` folder is exactly the asset that passed visual review.
+
 ## v2.1.1
 
 ### Added
