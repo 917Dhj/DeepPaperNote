@@ -406,6 +406,80 @@ def test_local_pdf_good_title_does_not_use_unrelated_external_title() -> None:
     assert corrected == ""
 
 
+def test_manifestation_equivalence_accepts_identical_cjk_identity() -> None:
+    title = "双元联盟网络如何影响突破式创新——技术能力与网络惯例的调节作用"
+    decision = common.manifestation_equivalence_decision(
+        {"title": title, "authors": ["朱云鹃"]},
+        {"title": title, "authors": ["朱云鹃"]},
+    )
+
+    evidence = {item["kind"]: item for item in decision["evidence"]}
+    assert decision["status"] == "equivalent"
+    assert evidence["title_similarity"]["score"] == 1.0
+    assert evidence["leading_author"]["status"] == "match"
+
+
+def test_manifestation_equivalence_rejects_distinct_spaced_cjk_authors() -> None:
+    decision = common.manifestation_equivalence_decision(
+        {"title": "完全不同论文", "authors": ["李 云鹃"]},
+        {"title": "深度学习研究一", "authors": ["朱 云鹃"]},
+    )
+
+    evidence = {item["kind"]: item for item in decision["evidence"]}
+    assert decision["status"] == "ambiguous"
+    assert evidence["leading_author"]["status"] == "conflict"
+
+
+def test_manifestation_equivalence_preserves_unicode_combining_marks() -> None:
+    decision = common.manifestation_equivalence_decision(
+        {"title": "कतब", "authors": ["करण"]},
+        {"title": "किताब", "authors": ["किरण"]},
+    )
+
+    evidence = {item["kind"]: item for item in decision["evidence"]}
+    assert decision["status"] == "ambiguous"
+    assert evidence["title_similarity"]["score"] == 0.0
+    assert evidence["leading_author"]["status"] == "conflict"
+
+
+def test_ascii_identity_matching_remains_unchanged() -> None:
+    assert common.normalize_title("Attention: Is All You Need!") == (
+        "attention is all you need"
+    )
+    equivalent = common.manifestation_equivalence_decision(
+        {"title": "attention is all you need", "authors": ["Alice Example"]},
+        {"title": "Attention Is All You Need", "authors": ["Alice Example"]},
+    )
+    ambiguous = common.manifestation_equivalence_decision(
+        {"title": "Completely Different Paper", "authors": ["Bob Other"]},
+        {"title": "Attention Is All You Need", "authors": ["Alice Example"]},
+    )
+
+    assert equivalent["status"] == "equivalent"
+    assert ambiguous["status"] == "ambiguous"
+
+
+def test_identity_adjudication_accepts_identical_cjk_author() -> None:
+    title = "双元联盟网络如何影响突破式创新——技术能力与网络惯例的调节作用"
+    decision = common.adjudicate_identity_observations(
+        {"title": title, "authors": ["朱云鹃"], "year": "2026"},
+        [
+            {
+                "provider": "crossref",
+                "record": {
+                    "title": title,
+                    "authors": ["朱云鹃"],
+                    "year": "2026",
+                },
+            }
+        ],
+    )
+
+    assert decision["rejected_observations"] == []
+    assert len(decision["accepted_observations"]) == 1
+    assert decision["accepted_observations"][0]["reason"] == "title_author_year"
+
+
 def test_resolve_note_output_mode_falls_back_to_workspace(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     config = {
