@@ -304,6 +304,10 @@ def env_config_value(*names: str, default: str = "") -> str:
 
 
 def title_similarity(a: str, b: str) -> float:
+    a_identity = normalize_identity_title(a)
+    b_identity = normalize_identity_title(b)
+    if a_identity and a_identity == b_identity:
+        return 1.0
     a_norm = normalize_title(a)
     b_norm = normalize_title(b)
     if not a_norm or not b_norm:
@@ -587,6 +591,10 @@ def _full_leading_author_matches(
     work_authors = _dedupe_string_list(work_record.get("authors", []))
     if not source_authors or not work_authors:
         return False
+    source_normalized = normalize_identity_title(source_authors[0])
+    work_normalized = normalize_identity_title(work_authors[0])
+    if source_normalized == work_normalized:
+        return True
     source_parts = _author_identity_parts(source_authors[0])
     work_parts = _author_identity_parts(work_authors[0])
     if len(source_parts) < 2 or len(work_parts) < 2:
@@ -609,9 +617,16 @@ def _leading_author_status(
     work_authors = _dedupe_string_list(work_record.get("authors", []))
     if not source_authors or not work_authors:
         return None
+    source_normalized = normalize_identity_title(source_authors[0])
+    work_normalized = normalize_identity_title(work_authors[0])
     source_key = _author_key(source_authors[0])
     work_key = _author_key(work_authors[0])
-    status = "match" if source_key and source_key == work_key else "conflict"
+    status = (
+        "match"
+        if source_normalized == work_normalized
+        or (source_key and source_key == work_key)
+        else "conflict"
+    )
     return {
         "kind": "leading_author",
         "status": status,
