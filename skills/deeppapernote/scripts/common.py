@@ -146,7 +146,10 @@ def strip_tags(text: str) -> str:
 
 
 def normalize_title(text: str) -> str:
-    return re.sub(r"[^a-z0-9\s]", "", normalize_whitespace(text).lower()).strip()
+    normalized = unicodedata.normalize("NFKC", normalize_whitespace(text)).casefold()
+    return normalize_whitespace("".join(
+        character for character in normalized if character.isalnum() or character.isspace()
+    ))
 
 
 LOCAL_PDF_PREFIX_PATTERN = re.compile(r"^(?:[^-]{1,120})\s+-\s+(?:19|20)\d{2}\s+-\s+")
@@ -587,6 +590,10 @@ def _full_leading_author_matches(
     work_authors = _dedupe_string_list(work_record.get("authors", []))
     if not source_authors or not work_authors:
         return False
+    source_normalized = unicodedata.normalize("NFKC", source_authors[0]).casefold()
+    work_normalized = unicodedata.normalize("NFKC", work_authors[0]).casefold()
+    if source_normalized == work_normalized:
+        return True
     source_parts = _author_identity_parts(source_authors[0])
     work_parts = _author_identity_parts(work_authors[0])
     if len(source_parts) < 2 or len(work_parts) < 2:
@@ -609,9 +616,11 @@ def _leading_author_status(
     work_authors = _dedupe_string_list(work_record.get("authors", []))
     if not source_authors or not work_authors:
         return None
+    source_normalized = unicodedata.normalize("NFKC", source_authors[0]).casefold()
+    work_normalized = unicodedata.normalize("NFKC", work_authors[0]).casefold()
     source_key = _author_key(source_authors[0])
     work_key = _author_key(work_authors[0])
-    status = "match" if source_key and source_key == work_key else "conflict"
+    status = "match" if source_normalized == work_normalized or (source_key and source_key == work_key) else "conflict"
     return {
         "kind": "leading_author",
         "status": status,
