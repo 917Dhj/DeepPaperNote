@@ -144,7 +144,6 @@ def extract_raw_sections(page_texts: list[dict[str, Any]]) -> list[dict[str, Any
         page_number = int(page["page"])
         if current is None:
             current = new_record("preamble", "preamble", page_number, seen)
-        current["page_end"] = page_number
 
         for raw_line in str(page.get("text", "")).splitlines():
             line = clean_pdf_line(raw_line)
@@ -159,6 +158,7 @@ def extract_raw_sections(page_texts: list[dict[str, Any]]) -> list[dict[str, Any
                 kind = stop_reason or str(heading)
                 current = new_record(kind, line, page_number, seen)
                 continue
+            current["page_end"] = page_number
             current.setdefault("_lines", []).append(line)
 
     if current is not None:
