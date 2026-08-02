@@ -5,6 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import extract_source_text
 import pytest
 
 try:
@@ -56,6 +57,49 @@ def run_extract_source(input_path: Path, output_path: Path, *extra: str) -> dict
         check=True,
     )
     return json.loads(output_path.read_text(encoding="utf-8"))
+
+
+def test_extract_raw_sections_closes_previous_section_at_page_leading_heading() -> None:
+    pages = [
+        {"page": 1, "text": "Introduction\nPrior section body."},
+        {
+            "page": 2,
+            "text": "\n\nMethods\nNew section body.\nFigure 1: Method overview",
+        },
+    ]
+
+    sections = extract_source_text.extract_raw_sections(pages)
+    introduction = next(section for section in sections if section["kind"] == "introduction")
+    method = next(section for section in sections if section["kind"] == "method")
+
+    assert (introduction["page_start"], introduction["page_end"]) == (1, 1)
+    assert (method["page_start"], method["page_end"]) == (2, 2)
+    assert extract_source_text.section_ids_for_page(sections, 2) == [method["section_id"]]
+    assert (
+        extract_source_text.caption_manifest(pages, sections)["figures"][0]["section_id"]
+        == method["section_id"]
+    )
+
+
+def test_extract_raw_sections_keeps_overlap_for_mid_page_heading() -> None:
+    pages = [
+        {"page": 1, "text": "Introduction\nPrior section body."},
+        {
+            "page": 2,
+            "text": "Introduction continues on this page.\nMethods\nNew section body.",
+        },
+    ]
+
+    sections = extract_source_text.extract_raw_sections(pages)
+    introduction = next(section for section in sections if section["kind"] == "introduction")
+    method = next(section for section in sections if section["kind"] == "method")
+
+    assert (introduction["page_start"], introduction["page_end"]) == (1, 2)
+    assert (method["page_start"], method["page_end"]) == (2, 2)
+    assert extract_source_text.section_ids_for_page(sections, 2) == [
+        introduction["section_id"],
+        method["section_id"],
+    ]
 
 
 def test_extract_source_text_defaults_to_all_pages_and_jsonl(tmp_path: Path) -> None:
