@@ -50,9 +50,12 @@ SHELL_CONFIG_FILES = [
 ]
 
 try:
-    import fitz  # type: ignore
+    import pymupdf as fitz  # type: ignore
 except ImportError:  # pragma: no cover
-    fitz = None
+    try:
+        import fitz  # type: ignore
+    except ImportError:
+        fitz = None
 
 try:
     import certifi  # type: ignore
