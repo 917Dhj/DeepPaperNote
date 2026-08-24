@@ -93,6 +93,25 @@ def write_captioned_figure_pdf(path: Path) -> None:
         doc.close()
 
 
+def write_figure_with_multiline_bottom_label(path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for PDF asset integration tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.draw_rect(fitz.Rect(80.0, 80.0, 520.0, 300.0), width=2.0)
+        page.insert_text((88.0, 318.0), "(a) bottom panel", fontsize=10)
+        page.insert_text((88.0, 336.0), "continued label, d = 2000", fontsize=10)
+        page.insert_text(
+            (80.0, 380.0),
+            "Figure 1: Synthetic figure with a multi-line bottom label.",
+            fontsize=10,
+        )
+        doc.save(path)
+    finally:
+        doc.close()
+
+
 def write_tables_with_captions_above_and_below(path: Path) -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for PDF asset integration tests.")
@@ -198,6 +217,47 @@ def test_extract_pdf_assets_emits_caption_free_visual_body_and_page_preview(
     assert asset["bbox_pt"][3] < 329.0
     assert asset["caption_text"].startswith("Figure 1.")
     assert Path(asset["page_preview_path"]).is_file()
+
+
+def test_extract_pdf_assets_keeps_multiline_bottom_label_above_caption(
+    tmp_path: Path,
+) -> None:
+    pdf_path = tmp_path / "multiline-label.pdf"
+    write_figure_with_multiline_bottom_label(pdf_path)
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "assets.json"
+    write_fetch_input(input_path, pdf_path, title="Multiline Bottom Label")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_PDF_ASSETS_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--assets-dir",
+            str(tmp_path / "assets"),
+            "--figure-dpi",
+            "72",
+        ],
+        check=True,
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    asset = payload["figure_assets"][0]
+    doc = fitz.open(pdf_path)
+    try:
+        second_label = doc[0].search_for("continued label, d = 2000")[0]
+        caption = doc[0].search_for(
+            "Figure 1: Synthetic figure with a multi-line bottom label."
+        )[0]
+    finally:
+        doc.close()
+
+    assert asset["bbox_pt"][3] >= second_label.y1
+    assert asset["bbox_pt"][3] < caption.y0
+    assert Path(asset["path"]).is_file()
 
 
 def test_extract_pdf_assets_excludes_table_captions_above_and_below(

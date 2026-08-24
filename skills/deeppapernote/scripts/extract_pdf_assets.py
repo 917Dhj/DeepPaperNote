@@ -646,7 +646,7 @@ def _estimate_figure_bbox_above_caption(
                 relevant.append((r[0], r[1], r[2], clipped_y1))
 
     if relevant:
-        visual_bbox = (
+        active_bbox = (
             min(r[0] for r in relevant),
             min(r[1] for r in relevant),
             max(r[2] for r in relevant),
@@ -663,12 +663,19 @@ def _estimate_figure_bbox_above_caption(
                 or bb[3] <= upper_bound
             ):
                 continue
-            horizontal_gap = max(visual_bbox[0] - bb[2], bb[0] - visual_bbox[2], 0.0)
-            vertical_gap = max(visual_bbox[1] - bb[3], bb[1] - visual_bbox[3], 0.0)
+            horizontal_gap = max(active_bbox[0] - bb[2], bb[0] - active_bbox[2], 0.0)
+            vertical_gap = max(active_bbox[1] - bb[3], bb[1] - active_bbox[3], 0.0)
             if (vertical_gap == 0.0 and horizontal_gap <= 36.0) or (
                 horizontal_gap == 0.0 and vertical_gap <= 12.0
             ):
-                relevant.append((bb[0], bb[1], bb[2], min(bb[3], caption_y_top - 2.0)))
+                accepted_bbox = (bb[0], bb[1], bb[2], min(bb[3], caption_y_top - 2.0))
+                relevant.append(accepted_bbox)
+                active_bbox = (
+                    min(active_bbox[0], accepted_bbox[0]),
+                    min(active_bbox[1], accepted_bbox[1]),
+                    max(active_bbox[2], accepted_bbox[2]),
+                    max(active_bbox[3], accepted_bbox[3]),
+                )
         x0 = min(r[0] for r in relevant)
         y0 = min(r[1] for r in relevant)
         x1 = max(r[2] for r in relevant)
