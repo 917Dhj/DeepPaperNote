@@ -1,5 +1,7 @@
 # Note Quality
 
+Language note: evaluate headings and language cleanliness against `synthesis_bundle.writing_contract`. For `en`, use `output-language.md`; Chinese-specific examples below apply only to `zh-CN`.
+
 The note is high quality only if it satisfies most of the checks below.
 
 ## Minimum Bar

@@ -16,35 +16,41 @@ from contracts import (
     WRITING_CONTRACT_RULES,
     required_field_value_error,
 )
+from localization import note_schema, normalize_output_language
 
-REQUIRED_SECTIONS = NOTE_REQUIRED_SECTIONS
+ACTIVE_LANGUAGE = "zh-CN"
+SCHEMA: dict = {}
+SECTIONS: dict[str, str] = {}
+REQUIRED_SECTIONS: tuple[str, ...] = NOTE_REQUIRED_SECTIONS
+CORE_INFO_FIELDS: list[str] = []
+CORE_INFO_FIELD_INDEX: dict[str, int] = {}
+CORE_INFO_FIELD_ALIASES: dict[str, str] = {}
+FIGURE_TARGET_SECTIONS: set[str] = set()
+FIGURE_LABELS: dict[str, str] = {}
+MECHANISM_FLOW_HEADING = "机制流程"
 
-CORE_INFO_FIELDS = [
-    "标题",
-    "标题翻译",
-    "作者",
-    "机构",
-    "发表时间",
-    "发表渠道",
-    "DOI",
-    "arXiv",
-    "论文链接",
-    "代码 / 项目",
-    "数据 / 资源",
-    "论文类型",
-]
+def configure_output_language(language: str | None = None) -> str:
+    global ACTIVE_LANGUAGE, SCHEMA, SECTIONS, REQUIRED_SECTIONS, CORE_INFO_FIELDS
+    global CORE_INFO_FIELD_INDEX, CORE_INFO_FIELD_ALIASES, FIGURE_TARGET_SECTIONS, FIGURE_LABELS, MECHANISM_FLOW_HEADING
+    ACTIVE_LANGUAGE = normalize_output_language(language)
+    SCHEMA = note_schema(ACTIVE_LANGUAGE)
+    SECTIONS = dict(SCHEMA["sections"])
+    REQUIRED_SECTIONS = tuple(SECTIONS.values())
+    CORE_INFO_FIELDS = list(SCHEMA["core_info_fields"])
+    CORE_INFO_FIELD_INDEX = {field: idx for idx, field in enumerate(CORE_INFO_FIELDS)}
+    CORE_INFO_FIELD_ALIASES = dict(SCHEMA.get("core_info_aliases", {}))
+    FIGURE_TARGET_SECTIONS = {SECTIONS[key] for key in ("research_questions", "data_and_task", "method", "key_results", "deep_analysis", "limitations", "my_notes")}
+    FIGURE_LABELS = dict(SCHEMA["figure_labels"])
+    MECHANISM_FLOW_HEADING = str(SCHEMA["mechanism_flow"])
+    return ACTIVE_LANGUAGE
 
-CORE_INFO_FIELD_INDEX = {field: idx for idx, field in enumerate(CORE_INFO_FIELDS)}
+def section(key: str) -> str:
+    return SECTIONS[key]
 
-FIGURE_TARGET_SECTIONS = {
-    "研究问题",
-    "数据与任务定义",
-    "方法主线",
-    "关键结果",
-    "深度分析",
-    "局限",
-    "我的笔记",
-}
+def figure_prefix(key: str) -> str:
+    return f"> {FIGURE_LABELS[key]}"
+
+configure_output_language()
 
 FIGURE_BUCKET_RESIDUE_TOKENS = {
     "剩余",
@@ -132,7 +138,7 @@ USABLE_CANDIDATE_STATUS_RE = re.compile(
         |
         clear\s+crop
         |
-        high[-\s]*(?:confidence|match)
+        (?<!no\s)(?<!not\s)high[-\s]*(?:confidence|match)
     )
     """,
     flags=re.IGNORECASE | re.VERBOSE,
@@ -230,6 +236,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--plan-file", default="", help="Optional note_plan JSON path. Defaults to sibling <note>.plan.json.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
+    p.add_argument("--language", default="", help="Output language: en or zh-CN. Defaults to DEEPPAPERNOTE_OUTPUT_LANGUAGE or zh-CN.")
     return p
 
 
@@ -322,10 +329,10 @@ def find_missing_sections(text: str) -> list[str]:
 
 def front_matter_order_warnings(text: str) -> list[str]:
     warnings: list[str] = []
-    required_order = ["## 原文摘要翻译", "## 创新点", "## 一句话总结"]
+    required_order = [f"## {section('abstract')}", f"## {section('contributions')}", f"## {section('one_sentence_summary')}"]
     positions = []
-    for section in required_order:
-        idx = text.find(section)
+    for required_heading in required_order:
+        idx = text.find(required_heading)
         if idx < 0:
             return warnings
         positions.append(idx)
@@ -376,6 +383,9 @@ METHOD_PAPER_SIGNAL_KEYWORDS = [
     "decoder",
     "pipeline",
     "framework",
+    "model",
+    "system",
+    "module",
 ]
 
 MECHANISM_IO_TOKENS = [
@@ -385,6 +395,10 @@ MECHANISM_IO_TOKENS = [
     "送到",
     "生成",
     "得到",
+    "input",
+    "output",
+    "produces",
+    "returns",
 ]
 
 MECHANISM_ACTION_TOKENS = [
@@ -399,6 +413,14 @@ MECHANISM_ACTION_TOKENS = [
     "拼接",
     "查询",
     "更新",
+    "align",
+    "compute",
+    "estimate",
+    "extract",
+    "encode",
+    "decode",
+    "update",
+    "aggregate",
 ]
 
 
@@ -498,7 +520,7 @@ DOUBLE_ESCAPED_TEX_COMMANDS = {
 
 def is_metadata_line(line: str) -> bool:
     stripped = line.strip()
-    prefixes = [f"- {field}:" for field in CORE_INFO_FIELDS]
+    prefixes = [f"- {field}:" for field in (*CORE_INFO_FIELDS, *CORE_INFO_FIELD_ALIASES)]
     return any(stripped.startswith(prefix) for prefix in prefixes)
 
 
@@ -512,9 +534,9 @@ def is_exempt_line(line: str) -> bool:
         return True
     if (
         stripped.startswith("> [!figure]")
-        or stripped.startswith("> 建议位置：")
-        or stripped.startswith("> 放置原因：")
-        or stripped.startswith("> 当前状态：")
+        or stripped.startswith(figure_prefix("location"))
+        or stripped.startswith(figure_prefix("reason"))
+        or stripped.startswith(figure_prefix("status"))
     ):
         return True
     if re.search(r"https?://", stripped):
@@ -556,7 +578,11 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
         stripped = line.strip()
         section_name = section_name_for_line(lines, idx - 1)
         subsection_name = subsection_name_for_line(lines, idx - 1)
-        if section_name in {"核心信息", "引用"}:
+        if section_name in {section("core_information"), section("references")}:
+            continue
+        if ACTIVE_LANGUAGE == "en":
+            if re.search(r"[\u4e00-\u9fff]", stripped):
+                issues.append({"line_number": idx, "line": stripped, "reason": "non_english_text_present"})
             continue
         if not re.search(r"[\u4e00-\u9fff]", stripped):
             continue
@@ -578,6 +604,8 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
 
 
 def mechanical_translation_artifact_issues(text: str) -> list[dict[str, object]]:
+    if ACTIVE_LANGUAGE == "en":
+        return []
     issues: list[dict[str, object]] = []
     for idx, line in enumerate(text.splitlines(), start=1):
         stripped = line.strip()
@@ -620,11 +648,11 @@ def inspect_figure_callouts(text: str) -> list[str]:
             nxt = lines[j].strip()
             if not nxt.startswith(">"):
                 break
-            if nxt.startswith("> 建议位置："):
+            if nxt.startswith(figure_prefix("location")):
                 has_location = True
-            if nxt.startswith("> 放置原因："):
+            if nxt.startswith(figure_prefix("reason")):
                 has_reason = True
-            if nxt.startswith("> 当前状态："):
+            if nxt.startswith(figure_prefix("status")):
                 has_status = True
             j += 1
         if not has_location:
@@ -648,9 +676,10 @@ def figure_callout_title(line: str) -> str:
 
 def figure_status_text(line: str) -> str:
     stripped = line.strip()
-    if not stripped.startswith("> 当前状态："):
+    prefix = figure_prefix("status")
+    if not stripped.startswith(prefix):
         return ""
-    return stripped.removeprefix("> 当前状态：").strip()
+    return stripped.removeprefix(prefix).strip()
 
 
 def has_accepted_usable_placeholder_reason(status_text: str) -> bool:
@@ -748,8 +777,9 @@ def figure_callout_placement_issues(text: str) -> list[dict[str, object]]:
             nxt = lines[j].strip()
             if not nxt.startswith(">"):
                 break
-            if nxt.startswith("> 建议位置："):
-                location = nxt.removeprefix("> 建议位置：").strip()
+            prefix = figure_prefix("location")
+            if nxt.startswith(prefix):
+                location = nxt.removeprefix(prefix).strip()
                 break
             j += 1
 
@@ -919,14 +949,15 @@ def figure_structure_passes(text: str) -> bool:
 
 
 def core_info_structure_issues(text: str) -> list[dict[str, object]]:
-    body = section_body(text, "核心信息")
+    core_heading = section("core_information")
+    body = section_body(text, core_heading)
     if not body:
         return []
 
     issues: list[dict[str, object]] = []
     seen_fields: set[str] = set()
     last_known_index = -1
-    base_line = _line_number_from_offset(text, text.find("## 核心信息"))
+    base_line = _line_number_from_offset(text, text.find(f"## {core_heading}"))
 
     for offset, raw_line in enumerate(body.splitlines(), start=1):
         stripped = raw_line.strip()
@@ -945,6 +976,7 @@ def core_info_structure_issues(text: str) -> list[dict[str, object]]:
             continue
 
         field = match.group(1).strip()
+        field = CORE_INFO_FIELD_ALIASES.get(field, field)
         if field not in CORE_INFO_FIELD_INDEX:
             issues.append(
                 {
@@ -987,7 +1019,7 @@ def is_prose_line(line: str) -> bool:
     stripped = line.strip()
     if not stripped:
         return False
-    if stripped.startswith(("#", "-", "*", "> ", "```", "![[", "*论文原图编号")):
+    if stripped.startswith(("#", "-", "*", "> ", "```", "![[", f"*{FIGURE_LABELS['original_caption']}")):
         return False
     if stripped.startswith("`") and stripped.endswith("`"):
         return False
@@ -1085,6 +1117,14 @@ def _strip_fenced_code_preserve_newlines(text: str) -> str:
 
 def _extract_math_blocks(text: str) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     sanitized = _strip_fenced_code_preserve_newlines(text)
+    if ACTIVE_LANGUAGE == "en":
+        # Currency amounts such as "$25 billion" are prose, not LaTeX delimiters.
+        sanitized = re.sub(
+            r"\$(?=\d+(?:\.\d+)?\s+(?:thousand|million|billion|trillion|dollars?|usd)\b)",
+            r"\$",
+            sanitized,
+            flags=re.IGNORECASE,
+        )
     blocks: list[dict[str, object]] = []
     issues: list[dict[str, object]] = []
     consumed_lines: set[int] = set()
@@ -1286,7 +1326,8 @@ def subsection_body(text: str, section_heading: str, subsection_heading: str) ->
     if not body:
         return ""
     pattern = rf"^###\s+{re.escape(subsection_heading)}\s*$"
-    match = re.search(pattern, body, flags=re.MULTILINE)
+    flags = re.MULTILINE | (re.IGNORECASE if ACTIVE_LANGUAGE == "en" else 0)
+    match = re.search(pattern, body, flags=flags)
     if not match:
         return ""
     start = match.end()
@@ -1304,14 +1345,14 @@ def cleaned_section_lines(body: str) -> list[str]:
             continue
         if (
             stripped.startswith("> [!figure]")
-            or stripped.startswith("> 建议位置：")
-            or stripped.startswith("> 放置原因：")
-            or stripped.startswith("> 当前状态：")
+            or stripped.startswith(figure_prefix("location"))
+            or stripped.startswith(figure_prefix("reason"))
+            or stripped.startswith(figure_prefix("status"))
         ):
             continue
         if stripped.startswith("!["):
             continue
-        if stripped.startswith("*论文原图编号：") and stripped.endswith("*"):
+        if stripped.startswith(f"*{FIGURE_LABELS['original_caption']}") and stripped.endswith("*"):
             continue
         if stripped.startswith("> "):
             stripped = stripped[2:].strip()
@@ -1405,6 +1446,8 @@ def has_reference_entry(text: str) -> bool:
         return True
     if re.search(r"\b[A-Z][A-Za-z-]+ et al\.?\s*,?\s*(?:19|20)\d{2}\b", normalized):
         return True
+    if re.search(r"\b[A-Z][A-Za-z-]+(?:\s+(?:and|&|et al\.?|[A-Z][A-Za-z-]+))*\s*\((?:19|20)\d{2}\)", normalized):
+        return True
     if re.search(r"(?:19|20)\d{2}.*(?:DOI|doi|会议|期刊|arXiv)", normalized):
         return True
     return False
@@ -1412,62 +1455,66 @@ def has_reference_entry(text: str) -> bool:
 
 def inspect_substantive_content(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
-    for section in REQUIRED_SECTIONS:
-        body = section_body(text, section)
+    for section_heading in REQUIRED_SECTIONS:
+        body = section_body(text, section_heading)
         content = normalized_section_content(body)
         if is_placeholder_like(content):
-            issues.append(issue(section, "section_empty_shell", "error", content or section))
-        if section not in {"关键结果", "引用"} and is_honest_missing_declaration(content):
-            issues.append(issue(section, "section_honest_missing_not_allowed", "error", content))
+            issues.append(issue(section_heading, "section_empty_shell", "error", content or section_heading))
+        if section_heading not in {section("key_results"), section("references")} and is_honest_missing_declaration(content):
+            issues.append(issue(section_heading, "section_honest_missing_not_allowed", "error", content))
 
-    innovation = section_body(text, "创新点")
+    contributions_heading = section("contributions")
+    innovation = section_body(text, contributions_heading)
     innovation_content = normalized_section_content(innovation)
     innovation_units = meaningful_units(innovation, GENERIC_INNOVATION_PATTERNS)
     if not innovation_units:
-        issues.append(issue("创新点", "innovation_empty_shell", "error", innovation_content))
+        issues.append(issue(contributions_heading, "innovation_empty_shell", "error", innovation_content))
     elif len(innovation_units) < 2:
-        issues.append(issue("创新点", "innovation_too_few_specific_points", "warning", innovation_content))
+        issues.append(issue(contributions_heading, "innovation_too_few_specific_points", "warning", innovation_content))
 
-    key_results = section_body(text, "关键结果")
+    key_results_heading = section("key_results")
+    key_results = section_body(text, key_results_heading)
     key_results_content = normalized_section_content(key_results)
     if is_honest_missing_declaration(key_results_content):
         issues.append(
             issue(
-                "关键结果",
+                key_results_heading,
                 "key_results_honest_missing_not_allowed",
                 "error",
                 key_results_content,
             )
         )
     elif not meaningful_units(key_results, GENERIC_KEY_RESULT_PATTERNS):
-        issues.append(issue("关键结果", "key_results_empty_shell", "error", key_results_content))
+        issues.append(issue(key_results_heading, "key_results_empty_shell", "error", key_results_content))
     elif not has_number_token(key_results_content):
         issues.append(
             issue(
-                "关键结果",
+                key_results_heading,
                 "key_results_quantitative_result_missing",
                 "warning",
                 key_results_content,
             )
         )
 
-    references = section_body(text, "引用")
+    references_heading = section("references")
+    references = section_body(text, references_heading)
     references_content = normalized_section_content(references)
     if is_honest_missing_declaration(references_content):
-        issues.append(issue("引用", "references_unavailable_declared", "warning", references_content))
+        issues.append(issue(references_heading, "references_unavailable_declared", "warning", references_content))
     elif is_placeholder_like(references_content) or not has_reference_entry(references_content):
-        issues.append(issue("引用", "references_placeholder", "error", references_content))
+        issues.append(issue(references_heading, "references_placeholder", "error", references_content))
 
-    limitations = section_body(text, "局限")
+    limitations_heading = section("limitations")
+    limitations = section_body(text, limitations_heading)
     limitations_content = normalized_section_content(limitations)
     if not meaningful_units(limitations, GENERIC_LIMITATION_PATTERNS):
-        issues.append(issue("局限", "limitations_empty_shell", "error", limitations_content))
+        issues.append(issue(limitations_heading, "limitations_empty_shell", "error", limitations_content))
 
-    for section in ("方法主线", "深度分析"):
-        body = section_body(text, section)
+    for section_heading in (section("method"), section("deep_analysis")):
+        body = section_body(text, section_heading)
         content = normalized_section_content(body)
         if not meaningful_units(body):
-            issues.append(issue(section, "section_empty_shell", "error", content or section))
+            issues.append(issue(section_heading, "section_empty_shell", "error", content or section_heading))
 
     deduped: list[dict[str, object]] = []
     seen: set[tuple[str, str, str]] = set()
@@ -1481,7 +1528,7 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
 
 
 def method_section_requires_mechanism_flow(text: str) -> bool:
-    body = section_body(text, "方法主线")
+    body = section_body(text, section("method"))
     if not body:
         return False
     lower = body.lower()
@@ -1494,11 +1541,13 @@ def mechanism_flow_warnings(text: str) -> list[str]:
     warnings: list[str] = []
     if not method_section_requires_mechanism_flow(text):
         return warnings
-    if "### 机制流程" not in text:
+    heading_pattern = rf"^###\s+{re.escape(MECHANISM_FLOW_HEADING)}\s*$"
+    heading_flags = re.MULTILINE | (re.IGNORECASE if ACTIVE_LANGUAGE == "en" else 0)
+    if not re.search(heading_pattern, text, flags=heading_flags):
         warnings.append("mechanism_flow_subsection_missing")
         return warnings
 
-    body = subsection_body(text, "方法主线", "机制流程")
+    body = subsection_body(text, section("method"), MECHANISM_FLOW_HEADING)
     if not body:
         warnings.append("mechanism_flow_subsection_empty")
         return warnings
@@ -1508,8 +1557,9 @@ def mechanism_flow_warnings(text: str) -> list[str]:
         warnings.append("mechanism_flow_step_count_unexpected")
 
     step_text = " ".join(step_lines)
-    has_io_signal = any(token in step_text for token in MECHANISM_IO_TOKENS)
-    has_action_signal = any(token in step_text for token in MECHANISM_ACTION_TOKENS)
+    step_text_lower = step_text.lower()
+    has_io_signal = any(token.lower() in step_text_lower for token in MECHANISM_IO_TOKENS)
+    has_action_signal = any(token.lower() in step_text_lower for token in MECHANISM_ACTION_TOKENS)
     if not (has_io_signal and has_action_signal):
         warnings.append("mechanism_flow_too_abstract")
 
@@ -1529,6 +1579,7 @@ def main() -> None:
     from common import emit
 
     args = parser().parse_args()
+    output_language = configure_output_language(args.language or None)
     path = Path(args.input).expanduser().resolve()
     # utf-8-sig strips a leading BOM and the replace() normalizes CRLF so
     # Windows-authored notes are linted identically to LF/BOM-less notes;
@@ -1596,6 +1647,7 @@ def main() -> None:
     payload = {
         "status": "ok",
         "script": "lint_note.py",
+        "output_language": output_language,
         "paper_id": args.paper_id,
         "input_path": str(path),
         "headers": headers,

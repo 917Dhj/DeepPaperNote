@@ -78,7 +78,13 @@ Generate a deep-reading note for this paper: <title, DOI, URL, arXiv ID, or loca
 Turn this paper into an Obsidian note: <paper>
 ```
 
-DeepPaperNote currently generates Chinese notes by default, and its writing and validation rules are optimized for Chinese output.
+DeepPaperNote supports complete English and Simplified Chinese note schemas. Chinese remains the default for backward compatibility; set English persistently with:
+
+```bash
+export DEEPPAPERNOTE_OUTPUT_LANGUAGE=en
+```
+
+The core pipeline commands also accept `--language en` for a single run. Section names, metadata fields, figure callouts, planning guidance, linting, and Formal Save all follow the selected language.
 
 ## 🎯 Why DeepPaperNote?
 

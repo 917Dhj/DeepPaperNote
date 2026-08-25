@@ -28,6 +28,11 @@ def parser() -> argparse.ArgumentParser:
         default="auto",
         help="Local Zotero lookup policy used by the resolve stage.",
     )
+    p.add_argument(
+        "--language",
+        default="",
+        help="Output language contract: en or zh-CN. Defaults to DEEPPAPERNOTE_OUTPUT_LANGUAGE or zh-CN.",
+    )
     return p
 
 
@@ -147,6 +152,8 @@ def main() -> None:
             str(evidence_json),
             "--assets",
             str(assets_json),
+            "--language",
+            args.language,
             "--output",
             str(figures_json),
         ]
@@ -165,8 +172,7 @@ def main() -> None:
             str(figure_decisions_json),
         ]
     )
-    run_step(
-        [
+    bundle_command = [
             py,
             str(scripts_dir / "build_synthesis_bundle.py"),
             "--metadata",
@@ -184,7 +190,9 @@ def main() -> None:
             "--output",
             str(bundle_json),
         ]
-    )
+    if args.language:
+        bundle_command.extend(["--language", args.language])
+    run_step(bundle_command)
 
     print(
         "\n".join(
