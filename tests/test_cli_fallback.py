@@ -17,12 +17,34 @@ MATERIALIZE_SCRIPT = (
 ENV_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "check_environment.py"
 
 
+def formal_save_args(tmp_path: Path, note_text: str) -> list[str]:
+    lint_path = tmp_path / "passing-lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "note_sha256": hashlib.sha256(note_text.encode("utf-8")).hexdigest(),
+                "passes_basic_structure": True,
+                "passes_style_gate": True,
+                "passes_math_gate": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    decisions_path = tmp_path / "figure-decisions.json"
+    decisions_path.write_text(
+        json.dumps({"output_language": "zh-CN", "decisions": []}),
+        encoding="utf-8",
+    )
+    return ["--lint-json", str(lint_path), "--figure-decisions", str(decisions_path)]
+
+
 def test_write_note_falls_back_to_workspace(tmp_path: Path) -> None:
     env = os.environ.copy()
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
-
+    note_text = "# Fallback Output Test\n\nThis is a workspace fallback write test.\n"
     result = subprocess.run(
         [
             sys.executable,
@@ -30,7 +52,8 @@ def test_write_note_falls_back_to_workspace(tmp_path: Path) -> None:
             "--title",
             "Fallback Output Test",
             "--content",
-            "# Fallback Output Test\n\nThis is a workspace fallback write test.\n",
+            note_text,
+            *formal_save_args(tmp_path, note_text),
         ],
         cwd=tmp_path,
         env=env,
@@ -56,6 +79,7 @@ def test_write_note_rejects_asset_directory_outside_save_target(tmp_path: Path) 
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
     outside_asset_dir = tmp_path / "outside-assets"
 
+    note_text = "# Unsafe Asset Directory\n"
     result = subprocess.run(
         [
             sys.executable,
@@ -63,7 +87,8 @@ def test_write_note_rejects_asset_directory_outside_save_target(tmp_path: Path) 
             "--title",
             "Unsafe Asset Directory",
             "--content",
-            "# Unsafe Asset Directory\n",
+            note_text,
+            *formal_save_args(tmp_path, note_text),
             "--asset-subdir",
             str(outside_asset_dir),
         ],
@@ -178,6 +203,7 @@ def test_write_note_in_vault_mode_does_not_duplicate_paper_slug(tmp_path: Path) 
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
 
+    note_text = "# My Test Paper\n\nVault write regression test.\n"
     result = subprocess.run(
         [
             sys.executable,
@@ -189,7 +215,8 @@ def test_write_note_in_vault_mode_does_not_duplicate_paper_slug(tmp_path: Path) 
             "--subdir",
             "心理健康/My_Test_Paper",
             "--content",
-            "# My Test Paper\n\nVault write regression test.\n",
+            note_text,
+            *formal_save_args(tmp_path, note_text),
         ],
         cwd=tmp_path,
         env=env,
@@ -228,6 +255,7 @@ def test_write_note_uses_ready_chinese_obsidian_configuration(
     ):
         env.pop(name, None)
 
+    note_text = "# 配置驱动保存\n\n中文 Obsidian 保存测试。\n"
     result = subprocess.run(
         [
             sys.executable,
@@ -237,7 +265,8 @@ def test_write_note_uses_ready_chinese_obsidian_configuration(
             "--subdir",
             "机器学习",
             "--content",
-            "# 配置驱动保存\n\n中文 Obsidian 保存测试。\n",
+            note_text,
+            *formal_save_args(tmp_path, note_text),
         ],
         cwd=tmp_path,
         env=env,
@@ -308,7 +337,6 @@ def test_write_note_rejects_legacy_lint_json_without_output_language_before_save
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
-
     result = subprocess.run(
         [
             sys.executable,
@@ -352,6 +380,7 @@ def test_write_note_rejects_note_edited_after_final_lint_before_save(
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+    decisions_args = formal_save_args(tmp_path, linted_note)[2:]
 
     result = subprocess.run(
         [
@@ -363,6 +392,7 @@ def test_write_note_rejects_note_edited_after_final_lint_before_save(
             linted_note.replace("Linted", "Reviewed"),
             "--lint-json",
             str(lint_path),
+            *decisions_args,
         ],
         cwd=tmp_path,
         env=env,
@@ -388,6 +418,8 @@ def test_write_note_rejects_mismatched_figure_decisions_before_save_side_effects
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+    note_text = "# Language Mismatch\n"
+    lint_args = formal_save_args(tmp_path, note_text)[:2]
 
     result = subprocess.run(
         [
@@ -396,7 +428,8 @@ def test_write_note_rejects_mismatched_figure_decisions_before_save_side_effects
             "--title",
             "Language Mismatch",
             "--content",
-            "# Language Mismatch\n",
+            note_text,
+            *lint_args,
             "--figure-decisions",
             str(decisions_path),
         ],
@@ -458,6 +491,7 @@ def test_write_note_refuses_runtime_artifact_reference_without_lint_json(tmp_pat
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
 
+    note_text = "# Direct Reference Hygiene Test\n\n## 引用\n\n- /private/tmp/dpn-test-runs/candidate/artifacts/llama_source_manifest.json\n"
     result = subprocess.run(
         [
             sys.executable,
@@ -465,7 +499,8 @@ def test_write_note_refuses_runtime_artifact_reference_without_lint_json(tmp_pat
             "--title",
             "Direct Reference Hygiene Test",
             "--content",
-            "# Direct Reference Hygiene Test\n\n## 引用\n\n- /private/tmp/dpn-test-runs/candidate/artifacts/llama_source_manifest.json\n",
+            note_text,
+            *formal_save_args(tmp_path, note_text),
         ],
         cwd=tmp_path,
         env=env,
@@ -475,6 +510,33 @@ def test_write_note_refuses_runtime_artifact_reference_without_lint_json(tmp_pat
     )
     assert result.returncode != 0
     assert "reference hygiene gate failed" in result.stderr
+    assert not (tmp_path / "DeepPaperNote_output").exists()
+
+
+def test_write_note_requires_integrity_artifacts_before_save(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
+    env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
+    env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WRITE_SCRIPT),
+            "--title",
+            "Missing Integrity Artifacts",
+            "--content",
+            "# Missing Integrity Artifacts\n",
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "Final Note Lint" in result.stderr
     assert not (tmp_path / "DeepPaperNote_output").exists()
 
 

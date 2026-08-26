@@ -41,7 +41,11 @@ def parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
-    p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
+    p.add_argument(
+        "--language",
+        default="",
+        help="Run Override for output language: en or zh-CN.",
+    )
     return p
 
 
@@ -482,8 +486,9 @@ def main() -> None:
         runtime_config(cli_overrides={"output_language": args.language})["output_language"]
     )
     if args.review_decisions:
-        payload = apply_requested_repairs(load_record(args.review_decisions))
+        payload = load_record(args.review_decisions)
         require_artifact_output_language(payload, "Figure/Table Decisions", language)
+        payload = apply_requested_repairs(payload)
         payload["status"] = "ok"
         payload["script"] = "plan_figure_table_decisions.py"
         emit(payload, args.output)

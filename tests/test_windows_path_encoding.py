@@ -9,6 +9,7 @@ constructed explicitly, so they also guard the behavior when run on Linux CI.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -22,10 +23,33 @@ import lint_note
 import plan_figure_table_decisions
 from common import load_json_file, resolve_obsidian_note_path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts"
 BOM = "﻿"
+
+
+def _formal_save_artifacts(tmp_path: Path, canonical_note_text: str) -> tuple[Path, Path]:
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "note_sha256": hashlib.sha256(
+                    canonical_note_text.encode("utf-8")
+                ).hexdigest(),
+                "passes_basic_structure": True,
+                "passes_style_gate": True,
+                "passes_math_gate": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    decisions_path = tmp_path / "decisions.json"
+    decisions_path.write_text(
+        json.dumps({"output_language": "zh-CN", "decisions": []}),
+        encoding="utf-8",
+    )
+    return lint_path, decisions_path
 
 
 # --------------------------------------------------------------------------- #
@@ -173,6 +197,8 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
     content_file.write_bytes(
         BOM.encode("utf-8") + "# 标题\n\n正文内容。\n".encode("utf-8")
     )
+    canonical_note_text = "# 标题\n\n正文内容。\n"
+    lint_path, decisions_path = _formal_save_artifacts(tmp_path, canonical_note_text)
     result = subprocess.run(
         [
             sys.executable,
@@ -180,6 +206,8 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
             "--title", "BOM Content Test",
             "--vault", str(vault),
             "--content-file", str(content_file),
+            "--lint-json", str(lint_path),
+            "--figure-decisions", str(decisions_path),
         ],
         cwd=tmp_path,
         env=_clean_env(),
@@ -193,6 +221,57 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
     # frontmatter / the H1 title).
     assert not saved.startswith(BOM)
     assert saved.lstrip().startswith("# 标题")
+
+
+def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
+    tmp_path: Path,
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    content_file = tmp_path / "note.md"
+    crlf_text = "# CRLF Note\r\n\r\n正文内容。\r\n"
+    content_file.write_bytes(crlf_text.encode("utf-8"))
+    lint_output = tmp_path / "lint-from-script.json"
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPTS / "lint_note.py"),
+            "--input", str(content_file),
+            "--output", str(lint_output),
+        ],
+        cwd=tmp_path,
+        env=_clean_env(),
+        check=True,
+    )
+    lint = json.loads(lint_output.read_text(encoding="utf-8"))
+    lint.update({key: True for key in lint if key.startswith("passes_")})
+    lint_output.write_text(json.dumps(lint), encoding="utf-8")
+    decisions_path = tmp_path / "decisions.json"
+    decisions_path.write_text(
+        json.dumps({"output_language": "zh-CN", "decisions": []}),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPTS / "write_obsidian_note.py"),
+            "--title", "CRLF Note",
+            "--vault", str(vault),
+            "--content-file", str(content_file),
+            "--lint-json", str(lint_output),
+            "--figure-decisions", str(decisions_path),
+        ],
+        cwd=tmp_path,
+        env=_clean_env(),
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    saved = Path(json.loads(result.stdout)["note_path"]).read_bytes()
+    assert b"\r\n" not in saved
 
 
 def test_materialize_figure_asset_embed_uses_forward_slashes(tmp_path: Path) -> None:

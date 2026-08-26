@@ -425,6 +425,16 @@ def test_figure_table_decisions_apply_one_normalized_bbox_repair(
         ],
     }
 
+    result, payload = run_review_decisions(
+        tmp_path,
+        {"output_language": "en", **decisions},
+        check=False,
+    )
+    assert result.returncode != 0
+    assert payload is None
+    assert "does not match resolved output_language zh-CN" in result.stderr
+    assert not (tmp_path / "candidate_repair1.png").exists()
+
     _, payload = run_review_decisions(tmp_path, decisions)
     assert payload is not None
     decision = payload["decisions"][0]

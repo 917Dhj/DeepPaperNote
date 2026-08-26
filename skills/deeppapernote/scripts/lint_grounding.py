@@ -188,7 +188,11 @@ def parser() -> argparse.ArgumentParser:
         help="Figure/table decisions JSON path or JSON string.",
     )
     p.add_argument("--output", default="", help="Output JSON path.")
-    p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
+    p.add_argument(
+        "--language",
+        default="",
+        help="Run Override for output language: en or zh-CN.",
+    )
     return p
 
 

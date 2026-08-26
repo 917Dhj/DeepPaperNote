@@ -17,7 +17,11 @@ from contracts import (
     WRITING_CONTRACT_RULES,
     required_field_value_error,
 )
-from localization import note_schema, normalize_output_language, require_artifact_output_language
+from localization import (
+    normalize_output_language,
+    note_schema,
+    require_artifact_output_language,
+)
 
 ACTIVE_LANGUAGE = "zh-CN"
 SCHEMA: dict = {}

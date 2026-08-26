@@ -6,12 +6,14 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from build_synthesis_bundle import compact_writing_contract
 from lint_grounding import validate_note_plan
-from localization import normalize_output_language, require_artifact_output_language, required_sections
+from localization import (
+    normalize_output_language,
+    require_artifact_output_language,
+    required_sections,
+)
 from plan_figures import build_figure_items
-
 
 ENGLISH_SECTIONS = (
     "Core Information",

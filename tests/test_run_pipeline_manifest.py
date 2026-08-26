@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +18,7 @@ import run_pipeline
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RUN_PIPELINE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "run_pipeline.py"
+WRITE_NOTE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
 
 
 def write_test_pdf(path: Path) -> None:
@@ -103,6 +106,85 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     assert bundle["figure_table_manifest"]["decisions"]
     removed_bundle_keys = ("evidence", "candidate_chunks", "section_texts", "summary")
     assert not any(key in bundle for key in removed_bundle_keys)
+
+    note_text = "# 本地 PDF 语言完整性\n\n本笔记验证工件链可安全保存。\n"
+    lint_path = workdir / "paper_lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "note_sha256": hashlib.sha256(note_text.encode("utf-8")).hexdigest(),
+                "passes_basic_structure": True,
+                "passes_style_gate": True,
+                "passes_math_gate": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    save_cwd = tmp_path / "save-valid"
+    save_cwd.mkdir()
+    env = os.environ.copy()
+    env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+    env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "saved"
+    saved = subprocess.run(
+        [
+            sys.executable,
+            str(WRITE_NOTE_SCRIPT),
+            "--title",
+            "本地 PDF 语言完整性",
+            "--content",
+            note_text,
+            "--lint-json",
+            str(lint_path),
+            "--figure-decisions",
+            str(decisions_path),
+        ],
+        cwd=save_cwd,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    save_payload = json.loads(saved.stdout)
+    assert save_payload["output_language"] == "zh-CN"
+    assert Path(save_payload["note_path"]).read_text(encoding="utf-8") == note_text
+    assert Path(save_payload["images_dir"]).is_dir()
+
+    for artifact_language, expected_error in (
+        (None, "requires output_language"),
+        ("en", "does not match resolved output_language zh-CN"),
+    ):
+        invalid_decisions = dict(decisions)
+        if artifact_language is None:
+            invalid_decisions.pop("output_language")
+        else:
+            invalid_decisions["output_language"] = artifact_language
+        invalid_path = workdir / f"invalid-{artifact_language or 'missing'}.json"
+        invalid_path.write_text(json.dumps(invalid_decisions), encoding="utf-8")
+        failure_cwd = tmp_path / f"save-{artifact_language or 'missing'}"
+        failure_cwd.mkdir()
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(WRITE_NOTE_SCRIPT),
+                "--title",
+                "本地 PDF 语言失败",
+                "--content",
+                note_text,
+                "--lint-json",
+                str(lint_path),
+                "--figure-decisions",
+                str(invalid_path),
+            ],
+            cwd=failure_cwd,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0
+        assert expected_error in result.stderr
+        assert not (failure_cwd / "saved").exists()
 
 
 def test_run_pipeline_does_not_materialize_before_final_save(
