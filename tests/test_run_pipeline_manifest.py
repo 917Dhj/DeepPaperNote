@@ -253,11 +253,18 @@ def test_run_pipeline_does_not_materialize_before_final_save(
     assert fetch_call[fetch_call.index("--identity") + 1] == str(
         (workdir / "paper_identity.json").resolve()
     )
+    assert fetch_call[fetch_call.index("--dest-dir") + 1] == str(
+        (workdir / "paper_pdfs").resolve()
+    )
 
     evidence_call = calls[5]
     assert "--source-manifest" in evidence_call
     assert evidence_call[evidence_call.index("--source-manifest") + 1] == str(
         (workdir / "paper_source_manifest.json").resolve()
+    )
+    assets_call = calls[6]
+    assert assets_call[assets_call.index("--assets-dir") + 1] == str(
+        (workdir / "paper_assets").resolve()
     )
 
 

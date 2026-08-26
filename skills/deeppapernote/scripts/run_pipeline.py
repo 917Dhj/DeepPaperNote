@@ -82,11 +82,13 @@ def main() -> None:
     identity_json = workdir / f"{args.prefix}_identity.json"
     identity_trace_json = workdir / f"{args.prefix}_identity_repair_trace.json"
     fetch_json = workdir / f"{args.prefix}_fetch.json"
+    pdf_dir = workdir / f"{args.prefix}_pdfs"
     source_manifest_json = workdir / f"{args.prefix}_source_manifest.json"
     raw_sections_jsonl = workdir / f"{args.prefix}_raw_sections.jsonl"
     full_text_md = workdir / f"{args.prefix}_full_text.md"
     evidence_json = workdir / f"{args.prefix}_evidence.json"
     assets_json = workdir / f"{args.prefix}_assets.json"
+    assets_dir = workdir / f"{args.prefix}_assets"
     figures_json = workdir / f"{args.prefix}_figures.json"
     figure_decisions_json = workdir / f"{args.prefix}_figure_table_decisions.json"
     bundle_json = workdir / f"{args.prefix}_bundle.json"
@@ -138,6 +140,8 @@ def main() -> None:
             str(metadata_json),
             "--identity",
             str(identity_json),
+            "--dest-dir",
+            str(pdf_dir),
             "--output",
             str(fetch_json),
         ],
@@ -177,6 +181,8 @@ def main() -> None:
             str(scripts_dir / "extract_pdf_assets.py"),
             "--input",
             str(fetch_json),
+            "--assets-dir",
+            str(assets_dir),
             "--output",
             str(assets_json),
         ],

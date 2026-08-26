@@ -1265,6 +1265,25 @@ def _is_unique_exact_zotero_title_observation(
     )
 
 
+def _is_unique_exact_arxiv_title_observation(
+    anchor: dict[str, Any],
+    item: dict[str, Any],
+    observation: dict[str, Any],
+) -> bool:
+    relation = item.get("relation")
+    if not isinstance(relation, dict):
+        return False
+    return bool(
+        _string_field(item, "provider").lower() == "arxiv"
+        and _string_field(relation, "kind") == "arxiv_lookup"
+        and _string_field(relation, "match_kind") == "title"
+        and _string_field(relation, "match_resolution") == "unique_exact"
+        and _record_arxiv_id(observation)
+        and normalize_identity_title(_string_field(anchor, "title"))
+        == normalize_identity_title(_string_field(observation, "title"))
+    )
+
+
 def adjudicate_identity_observations(
     anchor: dict[str, Any],
     observations: list[Any],
@@ -1336,6 +1355,11 @@ def adjudicate_identity_observations(
             item,
             observation,
         )
+        unique_exact_arxiv_title_match = _is_unique_exact_arxiv_title_observation(
+            anchor,
+            item,
+            observation,
+        )
         if not title_author_year_match and not shared_identifiers:
             observation_provider = (
                 _string_field(item, "provider")
@@ -1379,6 +1403,7 @@ def adjudicate_identity_observations(
             not shared_identifiers
             and not title_author_year_match
             and not unique_exact_zotero_title_match
+            and not unique_exact_arxiv_title_match
         ):
             rejected_observations.append(
                 _identity_observation_summary(
@@ -1393,6 +1418,8 @@ def adjudicate_identity_observations(
             acceptance_reason = "shared_identifier"
         elif unique_exact_zotero_title_match:
             acceptance_reason = "unique_exact_zotero_title"
+        elif unique_exact_arxiv_title_match:
+            acceptance_reason = "unique_exact_arxiv_title"
         else:
             acceptance_reason = "title_author_year"
         summary = _identity_observation_summary(
@@ -2346,7 +2373,13 @@ def collect_metadata_observations(record: dict[str, Any]) -> list[dict[str, Any]
     title = normalize_whitespace(str(base.get("title", "")))
     arxiv_id = normalize_whitespace(str(base.get("arxiv_id", "")))
 
-    def append(provider: str, kind: str, value: str, candidate: dict[str, Any] | None) -> None:
+    def append(
+        provider: str,
+        kind: str,
+        value: str,
+        candidate: dict[str, Any] | None,
+        relation: dict[str, str] | None = None,
+    ) -> None:
         if not candidate:
             return
         observation = {
@@ -2354,6 +2387,8 @@ def collect_metadata_observations(record: dict[str, Any]) -> list[dict[str, Any]
             "retrieved_by": {"kind": kind, "value": value},
             "record": deepcopy(candidate),
         }
+        if relation:
+            observation["relation"] = relation
         if observation not in observations:
             observations.append(observation)
 
@@ -2377,11 +2412,26 @@ def collect_metadata_observations(record: dict[str, Any]) -> list[dict[str, Any]
         append("openalex", "title", title, oa)
         cross = choose_best_title_match(title, search_crossref_by_title(title, limit=5))
         append("crossref", "title", title, cross)
-        arxiv = choose_best_title_match(
-            title,
-            safe_fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5),
+        arxiv_candidates = safe_fetch_arxiv_entries(
+            search_query=f'ti:"{title}"', max_results=5
         )
-        append("arxiv", "title", title, arxiv)
+        arxiv = choose_best_title_match(title, arxiv_candidates)
+        exact_matches = [
+            candidate
+            for candidate in arxiv_candidates
+            if normalize_identity_title(_string_field(candidate, "title"))
+            == normalize_identity_title(title)
+        ]
+        relation = (
+            {
+                "kind": "arxiv_lookup",
+                "match_kind": "title",
+                "match_resolution": "unique_exact",
+            }
+            if arxiv is not None and len(exact_matches) == 1 and arxiv == exact_matches[0]
+            else None
+        )
+        append("arxiv", "title", title, arxiv, relation)
 
     return observations
 
