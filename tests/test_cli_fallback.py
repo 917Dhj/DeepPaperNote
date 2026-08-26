@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WRITE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
 MATERIALIZE_SCRIPT = (
@@ -201,6 +200,56 @@ def test_write_note_in_vault_mode_does_not_duplicate_paper_slug(tmp_path: Path) 
     note_path = Path(payload["note_path"])
     assert note_path == vault / "Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
     assert note_path.exists()
+
+
+def test_write_note_uses_ready_chinese_obsidian_configuration(
+    tmp_path: Path, configured_user_home: Path
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    configured_user_home.write_text(
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "save_mode": "obsidian",
+                "obsidian_vault": str(vault),
+                "papers_dir": "Research/Papers",
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    for name in (
+        "DEEPPAPERNOTE_OUTPUT_LANGUAGE",
+        "DEEPPAPERNOTE_SAVE_MODE",
+        "DEEPPAPERNOTE_OBSIDIAN_VAULT",
+        "DEEPPAPERNOTE_PAPERS_DIR",
+    ):
+        env.pop(name, None)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WRITE_SCRIPT),
+            "--title",
+            "配置驱动保存",
+            "--subdir",
+            "机器学习",
+            "--content",
+            "# 配置驱动保存\n\n中文 Obsidian 保存测试。\n",
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["output_language"] == "zh-CN"
+    assert payload["output_mode"] == "obsidian"
+    assert Path(payload["note_path"]).is_file()
+    assert Path(payload["note_path"]).is_relative_to(vault)
 
 
 def test_write_note_refuses_when_math_gate_fails(tmp_path: Path) -> None:

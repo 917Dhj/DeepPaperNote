@@ -184,20 +184,24 @@ def test_english_figure_plan_uses_english_targets_and_reasons() -> None:
     assert not any("\u4e00" <= character <= "\u9fff" for character in json.dumps(items, ensure_ascii=False))
 
 
-def test_english_note_passes_every_lint_gate(tmp_path: Path) -> None:
+def test_english_note_passes_every_lint_gate_from_user_configuration(
+    tmp_path: Path, configured_user_home: Path
+) -> None:
     note_path = tmp_path / "paper.md"
     plan_path = tmp_path / "paper.plan.json"
     output_path = tmp_path / "lint.json"
     note_path.write_text(english_note(), encoding="utf-8")
     plan_path.write_text(json.dumps(plan_payload()), encoding="utf-8")
+    configured_user_home.write_text(
+        json.dumps({"output_language": "en", "save_mode": "workspace"}),
+        encoding="utf-8",
+    )
     script = Path(__file__).resolve().parents[1] / "skills/deeppapernote/scripts/lint_note.py"
 
     subprocess.run(
         [
             sys.executable,
             str(script),
-            "--language",
-            "en",
             "--input",
             str(note_path),
             "--plan-file",

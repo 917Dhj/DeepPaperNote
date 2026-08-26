@@ -511,7 +511,9 @@ def main() -> None:
     page_assets = data.get("page_assets", []) if isinstance(data.get("page_assets"), list) else []
     image_assets = data.get("image_assets", []) if isinstance(data.get("image_assets"), list) else []
     figure_assets = data.get("figure_assets", []) if isinstance(data.get("figure_assets"), list) else []
-    language = normalize_output_language(args.language or runtime_config().get("output_language"))
+    language = normalize_output_language(
+        runtime_config(cli_overrides={"output_language": args.language})["output_language"]
+    )
     items = build_figure_items(evidence_pack, limit=args.max_items, language=language)
     items = attach_candidate_images(items, page_assets, image_assets, figure_assets)
     payload = {

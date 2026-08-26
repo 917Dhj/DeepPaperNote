@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+from common import runtime_config
 
 
 def parser() -> argparse.ArgumentParser:
@@ -31,17 +34,45 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--language",
         default="",
-        help="Output language contract: en or zh-CN. Defaults to DEEPPAPERNOTE_OUTPUT_LANGUAGE or zh-CN.",
+        choices=("", "en", "zh-CN"),
+        help="Run Override for the output language contract.",
     )
+    p.add_argument("--save-mode", choices=("workspace", "obsidian"), default="")
+    p.add_argument("--vault", default="", help="Run Override for the Obsidian Vault.")
+    p.add_argument("--papers-dir", default="", help="Run Override for the Vault paper directory.")
     return p
 
 
-def run_step(cmd: list[str]) -> None:
-    subprocess.run(cmd, check=True)
+def run_step(cmd: list[str], *, env: dict[str, str]) -> None:
+    subprocess.run(cmd, check=True, env=env)
 
 
 def main() -> None:
     args = parser().parse_args()
+    try:
+        config = runtime_config(
+            cli_overrides={
+                "output_language": args.language,
+                "save_mode": args.save_mode,
+                "obsidian_vault": args.vault,
+                "papers_dir": args.papers_dir,
+            }
+        )
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    args.language = config["output_language"]
+    run_environment = os.environ.copy()
+    for field, name in {
+        "output_language": "DEEPPAPERNOTE_OUTPUT_LANGUAGE",
+        "save_mode": "DEEPPAPERNOTE_SAVE_MODE",
+        "obsidian_vault": "DEEPPAPERNOTE_OBSIDIAN_VAULT",
+        "papers_dir": "DEEPPAPERNOTE_PAPERS_DIR",
+    }.items():
+        value = str(config.get(field, "")).strip()
+        if value:
+            run_environment[name] = value
+        else:
+            run_environment.pop(name, None)
     scripts_dir = Path(__file__).resolve().parent
     workdir = Path(args.workdir).expanduser().resolve()
     workdir.mkdir(parents=True, exist_ok=True)
@@ -70,7 +101,8 @@ def main() -> None:
             args.zotero_mode,
             "--output",
             str(resolve_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -80,7 +112,8 @@ def main() -> None:
             str(resolve_json),
             "--output",
             str(metadata_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -94,7 +127,8 @@ def main() -> None:
             str(identity_trace_json),
             "--output",
             str(identity_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -106,7 +140,8 @@ def main() -> None:
             str(identity_json),
             "--output",
             str(fetch_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -120,7 +155,8 @@ def main() -> None:
             str(raw_sections_jsonl),
             "--full-text-output",
             str(full_text_md),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -132,7 +168,8 @@ def main() -> None:
             str(source_manifest_json),
             "--output",
             str(evidence_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -142,7 +179,8 @@ def main() -> None:
             str(fetch_json),
             "--output",
             str(assets_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -156,7 +194,8 @@ def main() -> None:
             args.language,
             "--output",
             str(figures_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -170,7 +209,8 @@ def main() -> None:
             str(assets_json),
             "--output",
             str(figure_decisions_json),
-        ]
+        ],
+        env=run_environment,
     )
     bundle_command = [
             py,
@@ -192,7 +232,7 @@ def main() -> None:
         ]
     if args.language:
         bundle_command.extend(["--language", args.language])
-    run_step(bundle_command)
+    run_step(bundle_command, env=run_environment)
 
     print(
         "\n".join(

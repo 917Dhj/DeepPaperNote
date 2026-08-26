@@ -1119,6 +1119,7 @@ def test_note_plan_explicit_not_reported_entries_pass_plan_gate(tmp_path) -> Non
 
 
 def test_write_obsidian_note_refuses_failed_plan_gate(tmp_path) -> None:
+    (tmp_path / "vault").mkdir()
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(
         json.dumps(
@@ -1157,6 +1158,7 @@ def test_write_obsidian_note_refuses_failed_plan_gate(tmp_path) -> None:
 
 
 def test_write_obsidian_note_reports_lint_warning_details(tmp_path) -> None:
+    (tmp_path / "vault").mkdir()
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(
         json.dumps(
@@ -1275,6 +1277,7 @@ def test_real_image_embed_counts_as_figure_marker_in_full_lint(tmp_path) -> None
 
 
 def test_write_obsidian_note_refuses_failed_substantive_gate(tmp_path) -> None:
+    (tmp_path / "vault").mkdir()
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(
         json.dumps(

@@ -35,7 +35,7 @@ def parser() -> argparse.ArgumentParser:
         required=True,
         help="Figure/table decision JSON path or string.",
     )
-    p.add_argument("--language", default="", help="Output language: en or zh-CN. Defaults to DEEPPAPERNOTE_OUTPUT_LANGUAGE or zh-CN.")
+    p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
     p.add_argument("--output", default="", help="Output JSON path.")
     return p
 
@@ -44,12 +44,14 @@ def load_record(value: str) -> dict:
     return maybe_load_json_record(value) or {}
 
 
-def sanitize_reference_candidates(evidence_pack: dict, *, limit: int = 20) -> list[dict]:
+def sanitize_reference_candidates(
+    evidence_pack: dict, config: dict, *, limit: int = 20
+) -> list[dict]:
     candidates = evidence_pack.get("reference_candidates", []) or []
     if not isinstance(candidates, list):
         return []
     try:
-        matched_candidates = resolve_reference_links(candidates[:limit], runtime_config())
+        matched_candidates = resolve_reference_links(candidates[:limit], config)
     except Exception:
         matched_candidates = [
             {
@@ -435,6 +437,8 @@ def bundle(
     )
     source_manifest = source_manifest or {}
     figure_decisions_wrapper = figure_decisions_wrapper or {}
+    config = runtime_config(cli_overrides={"output_language": output_language or ""})
+    resolved_output_language = normalize_output_language(config["output_language"])
     identity_contract = identity_contract_summary(metadata, source_manifest)
     canonical_metadata = accepted_bundle_metadata(metadata, identity_contract)
 
@@ -482,7 +486,7 @@ def bundle(
             "coverage": source_manifest.get("coverage", {}) or {},
         },
         "source_index": source_index(source_manifest),
-        "references": {"candidates": sanitize_reference_candidates(evidence_pack)},
+        "references": {"candidates": sanitize_reference_candidates(evidence_pack, config)},
         "figure_plan": figure_plan,
         "figure_table_manifest": figure_table_manifest(
             figure_decisions_wrapper,
@@ -497,7 +501,7 @@ def bundle(
             "figure_assets": sanitize_figure_assets(assets_wrapper),
             "ocr_available": assets_wrapper.get("ocr_available", False),
         },
-        "writing_contract": compact_writing_contract(output_language),
+        "writing_contract": compact_writing_contract(resolved_output_language),
     }
 
 
@@ -523,7 +527,7 @@ def main() -> None:
             assets,
             source_manifest,
             figure_decisions,
-            normalize_output_language(args.language or runtime_config().get("output_language")),
+            args.language,
         ),
         args.output,
     )

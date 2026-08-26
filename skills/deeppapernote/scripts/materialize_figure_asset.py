@@ -25,6 +25,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--input", default="", help="Optional metadata JSON path or JSON string.")
     p.add_argument("--title", default="", help="Explicit paper title.")
     p.add_argument("--vault", default="", help="Target Obsidian vault path.")
+    p.add_argument("--save-mode", choices=("workspace", "obsidian"), default="")
+    p.add_argument("--papers-dir", default="", help="Vault-relative paper directory.")
     p.add_argument("--subdir", default="", help="Vault-relative note subdirectory.")
     p.add_argument("--filename", default="", help="Optional note filename override.")
     p.add_argument("--asset-subdir", default="images", help="Asset folder name relative to the note directory.")
@@ -40,9 +42,13 @@ def main() -> None:
     if not title:
         raise SystemExit("materialize_figure_asset.py requires --title or metadata with a title.")
 
-    config = runtime_config()
-    if args.vault:
-        config["obsidian_vault"] = args.vault
+    config = runtime_config(
+        cli_overrides={
+            "save_mode": args.save_mode or ("obsidian" if args.vault else ""),
+            "obsidian_vault": args.vault,
+            "papers_dir": args.papers_dir,
+        }
+    )
     resolved_subdir = resolve_domain_subdir(
         config,
         title=title,

@@ -40,11 +40,13 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--title", default="", help="Explicit title override.")
     p.add_argument("--output", default="", help="JSON status output path.")
     p.add_argument("--vault", default="", help="Target Obsidian vault path.")
+    p.add_argument("--save-mode", choices=("workspace", "obsidian"), default="")
+    p.add_argument("--papers-dir", default="", help="Vault-relative paper directory.")
     p.add_argument("--subdir", default="", help="Vault-relative subdirectory.")
     p.add_argument("--filename", default="", help="Explicit note filename.")
     p.add_argument("--asset-subdir", default="images", help="Asset folder name relative to the note directory.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
-    p.add_argument("--language", default="", help="Output language: en or zh-CN. Defaults to DEEPPAPERNOTE_OUTPUT_LANGUAGE or zh-CN.")
+    p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
     return p
 
 
@@ -199,7 +201,14 @@ def require_lint_gate(lint: dict, key: str, gate: str, lint_path: str) -> None:
 
 def main() -> None:
     args = parser().parse_args()
-    config = runtime_config()
+    config = runtime_config(
+        cli_overrides={
+            "output_language": args.language,
+            "save_mode": args.save_mode or ("obsidian" if args.vault else ""),
+            "obsidian_vault": args.vault,
+            "papers_dir": args.papers_dir,
+        }
+    )
     output_language = normalize_output_language(args.language or str(config.get("output_language", "")) or None)
 
     record = maybe_load_json_record(args.input) or {}
@@ -242,8 +251,6 @@ def main() -> None:
         raise SystemExit("write_obsidian_note.py requires --content-file, --content, or --stdin.")
     require_reference_hygiene(note_text, "before save")
 
-    if args.vault:
-        config["obsidian_vault"] = args.vault
     resolved_subdir = resolve_domain_subdir(
         config,
         title=title,

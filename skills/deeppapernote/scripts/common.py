@@ -17,6 +17,8 @@ from copy import deepcopy
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
+from user_configuration import inspect_configuration, resolve_preferences
+
 ARXIV_NS = {
     "atom": "http://www.w3.org/2005/Atom",
     "arxiv": "http://arxiv.org/schemas/atom",
@@ -2400,11 +2402,24 @@ def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
     return apply_identity_confidence(merged)
 
 
-def runtime_config() -> dict[str, Any]:
+def runtime_config(
+    *,
+    explicit_overrides: dict[str, Any] | None = None,
+    cli_overrides: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    inspection = inspect_configuration()
+    if inspection["state"] != "ready":
+        raise RuntimeError(json.dumps(inspection, ensure_ascii=False, sort_keys=True))
+    resolved = resolve_preferences(
+        explicit_overrides=explicit_overrides,
+        cli_overrides=cli_overrides,
+    )
+    if resolved["issues"] or resolved["missing"]:
+        raise RuntimeError(json.dumps(resolved, ensure_ascii=False, sort_keys=True))
     return {
-        "output_language": env_config_value("DEEPPAPERNOTE_OUTPUT_LANGUAGE", default="zh-CN"),
-        "obsidian_vault": env_config_value("DEEPPAPERNOTE_OBSIDIAN_VAULT"),
-        "papers_dir": env_config_value("DEEPPAPERNOTE_PAPERS_DIR", default="Research/Papers"),
+        "obsidian_vault": "",
+        "papers_dir": "",
+        **resolved["values"],
         "output_dir": env_config_value("DEEPPAPERNOTE_OUTPUT_DIR", default="tmp/DeepPaperNote"),
         "workspace_output_dir": env_config_value(
             "DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR",
@@ -2414,6 +2429,8 @@ def runtime_config() -> dict[str, Any]:
 
 
 def configured_obsidian_vault(config: dict[str, Any]) -> Path | None:
+    if str(config.get("save_mode", "")).strip() == "workspace":
+        return None
     vault = str(config.get("obsidian_vault", "")).strip()
     if not vault:
         return None
@@ -2426,14 +2443,18 @@ def configured_obsidian_vault(config: dict[str, Any]) -> Path | None:
 def require_obsidian_vault(config: dict[str, Any]) -> Path:
     vault_path = configured_obsidian_vault(config)
     if vault_path is None:
-        raise RuntimeError("Missing Obsidian vault configuration. Set DEEPPAPERNOTE_OBSIDIAN_VAULT.")
+        raise RuntimeError("Missing Obsidian Vault in User Configuration or the current Run Override.")
     return vault_path
 
 
 def resolve_note_output_mode(config: dict[str, Any]) -> tuple[str, Path]:
-    vault_path = configured_obsidian_vault(config)
-    if vault_path is not None:
-        return ("obsidian", vault_path)
+    save_mode = str(config.get("save_mode", "")).strip()
+    if save_mode == "obsidian":
+        return ("obsidian", require_obsidian_vault(config))
+    if not save_mode:
+        vault_path = configured_obsidian_vault(config)
+        if vault_path is not None:
+            return ("obsidian", vault_path)
     workspace_root = Path.cwd().resolve()
     output_dir = str(config.get("workspace_output_dir", "DeepPaperNote_output")).strip() or "DeepPaperNote_output"
     output_path = workspace_root / Path(

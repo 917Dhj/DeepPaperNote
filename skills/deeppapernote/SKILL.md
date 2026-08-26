@@ -8,7 +8,7 @@ description: Generate a high-quality deep-reading note for a single paper and wr
 Use this skill when the user wants one outcome:
 - read one paper carefully
 - generate a high-quality Markdown note
-- save the note into an Obsidian-style vault when configured, or into the current workspace when no vault is configured
+- save the note to the workspace or Obsidian target selected by User Configuration
 
 Chinese trigger examples:
 - `给这篇论文生成深度笔记`
@@ -20,15 +20,15 @@ English trigger examples:
 - `Generate a deep-reading note for this paper`
 - `Turn this paper into an Obsidian research note`
 
+## User Configuration
+
+Before a normal paper run, read `references/user-configuration.md` for configuration admission, migration, repair, Run Overrides, and Preference Changes.
+
 ## Output Language
 
-DeepPaperNote supports `zh-CN` and `en`. Resolve the language in this order:
-1. the user's explicit language request
-2. `--language` when a supporting script exposes it
-3. `DEEPPAPERNOTE_OUTPUT_LANGUAGE`
-4. `zh-CN` for backward compatibility
+DeepPaperNote supports `zh-CN` and `en`. Resolve it through User Configuration and Run Overrides; neither language nor save mode has a silent default.
 
-The synthesis bundle's `writing_contract.language`, localized sections, metadata fields, figure labels, and mechanism-flow heading are authoritative for drafting and linting. Never draft in one language and validate it under another. Read `references/output-language.md` when configuring, drafting, or debugging a non-default language.
+The synthesis bundle's `writing_contract.language`, localized sections, metadata fields, figure labels, and mechanism-flow heading are authoritative for drafting and linting. Never draft in one language and validate it under another. Read `references/output-language.md` when drafting or debugging either language profile.
 
 This skill is intentionally narrow:
 - it handles one paper at a time
@@ -58,21 +58,22 @@ The note must adapt to the paper type. Use the same base structure, but shift em
 ## Workflow
 
 Follow this order:
-1. resolve the paper identity
-2. collect metadata
-3. acquire the best available PDF
-4. extract canonical raw source text: `*_raw_sections.jsonl`, `*_source_manifest.json`, and optional derived `*_full_text.md`
-5. extract structural indexes and PDF assets
-6. plan figure placement
-7. build the full figure/table decision table
-8. build the manifest synthesis bundle
-9. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract
-10. draft from the plan only after the grounding gate passes
-11. have the model write the note
-12. lint the final note against the same `note_plan` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 13, 14, or 15
-13. perform `final_quality_review` after lint passes
-14. perform `final_readability_review` after the quality review passes
-15. write into Obsidian
+1. complete Configuration Readiness; advance only after inspection returns `ready`
+2. resolve the paper identity
+3. collect metadata
+4. acquire the best available PDF
+5. extract canonical raw source text: `*_raw_sections.jsonl`, `*_source_manifest.json`, and optional derived `*_full_text.md`
+6. extract structural indexes and PDF assets
+7. plan figure placement
+8. build the full figure/table decision table
+9. build the manifest synthesis bundle
+10. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract
+11. draft from the plan only after the grounding gate passes
+12. have the model write the note
+13. lint the final note against the same `note_plan` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 14, 15, or 16
+14. perform `final_quality_review` after lint passes
+15. perform `final_readability_review` after the quality review passes
+16. perform Formal Save to the configured target
 
 This is the required workflow for a normal single-paper note request, not a loose suggestion.
 Unless this skill explicitly marks a stage as optional, required stages must not be silently skipped, reordered into a shortcut, or treated as complete just because a partial artifact already exists.
@@ -147,9 +148,9 @@ Formal Save states:
 
 | Save Target state | Required action |
 |---|---|
-| Vault configured or provided and usable | Perform the Formal Save to that vault. |
-| Vault configured or provided, but the Formal Save fails | Keep the current Save Target and attempt an in-scope recovery. If it still cannot complete, report `blocked`; do not switch to workspace. |
-| No vault configured or provided | Ask whether the user wants to provide one. Use workspace only after the user explicitly chooses not to use a vault. |
+| `save_mode=obsidian` and the configured Vault is usable | Perform the Formal Save to that Vault. |
+| `save_mode=obsidian` and Formal Save fails | Keep the current Save Target and attempt an in-scope recovery. If it still cannot complete, report `blocked`; do not switch to workspace. |
+| `save_mode=workspace` | Perform the Formal Save inside the current workspace output root. |
 
 - A normal note-generation request should complete in one pass: note text, figure placeholder decisions, image materialization when confident, and final save.
 - Do not stop after a text-only draft just to ask whether the user wants figures inserted. Finish the figure replacement decision inside the same task unless the user explicitly asked for text only.
@@ -194,6 +195,7 @@ The topic references above can improve difficult runs, but the normal execution 
 
 Use these bundled scripts rather than rebuilding the workflow from scratch:
 - `scripts/check_environment.py`
+- `scripts/user_configuration.py`
 - `scripts/create_input_record.py`
 - `scripts/locate_zotero_attachment.py`
 - `scripts/resolve_paper.py`

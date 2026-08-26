@@ -78,13 +78,16 @@ Generate a deep-reading note for this paper: <title, DOI, URL, arXiv ID, or loca
 Turn this paper into an Obsidian note: <paper>
 ```
 
-DeepPaperNote supports complete English and Simplified Chinese note schemas. Chinese remains the default for backward compatibility; set English persistently with:
+DeepPaperNote supports complete English and Simplified Chinese note schemas. On first use, your Agent asks once for the output language and save mode, then writes the confirmed defaults to `~/.deeppapernote/config.json`.
 
-```bash
-export DEEPPAPERNOTE_OUTPUT_LANGUAGE=en
+```json
+{
+  "output_language": "en",
+  "save_mode": "workspace"
+}
 ```
 
-The core pipeline commands also accept `--language en` for a single run. Section names, metadata fields, figure callouts, planning guidance, linting, and Formal Save all follow the selected language.
+The core pipeline also accepts `--language en` for one run without changing the saved preference. Section names, metadata fields, figure callouts, planning guidance, linting, and Formal Save all follow the resolved language.
 
 ## 🎯 Why DeepPaperNote?
 
@@ -116,17 +119,26 @@ You do not need to install every skill. Choose the ones that match your workflow
 
 The canonical execution contract lives in [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md).
 
-## 🗂️ Obsidian Setup
+## 🗂️ User Configuration
 
-To make an Obsidian vault the default save target, set:
+DeepPaperNote stores durable device-local preferences in `~/.deeppapernote/config.json`.
 
-```bash
-export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/vault"
+To make an Obsidian Vault the durable save target, use:
+
+```json
+{
+  "output_language": "zh-CN",
+  "save_mode": "obsidian",
+  "obsidian_vault": "/absolute/path/to/your/vault",
+  "papers_dir": "Research/Papers"
+}
 ```
 
-- When a usable vault is configured or provided, DeepPaperNote saves the validated note and its paper-local `images/` directory there.
-- When no vault is configured, DeepPaperNote asks first. It writes to the current workspace only after you explicitly choose not to use a vault.
-- If a configured vault save fails, DeepPaperNote reports the blocked save instead of silently switching to another destination.
+- First use collects every required field in one prompt; later repair asks only for affected fields.
+- Existing legacy settings are offered once as migration candidates and become durable only after confirmation.
+- Workspace mode ignores Obsidian-only fields. Obsidian mode requires an existing absolute Vault and a relative paper directory inside it.
+- Run Overrides never modify `config.json`. A durable change requires an explicit request to change the future default.
+- If configuration or Formal Save is blocked, DeepPaperNote reports the affected field instead of switching destinations.
 
 ## 🔧 Optional Enhancements
 

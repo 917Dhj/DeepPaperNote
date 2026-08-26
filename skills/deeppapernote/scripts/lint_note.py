@@ -236,7 +236,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--plan-file", default="", help="Optional note_plan JSON path. Defaults to sibling <note>.plan.json.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
-    p.add_argument("--language", default="", help="Output language: en or zh-CN. Defaults to DEEPPAPERNOTE_OUTPUT_LANGUAGE or zh-CN.")
+    p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
     return p
 
 
@@ -1576,10 +1576,11 @@ def strip_frontmatter(text: str) -> str:
 
 
 def main() -> None:
-    from common import emit
+    from common import emit, runtime_config
 
     args = parser().parse_args()
-    output_language = configure_output_language(args.language or None)
+    config = runtime_config(cli_overrides={"output_language": args.language})
+    output_language = configure_output_language(str(config["output_language"]))
     path = Path(args.input).expanduser().resolve()
     # utf-8-sig strips a leading BOM and the replace() normalizes CRLF so
     # Windows-authored notes are linted identically to LF/BOM-less notes;

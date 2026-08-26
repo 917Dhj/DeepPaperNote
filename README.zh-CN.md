@@ -78,13 +78,16 @@ DeepPaperNote 需要 Python 3.10 或更高版本。核心 PDF 抽取路径依赖
 把这篇论文整理成 Obsidian 笔记：<论文>
 ```
 
-DeepPaperNote 完整支持英文和简体中文笔记结构。为了向后兼容，默认仍为中文；可用以下设置长期启用英文：
+DeepPaperNote 完整支持英文和简体中文笔记结构。首次使用时，Agent 会一次询问输出语言与保存模式，并把确认后的长期默认值写入 `~/.deeppapernote/config.json`。
 
-```bash
-export DEEPPAPERNOTE_OUTPUT_LANGUAGE=en
+```json
+{
+  "output_language": "zh-CN",
+  "save_mode": "workspace"
+}
 ```
 
-核心流程命令也支持使用 `--language en` 进行单次英文运行。章节名称、元数据字段、图表占位、规划规则、校验与正式保存都会遵循所选语言。
+核心流程也支持使用 `--language en` 进行单次英文运行，且不会改写长期偏好。章节名称、元数据字段、图表占位、规划规则、校验与正式保存都会遵循解析后的语言。
 
 ## 🎯 为什么选择 DeepPaperNote？
 
@@ -116,17 +119,26 @@ DeepPaperNote 仍然是唯一主产品。仓库同时提供一个可选 companio
 
 规范执行契约以 [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md) 为准。
 
-## 🗂️ Obsidian 配置
+## 🗂️ 用户配置
 
-如果希望默认保存到 Obsidian 库，请设置：
+DeepPaperNote 将设备本地的长期偏好保存在 `~/.deeppapernote/config.json`。
 
-```bash
-export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian/库/绝对路径"
+如果希望长期保存到 Obsidian Vault，可使用：
+
+```json
+{
+  "output_language": "zh-CN",
+  "save_mode": "obsidian",
+  "obsidian_vault": "/你的/Obsidian/Vault/绝对路径",
+  "papers_dir": "Research/Papers"
+}
 ```
 
-- 配置或提供了可用的 Vault 时，DeepPaperNote 会把校验完成的笔记及其论文专属 `images/` 目录保存到该 Vault。
-- 没有配置 Vault 时，DeepPaperNote 会先询问；只有你明确选择不使用 Vault 后，才会写入当前 workspace。
-- 如果已配置的 Vault 保存失败，DeepPaperNote 会报告保存受阻，而不会静默切换到其他目标。
+- 首次使用会在一个问题批次里收集所有必填项；后续修复只询问受影响字段。
+- 旧设置只会作为一次性迁移候选，得到确认后才会写入长期配置。
+- workspace 模式忽略 Obsidian 专属字段；Obsidian 模式要求 Vault 是已存在的绝对目录，论文目录是 Vault 内的相对路径。
+- 单次运行覆盖不会改写 `config.json`；只有明确要求修改未来默认值时才会持久化。
+- 配置或正式保存受阻时，DeepPaperNote 会报告具体字段，不会静默切换目标。
 
 ## 🔧 可选增强
 

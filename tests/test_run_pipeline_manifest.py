@@ -173,6 +173,68 @@ def test_run_pipeline_does_not_materialize_before_final_save(
     )
 
 
+def test_run_pipeline_stops_at_configuration_before_identity(
+    tmp_path: Path,
+    monkeypatch,
+    configured_user_home: Path,
+) -> None:
+    configured_user_home.unlink()
+    workdir = tmp_path / "must-not-exist"
+    calls: list[list[str]] = []
+    monkeypatch.setattr(run_pipeline.subprocess, "run", lambda cmd, **kwargs: calls.append(cmd))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pipeline.py",
+            "--input",
+            "paper.pdf",
+            "--workdir",
+            str(workdir),
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="needs_input"):
+        run_pipeline.main()
+
+    assert calls == []
+    assert not workdir.exists()
+
+
+def test_run_pipeline_propagates_run_override_without_persisting_it(
+    tmp_path: Path,
+    monkeypatch,
+    configured_user_home: Path,
+) -> None:
+    original = configured_user_home.read_bytes()
+    calls: list[tuple[list[str], dict[str, str]]] = []
+
+    def fake_run(cmd: list[str], check: bool = True, **kwargs) -> object:
+        calls.append((cmd, kwargs["env"]))
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(run_pipeline.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pipeline.py",
+            "--input",
+            "paper.pdf",
+            "--workdir",
+            str(tmp_path / "run"),
+            "--language",
+            "en",
+        ],
+    )
+
+    run_pipeline.main()
+
+    assert calls
+    assert all(env["DEEPPAPERNOTE_OUTPUT_LANGUAGE"] == "en" for _, env in calls)
+    assert configured_user_home.read_bytes() == original
+
+
 def test_run_pipeline_stops_before_fetch_when_identity_repair_is_exhausted(
     tmp_path: Path,
     monkeypatch,

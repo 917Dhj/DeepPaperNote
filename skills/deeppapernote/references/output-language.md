@@ -2,18 +2,12 @@
 
 DeepPaperNote supports two output schemas:
 
-| Setting | Language | Default |
-|---|---|---|
-| `zh-CN` | Simplified Chinese | Yes, for backward compatibility |
-| `en` | English | No |
+| Setting | Language |
+|---|---|
+| `zh-CN` | Simplified Chinese |
+| `en` | English |
 
-Set a persistent preference with:
-
-```bash
-export DEEPPAPERNOTE_OUTPUT_LANGUAGE=en
-```
-
-For a single command, use `--language en` with `run_pipeline.py`, `build_synthesis_bundle.py`, `lint_note.py`, or `write_obsidian_note.py` where applicable. An explicit user request overrides the persistent preference.
+Resolve the profile through `user-configuration.md`. For a single command, use `--language en` with `run_pipeline.py`, `build_synthesis_bundle.py`, `lint_note.py`, or `write_obsidian_note.py` where applicable. A Run Override never changes User Configuration.
 
 ## English note schema
 

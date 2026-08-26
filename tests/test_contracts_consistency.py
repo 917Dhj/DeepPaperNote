@@ -565,7 +565,8 @@ def test_skill_owns_formal_save_state_policy() -> None:
     assert marker not in obsidian_format_text
     assert "After such a refusal" not in skill_text
     assert "do not switch to workspace" in skill_text
-    assert "explicitly chooses not to use a vault" in skill_text
+    assert "`save_mode=workspace`" in skill_text
+    assert "references/user-configuration.md" in skill_text
     for policy_phrase in ("permission escalation", "workspace fallback", "explicit user consent"):
         assert policy_phrase not in obsidian_format_text
 
