@@ -19,11 +19,20 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "mechanism_flow": "机制流程",
     },
     "en": {
-        "sections": {"core_information": "Core Information", "abstract": "Abstract", "contributions": "Contributions", "one_sentence_summary": "One-Sentence Summary", "research_questions": "Research Questions", "data_and_task": "Data and Task Definition", "method": "Method", "key_results": "Key Results", "deep_analysis": "Deep Analysis", "limitations": "Limitations", "my_notes": "My Notes", "references": "References"},
+        "sections": {"core_information": "Core Information", "abstract": "Abstract", "contributions": "Contributions", "one_sentence_summary": "One-Sentence Summary", "research_questions": "Research Question", "data_and_task": "Data and Task Definition", "method": "Method", "key_results": "Key Results", "deep_analysis": "Deep Analysis", "limitations": "Limitations", "my_notes": "Research Notes", "references": "References"},
         "core_info_fields": ("Title", "Translated title", "Authors", "Institutions", "Publication date", "Venue", "DOI", "arXiv", "Paper link", "Code / Project", "Data / Resources", "Paper type"),
-        "core_info_aliases": {"Translated Title": "Translated title", "Author": "Authors", "Institution": "Institutions", "Publication Date": "Publication date", "Paper Link": "Paper link", "Code": "Code / Project", "Project": "Code / Project", "Data": "Data / Resources", "Resources": "Data / Resources", "Paper Type": "Paper type"},
+        "core_info_aliases": {},
         "figure_labels": {"location": "Suggested location:", "reason": "Why it matters:", "status": "Current status:", "original_caption": "Original paper item:"},
-        "mechanism_flow": "Analytical Flow",
+        "mechanism_flow": "Mechanism Flow",
+        "abstract_contract": {
+            "source": "source_abstract",
+            "requirement": "faithful_rendering_in_output_language",
+            "forbidden_additions": [
+                "later_contribution_claims",
+                "later_result_interpretation",
+                "hindsight_judgment",
+            ],
+        },
     },
 }
 

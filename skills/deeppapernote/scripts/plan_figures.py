@@ -153,7 +153,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
 ENGLISH_FIGURE_PLACEMENT: dict[str, tuple[str, str]] = {
     "main_result": ("Key Results", "This figure or table carries a primary result and belongs in Key Results."),
     "data_or_task_overview": ("Data and Task Definition", "This visual explains the source, construction, screening, or scope of the data and task."),
-    "method_overview": ("Analytical Flow", "This visual summarizes the method or system flow and belongs in Analytical Flow when the match is reliable."),
+    "method_overview": ("Mechanism Flow", "This visual summarizes the method or system flow and belongs in Mechanism Flow when the match is reliable."),
     "data_or_task": ("Data and Task Definition", "This visual clarifies the task setting, sample, or dataset."),
     "method_detail": ("Method", "This visual explains an internal mechanism or execution state and belongs in Method."),
     "table_result": ("Key Results", "This result table helps readers locate the central quantitative evidence."),

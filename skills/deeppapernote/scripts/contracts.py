@@ -289,14 +289,14 @@ PAPER_TYPE_CONTRACTS_EN: dict[str, dict[str, Any]] = {
             "What evidence shows failure, degradation, instability, or rising cost; if none is reported, what remains unproven?",
         ],
         "section_semantics": {
-            "Research Questions": "The specific technical problem and the shortcomings of existing methods.",
+            "Research Question": "The specific technical problem and the shortcomings of existing methods.",
             "Data and Task Definition": "Datasets, inputs and outputs, evaluation tasks, and experimental settings.",
             "Method": "Model, algorithm, training, and inference mechanisms.",
             "Key Results": "Main results, strong baselines, ablations, and decisive numbers.",
             "Deep Analysis": "Why the method works, where it is fragile, and the cost of reproduction or extension.",
         },
         "recommended_subsections": {
-            "Method": ["Analytical Flow", "Model Architecture", "Training Objective", "Inference and Sampling", "Implementation Details"],
+            "Method": ["Mechanism Flow", "Model Architecture", "Training Objective", "Inference and Sampling", "Implementation Details"],
             "Key Results": ["Main Results and Strong Baselines", "What the Ablations Establish", "Failure or Unstable Settings"],
             "Deep Analysis": ["Why It Works", "Complexity and Scalability", "Reproduction Notes"],
         },
@@ -316,7 +316,7 @@ PAPER_TYPE_CONTRACTS_EN: dict[str, dict[str, Any]] = {
             "How do sample composition, access, and privacy limits affect reproduction and generalization?",
         ],
         "section_semantics": {
-            "Research Questions": "The evaluation or data gap the resource is designed to address.",
+            "Research Question": "The evaluation or data gap the resource is designed to address.",
             "Data and Task Definition": "Sources, task splits, labels, and sample scope.",
             "Method": "Construction, filtering, annotation, and evaluation protocol—not a model pipeline.",
             "Key Results": "Baseline performance, difficulty, coverage, and bias.",
@@ -343,7 +343,7 @@ PAPER_TYPE_CONTRACTS_EN: dict[str, dict[str, Any]] = {
             "How do sample composition, missing data, privacy, and unavailable materials constrain reproduction?",
         ],
         "section_semantics": {
-            "Research Questions": "The clinical, psychological, or behavioral question, hypothesis, or variable relationship.",
+            "Research Question": "The clinical, psychological, or behavioral question, hypothesis, or variable relationship.",
             "Data and Task Definition": "Recruitment, eligibility, variables, instruments, and measurement.",
             "Method": "Study design, grouping, measurement flow, and statistical analysis.",
             "Key Results": "Effects, associations, group differences, uncertainty, and significance.",
@@ -369,7 +369,7 @@ PAPER_TYPE_CONTRACTS_EN: dict[str, dict[str, Any]] = {
             "Which conclusions are conceptual or normative rather than directly empirical?",
         ],
         "section_semantics": {
-            "Research Questions": "The social, cultural, historical, institutional, or theoretical problem.",
+            "Research Question": "The social, cultural, historical, institutional, or theoretical problem.",
             "Data and Task Definition": "Materials, cases, texts, interviews, archives, or corpus scope—not an ML task.",
             "Method": "Theoretical framework, conceptual distinctions, and argument path.",
             "Key Results": "Interpretive findings, conceptual contribution, or revision of prior views.",
@@ -395,7 +395,7 @@ PAPER_TYPE_CONTRACTS_EN: dict[str, dict[str, Any]] = {
             "Which trends are artifacts of the covered literature and cannot establish technical maturity?",
         ],
         "section_semantics": {
-            "Research Questions": "The field problem, controversy, or knowledge gap organized by the review.",
+            "Research Question": "The field problem, controversy, or knowledge gap organized by the review.",
             "Data and Task Definition": "Literature scope, search and screening criteria, and review objects.",
             "Method": "Taxonomy, review organization, and evidence-synthesis logic—not a single method architecture.",
             "Key Results": "Consensus, disagreement, trends, representative directions, and open questions.",
@@ -577,6 +577,8 @@ def writing_contract_rules(language: str | None = None) -> dict[str, Any]:
     rules["core_info_fields"] = tuple(schema["core_info_fields"])
     rules["figure_labels"] = dict(schema["figure_labels"])
     rules["mechanism_flow_heading"] = schema["mechanism_flow"]
+    if schema.get("abstract_contract"):
+        rules["abstract_contract"] = deepcopy(schema["abstract_contract"])
     return rules
 
 

@@ -199,6 +199,18 @@ MISSING_ASSET_MATERIALIZATION_RE = re.compile(
 MARKDOWN_IMAGE_EMBED_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*$")
 FIGURE_CALLOUT_TITLE_RE = re.compile(r"^>\s*\[!figure\][+-]?\s*(.*)$")
 HTTP_URL_RE = re.compile(r"https?://\S+")
+ENGLISH_METADATA_SOURCE_SPAN_PATTERNS = (
+    re.compile(r"`[^`\n]+`"),
+    re.compile(r"\[[^\]\n]+\]\([^)\n]+\)"),
+)
+ENGLISH_CJK_ENTITY_LINK_RE = re.compile(
+    r"\[[^\]\n]*[\u4e00-\u9fff][^\]\n]*\]\(https?://[^)\n]+\)"
+    r"|\[\[[^\]\n]*[\u4e00-\u9fff][^\]\n]*\]\]"
+)
+ENGLISH_CJK_MATH_LABEL_RE = re.compile(
+    r"\\operatorname\{(?:输入|输出|损失|状态|动作|奖励|标签|样本|预测|目标)\}"
+)
+ENGLISH_MATH_SPAN_RE = re.compile(r"\$\$[^$\n]+\$\$|\$[^$\n]+\$")
 
 RUNTIME_ARTIFACT_REFERENCE_PATTERNS = [
     re.compile(
@@ -355,6 +367,13 @@ def front_matter_order_warnings(text: str) -> list[str]:
     if positions != sorted(positions):
         warnings.append("front_matter_order_invalid")
     return warnings
+
+
+def english_top_level_section_warnings(text: str) -> list[str]:
+    if ACTIVE_LANGUAGE != "en":
+        return []
+    actual = re.findall(r"^##\s+(.+?)\s*$", text, flags=re.MULTILINE)
+    return [] if actual == list(REQUIRED_SECTIONS) else ["top_level_section_profile_invalid"]
 
 
 def _inside_any_span(start: int, end: int, spans: list[tuple[int, int]]) -> bool:
@@ -588,17 +607,42 @@ def subsection_name_for_line(lines: list[str], line_index: int) -> str:
 def mixed_language_issues(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
     lines = text.splitlines()
+    fenced_code_lines: set[int] = set()
+    fence_start: int | None = None
+    for line_index, line in enumerate(lines, start=1):
+        if not line.strip().startswith("```"):
+            continue
+        if fence_start is None:
+            fence_start = line_index
+        else:
+            fenced_code_lines.update(range(fence_start, line_index + 1))
+            fence_start = None
     for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if ACTIVE_LANGUAGE == "en":
+            if idx in fenced_code_lines:
+                continue
+            checked = stripped
+            section_name = section_name_for_line(lines, idx - 1)
+            if section_name in {section("core_information"), section("references")}:
+                for pattern in ENGLISH_METADATA_SOURCE_SPAN_PATTERNS:
+                    checked = pattern.sub("", checked)
+            if stripped.startswith(f"*{FIGURE_LABELS['original_caption']}"):
+                checked = ENGLISH_METADATA_SOURCE_SPAN_PATTERNS[0].sub("", checked)
+            checked = ENGLISH_CJK_ENTITY_LINK_RE.sub("", checked)
+            checked = ENGLISH_MATH_SPAN_RE.sub(
+                lambda match: ENGLISH_CJK_MATH_LABEL_RE.sub("", match.group(0)),
+                checked,
+            )
+            checked = HTTP_URL_RE.sub("", checked)
+            if re.search(r"[\u4e00-\u9fff]", checked):
+                issues.append({"line_number": idx, "line": stripped, "reason": "non_english_text_present"})
+            continue
         if is_exempt_line(line):
             continue
-        stripped = line.strip()
         section_name = section_name_for_line(lines, idx - 1)
         subsection_name = subsection_name_for_line(lines, idx - 1)
         if section_name in {section("core_information"), section("references")}:
-            continue
-        if ACTIVE_LANGUAGE == "en":
-            if re.search(r"[\u4e00-\u9fff]", stripped):
-                issues.append({"line_number": idx, "line": stripped, "reason": "non_english_text_present"})
             continue
         if not re.search(r"[\u4e00-\u9fff]", stripped):
             continue
@@ -1342,8 +1386,7 @@ def subsection_body(text: str, section_heading: str, subsection_heading: str) ->
     if not body:
         return ""
     pattern = rf"^###\s+{re.escape(subsection_heading)}\s*$"
-    flags = re.MULTILINE | (re.IGNORECASE if ACTIVE_LANGUAGE == "en" else 0)
-    match = re.search(pattern, body, flags=flags)
+    match = re.search(pattern, body, flags=re.MULTILINE)
     if not match:
         return ""
     start = match.end()
@@ -1555,11 +1598,15 @@ def method_section_requires_mechanism_flow(text: str) -> bool:
 
 def mechanism_flow_warnings(text: str) -> list[str]:
     warnings: list[str] = []
+    if ACTIVE_LANGUAGE == "en":
+        for heading in re.findall(r"^###\s+(.+?)\s*$", text, flags=re.MULTILINE):
+            if heading.casefold() == MECHANISM_FLOW_HEADING.casefold() and heading != MECHANISM_FLOW_HEADING:
+                warnings.append("mechanism_flow_heading_invalid")
+                break
     if not method_section_requires_mechanism_flow(text):
         return warnings
     heading_pattern = rf"^###\s+{re.escape(MECHANISM_FLOW_HEADING)}\s*$"
-    heading_flags = re.MULTILINE | (re.IGNORECASE if ACTIVE_LANGUAGE == "en" else 0)
-    if not re.search(heading_pattern, text, flags=heading_flags):
+    if not re.search(heading_pattern, text, flags=re.MULTILINE):
         warnings.append("mechanism_flow_subsection_missing")
         return warnings
 
@@ -1636,6 +1683,7 @@ def main() -> None:
         if reason and reason not in warnings:
             warnings.append(reason)
     warnings.extend(front_matter_order_warnings(text))
+    warnings.extend(english_top_level_section_warnings(text))
     warnings.extend(mechanism_flow_warnings(text))
     if not body_text.lstrip().startswith("# "):
         warnings.append("title_heading_missing")
@@ -1690,6 +1738,8 @@ def main() -> None:
                 "title_heading_missing",
                 "no_level2_sections",
                 "front_matter_order_invalid",
+                "top_level_section_profile_invalid",
+                "mechanism_flow_heading_invalid",
             }
             & set(warnings)
         ),

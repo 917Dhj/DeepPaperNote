@@ -348,7 +348,7 @@ def compact_writing_contract(language: str | None = None) -> dict:
     analysis_coverage["final_quality_review_checks"] = list(
         analysis_coverage["final_quality_review_checks"]
     )
-    return {
+    contract = {
         "language": rules["language"],
         "contract_role": "manifest_quality_contract",
         "canonical_source": (
@@ -417,6 +417,10 @@ def compact_writing_contract(language: str | None = None) -> dict:
         },
         "analysis_coverage_contract": analysis_coverage,
     }
+    abstract_contract = rules.get("abstract_contract")
+    if abstract_contract:
+        contract["abstract_contract"] = deepcopy(abstract_contract)
+    return contract
 
 
 def bundle(
