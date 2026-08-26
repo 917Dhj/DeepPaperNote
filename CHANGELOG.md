@@ -12,6 +12,11 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+### Added
+
+- Added end-to-end English output through `DEEPPAPERNOTE_OUTPUT_LANGUAGE=en` or `--language en`, including localized note schemas, paper-type planning contracts, figure callouts, grounding, final-note linting, and Formal Save validation.
+- Kept Simplified Chinese as the backward-compatible default while making the selected language explicit in synthesis, lint, and save artifacts.
+
 ## v2.2.0
 
 ### Improved

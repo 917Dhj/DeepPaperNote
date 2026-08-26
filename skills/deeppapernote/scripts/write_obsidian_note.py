@@ -22,6 +22,7 @@ from common import (
     runtime_config,
 )
 from lint_note import inspect_reference_hygiene
+from localization import normalize_output_language
 
 
 def parser() -> argparse.ArgumentParser:
@@ -43,6 +44,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--filename", default="", help="Explicit note filename.")
     p.add_argument("--asset-subdir", default="images", help="Asset folder name relative to the note directory.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
+    p.add_argument("--language", default="", help="Output language: en or zh-CN. Defaults to DEEPPAPERNOTE_OUTPUT_LANGUAGE or zh-CN.")
     return p
 
 
@@ -197,6 +199,8 @@ def require_lint_gate(lint: dict, key: str, gate: str, lint_path: str) -> None:
 
 def main() -> None:
     args = parser().parse_args()
+    config = runtime_config()
+    output_language = normalize_output_language(args.language or str(config.get("output_language", "")) or None)
 
     record = maybe_load_json_record(args.input) or {}
     title = args.title or str(record.get("title", "")).strip()
@@ -208,6 +212,12 @@ def main() -> None:
         # utf-8-sig tolerates a BOM in the lint JSON (e.g. produced/edited on
         # Windows) that would otherwise crash json.loads before any gate check.
         lint = json.loads(Path(lint_path).read_text(encoding="utf-8-sig"))
+        lint_language = str(lint.get("output_language", "")).strip()
+        if lint_language and lint_language != output_language:
+            raise SystemExit(
+                f"write_obsidian_note.py refused to write note because lint language "
+                f"{lint_language} does not match requested language {output_language}."
+            )
         require_lint_gate(lint, "passes_basic_structure", "basic structure", lint_path)
         require_lint_gate(lint, "passes_style_gate", "style", lint_path)
         require_lint_gate(lint, "passes_math_gate", "math", lint_path)
@@ -232,7 +242,6 @@ def main() -> None:
         raise SystemExit("write_obsidian_note.py requires --content-file, --content, or --stdin.")
     require_reference_hygiene(note_text, "before save")
 
-    config = runtime_config()
     if args.vault:
         config["obsidian_vault"] = args.vault
     resolved_subdir = resolve_domain_subdir(
@@ -271,6 +280,7 @@ def main() -> None:
     payload = {
         "status": "ok",
         "script": "write_obsidian_note.py",
+        "output_language": output_language,
         "paper_id": args.paper_id or record.get("paper_id", ""),
         "title": title,
         "note_path": str(target_path),

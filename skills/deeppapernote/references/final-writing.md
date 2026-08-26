@@ -1,5 +1,7 @@
 # Final Writing
 
+Language note: draft in `synthesis_bundle.writing_contract.language`. For `en`, use the exact schema in `output-language.md`; Chinese-only wording and typography rules below apply only to `zh-CN`.
+
 The final note should not read like raw extracted evidence.
 
 Use the structured artifacts as inputs:

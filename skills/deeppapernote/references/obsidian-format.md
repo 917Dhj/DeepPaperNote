@@ -1,5 +1,7 @@
 # Obsidian Format
 
+Language note: section names, metadata labels, figure callouts, and the mechanism-flow heading must follow `synthesis_bundle.writing_contract`. For `en`, use the exact schema in `output-language.md`; Chinese-specific examples below apply only to `zh-CN`.
+
 ## Heading Rules
 
 - Use `#` for the note title only.

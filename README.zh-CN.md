@@ -78,7 +78,13 @@ DeepPaperNote 需要 Python 3.10 或更高版本。核心 PDF 抽取路径依赖
 把这篇论文整理成 Obsidian 笔记：<论文>
 ```
 
-DeepPaperNote 默认生成中文笔记，当前写作与校验规则也主要针对中文输出优化。
+DeepPaperNote 完整支持英文和简体中文笔记结构。为了向后兼容，默认仍为中文；可用以下设置长期启用英文：
+
+```bash
+export DEEPPAPERNOTE_OUTPUT_LANGUAGE=en
+```
+
+核心流程命令也支持使用 `--language en` 进行单次英文运行。章节名称、元数据字段、图表占位、规划规则、校验与正式保存都会遵循所选语言。
 
 ## 🎯 为什么选择 DeepPaperNote？
 
