@@ -78,16 +78,8 @@ DeepPaperNote 需要 Python 3.10 或更高版本。核心 PDF 抽取路径依赖
 把这篇论文整理成 Obsidian 笔记：<论文>
 ```
 
-DeepPaperNote 完整支持英文和简体中文笔记结构。首次使用时，Agent 会一次询问输出语言与保存模式，并把确认后的长期默认值写入 `~/.deeppapernote/config.json`。
-
-```json
-{
-  "output_language": "zh-CN",
-  "save_mode": "workspace"
-}
-```
-
-核心流程也支持使用 `--language en` 进行单次英文运行，且不会改写长期偏好。章节名称、元数据字段、图表占位、规划规则、校验与正式保存都会遵循解析后的语言。
+DeepPaperNote 完整支持英文和简体中文笔记结构。首次使用时，Agent 会一次询问所选保存模式需要的全部字段，并把确认后的长期默认值写入 `~/.deeppapernote/config.json`。
+下方“用户配置”统一说明两种保存模式、两套语言 Profile 与单次覆盖方式。章节名称、元数据字段、图表占位、规划规则、校验与 Formal Save 都会遵循解析后的语言。
 
 ## 🎯 为什么选择 DeepPaperNote？
 
@@ -121,9 +113,25 @@ DeepPaperNote 仍然是唯一主产品。仓库同时提供一个可选 companio
 
 ## 🗂️ 用户配置
 
-DeepPaperNote 将设备本地的长期偏好保存在 `~/.deeppapernote/config.json`。
+DeepPaperNote 只用一个文件保存设备本地长期偏好：`~/.deeppapernote/config.json`。
 
-如果希望长期保存到 Obsidian Vault，可使用：
+| 字段 | 有效值 | 何时必填 |
+| --- | --- | --- |
+| `output_language` | `zh-CN` 或 `en` | 始终必填 |
+| `save_mode` | `workspace` 或 `obsidian` | 始终必填 |
+| `obsidian_vault` | 已存在的绝对目录 | 仅 `obsidian` 模式 |
+| `papers_dir` | Vault 内安全的相对路径 | 仅 `obsidian` 模式 |
+
+英文 workspace 配置只需要两个始终必填的字段：
+
+```json
+{
+  "output_language": "en",
+  "save_mode": "workspace"
+}
+```
+
+简体中文 Obsidian 配置还要给出 Vault 与论文目录：
 
 ```json
 {
@@ -134,11 +142,35 @@ DeepPaperNote 将设备本地的长期偏好保存在 `~/.deeppapernote/config.j
 }
 ```
 
-- 首次使用会在一个问题批次里收集所有必填项；后续修复只询问受影响字段。
-- 旧设置只会作为一次性迁移候选，得到确认后才会写入长期配置。
-- workspace 模式忽略 Obsidian 专属字段；Obsidian 模式要求 Vault 是已存在的绝对目录，论文目录是 Vault 内的相对路径。
-- 单次运行覆盖不会改写 `config.json`；只有明确要求修改未来默认值时才会持久化。
-- 配置或正式保存受阻时，DeepPaperNote 会报告具体字段，不会静默切换目标。
+配置会在论文身份解析等昂贵步骤之前完成。首次使用时，Agent 通过一个 Configuration Prompt Batch 一次询问全部必填字段；已有配置只坏了一个字段时，仅询问该字段。配置不可读或不可写时会标明受影响字段并失败关闭，不会带着无效配置继续。
+
+仅当 `config.json` 不存在时，旧环境变量或 shell 设置才会作为一次性迁移候选展示；确认后才写入长期偏好。配置文件一旦存在，shell 启动文件就不再提供偏好；当前进程值只保留为隐藏的兼容 Run Override。Preference Change 会保留未知（unknown）JSON 字段；替换畸形 JSON 前会先备份，并且必须得到确认。
+
+### Run Override 与 Preference Change
+
+每次运行都按以下固定优先级解析：
+
+`explicit request > CLI > current process environment > User Configuration`
+
+- “这篇论文仅本次用英文生成”是 Run Override，`config.json` 保持逐字节不变。
+- “这篇论文仅本次用中文生成”是对应的 `zh-CN` Run Override。
+- “以后默认生成英文笔记”是 Preference Change，确认后才修改未来默认值。
+- CLI 选项 `--language`、`--save-mode`、`--vault`、`--papers-dir` 都是 Run Override。例如：
+
+```bash
+python3 skills/deeppapernote/scripts/run_pipeline.py --input '<paper>' --language en --save-mode obsidian --vault /absolute/path/to/vault --papers-dir Research/Papers
+```
+
+workspace 模式本次不会使用 `obsidian_vault` 与 `papers_dir`，但会保留这些偏好，供以后 Obsidian 运行继续使用。Run Override 不会自动变成 Preference Change。
+
+### 输出语言 Profile 与 Formal Save
+
+- `zh-CN` 依次使用 `核心信息`、`原文摘要翻译`、`创新点`、`一句话总结`、`研究问题`、`数据与任务定义`、`方法主线`、`关键结果`、`深度分析`、`局限`、`我的笔记`、`引用`；方法部分使用 `机制流程`。图表 callout 使用 `建议位置：`、`放置原因：`、`当前状态：`，真实图片说明以 `论文原图编号：` 开头。
+- `en` 依次使用 `Core Information`、`Abstract`、`Contributions`、`One-Sentence Summary`、`Research Question`、`Data and Task Definition`、`Method`、`Key Results`、`Deep Analysis`、`Limitations`、`Research Notes`、`References`；方法部分使用 `Mechanism Flow`。图表 callout 使用 `Suggested location:`、`Why it matters:`、`Current status:`，真实图片说明以 `Original paper item:` 开头。
+
+两种 Profile 的 Abstract 都必须忠实呈现原论文摘要，并使用请求的输出语言；后续创新点和结果解释留在后续章节。同一个 canonical Skill 与一条流水线（one pipeline）会把选定语言一直绑定到 lint 和 Formal Save。
+
+Formal Save 会把 Markdown 笔记与 paper-local `images/` 目录写入选定的 workspace 或 Obsidian 目标。即使没有插入图片，`images/` 仍属于论文保存布局。保存受阻时会报告原目标，不会静默切换模式。
 
 ## 🔧 可选增强
 

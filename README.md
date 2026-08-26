@@ -78,16 +78,8 @@ Generate a deep-reading note for this paper: <title, DOI, URL, arXiv ID, or loca
 Turn this paper into an Obsidian note: <paper>
 ```
 
-DeepPaperNote supports complete English and Simplified Chinese note schemas. On first use, your Agent asks once for the output language and save mode, then writes the confirmed defaults to `~/.deeppapernote/config.json`.
-
-```json
-{
-  "output_language": "en",
-  "save_mode": "workspace"
-}
-```
-
-The core pipeline also accepts `--language en` for one run without changing the saved preference. Section names, metadata fields, figure callouts, planning guidance, linting, and Formal Save all follow the resolved language.
+DeepPaperNote supports complete English and Simplified Chinese note schemas. On first use, your Agent asks once for every field required by the selected save mode, then writes the confirmed defaults to `~/.deeppapernote/config.json`.
+The User Configuration section below covers both save modes, both language profiles, and one-run overrides. Section names, metadata fields, figure callouts, planning guidance, linting, and Formal Save all follow the resolved language.
 
 ## 🎯 Why DeepPaperNote?
 
@@ -121,9 +113,25 @@ The canonical execution contract lives in [`skills/deeppapernote/SKILL.md`](./sk
 
 ## 🗂️ User Configuration
 
-DeepPaperNote stores durable device-local preferences in `~/.deeppapernote/config.json`.
+DeepPaperNote stores durable device-local preferences in one file: `~/.deeppapernote/config.json`.
 
-To make an Obsidian Vault the durable save target, use:
+| Field | Valid values | When required |
+| --- | --- | --- |
+| `output_language` | `zh-CN` or `en` | Always |
+| `save_mode` | `workspace` or `obsidian` | Always |
+| `obsidian_vault` | Existing absolute directory | Only for `obsidian` |
+| `papers_dir` | Safe relative path inside the Vault | Only for `obsidian` |
+
+An English workspace configuration needs only the two always-required fields:
+
+```json
+{
+  "output_language": "en",
+  "save_mode": "workspace"
+}
+```
+
+A Simplified Chinese Obsidian configuration also names the Vault and paper directory:
 
 ```json
 {
@@ -134,11 +142,35 @@ To make an Obsidian Vault the durable save target, use:
 }
 ```
 
-- First use collects every required field in one prompt; later repair asks only for affected fields.
-- Existing legacy settings are offered once as migration candidates and become durable only after confirmation.
-- Workspace mode ignores Obsidian-only fields. Obsidian mode requires an existing absolute Vault and a relative paper directory inside it.
-- Run Overrides never modify `config.json`. A durable change requires an explicit request to change the future default.
-- If configuration or Formal Save is blocked, DeepPaperNote reports the affected field instead of switching destinations.
+Configuration is resolved before paper identity or other expensive paper work. On first use, the Agent presents one Configuration Prompt Batch for every required field. If a later file has one missing or invalid field, it asks only for that field; an unreadable or unwritable file fails closed with the affected field instead of continuing.
+
+Legacy environment or shell values are shown only as one-time migration candidates while `config.json` is absent. They become preferences only after confirmation. Once the file exists, shell startup files stop supplying preferences; current-process values remain a hidden compatibility Run Override. Preference Changes preserve unknown JSON fields, and malformed JSON is backed up before confirmed replacement.
+
+### Run Overrides and Preference Changes
+
+Runtime values follow this exact precedence:
+
+`explicit request > CLI > current process environment > User Configuration`
+
+- “Generate this paper's note in English just this once” is a Run Override and leaves `config.json` byte-for-byte unchanged.
+- “Generate this paper's note in Simplified Chinese just this once” is the corresponding `zh-CN` Run Override.
+- “Change my default output language to English” is a Preference Change and updates the future default after confirmation.
+- CLI options `--language`, `--save-mode`, `--vault`, and `--papers-dir` are Run Overrides. For example:
+
+```bash
+python3 skills/deeppapernote/scripts/run_pipeline.py --input '<paper>' --language en --save-mode obsidian --vault /absolute/path/to/vault --papers-dir Research/Papers
+```
+
+Workspace mode does not use `obsidian_vault` or `papers_dir` for that run, but it preserves those preferences for future Obsidian runs. Run Overrides never become Preference Changes automatically.
+
+### Output Language Profiles and Formal Save
+
+- `zh-CN` uses `核心信息`, `原文摘要翻译`, `创新点`, `一句话总结`, `研究问题`, `数据与任务定义`, `方法主线`, `关键结果`, `深度分析`, `局限`, `我的笔记`, and `引用`, with `机制流程` under the method section. Figure callouts use `建议位置：`, `放置原因：`, and `当前状态：`; a materialized-image caption begins with `论文原图编号：`.
+- `en` uses `Core Information`, `Abstract`, `Contributions`, `One-Sentence Summary`, `Research Question`, `Data and Task Definition`, `Method`, `Key Results`, `Deep Analysis`, `Limitations`, `Research Notes`, and `References`, with `Mechanism Flow`. Figure callouts use `Suggested location:`, `Why it matters:`, and `Current status:`; a materialized-image caption begins with `Original paper item:`.
+
+In either profile, Abstract faithfully renders the source abstract in the requested language; later contribution claims and interpretation stay in later sections. The same canonical Skill and one pipeline carry the chosen language through lint and Formal Save.
+
+Formal Save writes the Markdown note and its paper-local `images/` directory to the selected workspace or Obsidian target. The `images/` directory remains part of the saved paper layout even when no image is inserted. A blocked save reports the existing target and never silently switches modes.
 
 ## 🔧 Optional Enhancements
 

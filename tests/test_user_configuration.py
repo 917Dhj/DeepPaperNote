@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 import user_configuration
+from localization import SUPPORTED_OUTPUT_LANGUAGES, note_schema
 from user_configuration import (
     ConfigurationWriteError,
     inspect_configuration,
@@ -383,6 +385,116 @@ def test_public_and_agent_contracts_share_user_configuration_source_of_truth() -
     assert skill.index("Configuration Readiness") < skill.index("resolve the paper identity")
     assert "explicit request > CLI > current process environment > User Configuration" in contract
     assert "scripts/user_configuration.py" in contract
+
+
+def test_public_onboarding_covers_bilingual_configuration_and_run_overrides() -> None:
+    public_docs = {
+        "en": (PROJECT_ROOT / "README.md").read_text(encoding="utf-8"),
+        "zh-CN": (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8"),
+    }
+
+    for text in public_docs.values():
+        for field in user_configuration.KNOWN_FIELDS:
+            assert f"`{field}`" in text
+        values = (
+            *sorted(user_configuration.OUTPUT_LANGUAGES),
+            *sorted(user_configuration.SAVE_MODES),
+        )
+        for value in values:
+            assert f"`{value}`" in text
+        for option in ("--language", "--save-mode", "--vault", "--papers-dir"):
+            assert f"`{option}`" in text
+        assert '"output_language": "zh-CN"' in text
+        assert '"output_language": "en"' in text
+        assert (
+            "explicit request > CLI > current process environment > User Configuration"
+            in text
+        )
+        assert "Configuration Prompt Batch" in text
+        assert "Run Override" in text
+        assert "Preference Change" in text
+        assert "Formal Save" in text
+        assert "`images/`" in text
+        assert "unknown" in text.lower()
+        assert "DEEPPAPERNOTE_" not in text
+
+        field_values = {
+            "output_language": set(user_configuration.OUTPUT_LANGUAGES),
+            "save_mode": set(user_configuration.SAVE_MODES),
+        }
+        for field, expected in field_values.items():
+            row = re.search(rf"\| `{field}` \| ([^|]+) \|", text)
+            assert row is not None
+            assert set(re.findall(r"`([^`]+)`", row.group(1))) == expected
+
+        profile = text.split("### Output Language Profiles and Formal Save", 1)[-1]
+        if profile == text:
+            profile = text.split("### 输出语言 Profile 与 Formal Save", 1)[-1]
+        assert profile != text
+        for language in SUPPORTED_OUTPUT_LANGUAGES:
+            schema = note_schema(language)
+            section_positions = [
+                profile.index(f"`{section}`")
+                for section in schema["sections"].values()
+            ]
+            assert section_positions == sorted(section_positions)
+            for label in schema["figure_labels"].values():
+                assert f"`{label}`" in profile
+            assert f"`{schema['mechanism_flow']}`" in profile
+
+    assert "Generate this paper's note in English just this once" in public_docs["en"]
+    assert "Generate this paper's note in Simplified Chinese just this once" in public_docs["en"]
+    assert "Change my default output language to English" in public_docs["en"]
+    assert "这篇论文仅本次用英文生成" in public_docs["zh-CN"]
+    assert "这篇论文仅本次用中文生成" in public_docs["zh-CN"]
+    assert "以后默认生成英文笔记" in public_docs["zh-CN"]
+
+
+def test_canonical_configuration_reference_matches_machine_contract() -> None:
+    skill = (PROJECT_ROOT / "skills/deeppapernote/SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    contract = (
+        PROJECT_ROOT / "skills/deeppapernote/references/user-configuration.md"
+    ).read_text(encoding="utf-8")
+
+    for field in user_configuration.KNOWN_FIELDS:
+        assert f"`{field}`" in contract
+    values = (
+        *sorted(user_configuration.OUTPUT_LANGUAGES),
+        *sorted(user_configuration.SAVE_MODES),
+    )
+    for value in values:
+        assert f"`{value}`" in contract
+    for state in ("ready", "needs_input", "invalid", "blocked"):
+        assert f"`{state}`" in contract
+    assert (
+        "explicit request > CLI > current process environment > User Configuration"
+        in contract
+    )
+    assert "preserve" in contract.lower() and "unknown" in contract.lower()
+    assert "Workspace mode" in contract and "preserve" in contract
+    assert "before paper identity resolution" in contract
+    assert "one canonical Skill" in skill
+    assert "one pipeline" in skill
+    assert "paper-local `images/`" in skill
+
+
+def test_output_language_reference_matches_both_machine_schemas() -> None:
+    contract = (
+        PROJECT_ROOT / "skills/deeppapernote/references/output-language.md"
+    ).read_text(encoding="utf-8")
+
+    for language in SUPPORTED_OUTPUT_LANGUAGES:
+        schema = note_schema(language)
+        section_positions = []
+        for section in schema["sections"].values():
+            assert f"`{section}`" in contract
+            section_positions.append(contract.index(f"`{section}`"))
+        assert section_positions == sorted(section_positions)
+        for label in schema["figure_labels"].values():
+            assert label in contract
+        assert schema["mechanism_flow"] in contract
 
 
 def test_configuration_cli_keeps_semantic_failures_repairable(

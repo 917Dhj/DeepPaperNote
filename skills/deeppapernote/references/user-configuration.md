@@ -7,11 +7,11 @@ Use one device-local User Configuration at `~/.deeppapernote/config.json`:
 - `obsidian_vault`: existing absolute directory, required only in Obsidian mode
 - `papers_dir`: safe relative path inside the Vault, required only in Obsidian mode
 
-There is no implicit language or save-mode default. Workspace mode ignores stored Obsidian fields. Destination writability is a Formal Save concern; configuration inspection never creates a probe file in the workspace or Vault.
+There is no implicit language or save-mode default. Workspace mode ignores stored Obsidian fields for the current run but preserves them for a later Obsidian run. Destination writability is a Formal Save concern; configuration inspection never creates a probe file in the workspace or Vault.
 
 ## Configuration admission
 
-Complete Configuration Readiness before paper identity resolution:
+Complete Configuration Readiness before paper identity resolution. The inspector returns exactly one structured state: `ready`, `needs_input`, `invalid`, or `blocked`.
 
 1. Run `scripts/user_configuration.py` without setters and read its structured state.
 2. For `needs_input` on first use, ask one Configuration Prompt Batch for `output_language` and `save_mode`; require `obsidian_vault` and `papers_dir` in that same response when the user selects Obsidian. For later repair, ask only for `prompt_fields`.
@@ -23,13 +23,13 @@ Treat `invalid` as repairable input. Treat `blocked` as an I/O boundary: report 
 
 ## Resolution and persistence
 
-Resolve each preference using this exact precedence:
+Resolve each preference using this exact precedence; an explicit request is an explicit current-run parameter, including a natural-language request:
 
 `explicit request > CLI > current process environment > User Configuration`
 
 An explicit request about the current paper is a Run Override. Translate it to the matching runtime override and leave `config.json` byte-for-byte unchanged. Persist only explicit future-default wording as a Preference Change.
 
-While `config.json` is absent, supported process and shell values are migration candidates only. Once the file exists, shell startup files leave the preference path permanently; current process environment values remain run-scoped compatibility overrides.
+While `config.json` is absent, supported process and shell values are migration candidates only. Once the file exists, shell startup files leave the preference path permanently; current process environment values remain hidden, run-scoped compatibility overrides rather than public setup.
 
 Preference Changes preserve unknown JSON fields and report a warning. Malformed or non-object JSON receives a unique invalid backup before a confirmed replacement. Writes use a same-directory temporary file, atomic replacement, and exact reread comparison.
 

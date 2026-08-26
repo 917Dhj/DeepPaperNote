@@ -9,6 +9,27 @@ DeepPaperNote supports two output schemas:
 
 Resolve the profile through `user-configuration.md`. For a single command, use `--language en` with `run_pipeline.py`, `build_synthesis_bundle.py`, `lint_note.py`, or `write_obsidian_note.py` where applicable. A Run Override never changes User Configuration.
 
+## Simplified Chinese note schema
+
+Use these top-level sections in this order:
+
+1. `核心信息`
+2. `原文摘要翻译`
+3. `创新点`
+4. `一句话总结`
+5. `研究问题`
+6. `数据与任务定义`
+7. `方法主线`
+8. `关键结果`
+9. `深度分析`
+10. `局限`
+11. `我的笔记`
+12. `引用`
+
+Use `### 机制流程` for the mechanism-flow subsection. Chinese figure placeholders use the labels `建议位置：`, `放置原因：`, and `当前状态：`; a materialized image caption begins with `论文原图编号：`.
+
+`原文摘要翻译` is a faithful Chinese translation of the source abstract. Preserve its meaning and scope; contribution claims, result interpretation, and hindsight judgment belong later unless the source abstract itself contains them.
+
 ## English note schema
 
 Use these top-level sections in this order:

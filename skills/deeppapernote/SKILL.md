@@ -38,6 +38,7 @@ Bind that exact value through Figure Plan → Figure/Table Decisions → Synthes
 This contract is complete only when every named stage is bound to the resolved value and Formal Save validates the final bytes. Read `references/output-language.md` for profile content while drafting or debugging either language.
 
 This skill is intentionally narrow:
+- it is one canonical Skill and one pipeline with two output profiles
 - it handles one paper at a time
 - it does not update daily reading lists
 - it does not treat a shallow abstract rewrite as a successful output
