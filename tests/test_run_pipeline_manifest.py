@@ -62,6 +62,7 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     identity_trace_path = workdir / "paper_identity_repair_trace.json"
     raw_sections_path = workdir / "paper_raw_sections.jsonl"
     evidence_path = workdir / "paper_evidence.json"
+    figures_path = workdir / "paper_figures.json"
     decisions_path = workdir / "paper_figure_table_decisions.json"
     bundle_path = workdir / "paper_bundle.json"
     assert identity_path.exists()
@@ -76,6 +77,7 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     identity_trace = json.loads(identity_trace_path.read_text(encoding="utf-8"))
     source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    figures = json.loads(figures_path.read_text(encoding="utf-8"))
     decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
 
@@ -90,6 +92,10 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     assert source_manifest["identity_contract"]["identity_verdict"] == "accepted"
     assert any(section["section_id"] == "sec:method" for section in source_manifest["sections"])
     assert evidence["summary"]["source_corpus_used"] is True
+    assert figures["output_language"] == "zh-CN"
+    assert decisions["output_language"] == "zh-CN"
+    assert bundle["output_language"] == "zh-CN"
+    assert bundle["writing_contract"]["language"] == "zh-CN"
     assert {item["source_id"] for item in decisions["decisions"]} == {"Figure 1", "Table 1"}
     assert bundle["source_manifest"]["raw_sections_path"] == str(raw_sections_path.resolve())
     assert bundle["identity_contract"]["identity_verdict"] == "accepted"

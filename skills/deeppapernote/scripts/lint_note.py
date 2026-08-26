@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -16,7 +17,7 @@ from contracts import (
     WRITING_CONTRACT_RULES,
     required_field_value_error,
 )
-from localization import note_schema, normalize_output_language
+from localization import note_schema, normalize_output_language, require_artifact_output_language
 
 ACTIVE_LANGUAGE = "zh-CN"
 SCHEMA: dict = {}
@@ -246,7 +247,10 @@ def resolve_note_plan_path(note_path: Path, plan_file: str) -> Path:
     return note_path.with_suffix(".plan.json")
 
 
-def inspect_note_plan(plan_path: Path) -> tuple[bool, list[str]]:
+def inspect_note_plan(
+    plan_path: Path,
+    output_language: str | None = None,
+) -> tuple[bool, list[str]]:
     if not plan_path.exists():
         return False, ["planning_artifact_missing"]
 
@@ -259,6 +263,14 @@ def inspect_note_plan(plan_path: Path) -> tuple[bool, list[str]]:
         return True, ["planning_required_fields_invalid"]
 
     issues: list[str] = []
+    try:
+        require_artifact_output_language(
+            plan,
+            "Note Plan",
+            output_language or ACTIVE_LANGUAGE,
+        )
+    except ValueError as exc:
+        issues.append(f"planning_output_language_contract_failed: {exc}")
     missing_fields = [field for field in NOTE_PLAN_REQUIRED_FIELDS if field not in plan]
     if missing_fields:
         issues.append("planning_required_fields_missing")
@@ -1600,7 +1612,8 @@ def main() -> None:
     reference_hygiene_issues = inspect_reference_hygiene(text)
     substantive_issues = inspect_substantive_content(text)
     planning_artifact_found, planning_artifact_issues = inspect_note_plan(
-        resolve_note_plan_path(path, args.plan_file)
+        resolve_note_plan_path(path, args.plan_file),
+        output_language,
     )
     warnings.extend(inspect_figure_callouts(text))
     for issue in figure_issues:
@@ -1651,6 +1664,7 @@ def main() -> None:
         "output_language": output_language,
         "paper_id": args.paper_id,
         "input_path": str(path),
+        "note_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
         "headers": headers,
         "missing_sections": missing_sections,
         "warnings": warnings,

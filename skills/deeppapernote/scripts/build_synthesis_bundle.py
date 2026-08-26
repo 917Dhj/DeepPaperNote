@@ -20,7 +20,7 @@ from contracts import (
     paper_type_contracts,
     writing_contract_rules,
 )
-from localization import normalize_output_language
+from localization import normalize_output_language, require_artifact_output_language
 
 
 def parser() -> argparse.ArgumentParser:
@@ -360,8 +360,11 @@ def compact_writing_contract(language: str | None = None) -> dict:
         "figure_labels": dict(rules["figure_labels"]),
         "mechanism_flow_heading": rules["mechanism_flow_heading"],
         "note_plan_contract": {
-            "required_fields": list(NOTE_PLAN_REQUIRED_FIELDS),
-            "field_types": dict(rules["note_plan_field_types"]),
+            "required_fields": ["output_language", *NOTE_PLAN_REQUIRED_FIELDS],
+            "field_types": {
+                "output_language": "string",
+                **dict(rules["note_plan_field_types"]),
+            },
             "required_field_checks": deepcopy(
                 rules["note_plan_required_field_checks"]
             ),
@@ -439,12 +442,23 @@ def bundle(
     figure_decisions_wrapper = figure_decisions_wrapper or {}
     config = runtime_config(cli_overrides={"output_language": output_language or ""})
     resolved_output_language = normalize_output_language(config["output_language"])
+    require_artifact_output_language(
+        figures_wrapper,
+        "Figure Plan",
+        resolved_output_language,
+    )
+    require_artifact_output_language(
+        figure_decisions_wrapper,
+        "Figure/Table Decisions",
+        resolved_output_language,
+    )
     identity_contract = identity_contract_summary(metadata, source_manifest)
     canonical_metadata = accepted_bundle_metadata(metadata, identity_contract)
 
     return {
         "status": "ok",
         "script": "build_synthesis_bundle.py",
+        "output_language": resolved_output_language,
         "paper_id": identity_contract.get("paper_id")
         or canonical_metadata.get("paper_id")
         or evidence_wrapper.get("paper_id", ""),

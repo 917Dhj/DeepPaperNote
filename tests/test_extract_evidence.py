@@ -24,6 +24,10 @@ EXTRACT_EVIDENCE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" 
 
 
 def bundle(*, metadata: dict, source_manifest: dict | None = None, **kwargs) -> dict:
+    if not kwargs.get("figures_wrapper"):
+        kwargs["figures_wrapper"] = {"output_language": "zh-CN", "figure_plan": {}}
+    if not kwargs.get("figure_decisions_wrapper"):
+        kwargs["figure_decisions_wrapper"] = {"output_language": "zh-CN", "decisions": []}
     manifest = dict(source_manifest or {})
     if "identity_contract" not in manifest:
         title = str(metadata.get("title", ""))

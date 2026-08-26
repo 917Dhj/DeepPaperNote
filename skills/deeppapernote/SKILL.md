@@ -24,11 +24,18 @@ English trigger examples:
 
 Before a normal paper run, read `references/user-configuration.md` for configuration admission, migration, repair, Run Overrides, and Preference Changes.
 
-## Output Language
+## Language Integrity Contract
 
-DeepPaperNote supports `zh-CN` and `en`. Resolve it through User Configuration and Run Overrides; neither language nor save mode has a silent default.
+After Configuration Readiness, resolve one `output_language` (`zh-CN` or `en`) for the run. `source_manifest.language_hint` describes source text only and never selects the note profile.
 
-The synthesis bundle's `writing_contract.language`, localized sections, metadata fields, figure labels, and mechanism-flow heading are authoritative for drafting and linting. Never draft in one language and validate it under another. Read `references/output-language.md` when drafting or debugging either language profile.
+Bind that exact value through Figure Plan → Figure/Table Decisions → Synthesis Bundle → Note Plan → Grounding Lint → Final Note Lint → Final Quality Review → Final Readability Review → Formal Save:
+
+- Every JSON artifact in the chain carries a top-level `output_language`; the Synthesis Bundle also carries the same value at `writing_contract.language`.
+- Before producing its output, every adjacent consumer requires each input language and compares it with the resolved value. Missing, unsupported, or mismatched values stop the run; no stage infers or defaults an artifact language.
+- Final Quality Review and Final Readability Review each receive the resolved value and check the note against only that profile.
+- Final Note Lint records `note_sha256`. Any review edit invalidates the prior lint, so rerun Final Note Lint under the same language. Formal Save requires the lint language and `note_sha256` to match the final note, and validates Figure/Table Decisions language before any save side effect.
+
+This contract is complete only when every named stage is bound to the resolved value and Formal Save validates the final bytes. Read `references/output-language.md` for profile content while drafting or debugging either language.
 
 This skill is intentionally narrow:
 - it handles one paper at a time
@@ -67,7 +74,7 @@ Follow this order:
 7. plan figure placement
 8. build the full figure/table decision table
 9. build the manifest synthesis bundle
-10. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract
+10. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract, including its exact `output_language`
 11. draft from the plan only after the grounding gate passes
 12. have the model write the note
 13. lint the final note against the same `note_plan` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 14, 15, or 16
@@ -112,7 +119,6 @@ Non-negotiable rules:
 - abstract fidelity: preserve the original abstract's meaning without adding later evidence or model judgments; translate it in `zh-CN` mode and render it faithfully in English in `en` mode
 - mechanism depth: method, framework, and system papers should include the localized mechanism-flow subsection under the localized method section, normally as a 3 to 4 step numbered flow with input, operation, and output destination
 - placeholder-first figures: plan major figure/table placeholders first; replace one only when identity match and visual usability are both strong; otherwise keep the placeholder
-- final quality gates: lint is a floor; after lint passes, first run `final_quality_review` for analytical depth, then run `final_readability_review` for language polish, and rerun lint if either review edits the note
 
 Reference usage policy:
 - do not load every reference file by default

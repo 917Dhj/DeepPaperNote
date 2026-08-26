@@ -36,6 +36,26 @@ def normalize_output_language(value: str | None = None) -> str:
         raise ValueError(f"Unsupported DeepPaperNote output language: {raw}. Choose one of: {', '.join(SUPPORTED_OUTPUT_LANGUAGES)}.")
     return normalized
 
+
+def require_artifact_output_language(
+    artifact: dict[str, Any],
+    artifact_name: str,
+    expected: str,
+) -> str:
+    language = artifact.get("output_language")
+    if language not in SUPPORTED_OUTPUT_LANGUAGES:
+        raise ValueError(
+            f"{artifact_name} requires output_language with one of: "
+            f"{', '.join(SUPPORTED_OUTPUT_LANGUAGES)}."
+        )
+    resolved = normalize_output_language(expected)
+    if language != resolved:
+        raise ValueError(
+            f"{artifact_name} output_language {language} does not match "
+            f"resolved output_language {resolved}."
+        )
+    return str(language)
+
 def note_schema(language: str | None = None) -> dict[str, Any]:
     return deepcopy(_SCHEMAS[normalize_output_language(language)])
 

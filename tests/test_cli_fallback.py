@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -257,6 +258,7 @@ def test_write_note_refuses_when_math_gate_fails(tmp_path: Path) -> None:
     lint_path.write_text(
         json.dumps(
             {
+                "output_language": "zh-CN",
                 "passes_basic_structure": True,
                 "passes_style_gate": True,
                 "passes_math_gate": False,
@@ -288,7 +290,9 @@ def test_write_note_refuses_when_math_gate_fails(tmp_path: Path) -> None:
     assert "math gate failed" in result.stderr
 
 
-def test_write_note_accepts_legacy_lint_json_without_figure_gate(tmp_path: Path) -> None:
+def test_write_note_rejects_legacy_lint_json_without_output_language_before_save(
+    tmp_path: Path,
+) -> None:
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(
         json.dumps(
@@ -318,12 +322,94 @@ def test_write_note_accepts_legacy_lint_json_without_figure_gate(tmp_path: Path)
         ],
         cwd=tmp_path,
         env=env,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
     )
-    payload = json.loads(result.stdout)
-    assert Path(payload["note_path"]).exists()
+    assert result.returncode != 0
+    assert "lint artifact requires output_language" in result.stderr
+    assert not (tmp_path / "DeepPaperNote_output").exists()
+
+
+def test_write_note_rejects_note_edited_after_final_lint_before_save(
+    tmp_path: Path,
+) -> None:
+    linted_note = "# Final Review Test\n\nLinted body.\n"
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "note_sha256": hashlib.sha256(linted_note.encode("utf-8")).hexdigest(),
+                "passes_basic_structure": True,
+                "passes_style_gate": True,
+                "passes_math_gate": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
+    env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
+    env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WRITE_SCRIPT),
+            "--title",
+            "Final Review Test",
+            "--content",
+            linted_note.replace("Linted", "Reviewed"),
+            "--lint-json",
+            str(lint_path),
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "changed after Final Note Lint" in result.stderr
+    assert not (tmp_path / "DeepPaperNote_output").exists()
+
+
+def test_write_note_rejects_mismatched_figure_decisions_before_save_side_effects(
+    tmp_path: Path,
+) -> None:
+    decisions_path = tmp_path / "decisions.json"
+    decisions_path.write_text(
+        json.dumps({"output_language": "en", "decisions": []}),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
+    env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
+    env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WRITE_SCRIPT),
+            "--title",
+            "Language Mismatch",
+            "--content",
+            "# Language Mismatch\n",
+            "--figure-decisions",
+            str(decisions_path),
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "does not match resolved output_language zh-CN" in result.stderr
+    assert not (tmp_path / "DeepPaperNote_output").exists()
 
 
 def test_write_note_refuses_when_reference_hygiene_gate_fails(tmp_path: Path) -> None:
@@ -331,6 +417,7 @@ def test_write_note_refuses_when_reference_hygiene_gate_fails(tmp_path: Path) ->
     lint_path.write_text(
         json.dumps(
             {
+                "output_language": "zh-CN",
                 "passes_basic_structure": True,
                 "passes_style_gate": True,
                 "passes_math_gate": True,
@@ -396,6 +483,7 @@ def test_write_note_refuses_when_figure_gate_fails(tmp_path: Path) -> None:
     lint_path.write_text(
         json.dumps(
             {
+                "output_language": "zh-CN",
                 "passes_basic_structure": True,
                 "passes_style_gate": True,
                 "passes_math_gate": True,

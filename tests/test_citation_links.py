@@ -299,8 +299,9 @@ def test_bundle_exposes_reference_candidates_under_references(monkeypatch) -> No
                 ]
             }
         },
-        figures_wrapper={},
+        figures_wrapper={"output_language": "zh-CN", "figure_plan": {}},
         assets_wrapper={},
+        figure_decisions_wrapper={"output_language": "zh-CN", "decisions": []},
         source_manifest={
             "identity_contract": {
                 "artifact_type": "canonical_identity",
@@ -338,8 +339,9 @@ def test_bundle_reuses_cli_language_configuration_for_reference_resolution(monke
                 "reference_candidates": [{"display_text": "Unknown Paper."}]
             }
         },
-        figures_wrapper={},
+        figures_wrapper={"output_language": "en", "figure_plan": {}},
         assets_wrapper={},
+        figure_decisions_wrapper={"output_language": "en", "decisions": []},
         source_manifest={
             "identity_contract": {
                 "artifact_type": "canonical_identity",

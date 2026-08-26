@@ -9,7 +9,7 @@ import pytest
 
 from build_synthesis_bundle import compact_writing_contract
 from lint_grounding import validate_note_plan
-from localization import normalize_output_language, required_sections
+from localization import normalize_output_language, require_artifact_output_language, required_sections
 from plan_figures import build_figure_items
 
 
@@ -109,6 +109,7 @@ The state-record design is reusable in evidence-first paper workflows because it
 
 def plan_payload() -> dict:
     return {
+        "output_language": "en",
         "paper_type": "AI_method",
         "paper_type_rationale": "The paper proposes and evaluates a model mechanism.",
         "dominant_domain": "reasoning",
@@ -136,6 +137,17 @@ def test_language_aliases_and_invalid_value() -> None:
     assert normalize_output_language("zh") == "zh-CN"
     with pytest.raises(ValueError):
         normalize_output_language("fr")
+
+
+def test_artifact_language_requires_exact_supported_value() -> None:
+    with pytest.raises(ValueError, match="requires output_language"):
+        require_artifact_output_language({}, "Note Plan", "zh-CN")
+    with pytest.raises(ValueError, match="requires output_language"):
+        require_artifact_output_language(
+            {"output_language": "English"},
+            "Note Plan",
+            "en",
+        )
 
 
 def test_english_contract_exposes_localized_schema() -> None:

@@ -91,6 +91,7 @@ def _valid_note_text() -> str:
 
 def _valid_plan_payload() -> dict:
     return {
+        "output_language": "zh-CN",
         "paper_type": "AI_method",
         "paper_type_rationale": "The paper proposes a model mechanism and evaluates it experimentally.",
         "dominant_domain": "reasoning",
@@ -957,6 +958,32 @@ def test_note_plan_missing_fails_plan_gate(tmp_path) -> None:
     assert payload["passes_plan_gate"] is False
 
 
+def test_note_plan_language_mismatch_fails_plan_gate(tmp_path) -> None:
+    note_path = tmp_path / "Paper.md"
+    plan_path = tmp_path / "Paper.plan.json"
+    note_path.write_text(_valid_note_text(), encoding="utf-8")
+    plan = _valid_plan_payload()
+    plan["output_language"] = "en"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "lint_note.py"
+    result = subprocess.run(
+        [sys.executable, str(script_path), "--input", str(note_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["output_language"] == "zh-CN"
+    assert payload["passes_plan_gate"] is False
+    assert any(
+        issue.startswith("planning_output_language_contract_failed:")
+        for issue in payload["planning_artifact_issues"]
+    )
+    assert len(payload["note_sha256"]) == 64
+
+
 def test_mechanical_translation_artifacts_fail_style_gate(tmp_path) -> None:
     note_path = tmp_path / "Paper.md"
     plan_path = tmp_path / "Paper.plan.json"
@@ -1023,8 +1050,9 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
     note_path.write_text(_valid_note_text(), encoding="utf-8")
     plan_path.write_text(
         json.dumps(
-            {
-                "paper_type": "",
+                {
+                    "output_language": "zh-CN",
+                    "paper_type": "",
                 "paper_type_rationale": "",
                 "dominant_domain": "   ",
                 "must_cover": [],
@@ -1078,8 +1106,9 @@ def test_note_plan_explicit_not_reported_entries_pass_plan_gate(tmp_path) -> Non
     note_path.write_text(_valid_note_text(), encoding="utf-8")
     plan_path.write_text(
         json.dumps(
-            {
-                "paper_type": "AI_method",
+                {
+                    "output_language": "zh-CN",
+                    "paper_type": "AI_method",
                 "paper_type_rationale": "The paper proposes a model mechanism and evaluates it experimentally.",
                 "dominant_domain": "reasoning",
                 "must_cover": ["方法主线"],
@@ -1123,8 +1152,9 @@ def test_write_obsidian_note_refuses_failed_plan_gate(tmp_path) -> None:
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(
         json.dumps(
-            {
-                "passes_basic_structure": True,
+                {
+                    "output_language": "zh-CN",
+                    "passes_basic_structure": True,
                 "passes_style_gate": True,
                 "passes_math_gate": True,
                 "passes_figure_gate": True,
@@ -1162,8 +1192,9 @@ def test_write_obsidian_note_reports_lint_warning_details(tmp_path) -> None:
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(
         json.dumps(
-            {
-                "passes_basic_structure": True,
+                {
+                    "output_language": "zh-CN",
+                    "passes_basic_structure": True,
                 "passes_style_gate": False,
                 "passes_math_gate": True,
                 "warnings": ["mixed_language_lines_present"],
@@ -1281,8 +1312,9 @@ def test_write_obsidian_note_refuses_failed_substantive_gate(tmp_path) -> None:
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(
         json.dumps(
-            {
-                "passes_basic_structure": True,
+                {
+                    "output_language": "zh-CN",
+                    "passes_basic_structure": True,
                 "passes_style_gate": True,
                 "passes_math_gate": True,
                 "passes_figure_gate": True,
@@ -1315,8 +1347,10 @@ def test_write_obsidian_note_refuses_failed_substantive_gate(tmp_path) -> None:
     assert "substantive content gate failed" in result.stderr
 
 
-def passing_lint_payload() -> dict:
+def passing_lint_payload(note_text: str) -> dict:
     return {
+        "output_language": "zh-CN",
+        "note_sha256": hashlib.sha256(note_text.encode("utf-8")).hexdigest(),
         "passes_basic_structure": True,
         "passes_style_gate": True,
         "passes_math_gate": True,
@@ -1349,12 +1383,14 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
     digest = hashlib.sha256(b"fake-png").hexdigest()
+    note_text = "# Figure Insert Paper\n\n![Figure 1](images/page_001_fig_figure_1.png)\n*Fig. 1 caption.*\n"
     lint_path = tmp_path / "lint.json"
-    lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
+    lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
     decisions_path.write_text(
         json.dumps(
             {
+                "output_language": "zh-CN",
                 "decisions": [
                     {
                         "source_id": "Figure 1",
@@ -1392,7 +1428,7 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
             "--subdir",
             "Research/Papers/Figure Insert Paper",
             "--content",
-            "# Figure Insert Paper\n\n![Figure 1](images/page_001_fig_figure_1.png)\n*Fig. 1 caption.*\n",
+            note_text,
             "--lint-json",
             str(lint_path),
             "--figure-decisions",
@@ -1420,12 +1456,14 @@ def test_write_obsidian_note_rejects_stale_reviewed_insert_bytes(tmp_path) -> No
     source_image = tmp_path / "page_001_fig_figure_1.png"
     reviewed_digest = hashlib.sha256(b"reviewed").hexdigest()
     source_image.write_bytes(b"changed-after-review")
+    note_text = "# Stale Figure Review\n\n![Figure 1](images/page_001_fig_figure_1.png)\n*Fig. 1 caption.*\n"
     lint_path = tmp_path / "lint.json"
-    lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
+    lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
     decisions_path.write_text(
         json.dumps(
             {
+                "output_language": "zh-CN",
                 "decisions": [
                     {
                         "source_id": "Figure 1",
@@ -1464,7 +1502,7 @@ def test_write_obsidian_note_rejects_stale_reviewed_insert_bytes(tmp_path) -> No
             "--title",
             "Stale Figure Review",
             "--content",
-            "# Stale Figure Review\n\n![Figure 1](images/page_001_fig_figure_1.png)\n*Fig. 1 caption.*\n",
+            note_text,
             "--lint-json",
             str(lint_path),
             "--figure-decisions",
@@ -1485,12 +1523,14 @@ def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> N
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
+    note_text = "# Figure Insert Paper\n\n正文没有引用图片。\n"
     lint_path = tmp_path / "lint.json"
-    lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
+    lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
     decisions_path.write_text(
         json.dumps(
             {
+                "output_language": "zh-CN",
                 "decisions": [
                     {
                         "source_id": "Figure 1",
@@ -1513,7 +1553,7 @@ def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> N
             "--title",
             "Figure Insert Paper",
             "--content",
-            "# Figure Insert Paper\n\n正文没有引用图片。\n",
+            note_text,
             "--lint-json",
             str(lint_path),
             "--figure-decisions",
@@ -1534,12 +1574,14 @@ def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) ->
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
+    note_text = "# Figure Insert Paper\n\n正文只提到 images/page_001_fig_figure_1.png 这个路径。\n"
     lint_path = tmp_path / "lint.json"
-    lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
+    lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
     decisions_path.write_text(
         json.dumps(
             {
+                "output_language": "zh-CN",
                 "decisions": [
                     {
                         "source_id": "Figure 1",
@@ -1562,7 +1604,7 @@ def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) ->
             "--title",
             "Figure Insert Paper",
             "--content",
-            "# Figure Insert Paper\n\n正文只提到 images/page_001_fig_figure_1.png 这个路径。\n",
+            note_text,
             "--lint-json",
             str(lint_path),
             "--figure-decisions",
@@ -1583,12 +1625,14 @@ def test_write_obsidian_note_rejects_unsafe_insert_filename(tmp_path) -> None:
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
+    note_text = "# Figure Insert Paper\n\n![Figure 1](images/../escaped.png)\n*Fig. 1 caption.*\n"
     lint_path = tmp_path / "lint.json"
-    lint_path.write_text(json.dumps(passing_lint_payload()), encoding="utf-8")
+    lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
     decisions_path.write_text(
         json.dumps(
             {
+                "output_language": "zh-CN",
                 "decisions": [
                     {
                         "source_id": "Figure 1",
@@ -1611,7 +1655,7 @@ def test_write_obsidian_note_rejects_unsafe_insert_filename(tmp_path) -> None:
             "--title",
             "Figure Insert Paper",
             "--content",
-            "# Figure Insert Paper\n\n![Figure 1](images/../escaped.png)\n*Fig. 1 caption.*\n",
+            note_text,
             "--lint-json",
             str(lint_path),
             "--figure-decisions",
@@ -1691,8 +1735,9 @@ def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
     plan_path = tmp_path / "note.plan.json"
     plan_path.write_text(
         json.dumps(
-            {
-                "paper_type": "AI_method",
+                {
+                    "output_language": "zh-CN",
+                    "paper_type": "AI_method",
                 "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": "method",
@@ -1720,8 +1765,9 @@ def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
     plan_path = tmp_path / "note.plan.json"
     plan_path.write_text(
         json.dumps(
-            {
-                "paper_type": "AI_method",
+                {
+                    "output_language": "zh-CN",
+                    "paper_type": "AI_method",
                 "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": [],
@@ -1761,8 +1807,9 @@ def test_inspect_note_plan_accepts_valid_plan(tmp_path) -> None:
     plan_path = tmp_path / "note.plan.json"
     plan_path.write_text(
         json.dumps(
-            {
-                "paper_type": "AI_method",
+                {
+                    "output_language": "zh-CN",
+                    "paper_type": "AI_method",
                 "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": ["方法主线"],

@@ -207,6 +207,8 @@ def main() -> None:
             str(figures_json),
             "--assets",
             str(assets_json),
+            "--language",
+            args.language,
             "--output",
             str(figure_decisions_json),
         ],

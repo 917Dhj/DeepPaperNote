@@ -40,6 +40,7 @@ def run_decisions(
     figures: dict,
     assets: dict | None = None,
 ) -> dict:
+    figures = {"output_language": "zh-CN", **figures}
     source_path = write_json(tmp_path / "source_manifest.json", source_manifest)
     figures_path = write_json(tmp_path / "figures.json", figures)
     output_path = tmp_path / "figure_table_decisions.json"
@@ -66,6 +67,7 @@ def run_review_decisions(
     *,
     check: bool = True,
 ) -> tuple[subprocess.CompletedProcess[str], dict | None]:
+    decisions = {"output_language": "zh-CN", **decisions}
     decisions_path = write_json(tmp_path / "review_decisions.json", decisions)
     output_path = tmp_path / "reviewed_decisions.json"
     result = subprocess.run(
@@ -113,6 +115,7 @@ def test_figure_table_decisions_cover_every_caption(tmp_path: Path) -> None:
         },
     }
     figures = {
+        "output_language": "zh-CN",
         "figure_plan": {
             "figures": [
                 {
@@ -142,6 +145,36 @@ def test_figure_table_decisions_cover_every_caption(tmp_path: Path) -> None:
     assert decisions["Table 1"]["decision"] == "placeholder"
     assert decisions["Figure 2"]["decision"] == "low_priority"
     assert payload["summary"]["total_items"] == 3
+    assert payload["output_language"] == "zh-CN"
+
+
+def test_figure_table_decisions_reject_mismatched_figure_plan_language(
+    tmp_path: Path,
+) -> None:
+    source_path = write_json(tmp_path / "source_manifest.json", {"captions": {}})
+    figures_path = write_json(
+        tmp_path / "figures.json",
+        {"output_language": "en", "figure_plan": {"figures": []}},
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(DECISIONS_SCRIPT),
+            "--source-manifest",
+            str(source_path),
+            "--figures",
+            str(figures_path),
+            "--language",
+            "zh-CN",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "Figure Plan output_language en does not match resolved output_language zh-CN" in result.stderr
 
 
 def test_figure_table_decisions_cover_source_corpus_captions(tmp_path: Path) -> None:

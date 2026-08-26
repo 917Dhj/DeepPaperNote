@@ -41,6 +41,6 @@ Use `### Analytical Flow` for the mechanism-flow subsection. Each figure placeho
 
 For a materialized image, use the normal image embed followed immediately by one italic caption beginning with `Original paper item:`.
 
-## Validation invariant
+## Contract ownership
 
-The bundle language, drafted note language, lint language, and save language must match. Do not reuse a passing lint artifact from another language.
+`SKILL.md` owns the cross-stage Language Integrity Contract. This reference owns only the profile-specific schema and labels above; apply them under the resolved language carried by that contract.

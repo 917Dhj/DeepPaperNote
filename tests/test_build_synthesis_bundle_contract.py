@@ -4,8 +4,46 @@ import json
 
 import pytest
 
-from build_synthesis_bundle import bundle
+from build_synthesis_bundle import bundle as build_bundle
 from contracts import WRITING_CONTRACT_RULES
+
+
+def accepted_source_manifest() -> dict:
+    return {
+        "paper_id": "paper:contract",
+        "identity_contract": {
+            "artifact_type": "canonical_identity",
+            "schema_version": 2,
+            "paper_id": "paper:contract",
+            "identity_verdict": "accepted",
+            "work_level_identity": {"title": "Contract Paper"},
+            "accepted_metadata": {"title": "Contract Paper"},
+        },
+    }
+
+
+def bundle(*args: object, **kwargs: object) -> dict:
+    if not kwargs.get("figures_wrapper"):
+        kwargs["figures_wrapper"] = {"output_language": "zh-CN", "figure_plan": {}}
+    if not kwargs.get("figure_decisions_wrapper"):
+        kwargs["figure_decisions_wrapper"] = {"output_language": "zh-CN", "decisions": []}
+    return build_bundle(*args, **kwargs)
+
+
+def test_bundle_rejects_mismatched_adjacent_artifact_language() -> None:
+    with pytest.raises(
+        ValueError,
+        match="Figure Plan output_language en does not match resolved output_language zh-CN",
+    ):
+        bundle(
+            metadata={"title": "Contract Paper"},
+            evidence_wrapper={"evidence_pack": {}},
+            figures_wrapper={"output_language": "en", "figure_plan": {}},
+            assets_wrapper={},
+            source_manifest=accepted_source_manifest(),
+            figure_decisions_wrapper={"output_language": "zh-CN", "decisions": []},
+            output_language="zh-CN",
+        )
 
 
 def test_bundle_refuses_raw_metadata_without_an_identity_contract() -> None:

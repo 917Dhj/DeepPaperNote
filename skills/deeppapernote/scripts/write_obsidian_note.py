@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -22,7 +23,7 @@ from common import (
     runtime_config,
 )
 from lint_note import inspect_reference_hygiene
-from localization import normalize_output_language
+from localization import normalize_output_language, require_artifact_output_language
 
 
 def parser() -> argparse.ArgumentParser:
@@ -216,17 +217,16 @@ def main() -> None:
     if not title:
         raise SystemExit("write_obsidian_note.py requires --title or metadata with a title.")
 
+    lint: dict = {}
     if args.lint_json:
         lint_path = str(Path(args.lint_json).expanduser().resolve())
         # utf-8-sig tolerates a BOM in the lint JSON (e.g. produced/edited on
         # Windows) that would otherwise crash json.loads before any gate check.
         lint = json.loads(Path(lint_path).read_text(encoding="utf-8-sig"))
-        lint_language = str(lint.get("output_language", "")).strip()
-        if lint_language and lint_language != output_language:
-            raise SystemExit(
-                f"write_obsidian_note.py refused to write note because lint language "
-                f"{lint_language} does not match requested language {output_language}."
-            )
+        try:
+            require_artifact_output_language(lint, "lint artifact", output_language)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
         require_lint_gate(lint, "passes_basic_structure", "basic structure", lint_path)
         require_lint_gate(lint, "passes_style_gate", "style", lint_path)
         require_lint_gate(lint, "passes_math_gate", "math", lint_path)
@@ -249,7 +249,32 @@ def main() -> None:
         note_text = sys.stdin.read()
     else:
         raise SystemExit("write_obsidian_note.py requires --content-file, --content, or --stdin.")
+    if lint:
+        lint_note_sha256 = str(lint.get("note_sha256", "")).strip()
+        if not lint_note_sha256:
+            raise SystemExit("lint artifact requires note_sha256.")
+        note_sha256 = hashlib.sha256(note_text.encode("utf-8")).hexdigest()
+        if lint_note_sha256 != note_sha256:
+            raise SystemExit(
+                "write_obsidian_note.py refused to write note because the final note "
+                "changed after Final Note Lint; rerun lint under the same output_language."
+            )
     require_reference_hygiene(note_text, "before save")
+
+    if lint and not args.figure_decisions:
+        raise SystemExit("Formal Save requires Figure/Table Decisions with output_language.")
+    figure_decisions = maybe_load_json_record(args.figure_decisions) if args.figure_decisions else {}
+    if args.figure_decisions and figure_decisions is None:
+        raise SystemExit(f"Expected JSON object for --figure-decisions: {args.figure_decisions}")
+    if figure_decisions:
+        try:
+            require_artifact_output_language(
+                figure_decisions,
+                "Figure/Table Decisions",
+                output_language,
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
 
     resolved_subdir = resolve_domain_subdir(
         config,
@@ -267,9 +292,6 @@ def main() -> None:
     asset_dir = resolve_note_asset_dir(target_path, args.asset_subdir)
     asset_subdir = asset_dir.relative_to(target_path.parent).as_posix()
     ensure_parent(target_path)
-    figure_decisions = maybe_load_json_record(args.figure_decisions) if args.figure_decisions else {}
-    if args.figure_decisions and figure_decisions is None:
-        raise SystemExit(f"Expected JSON object for --figure-decisions: {args.figure_decisions}")
     materialized_figures = (
         materialize_insert_decisions(
             note_text,
