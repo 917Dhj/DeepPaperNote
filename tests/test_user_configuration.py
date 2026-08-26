@@ -15,11 +15,21 @@ from user_configuration import (
     inspect_configuration,
     persist_preferences,
     resolve_preferences,
+    user_config_path,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_SCRIPT = PROJECT_ROOT / "skills/deeppapernote/scripts/user_configuration.py"
 ENVIRONMENT_SCRIPT = PROJECT_ROOT / "skills/deeppapernote/scripts/check_environment.py"
+
+
+def test_user_config_path_honors_process_isolation_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    isolated_path = tmp_path / "isolated" / "config.json"
+    monkeypatch.setenv("DEEPPAPERNOTE_CONFIG_PATH", str(isolated_path))
+
+    assert user_config_path() == isolated_path
 
 
 def test_first_use_requests_one_workspace_prompt_batch(tmp_path: Path) -> None:
@@ -500,6 +510,10 @@ def test_output_language_reference_matches_both_machine_schemas() -> None:
 def test_configuration_cli_keeps_semantic_failures_repairable(
     configured_user_home: Path,
 ) -> None:
+    configured_user_home.write_text(
+        json.dumps({"output_language": "zh-CN", "save_mode": "workspace"}),
+        encoding="utf-8",
+    )
     result = subprocess.run(
         [sys.executable, str(CONFIG_SCRIPT), "--set-save-mode", "obsidian"],
         env=os.environ.copy(),
@@ -520,7 +534,7 @@ def test_environment_report_survives_missing_user_configuration(
     home = tmp_path / "empty-home"
     home.mkdir()
     env = os.environ.copy()
-    env["HOME"] = str(home)
+    env["DEEPPAPERNOTE_CONFIG_PATH"] = str(home / ".deeppapernote" / "config.json")
     result = subprocess.run(
         [sys.executable, str(ENVIRONMENT_SCRIPT)],
         env=env,

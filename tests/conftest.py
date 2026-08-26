@@ -15,11 +15,24 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 @pytest.fixture(autouse=True)
 def configured_user_home(tmp_path: Path, monkeypatch) -> Path:
-    monkeypatch.setenv("HOME", str(tmp_path))
     config_path = tmp_path / ".deeppapernote" / "config.json"
     config_path.parent.mkdir(exist_ok=True)
+    for name in (
+        "DEEPPAPERNOTE_OUTPUT_LANGUAGE",
+        "DEEPPAPERNOTE_SAVE_MODE",
+        "DEEPPAPERNOTE_OBSIDIAN_VAULT",
+        "DEEPPAPERNOTE_PAPERS_DIR",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("DEEPPAPERNOTE_CONFIG_PATH", str(config_path))
     config_path.write_text(
-        json.dumps({"output_language": "zh-CN", "save_mode": "workspace"}),
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "save_mode": "workspace",
+                "papers_dir": "Research/Papers",
+            }
+        ),
         encoding="utf-8",
     )
     return config_path

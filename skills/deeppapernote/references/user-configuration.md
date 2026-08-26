@@ -2,6 +2,8 @@
 
 Use one device-local User Configuration at `~/.deeppapernote/config.json`:
 
+For isolated validation only, `DEEPPAPERNOTE_CONFIG_PATH` may relocate this one file for the current process. It is not a preference, does not create a second configuration layer, and must not be persisted into the configuration itself.
+
 - `output_language`: `zh-CN` or `en`
 - `save_mode`: `workspace` or `obsidian`
 - `obsidian_vault`: existing absolute directory, required only in Obsidian mode

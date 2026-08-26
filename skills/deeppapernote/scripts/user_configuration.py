@@ -42,6 +42,9 @@ class ConfigurationValidationError(ConfigurationWriteError):
 
 
 def user_config_path() -> Path:
+    override = os.environ.get("DEEPPAPERNOTE_CONFIG_PATH", "").strip()
+    if override:
+        return Path(override).expanduser()
     return Path.home() / ".deeppapernote" / "config.json"
 
 
