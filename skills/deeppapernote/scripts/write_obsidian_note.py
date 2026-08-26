@@ -305,7 +305,7 @@ def main() -> None:
         if figure_decisions
         else []
     )
-    Path(target_path).write_text(note_text, encoding="utf-8")
+    Path(target_path).write_text(note_text, encoding="utf-8", newline="\n")
     require_reference_hygiene(Path(target_path).read_text(encoding="utf-8"), "after save")
     asset_dir.mkdir(parents=True, exist_ok=True)
 
