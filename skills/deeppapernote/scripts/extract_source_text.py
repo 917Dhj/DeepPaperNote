@@ -16,6 +16,7 @@ from common import (
     ensure_parent,
     extract_appendix_index,
     extract_caption_lines,
+    file_sha256,
     fitz,
     match_section_heading,
     maybe_load_json_record,
@@ -302,6 +303,7 @@ def build_manifest(
         "schema_version": 1,
         "paper_id": record.get("paper_id") or paper_id_for_record(record),
         "title": record.get("title", ""),
+        "source_sha256": record.get("source_sha256", ""),
         "source_kind": "pdf_text",
         "raw_sections_path": (
             str(Path(raw_sections_output).expanduser().resolve()) if raw_sections_output else ""
@@ -353,6 +355,11 @@ def main() -> None:
     pdf_path = resolve_pdf_path(record)
     if pdf_path is None:
         raise SystemExit("extract_source_text.py requires a resolvable local PDF path.")
+    source_sha256 = file_sha256(pdf_path)
+    reported_source_sha256 = normalize_whitespace(str(record.get("source_sha256", "")))
+    if reported_source_sha256 and reported_source_sha256 != source_sha256:
+        raise SystemExit("extract_source_text.py source_sha256 does not match acquired PDF.")
+    record["source_sha256"] = source_sha256
 
     raw_sections_output = args.raw_sections_output
     if not raw_sections_output and args.output:

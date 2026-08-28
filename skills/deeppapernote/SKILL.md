@@ -30,7 +30,7 @@ Resolve Run Overrides from the explicit request, CLI, and current process enviro
 
 After Configuration Readiness, resolve one `output_language` (`zh-CN` or `en`) for the run. `source_manifest.language_hint` describes source text only and never selects the note profile.
 
-Bind that exact value through Figure Plan → Figure/Table Decisions → Synthesis Bundle → Note Plan → Grounding Lint → Final Note Lint → Final Quality Review → Final Readability Review → Formal Save:
+Bind that exact value through Save Target Admission → Figure Plan → Figure/Table Decisions → Synthesis Bundle → Note Plan → Grounding Lint → Final Note Lint → Final Quality Review → Final Readability Review → Formal Save:
 
 - Every JSON artifact in the chain carries a top-level `output_language`; the Synthesis Bundle also carries the same value at `writing_contract.language`.
 - Before producing its output, every adjacent consumer requires each input language and compares it with the resolved value. Missing, unsupported, or mismatched values stop the run; no stage infers or defaults an artifact language.
@@ -73,17 +73,23 @@ Follow this order:
 3. collect metadata
 4. acquire the best available PDF
 5. extract canonical raw source text: `*_raw_sections.jsonl`, `*_source_manifest.json`, and optional derived `*_full_text.md`
-6. extract structural indexes and PDF assets
-7. plan figure placement
-8. build the full figure/table decision table
-9. build the manifest synthesis bundle
-10. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract, including its exact `output_language`
-11. draft from the plan only after the grounding gate passes
-12. have the model write the note
-13. lint the final note against the same `note_plan` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 14, 15, or 16
-14. perform `final_quality_review` after lint passes
-15. perform `final_readability_review` after the quality review passes
-16. perform Formal Save to the configured target
+6. perform Save Target Admission before drafting or domain routing:
+   - for Obsidian mode, run `scripts/write_obsidian_note.py --preflight` with the resolved title, exact `output_language`, Vault, and `*_source_manifest.json`; this program result is authoritative, so do not replace it with prompt-only duplicate checking
+   - when admission returns `reuse_source_directory` or `reuse_empty_same_name_directory`, use that directory and skip domain selection
+   - when it returns `same_language_note_exists`, stop before drafting and ask whether to overwrite the reported note. If the user approves, rerun preflight with `--overwrite-existing-note --expected-existing-note-sha256 <reported_sha256>` and carry that exact confirmation into Formal Save; if the user declines, stop without writing
+   - for any other blocked conflict, report the returned ambiguity and stop without creating a second directory
+   - workspace mode does not scan an Obsidian Vault and continues through its normal domain routing
+7. extract structural indexes and PDF assets
+8. plan figure placement
+9. build the full figure/table decision table
+10. build the manifest synthesis bundle
+11. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract, including its exact `output_language`
+12. draft from the plan only after the grounding gate passes
+13. have the model write the note
+14. lint the final note against the same `note_plan` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 15, 16, or 17
+15. perform `final_quality_review` after lint passes
+16. perform `final_readability_review` after the quality review passes
+17. perform Formal Save to the admitted target with `scripts/write_obsidian_note.py`, the same Source Manifest, and any user-approved overwrite hash; the script repeats admission before the first save side effect
 
 This is the required workflow for a normal single-paper note request, not a loose suggestion.
 Unless this skill explicitly marks a stage as optional, required stages must not be silently skipped, reordered into a shortcut, or treated as complete just because a partial artifact already exists.

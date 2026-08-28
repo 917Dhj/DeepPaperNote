@@ -3064,8 +3064,15 @@ def infer_domain_label(title: str, abstract: str = "") -> str:
 def is_probable_paper_folder(path: Path) -> bool:
     if not path.is_dir():
         return False
-    marker = path / f"{path.name}.md"
-    return marker.exists()
+    return any(
+        (path / marker).exists()
+        for marker in (
+            f"{path.name}.md",
+            f"{path.name}.zh-CN.md",
+            f"{path.name}.en.md",
+            ".deeppapernote.json",
+        )
+    )
 
 
 def existing_domain_dirs(config: dict[str, Any]) -> list[str]:

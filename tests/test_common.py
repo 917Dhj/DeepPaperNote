@@ -727,7 +727,10 @@ def test_existing_domain_dirs_excludes_root_level_paper_folder(tmp_path: Path) -
     (papers / "大模型").mkdir(parents=True)
     paper_dir = papers / "Attention_Is_All_You_Need"
     paper_dir.mkdir(parents=True)
-    (paper_dir / "Attention_Is_All_You_Need.md").write_text("# note\n", encoding="utf-8")
+    (paper_dir / "Attention_Is_All_You_Need.zh-CN.md").write_text(
+        "# note\n",
+        encoding="utf-8",
+    )
 
     config = {
         "obsidian_vault": str(vault),

@@ -186,7 +186,7 @@ workspace 模式本次不会使用 `obsidian_vault` 与 `papers_dir`，但会保
 
 两种 Profile 的 Abstract 都必须忠实呈现原论文摘要，并使用请求的输出语言；后续创新点和结果解释留在后续章节。同一个 canonical Skill 与一条流水线（one pipeline）会把选定语言一直绑定到 lint 和 Formal Save。
 
-Formal Save 会把 Markdown 笔记与 paper-local `images/` 目录写入选定的 workspace 或 Obsidian 目标。即使没有插入图片，`images/` 仍属于论文保存布局。保存受阻时会报告原目标，不会静默切换模式。
+Formal Save 会把 Markdown 笔记与 paper-local `images/` 目录写入选定的 workspace 或 Obsidian 目标。在 Obsidian 模式下，DeepPaperNote 会为原始 PDF 计算指纹，并在开始写作前搜索整个 Vault；同一来源的 `<paper>.zh-CN.md` 与 `<paper>.en.md` 会共用同一个身份目录。已经存在同语言笔记时绝不会静默覆盖：保存程序会返回原笔记路径与哈希，并要求用户明确确认。目录身份保存在 `.deeppapernote.json` 中；Windows 上还会设置原生 Hidden 属性。即使没有插入图片，`images/` 仍属于论文保存布局；保存受阻时也不会静默切换模式。
 
 ## 🔧 可选增强
 

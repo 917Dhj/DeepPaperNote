@@ -186,7 +186,7 @@ Workspace mode does not use `obsidian_vault` or `papers_dir` for that run, but i
 
 In either profile, Abstract faithfully renders the source abstract in the requested language; later contribution claims and interpretation stay in later sections. The same canonical Skill and one pipeline carry the chosen language through lint and Formal Save.
 
-Formal Save writes the Markdown note and its paper-local `images/` directory to the selected workspace or Obsidian target. The `images/` directory remains part of the saved paper layout even when no image is inserted. A blocked save reports the existing target and never silently switches modes.
+Formal Save writes the Markdown note and its paper-local `images/` directory to the selected workspace or Obsidian target. In Obsidian mode, DeepPaperNote fingerprints the original PDF, searches the entire Vault before drafting, and keeps language variants such as `<paper>.zh-CN.md` and `<paper>.en.md` in one source-identified directory. A same-language note is never silently overwritten: the save reports its path and hash and requires explicit confirmation. The directory identity lives in `.deeppapernote.json`; Windows saves also apply the native Hidden attribute. The `images/` directory remains part of the saved paper layout even when no image is inserted, and a blocked save never silently switches modes.
 
 ## 🔧 Optional Enhancements
 

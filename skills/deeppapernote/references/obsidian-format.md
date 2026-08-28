@@ -16,8 +16,10 @@ Language note: section names, metadata labels, figure callouts, and the mechanis
 Default file name:
 - sanitized English title with underscores
 - default note layout is folder-per-paper:
-  - `<领域>/<paper_slug>/<paper_slug>.md`
+  - `<领域>/<paper_slug>/<paper_slug>.zh-CN.md`
+  - `<领域>/<paper_slug>/<paper_slug>.en.md`
   - `<领域>/<paper_slug>/images/...`
+  - `<领域>/<paper_slug>/.deeppapernote.json`
 - when deciding `<领域>`, prefer matching an existing first-level domain folder under the user's papers directory
 - domain routing uses the editable taxonomy in `references/domain_rules.yaml`: application domains are checked before fallback method domains
 - reuse existing first-level folders conservatively; method-only evidence should not force reuse of an unrelated application folder
@@ -25,6 +27,10 @@ Default file name:
 - do not save new papers directly into the bare papers root
 - always create the paper-local `images/` directory during final save, even if no real image is inserted
 - the paper-local `images/` directory is part of the required note layout, not an optional optimization
+
+The hidden `.deeppapernote.json` sidecar is the program-owned directory identity record. It stores the exact original PDF SHA-256, the frozen note stem, and the language variants already saved in that directory. Keep the dot-prefixed name on every platform; on Windows the save script also applies the native Hidden file attribute and verifies it after each sidecar replacement.
+
+Before an Obsidian draft begins, use the save script's preflight result rather than inspecting names manually. It searches the entire Vault for the source SHA-256 and same-name directories. An exact source match reuses its frozen directory without domain routing; another language is added beside the existing note, while an existing note in the requested language requires explicit hash-bound overwrite confirmation. A nonempty same-name directory without a valid sidecar, a same-name directory for different source bytes, or multiple identity matches fails closed.
 
 If the user already has a vault convention, preserve it.
 

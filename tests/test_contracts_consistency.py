@@ -610,6 +610,17 @@ def test_skill_owns_formal_save_state_policy() -> None:
         assert policy_phrase not in obsidian_format_text
 
 
+def test_skill_requires_programmatic_save_target_admission_before_drafting() -> None:
+    text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    workflow = text.split("## Workflow", 1)[1].split("## Core Execution Contract", 1)[0]
+
+    assert "Save Target Admission" in workflow
+    assert "write_obsidian_note.py --preflight" in workflow
+    assert workflow.index("Save Target Admission") < workflow.index("plan figure placement")
+    assert "same_language_note_exists" in workflow
+    assert "--expected-existing-note-sha256" in workflow
+
+
 def test_topic_references_keep_separate_note_plan_responsibilities() -> None:
     evidence_first = (SKILL_ROOT / "references" / "evidence-first.md").read_text(
         encoding="utf-8"

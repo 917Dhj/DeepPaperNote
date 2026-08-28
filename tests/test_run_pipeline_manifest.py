@@ -18,6 +18,9 @@ import run_pipeline
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RUN_PIPELINE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "run_pipeline.py"
+EXTRACT_SOURCE_SCRIPT = (
+    PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "extract_source_text.py"
+)
 WRITE_NOTE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
 
 
@@ -92,6 +95,7 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     assert identity_trace["repair_attempts"] == []
     assert source_manifest["coverage"]["text_pages_extracted"] == 4
     assert source_manifest["coverage"]["text_truncated"] is False
+    assert source_manifest["source_sha256"] == hashlib.sha256(pdf_path.read_bytes()).hexdigest()
     assert source_manifest["identity_contract"]["identity_verdict"] == "accepted"
     assert any(section["section_id"] == "sec:method" for section in source_manifest["sections"])
     assert evidence["summary"]["source_corpus_used"] is True
@@ -185,6 +189,50 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
         assert result.returncode != 0
         assert expected_error in result.stderr
         assert not (failure_cwd / "saved").exists()
+
+
+def test_extract_source_text_rejects_a_mismatched_acquired_pdf_hash(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    fetch_path = tmp_path / "fetch.json"
+    manifest_path = tmp_path / "paper_source_manifest.json"
+    write_test_pdf(pdf_path)
+    fetch_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "fetch_pdf.py",
+                "paper_id": "paper:hash-mismatch",
+                "title": "Hash Mismatch",
+                "pdf_path": str(pdf_path),
+                "source_sha256": "0" * 64,
+                "identity_contract": {
+                    "artifact_type": "canonical_identity",
+                    "schema_version": 2,
+                    "paper_id": "paper:hash-mismatch",
+                    "identity_verdict": "accepted",
+                    "work_level_identity": {"title": "Hash Mismatch"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_SOURCE_SCRIPT),
+            "--input",
+            str(fetch_path),
+            "--output",
+            str(manifest_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "source_sha256 does not match acquired PDF" in result.stderr
+    assert not manifest_path.exists()
 
 
 def test_run_pipeline_does_not_materialize_before_final_save(

@@ -116,6 +116,15 @@ def _valid_plan_payload() -> dict:
     }
 
 
+def _source_manifest_path(tmp_path: Path) -> Path:
+    path = tmp_path / "source_manifest.json"
+    path.write_text(
+        json.dumps({"status": "ok", "source_sha256": "a" * 64}),
+        encoding="utf-8",
+    )
+    return path
+
+
 def test_reference_hygiene_allows_images_doi_arxiv_and_urls() -> None:
     note = (
         _valid_note_text()
@@ -1175,6 +1184,8 @@ def test_write_obsidian_note_refuses_failed_plan_gate(tmp_path) -> None:
             "# Plan Gate Paper",
             "--lint-json",
             str(lint_path),
+            "--source-manifest",
+            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(tmp_path / "vault"),
         ],
@@ -1215,6 +1226,8 @@ def test_write_obsidian_note_reports_lint_warning_details(tmp_path) -> None:
             "# Style Gate Paper",
             "--lint-json",
             str(lint_path),
+            "--source-manifest",
+            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(tmp_path / "vault"),
         ],
@@ -1336,6 +1349,8 @@ def test_write_obsidian_note_refuses_failed_substantive_gate(tmp_path) -> None:
             "# Substantive Gate Paper",
             "--lint-json",
             str(lint_path),
+            "--source-manifest",
+            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(tmp_path / "vault"),
         ],
@@ -1433,6 +1448,8 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
             str(lint_path),
             "--figure-decisions",
             str(decisions_path),
+            "--source-manifest",
+            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
             "--output",
@@ -1507,6 +1524,8 @@ def test_write_obsidian_note_rejects_stale_reviewed_insert_bytes(tmp_path) -> No
             str(lint_path),
             "--figure-decisions",
             str(decisions_path),
+            "--source-manifest",
+            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
         ],
@@ -1558,6 +1577,8 @@ def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> N
             str(lint_path),
             "--figure-decisions",
             str(decisions_path),
+            "--source-manifest",
+            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
         ],
@@ -1609,6 +1630,8 @@ def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) ->
             str(lint_path),
             "--figure-decisions",
             str(decisions_path),
+            "--source-manifest",
+            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
         ],
@@ -1660,6 +1683,8 @@ def test_write_obsidian_note_rejects_unsafe_insert_filename(tmp_path) -> None:
             str(lint_path),
             "--figure-decisions",
             str(decisions_path),
+            "--source-manifest",
+            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
         ],

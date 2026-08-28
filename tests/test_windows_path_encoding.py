@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ import common
 import lint_grounding
 import lint_note
 import plan_figure_table_decisions
+import write_obsidian_note
 from common import load_json_file, resolve_obsidian_note_path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -50,6 +52,15 @@ def _formal_save_artifacts(tmp_path: Path, canonical_note_text: str) -> tuple[Pa
         encoding="utf-8",
     )
     return lint_path, decisions_path
+
+
+def _source_manifest(tmp_path: Path) -> Path:
+    path = tmp_path / "source-manifest.json"
+    path.write_text(
+        json.dumps({"status": "ok", "source_sha256": "a" * 64}),
+        encoding="utf-8",
+    )
+    return path
 
 
 # --------------------------------------------------------------------------- #
@@ -163,6 +174,30 @@ def test_source_image_filename_handles_backslash_path() -> None:
     assert plan_figure_table_decisions.source_image_filename(plan_item) == "page_004_fig.png"
 
 
+def test_windows_sidecar_hidden_attribute_preserves_existing_attributes(
+    tmp_path: Path,
+) -> None:
+    sidecar = tmp_path / ".deeppapernote.json"
+    sidecar.write_text("{}", encoding="utf-8")
+    attributes = {"value": 0x20}
+
+    def get_attributes(_path: str) -> int:
+        return attributes["value"]
+
+    def set_attributes(_path: str, value: int) -> bool:
+        attributes["value"] = value
+        return True
+
+    write_obsidian_note.ensure_sidecar_hidden(
+        sidecar,
+        platform="nt",
+        get_attributes=get_attributes,
+        set_attributes=set_attributes,
+    )
+
+    assert attributes["value"] == 0x20 | 0x2
+
+
 # --------------------------------------------------------------------------- #
 # End-to-end (subprocess) — the script main() read paths                      #
 # --------------------------------------------------------------------------- #
@@ -208,6 +243,7 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
             "--content-file", str(content_file),
             "--lint-json", str(lint_path),
             "--figure-decisions", str(decisions_path),
+            "--source-manifest", str(_source_manifest(tmp_path)),
         ],
         cwd=tmp_path,
         env=_clean_env(),
@@ -221,6 +257,9 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
     # frontmatter / the H1 title).
     assert not saved.startswith(BOM)
     assert saved.lstrip().startswith("# 标题")
+    if os.name == "nt":
+        sidecar = Path(payload["sidecar_path"])
+        assert sidecar.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN
 
 
 def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
@@ -262,6 +301,7 @@ def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
             "--content-file", str(content_file),
             "--lint-json", str(lint_output),
             "--figure-decisions", str(decisions_path),
+            "--source-manifest", str(_source_manifest(tmp_path)),
         ],
         cwd=tmp_path,
         env=_clean_env(),
