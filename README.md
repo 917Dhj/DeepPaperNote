@@ -78,7 +78,7 @@ Generate a deep-reading note for this paper: <title, DOI, URL, arXiv ID, or loca
 Turn this paper into an Obsidian note: <paper>
 ```
 
-DeepPaperNote supports complete English and Simplified Chinese note schemas. On first use, your Agent asks once for every field required by the selected save mode, then writes the confirmed defaults to `~/.deeppapernote/config.json`.
+DeepPaperNote supports complete English and Simplified Chinese note schemas. A complete set of inherited `DEEPPAPERNOTE_*` environment variables starts the run without reading `~/.deeppapernote/config.json`; otherwise your Agent uses that file as a fallback and asks only for unresolved fields.
 The User Configuration section below covers both save modes, both language profiles, and one-run overrides. Section names, metadata fields, figure callouts, planning guidance, linting, and Formal Save all follow the resolved language.
 
 ## 🎯 Why DeepPaperNote?
@@ -113,7 +113,7 @@ The canonical execution contract lives in [`skills/deeppapernote/SKILL.md`](./sk
 
 ## 🗂️ User Configuration
 
-DeepPaperNote stores durable device-local preferences in one file: `~/.deeppapernote/config.json`.
+DeepPaperNote can run entirely from current-process environment variables. It also stores optional durable device-local preferences in `~/.deeppapernote/config.json` for fallback values and explicit future defaults.
 
 | Field | Valid values | When required |
 | --- | --- | --- |
@@ -124,6 +124,13 @@ DeepPaperNote stores durable device-local preferences in one file: `~/.deeppaper
 
 An English workspace configuration needs only the two always-required fields:
 
+```bash
+export DEEPPAPERNOTE_OUTPUT_LANGUAGE=en
+export DEEPPAPERNOTE_SAVE_MODE=workspace
+```
+
+The equivalent optional User Configuration is:
+
 ```json
 {
   "output_language": "en",
@@ -132,6 +139,15 @@ An English workspace configuration needs only the two always-required fields:
 ```
 
 A Simplified Chinese Obsidian configuration also names the Vault and paper directory:
+
+```bash
+export DEEPPAPERNOTE_OUTPUT_LANGUAGE=zh-CN
+export DEEPPAPERNOTE_SAVE_MODE=obsidian
+export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/vault"
+export DEEPPAPERNOTE_PAPERS_DIR="Research/Papers"
+```
+
+The equivalent optional User Configuration is:
 
 ```json
 {
@@ -142,9 +158,9 @@ A Simplified Chinese Obsidian configuration also names the Vault and paper direc
 }
 ```
 
-Configuration is resolved before paper identity or other expensive paper work. On first use, the Agent presents one Configuration Prompt Batch for every required field. If a later file has one missing or invalid field, it asks only for that field; an unreadable or unwritable file fails closed with the affected field instead of continuing.
+Configuration is resolved before paper identity or other expensive paper work. DeepPaperNote first resolves the explicit request, CLI arguments, and current process environment. If those values form a complete valid configuration, the run proceeds without reading User Configuration. Otherwise the Agent reads `config.json` as fallback and presents one Configuration Prompt Batch only for unresolved fields; an unreadable fallback file fails closed instead of continuing.
 
-Legacy environment or shell values are shown only as one-time migration candidates while `config.json` is absent. They become preferences only after confirmation. Once the file exists, shell startup files stop supplying preferences; current-process values remain a hidden compatibility Run Override. Preference Changes preserve unknown JSON fields, and malformed JSON is backed up before confirmed replacement.
+Current-process environment values are first-class Run Overrides and never change the optional file. Shell startup files are consulted only as migration candidates when inherited values are incomplete and `config.json` is absent. Preference Changes preserve unknown JSON fields, and malformed JSON is backed up before confirmed replacement.
 
 ### Run Overrides and Preference Changes
 

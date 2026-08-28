@@ -17,6 +17,10 @@ Add an entry here when the project meaningfully changes for users, for example:
 - Added end-to-end English output through User Configuration or `--language en`, including localized note schemas, paper-type planning contracts, figure callouts, grounding, final-note linting, and Formal Save validation.
 - Added one device-local `config.json` for language and save preferences, with first-use/repair inspection, confirmed migration, atomic persistence, and run-scoped overrides.
 
+### Changed
+
+- Complete valid Run Overrides now satisfy Configuration Readiness without reading `~/.deeppapernote/config.json`; incomplete overrides continue through the existing User Configuration fallback and validation flow.
+
 ## v2.2.0
 
 ### Improved

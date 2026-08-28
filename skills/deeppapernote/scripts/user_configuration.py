@@ -277,9 +277,27 @@ def resolve_preferences(
     configuration, read_error = _read_configuration(path)
     if read_error or configuration is None:
         raise RuntimeError(f"User Configuration is not readable and valid: {read_error}")
+    resolved = resolve_run_overrides(
+        explicit_overrides=explicit_overrides,
+        cli_overrides=cli_overrides,
+        environ=environ,
+    )
+    values = _clean_values(configuration)
+    sources = {field: "user_configuration" for field in values}
+    values.update(resolved["values"])
+    sources.update(resolved["sources"])
+    issues, missing = _validate(values)
+    return {"values": values, "sources": sources, "issues": issues, "missing": missing}
+
+
+def resolve_run_overrides(
+    *,
+    explicit_overrides: Mapping[str, Any] | None = None,
+    cli_overrides: Mapping[str, Any] | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
     environment = os.environ if environ is None else environ
     layers = (
-        ("user_configuration", _clean_values(configuration)),
         (
             "process_environment",
             {

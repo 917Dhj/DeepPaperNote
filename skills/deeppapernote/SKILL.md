@@ -8,7 +8,7 @@ description: Generate a high-quality deep-reading note for a single paper and wr
 Use this skill when the user wants one outcome:
 - read one paper carefully
 - generate a high-quality Markdown note
-- save the note to the workspace or Obsidian target selected by User Configuration
+- save the note to the workspace or Obsidian target selected by resolved configuration
 
 Chinese trigger examples:
 - `给这篇论文生成深度笔记`
@@ -23,6 +23,8 @@ English trigger examples:
 ## User Configuration
 
 Before a normal paper run, read `references/user-configuration.md` for configuration admission, migration, repair, Run Overrides, and Preference Changes.
+
+Resolve Run Overrides from the explicit request, CLI, and current process environment first. When they form a complete valid configuration for the selected Save Mode, Configuration Readiness is complete without reading User Configuration. Only inspect User Configuration when those Run Overrides need fallback values.
 
 ## Language Integrity Contract
 
@@ -66,7 +68,7 @@ The note must adapt to the paper type. Use the same base structure, but shift em
 ## Workflow
 
 Follow this order:
-1. complete Configuration Readiness; advance only after inspection returns `ready`
+1. complete Configuration Readiness: resolve Run Overrides first, and inspect User Configuration only when they are incomplete; advance only after the resolved run configuration is complete and valid
 2. resolve the paper identity
 3. collect metadata
 4. acquire the best available PDF

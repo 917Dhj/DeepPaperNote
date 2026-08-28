@@ -78,7 +78,7 @@ DeepPaperNote 需要 Python 3.10 或更高版本。核心 PDF 抽取路径依赖
 把这篇论文整理成 Obsidian 笔记：<论文>
 ```
 
-DeepPaperNote 完整支持英文和简体中文笔记结构。首次使用时，Agent 会一次询问所选保存模式需要的全部字段，并把确认后的长期默认值写入 `~/.deeppapernote/config.json`。
+DeepPaperNote 完整支持英文和简体中文笔记结构。如果当前进程继承的 `DEEPPAPERNOTE_*` 环境变量已经完整，运行时不会读取 `~/.deeppapernote/config.json`；否则 Agent 才把该文件作为 fallback，并只询问仍未解析的字段。
 下方“用户配置”统一说明两种保存模式、两套语言 Profile 与单次覆盖方式。章节名称、元数据字段、图表占位、规划规则、校验与 Formal Save 都会遵循解析后的语言。
 
 ## 🎯 为什么选择 DeepPaperNote？
@@ -113,7 +113,7 @@ DeepPaperNote 仍然是唯一主产品。仓库同时提供一个可选 companio
 
 ## 🗂️ 用户配置
 
-DeepPaperNote 只用一个文件保存设备本地长期偏好：`~/.deeppapernote/config.json`。
+DeepPaperNote 可以完全使用当前进程环境变量运行；也可以在 `~/.deeppapernote/config.json` 中保存可选的设备本地长期偏好，作为 fallback 和明确的未来默认值。
 
 | 字段 | 有效值 | 何时必填 |
 | --- | --- | --- |
@@ -124,6 +124,13 @@ DeepPaperNote 只用一个文件保存设备本地长期偏好：`~/.deeppaperno
 
 英文 workspace 配置只需要两个始终必填的字段：
 
+```bash
+export DEEPPAPERNOTE_OUTPUT_LANGUAGE=en
+export DEEPPAPERNOTE_SAVE_MODE=workspace
+```
+
+等价的可选 User Configuration 是：
+
 ```json
 {
   "output_language": "en",
@@ -132,6 +139,15 @@ DeepPaperNote 只用一个文件保存设备本地长期偏好：`~/.deeppaperno
 ```
 
 简体中文 Obsidian 配置还要给出 Vault 与论文目录：
+
+```bash
+export DEEPPAPERNOTE_OUTPUT_LANGUAGE=zh-CN
+export DEEPPAPERNOTE_SAVE_MODE=obsidian
+export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian/Vault/绝对路径"
+export DEEPPAPERNOTE_PAPERS_DIR="Research/Papers"
+```
+
+等价的可选 User Configuration 是：
 
 ```json
 {
@@ -142,9 +158,9 @@ DeepPaperNote 只用一个文件保存设备本地长期偏好：`~/.deeppaperno
 }
 ```
 
-配置会在论文身份解析等昂贵步骤之前完成。首次使用时，Agent 通过一个 Configuration Prompt Batch 一次询问全部必填字段；已有配置只坏了一个字段时，仅询问该字段。配置不可读或不可写时会标明受影响字段并失败关闭，不会带着无效配置继续。
+配置会在论文身份解析等昂贵步骤之前完成。DeepPaperNote 会先解析显式请求、CLI 参数和当前进程环境变量；如果它们已经构成完整合法的配置，就不读取 User Configuration。否则才读取 `config.json` 作为 fallback，并通过一个 Configuration Prompt Batch 只询问仍未解析的字段；fallback 文件不可读时会失败关闭。
 
-仅当 `config.json` 不存在时，旧环境变量或 shell 设置才会作为一次性迁移候选展示；确认后才写入长期偏好。配置文件一旦存在，shell 启动文件就不再提供偏好；当前进程值只保留为隐藏的兼容 Run Override。Preference Change 会保留未知（unknown）JSON 字段；替换畸形 JSON 前会先备份，并且必须得到确认。
+当前进程环境变量是正式的 Run Override，不会改写可选配置文件。只有当继承的变量不完整且 `config.json` 不存在时，shell 启动文件才会作为迁移候选；确认后才写入长期偏好。Preference Change 会保留未知（unknown）JSON 字段；替换畸形 JSON 前会先备份，并且必须得到确认。
 
 ### Run Override 与 Preference Change
 

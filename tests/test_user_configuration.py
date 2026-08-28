@@ -389,11 +389,13 @@ def test_public_and_agent_contracts_share_user_configuration_source_of_truth() -
 
     for public_doc in (readme, readme_zh):
         assert "~/.deeppapernote/config.json" in public_doc
-        assert "DEEPPAPERNOTE_OUTPUT_LANGUAGE" not in public_doc
-        assert "DEEPPAPERNOTE_OBSIDIAN_VAULT" not in public_doc
+        for name in user_configuration.ENV_FIELDS.values():
+            assert name in public_doc
     assert "references/user-configuration.md" in skill
-    assert skill.index("Configuration Readiness") < skill.index("resolve the paper identity")
+    assert skill.index("Resolve Run Overrides") < skill.index("inspect User Configuration")
+    assert skill.index("inspect User Configuration") < skill.index("resolve the paper identity")
     assert "explicit request > CLI > current process environment > User Configuration" in contract
+    assert "without reading User Configuration" in contract
     assert "scripts/user_configuration.py" in contract
 
 
@@ -426,7 +428,8 @@ def test_public_onboarding_covers_bilingual_configuration_and_run_overrides() ->
         assert "Formal Save" in text
         assert "`images/`" in text
         assert "unknown" in text.lower()
-        assert "DEEPPAPERNOTE_" not in text
+        for name in user_configuration.ENV_FIELDS.values():
+            assert name in text
 
         field_values = {
             "output_language": set(user_configuration.OUTPUT_LANGUAGES),

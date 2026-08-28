@@ -17,7 +17,11 @@ from copy import deepcopy
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
-from user_configuration import inspect_configuration, resolve_preferences
+from user_configuration import (
+    inspect_configuration,
+    resolve_preferences,
+    resolve_run_overrides,
+)
 
 ARXIV_NS = {
     "atom": "http://www.w3.org/2005/Atom",
@@ -2457,15 +2461,20 @@ def runtime_config(
     explicit_overrides: dict[str, Any] | None = None,
     cli_overrides: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    inspection = inspect_configuration()
-    if inspection["state"] != "ready":
-        raise RuntimeError(json.dumps(inspection, ensure_ascii=False, sort_keys=True))
-    resolved = resolve_preferences(
+    resolved = resolve_run_overrides(
         explicit_overrides=explicit_overrides,
         cli_overrides=cli_overrides,
     )
     if resolved["issues"] or resolved["missing"]:
-        raise RuntimeError(json.dumps(resolved, ensure_ascii=False, sort_keys=True))
+        inspection = inspect_configuration()
+        if inspection["state"] != "ready":
+            raise RuntimeError(json.dumps(inspection, ensure_ascii=False, sort_keys=True))
+        resolved = resolve_preferences(
+            explicit_overrides=explicit_overrides,
+            cli_overrides=cli_overrides,
+        )
+        if resolved["issues"] or resolved["missing"]:
+            raise RuntimeError(json.dumps(resolved, ensure_ascii=False, sort_keys=True))
     return {
         "obsidian_vault": "",
         "papers_dir": "",
