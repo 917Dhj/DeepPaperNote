@@ -45,7 +45,7 @@ DeepPaperNote is an agent skill for reading **one paper at a time**. The same co
 
 ## 📰 News
 
-- **[2026-08-29]** 🌐 Added complete English note support across note structure, figure callouts, validation, and Formal Save. [What's new](./CHANGELOG.md#unreleased)
+- **[v2.3.0]** 🌐 Added complete English note support across note structure, figure callouts, validation, and Formal Save. [Release notes](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.0)
 - **[2026-07-16]** 🧩 Added [`paper-glossary`](./skills/paper-glossary/README.md), an optional companion skill for building reusable Obsidian terminology notes.
 - **[2026-07-16]** 🔌 DeepPaperNote is now distributed as a plugin for multiple agents, with support for selecting multiple skills from the repository. [PR #12](https://github.com/917Dhj/DeepPaperNote/pull/12)
 

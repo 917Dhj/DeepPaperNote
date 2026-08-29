@@ -12,6 +12,8 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+## v2.3.0
+
 ### Added
 
 - Added end-to-end English output through User Configuration or `--language en`, including localized note schemas, paper-type planning contracts, figure callouts, grounding, final-note linting, and Formal Save validation.
@@ -22,6 +24,15 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - Complete valid Run Overrides now satisfy Configuration Readiness without reading `~/.deeppapernote/config.json`; incomplete overrides continue through the existing User Configuration fallback and validation flow.
 - Obsidian notes now use language-specific filenames, and Windows sidecars receive the native Hidden file attribute in addition to their dot-prefixed name.
+- Successful runs now report the saved note path and domain, validation results, figure and table counts, warning count, and final note integrity check.
+
+### Fixed
+
+- Formal Save now preserves LF line endings on Windows instead of applying platform-specific newline conversion.
+
+### Contributors
+
+- Added configurable English note output from [PR #26](https://github.com/917Dhj/DeepPaperNote/pull/26) by [@basbun](https://github.com/basbun).
 
 ## v2.2.0
 

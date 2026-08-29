@@ -45,7 +45,7 @@ DeepPaperNote 是一个专注于**一次精读一篇论文**的 Agent Skill。�
 
 ## 📰 最新动态
 
-- **[2026-08-29]** 🌐 新增完整英文笔记支持，从章节结构、图表标注到校验与 Formal Save，全流程保持英文一致。[查看更新](./CHANGELOG.md#unreleased)
+- **[v2.3.0]** 🌐 新增完整英文笔记支持，从章节结构、图表标注到校验与 Formal Save，全流程保持英文一致。[版本说明](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.0)
 - **[2026-07-16]** 🧩 新增可选 companion skill [`paper-glossary`](./skills/paper-glossary/README.md)，用于构建可复用的 Obsidian 术语笔记。
 - **[2026-07-16]** 🔌 DeepPaperNote 现在以支持多个 Agent 的插件形式分发，并支持从仓库中选择多个 skill。[PR #12](https://github.com/917Dhj/DeepPaperNote/pull/12)
 
