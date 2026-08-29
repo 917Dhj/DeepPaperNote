@@ -835,7 +835,9 @@ def test_save_target_preflight_honors_recorded_language_note_filename(
     sidecar_path = renamed_path.parent / ".deeppapernote.json"
     sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
     sidecar["notes"]["zh-CN"]["filename"] = renamed_path.name
-    sidecar_path.write_text(json.dumps(sidecar), encoding="utf-8")
+    updated_sidecar_path = sidecar_path.with_name(f"{sidecar_path.name}.tmp")
+    updated_sidecar_path.write_text(json.dumps(sidecar), encoding="utf-8")
+    os.replace(updated_sidecar_path, sidecar_path)
 
     preflight = subprocess.run(
         [
