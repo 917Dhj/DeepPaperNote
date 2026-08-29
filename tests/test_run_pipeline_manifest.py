@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +18,10 @@ import run_pipeline
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RUN_PIPELINE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "run_pipeline.py"
+EXTRACT_SOURCE_SCRIPT = (
+    PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "extract_source_text.py"
+)
+WRITE_NOTE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
 
 
 def write_test_pdf(path: Path) -> None:
@@ -62,6 +68,7 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     identity_trace_path = workdir / "paper_identity_repair_trace.json"
     raw_sections_path = workdir / "paper_raw_sections.jsonl"
     evidence_path = workdir / "paper_evidence.json"
+    figures_path = workdir / "paper_figures.json"
     decisions_path = workdir / "paper_figure_table_decisions.json"
     bundle_path = workdir / "paper_bundle.json"
     assert identity_path.exists()
@@ -76,6 +83,7 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     identity_trace = json.loads(identity_trace_path.read_text(encoding="utf-8"))
     source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    figures = json.loads(figures_path.read_text(encoding="utf-8"))
     decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
 
@@ -87,9 +95,14 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     assert identity_trace["repair_attempts"] == []
     assert source_manifest["coverage"]["text_pages_extracted"] == 4
     assert source_manifest["coverage"]["text_truncated"] is False
+    assert source_manifest["source_sha256"] == hashlib.sha256(pdf_path.read_bytes()).hexdigest()
     assert source_manifest["identity_contract"]["identity_verdict"] == "accepted"
     assert any(section["section_id"] == "sec:method" for section in source_manifest["sections"])
     assert evidence["summary"]["source_corpus_used"] is True
+    assert figures["output_language"] == "zh-CN"
+    assert decisions["output_language"] == "zh-CN"
+    assert bundle["output_language"] == "zh-CN"
+    assert bundle["writing_contract"]["language"] == "zh-CN"
     assert {item["source_id"] for item in decisions["decisions"]} == {"Figure 1", "Table 1"}
     assert bundle["source_manifest"]["raw_sections_path"] == str(raw_sections_path.resolve())
     assert bundle["identity_contract"]["identity_verdict"] == "accepted"
@@ -97,6 +110,129 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     assert bundle["figure_table_manifest"]["decisions"]
     removed_bundle_keys = ("evidence", "candidate_chunks", "section_texts", "summary")
     assert not any(key in bundle for key in removed_bundle_keys)
+
+    note_text = "# 本地 PDF 语言完整性\n\n本笔记验证工件链可安全保存。\n"
+    lint_path = workdir / "paper_lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "note_sha256": hashlib.sha256(note_text.encode("utf-8")).hexdigest(),
+                "passes_basic_structure": True,
+                "passes_style_gate": True,
+                "passes_math_gate": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    save_cwd = tmp_path / "save-valid"
+    save_cwd.mkdir()
+    env = os.environ.copy()
+    env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
+    env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "saved"
+    saved = subprocess.run(
+        [
+            sys.executable,
+            str(WRITE_NOTE_SCRIPT),
+            "--title",
+            "本地 PDF 语言完整性",
+            "--content",
+            note_text,
+            "--lint-json",
+            str(lint_path),
+            "--figure-decisions",
+            str(decisions_path),
+        ],
+        cwd=save_cwd,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    save_payload = json.loads(saved.stdout)
+    assert save_payload["output_language"] == "zh-CN"
+    assert Path(save_payload["note_path"]).read_text(encoding="utf-8") == note_text
+    assert Path(save_payload["images_dir"]).is_dir()
+
+    for artifact_language, expected_error in (
+        (None, "requires output_language"),
+        ("en", "does not match resolved output_language zh-CN"),
+    ):
+        invalid_decisions = dict(decisions)
+        if artifact_language is None:
+            invalid_decisions.pop("output_language")
+        else:
+            invalid_decisions["output_language"] = artifact_language
+        invalid_path = workdir / f"invalid-{artifact_language or 'missing'}.json"
+        invalid_path.write_text(json.dumps(invalid_decisions), encoding="utf-8")
+        failure_cwd = tmp_path / f"save-{artifact_language or 'missing'}"
+        failure_cwd.mkdir()
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(WRITE_NOTE_SCRIPT),
+                "--title",
+                "本地 PDF 语言失败",
+                "--content",
+                note_text,
+                "--lint-json",
+                str(lint_path),
+                "--figure-decisions",
+                str(invalid_path),
+            ],
+            cwd=failure_cwd,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0
+        assert expected_error in result.stderr
+        assert not (failure_cwd / "saved").exists()
+
+
+def test_extract_source_text_rejects_a_mismatched_acquired_pdf_hash(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    fetch_path = tmp_path / "fetch.json"
+    manifest_path = tmp_path / "paper_source_manifest.json"
+    write_test_pdf(pdf_path)
+    fetch_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "fetch_pdf.py",
+                "paper_id": "paper:hash-mismatch",
+                "title": "Hash Mismatch",
+                "pdf_path": str(pdf_path),
+                "source_sha256": "0" * 64,
+                "identity_contract": {
+                    "artifact_type": "canonical_identity",
+                    "schema_version": 2,
+                    "paper_id": "paper:hash-mismatch",
+                    "identity_verdict": "accepted",
+                    "work_level_identity": {"title": "Hash Mismatch"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_SOURCE_SCRIPT),
+            "--input",
+            str(fetch_path),
+            "--output",
+            str(manifest_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "source_sha256 does not match acquired PDF" in result.stderr
+    assert not manifest_path.exists()
 
 
 def test_run_pipeline_does_not_materialize_before_final_save(
@@ -165,12 +301,81 @@ def test_run_pipeline_does_not_materialize_before_final_save(
     assert fetch_call[fetch_call.index("--identity") + 1] == str(
         (workdir / "paper_identity.json").resolve()
     )
+    assert fetch_call[fetch_call.index("--dest-dir") + 1] == str(
+        (workdir / "paper_pdfs").resolve()
+    )
 
     evidence_call = calls[5]
     assert "--source-manifest" in evidence_call
     assert evidence_call[evidence_call.index("--source-manifest") + 1] == str(
         (workdir / "paper_source_manifest.json").resolve()
     )
+    assets_call = calls[6]
+    assert assets_call[assets_call.index("--assets-dir") + 1] == str(
+        (workdir / "paper_assets").resolve()
+    )
+
+
+def test_run_pipeline_stops_at_configuration_before_identity(
+    tmp_path: Path,
+    monkeypatch,
+    configured_user_home: Path,
+) -> None:
+    configured_user_home.unlink()
+    workdir = tmp_path / "must-not-exist"
+    calls: list[list[str]] = []
+    monkeypatch.setattr(run_pipeline.subprocess, "run", lambda cmd, **kwargs: calls.append(cmd))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pipeline.py",
+            "--input",
+            "paper.pdf",
+            "--workdir",
+            str(workdir),
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="needs_input"):
+        run_pipeline.main()
+
+    assert calls == []
+    assert not workdir.exists()
+
+
+def test_run_pipeline_propagates_run_override_without_persisting_it(
+    tmp_path: Path,
+    monkeypatch,
+    configured_user_home: Path,
+) -> None:
+    original = configured_user_home.read_bytes()
+    calls: list[tuple[list[str], dict[str, str]]] = []
+
+    def fake_run(cmd: list[str], check: bool = True, **kwargs) -> object:
+        calls.append((cmd, kwargs["env"]))
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(run_pipeline.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pipeline.py",
+            "--input",
+            "paper.pdf",
+            "--workdir",
+            str(tmp_path / "run"),
+            "--language",
+            "en",
+        ],
+    )
+
+    run_pipeline.main()
+
+    assert calls
+    assert all(env["DEEPPAPERNOTE_OUTPUT_LANGUAGE"] == "en" for _, env in calls)
+    assert configured_user_home.read_bytes() == original
 
 
 def test_run_pipeline_stops_before_fetch_when_identity_repair_is_exhausted(

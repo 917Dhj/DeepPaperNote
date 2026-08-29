@@ -15,9 +15,11 @@ from common import (
     file_sha256,
     maybe_load_json_record,
     normalize_whitespace,
+    runtime_config,
 )
 from contracts import WRITING_CONTRACT_RULES
 from extract_pdf_assets import _render_crop, save_image_bytes
+from localization import normalize_output_language, require_artifact_output_language
 from source_corpus import SourceCorpusLoadError, load_source_corpus
 
 DECISION_VALUES = set(WRITING_CONTRACT_RULES["figure_decision_values"])
@@ -39,6 +41,11 @@ def parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
+    p.add_argument(
+        "--language",
+        default="",
+        help="Run Override for output language: en or zh-CN.",
+    )
     return p
 
 
@@ -475,8 +482,13 @@ def build_decisions(
 
 def main() -> None:
     args = parser().parse_args()
+    language = normalize_output_language(
+        runtime_config(cli_overrides={"output_language": args.language})["output_language"]
+    )
     if args.review_decisions:
-        payload = apply_requested_repairs(load_record(args.review_decisions))
+        payload = load_record(args.review_decisions)
+        require_artifact_output_language(payload, "Figure/Table Decisions", language)
+        payload = apply_requested_repairs(payload)
         payload["status"] = "ok"
         payload["script"] = "plan_figure_table_decisions.py"
         emit(payload, args.output)
@@ -488,6 +500,7 @@ def main() -> None:
         )
     source_manifest = load_record(args.source_manifest)
     figures = load_record(args.figures) if args.figures else {}
+    require_artifact_output_language(figures, "Figure Plan", language)
     assets = load_record(args.assets) if args.assets else {}
     decisions = build_decisions(
         source_manifest,
@@ -498,6 +511,7 @@ def main() -> None:
     payload = {
         "status": "ok",
         "script": "plan_figure_table_decisions.py",
+        "output_language": language,
         "paper_id": args.paper_id or source_manifest.get("paper_id", ""),
         "decisions": decisions,
         "summary": {

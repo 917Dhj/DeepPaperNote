@@ -280,7 +280,11 @@ def test_bundle_exposes_reference_candidates_under_references(monkeypatch) -> No
     monkeypatch.setattr(
         build_synthesis_bundle,
         "runtime_config",
-        lambda: {"obsidian_vault": "", "papers_dir": "Research/Papers"},
+        lambda **_kwargs: {
+            "output_language": "zh-CN",
+            "obsidian_vault": "",
+            "papers_dir": "Research/Papers",
+        },
     )
 
     synthesis = build_synthesis_bundle.bundle(
@@ -295,8 +299,9 @@ def test_bundle_exposes_reference_candidates_under_references(monkeypatch) -> No
                 ]
             }
         },
-        figures_wrapper={},
+        figures_wrapper={"output_language": "zh-CN", "figure_plan": {}},
         assets_wrapper={},
+        figure_decisions_wrapper={"output_language": "zh-CN", "decisions": []},
         source_manifest={
             "identity_contract": {
                 "artifact_type": "canonical_identity",
@@ -314,3 +319,41 @@ def test_bundle_exposes_reference_candidates_under_references(monkeypatch) -> No
     assert candidates[0]["display_text"] == "Vaswani et al. (2017). Attention Is All You Need."
     assert candidates[0]["match_status"] == "vault_unavailable"
     assert candidates[0]["wikilink"] == ""
+
+
+def test_bundle_reuses_cli_language_configuration_for_reference_resolution(monkeypatch) -> None:
+    def configured_runtime(*, cli_overrides):
+        assert cli_overrides == {"output_language": "en"}
+        return {
+            "output_language": "en",
+            "obsidian_vault": "",
+            "papers_dir": "Research/Papers",
+        }
+
+    monkeypatch.setattr(build_synthesis_bundle, "runtime_config", configured_runtime)
+
+    synthesis = build_synthesis_bundle.bundle(
+        metadata={"title": "Citation Paper"},
+        evidence_wrapper={
+            "evidence_pack": {
+                "reference_candidates": [{"display_text": "Unknown Paper."}]
+            }
+        },
+        figures_wrapper={"output_language": "en", "figure_plan": {}},
+        assets_wrapper={},
+        figure_decisions_wrapper={"output_language": "en", "decisions": []},
+        source_manifest={
+            "identity_contract": {
+                "artifact_type": "canonical_identity",
+                "schema_version": 2,
+                "paper_id": "paper:citation-test",
+                "identity_verdict": "accepted",
+                "work_level_identity": {"title": "Citation Paper"},
+                "accepted_metadata": {"title": "Citation Paper"},
+            }
+        },
+        output_language="en",
+    )
+
+    assert synthesis["writing_contract"]["language"] == "en"
+    assert synthesis["references"]["candidates"][0]["match_status"] == "vault_unavailable"

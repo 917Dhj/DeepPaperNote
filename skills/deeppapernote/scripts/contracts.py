@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any, TypedDict
+
+from localization import note_schema, normalize_output_language, required_sections
 
 NOTE_REQUIRED_SECTIONS: tuple[str, ...] = (
     "核心信息",
@@ -19,6 +22,9 @@ NOTE_REQUIRED_SECTIONS: tuple[str, ...] = (
     "我的笔记",
     "引用",
 )
+
+def note_required_sections(language: str | None = None) -> tuple[str, ...]:
+    return required_sections(language)
 
 PAPER_TYPE_VALUES: tuple[str, ...] = (
     "AI_method",
@@ -269,6 +275,145 @@ PAPER_TYPE_CONTRACTS: dict[str, dict[str, Any]] = {
     },
 }
 
+PAPER_TYPE_CONTRACTS_EN: dict[str, dict[str, Any]] = {
+    "AI_method": {
+        "paper_type": "AI_method",
+        "reader_lens": "A technical reader who may need to reproduce the method and its mechanism.",
+        "section_focus": ["problem setting", "method mechanism", "training or inference flow", "key equations", "strong baselines", "ablations and failure boundaries"],
+        "required_checks": ["Explain the mechanism flow, essential equations, experimental design, what the ablations establish, and the failure boundary."],
+        "formula_rules": ["Keep only the one to three equations needed to understand the method and explain their engineering meaning."],
+        "avoid_rules": ["Do not force a non-method paper into a model-architecture narrative."],
+        "boundary_questions": [
+            "Which experiment or ablation supports the claimed benefit of the core mechanism?",
+            "Which comparisons apply only under the reported data, baselines, compute, or protocol?",
+            "What evidence shows failure, degradation, instability, or rising cost; if none is reported, what remains unproven?",
+        ],
+        "section_semantics": {
+            "Research Question": "The specific technical problem and the shortcomings of existing methods.",
+            "Data and Task Definition": "Datasets, inputs and outputs, evaluation tasks, and experimental settings.",
+            "Method": "Model, algorithm, training, and inference mechanisms.",
+            "Key Results": "Main results, strong baselines, ablations, and decisive numbers.",
+            "Deep Analysis": "Why the method works, where it is fragile, and the cost of reproduction or extension.",
+        },
+        "recommended_subsections": {
+            "Method": ["Mechanism Flow", "Model Architecture", "Training Objective", "Inference and Sampling", "Implementation Details"],
+            "Key Results": ["Main Results and Strong Baselines", "What the Ablations Establish", "Failure or Unstable Settings"],
+            "Deep Analysis": ["Why It Works", "Complexity and Scalability", "Reproduction Notes"],
+        },
+        "mechanism_flow_contract": {"apply_when_paper_type_in": ["AI_method"], "required_step_count": "3_to_4", "required_step_fields": ["input", "operation", "output_destination"]},
+    },
+    "benchmark_or_dataset": {
+        "paper_type": "benchmark_or_dataset",
+        "reader_lens": "A researcher assessing whether a benchmark or dataset is useful and where it is biased.",
+        "section_focus": ["task decomposition", "data sources and construction", "annotation protocol", "evaluation metrics", "coverage and bias", "sample statistics and access limits"],
+        "required_checks": ["Explain sources, construction or annotation, metrics, baselines, sample statistics, access or privacy constraints, and applicability."],
+        "formula_rules": ["Keep only essential metrics, sampling rules, or split definitions."],
+        "avoid_rules": ["Do not describe data construction as a model pipeline."],
+        "boundary_questions": [
+            "What construct does the resource actually measure, and which capabilities are only proxies?",
+            "Which coverage gaps or biases follow from its tasks, labels, sampling, filtering, or evaluation protocol?",
+            "Do baseline results demonstrate discrimination, or only adaptation to this protocol?",
+            "How do sample composition, access, and privacy limits affect reproduction and generalization?",
+        ],
+        "section_semantics": {
+            "Research Question": "The evaluation or data gap the resource is designed to address.",
+            "Data and Task Definition": "Sources, task splits, labels, and sample scope.",
+            "Method": "Construction, filtering, annotation, and evaluation protocol—not a model pipeline.",
+            "Key Results": "Baseline performance, difficulty, coverage, and bias.",
+            "Deep Analysis": "What the resource measures and what it cannot represent.",
+        },
+        "recommended_subsections": {
+            "Data and Task Definition": ["Data Sources", "Task Splits", "Annotation and Filtering"],
+            "Method": ["Construction Process", "Evaluation Protocol", "Baseline Setup"],
+            "Key Results": ["Baseline Performance", "Difficulty Distribution", "Coverage and Bias"],
+            "Deep Analysis": ["What It Actually Measures", "Applicability Boundary"],
+        },
+    },
+    "clinical_or_psychology_empirical": {
+        "paper_type": "clinical_or_psychology_empirical",
+        "reader_lens": "A research reader focused on samples, variable relationships, uncertainty, and generalization.",
+        "section_focus": ["sample source", "inclusion and exclusion", "variables and instruments", "analysis pipeline", "effect sizes and uncertainty", "ethics, access, and generalization"],
+        "required_checks": ["Distinguish association, prediction, group difference, and causal interpretation; report sample, ethics, privacy, and generalization limits."],
+        "formula_rules": ["Keep only essential statistical models, effect sizes, intervals, or instrument definitions."],
+        "avoid_rules": ["Do not turn association, prediction, or group differences into unsupported causal claims."],
+        "boundary_questions": [
+            "How do recruitment, eligibility, measurement, and annotation constrain generalization?",
+            "Does the design support association, prediction, group difference, or causality?",
+            "Does the interpretation depend on unobserved confounding, thresholds, missingness, or setting?",
+            "How do sample composition, missing data, privacy, and unavailable materials constrain reproduction?",
+        ],
+        "section_semantics": {
+            "Research Question": "The clinical, psychological, or behavioral question, hypothesis, or variable relationship.",
+            "Data and Task Definition": "Recruitment, eligibility, variables, instruments, and measurement.",
+            "Method": "Study design, grouping, measurement flow, and statistical analysis.",
+            "Key Results": "Effects, associations, group differences, uncertainty, and significance.",
+            "Deep Analysis": "Interpretation, causal boundary, substantive meaning, and generalization limits.",
+        },
+        "recommended_subsections": {
+            "Data and Task Definition": ["Sample and Eligibility", "Variables and Instruments", "Measurement Process"],
+            "Method": ["Study Design", "Analysis Model", "Primary Comparisons"],
+            "Key Results": ["Primary Effects", "Uncertainty and Significance", "Clinical or Psychological Interpretation"],
+            "Deep Analysis": ["Causal Interpretation Boundary", "Generalization Limits"],
+        },
+    },
+    "humanities_or_social_science": {
+        "paper_type": "humanities_or_social_science",
+        "reader_lens": "A reader evaluating theoretical framing, material interpretation, and argument structure.",
+        "section_focus": ["object of study", "materials", "theoretical framework", "argument path", "conceptual contribution", "interpretive boundary"],
+        "required_checks": ["Distinguish the author's argument, material evidence, normative judgment, and empirical fact."],
+        "formula_rules": ["Do not force equations; retain only essential formal definitions or coding rules."],
+        "avoid_rules": ["Do not present normative judgment, textual interpretation, or case analysis as experimental fact."],
+        "boundary_questions": [
+            "Which materials, cases, or theoretical premises support the interpretation?",
+            "What alternative explanations fit the same material, and how are they addressed?",
+            "Which conclusions are conceptual or normative rather than directly empirical?",
+        ],
+        "section_semantics": {
+            "Research Question": "The social, cultural, historical, institutional, or theoretical problem.",
+            "Data and Task Definition": "Materials, cases, texts, interviews, archives, or corpus scope—not an ML task.",
+            "Method": "Theoretical framework, conceptual distinctions, and argument path.",
+            "Key Results": "Interpretive findings, conceptual contribution, or revision of prior views.",
+            "Deep Analysis": "Argument strength, material limits, alternative explanations, and transferability.",
+        },
+        "recommended_subsections": {
+            "Data and Task Definition": ["Material Scope", "Selection Criteria", "Case or Corpus Boundary"],
+            "Method": ["Theoretical Framework", "Conceptual Distinctions", "Argument Path"],
+            "Key Results": ["Core Interpretive Findings", "Conceptual Contribution"],
+            "Deep Analysis": ["Argument Strength", "Alternative Explanations", "Material Boundary"],
+        },
+    },
+    "survey_or_review": {
+        "paper_type": "survey_or_review",
+        "reader_lens": "A reader mapping a literature, taxonomy, evidence boundary, and open questions.",
+        "section_focus": ["review scope", "inclusion and exclusion", "taxonomy", "method families", "consensus and disagreement", "open questions"],
+        "required_checks": ["Explain scope, study selection, taxonomy, consensus, disagreement, and open questions."],
+        "formula_rules": ["Keep only classification axes, eligibility rules, evidence-synthesis rules, or meta-analytic statistics."],
+        "avoid_rules": ["Do not present findings summarized from the literature as a new experiment by the review authors."],
+        "boundary_questions": [
+            "Which research routes may be missed by the search scope, eligibility criteria, or taxonomy?",
+            "Which statements reflect consensus, author-defined categories, or unresolved disagreement?",
+            "Which trends are artifacts of the covered literature and cannot establish technical maturity?",
+        ],
+        "section_semantics": {
+            "Research Question": "The field problem, controversy, or knowledge gap organized by the review.",
+            "Data and Task Definition": "Literature scope, search and screening criteria, and review objects.",
+            "Method": "Taxonomy, review organization, and evidence-synthesis logic—not a single method architecture.",
+            "Key Results": "Consensus, disagreement, trends, representative directions, and open questions.",
+            "Deep Analysis": "Coverage blind spots, explanatory power of the taxonomy, and future opportunities.",
+        },
+        "recommended_subsections": {
+            "Data and Task Definition": ["Review Scope", "Inclusion and Exclusion", "Literature Coverage"],
+            "Method": ["Taxonomy", "Method Families", "Evidence Organization"],
+            "Key Results": ["Representative Directions", "Consensus and Disagreement", "Open Questions"],
+            "Deep Analysis": ["Taxonomy Limits", "Uncovered Areas", "Future Research Opportunities"],
+        },
+    },
+}
+
+
+def paper_type_contracts(language: str | None = None) -> dict[str, dict[str, Any]]:
+    return deepcopy(PAPER_TYPE_CONTRACTS_EN if normalize_output_language(language) == "en" else PAPER_TYPE_CONTRACTS)
+
 WRITING_CONTRACT_RULES: dict[str, Any] = {
     "required_sections": NOTE_REQUIRED_SECTIONS,
     "paper_type_values": PAPER_TYPE_VALUES,
@@ -421,6 +566,20 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
         ),
     },
 }
+
+def writing_contract_rules(language: str | None = None) -> dict[str, Any]:
+    resolved = normalize_output_language(language)
+    schema = note_schema(resolved)
+    rules = deepcopy(WRITING_CONTRACT_RULES)
+    rules["language"] = resolved
+    rules["required_sections"] = tuple(schema["sections"].values())
+    rules["grounding_required_sections"] = tuple(schema["sections"][key] for key in ("research_questions", "data_and_task", "method", "key_results", "deep_analysis", "limitations"))
+    rules["core_info_fields"] = tuple(schema["core_info_fields"])
+    rules["figure_labels"] = dict(schema["figure_labels"])
+    rules["mechanism_flow_heading"] = schema["mechanism_flow"]
+    if schema.get("abstract_contract"):
+        rules["abstract_contract"] = deepcopy(schema["abstract_contract"])
+    return rules
 
 
 class MetadataRecord(TypedDict, total=False):

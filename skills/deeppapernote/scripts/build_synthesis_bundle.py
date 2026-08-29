@@ -16,11 +16,11 @@ from common import (
 )
 from contracts import (
     NOTE_PLAN_REQUIRED_FIELDS,
-    NOTE_REQUIRED_SECTIONS,
-    PAPER_TYPE_CONTRACTS,
     PAPER_TYPE_VALUES,
-    WRITING_CONTRACT_RULES,
+    paper_type_contracts,
+    writing_contract_rules,
 )
+from localization import normalize_output_language, require_artifact_output_language
 
 
 def parser() -> argparse.ArgumentParser:
@@ -35,6 +35,7 @@ def parser() -> argparse.ArgumentParser:
         required=True,
         help="Figure/table decision JSON path or string.",
     )
+    p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
     p.add_argument("--output", default="", help="Output JSON path.")
     return p
 
@@ -43,12 +44,14 @@ def load_record(value: str) -> dict:
     return maybe_load_json_record(value) or {}
 
 
-def sanitize_reference_candidates(evidence_pack: dict, *, limit: int = 20) -> list[dict]:
+def sanitize_reference_candidates(
+    evidence_pack: dict, config: dict, *, limit: int = 20
+) -> list[dict]:
     candidates = evidence_pack.get("reference_candidates", []) or []
     if not isinstance(candidates, list):
         return []
     try:
-        matched_candidates = resolve_reference_links(candidates[:limit], runtime_config())
+        matched_candidates = resolve_reference_links(candidates[:limit], config)
     except Exception:
         matched_candidates = [
             {
@@ -315,17 +318,18 @@ def figure_table_manifest(
     }
 
 
-def compact_writing_contract() -> dict:
-    depth_requirements = dict(WRITING_CONTRACT_RULES["note_plan_depth_requirements"])
+def compact_writing_contract(language: str | None = None) -> dict:
+    rules = writing_contract_rules(language)
+    depth_requirements = dict(rules["note_plan_depth_requirements"])
     depth_requirements["required_section_focus_fields"] = list(
         depth_requirements["required_section_focus_fields"]
     )
     depth_requirements["generic_focus_phrases"] = list(
         depth_requirements["generic_focus_phrases"]
     )
-    usable_insert_candidate = dict(WRITING_CONTRACT_RULES["usable_insert_candidate"])
+    usable_insert_candidate = dict(rules["usable_insert_candidate"])
     usable_insert_candidate["kinds"] = list(usable_insert_candidate["kinds"])
-    visual_review_contract = deepcopy(WRITING_CONTRACT_RULES["visual_review_contract"])
+    visual_review_contract = deepcopy(rules["visual_review_contract"])
     for field in (
         "review_fields",
         "review_status_values",
@@ -334,7 +338,7 @@ def compact_writing_contract() -> dict:
         "terminal_failure_reasons",
     ):
         visual_review_contract[field] = list(visual_review_contract[field])
-    analysis_coverage = deepcopy(WRITING_CONTRACT_RULES["analysis_coverage_contract"])
+    analysis_coverage = deepcopy(rules["analysis_coverage_contract"])
     analysis_coverage["central_claim_fields"] = list(
         analysis_coverage["central_claim_fields"]
     )
@@ -344,19 +348,25 @@ def compact_writing_contract() -> dict:
     analysis_coverage["final_quality_review_checks"] = list(
         analysis_coverage["final_quality_review_checks"]
     )
-    return {
-        "language": "zh-CN",
+    contract = {
+        "language": rules["language"],
         "contract_role": "manifest_quality_contract",
         "canonical_source": (
             "SKILL.md defines the workflow; scripts/contracts.py defines "
             "machine-checkable contract data."
         ),
-        "must_include_sections": list(NOTE_REQUIRED_SECTIONS),
+        "must_include_sections": list(rules["required_sections"]),
+        "core_info_fields": list(rules["core_info_fields"]),
+        "figure_labels": dict(rules["figure_labels"]),
+        "mechanism_flow_heading": rules["mechanism_flow_heading"],
         "note_plan_contract": {
-            "required_fields": list(NOTE_PLAN_REQUIRED_FIELDS),
-            "field_types": dict(WRITING_CONTRACT_RULES["note_plan_field_types"]),
+            "required_fields": ["output_language", *NOTE_PLAN_REQUIRED_FIELDS],
+            "field_types": {
+                "output_language": "string",
+                **dict(rules["note_plan_field_types"]),
+            },
             "required_field_checks": deepcopy(
-                WRITING_CONTRACT_RULES["note_plan_required_field_checks"]
+                rules["note_plan_required_field_checks"]
             ),
             "artifact_preference": "short_json_planning_file",
             "grounding_field": "section_plan[*].evidence_sources",
@@ -367,21 +377,21 @@ def compact_writing_contract() -> dict:
             "suggested_paper_type_role": "none",
             "allowed_paper_types": list(PAPER_TYPE_VALUES),
         },
-        "contracts_by_paper_type": PAPER_TYPE_CONTRACTS,
+        "contracts_by_paper_type": paper_type_contracts(rules["language"]),
         "grounding_contract": {
             "source_of_truth": "source_manifest",
             "source_index_source_of_truth": "source_manifest",
             "truncation_source_of_truth": "source_manifest.coverage_or_pdf",
             "partial_reading_acceptance_owner": "note_plan_or_grounding",
             "accepted_reference_forms": list(
-                WRITING_CONTRACT_RULES["allowed_grounding_reference_forms"]
+                rules["allowed_grounding_reference_forms"]
             ),
-            "required_sections": list(WRITING_CONTRACT_RULES["grounding_required_sections"]),
+            "required_sections": list(rules["grounding_required_sections"]),
             "note_plan_depth_requirements": depth_requirements,
             "excluded_model_input_fields": list(
-                WRITING_CONTRACT_RULES["excluded_model_input_fields"]
+                rules["excluded_model_input_fields"]
             ),
-            "reject_old_references": list(WRITING_CONTRACT_RULES["old_bundle_reference_prefixes"]),
+            "reject_old_references": list(rules["old_bundle_reference_prefixes"]),
             "lint_command": (
                 "scripts/lint_grounding.py --note-plan ... "
                 "--source-manifest ... --bundle-json ... --figure-decisions ..."
@@ -391,22 +401,26 @@ def compact_writing_contract() -> dict:
             "placeholder_first": True,
             "visual_quality_gate": "fail_closed",
             "decision_table_required": True,
-            "decision_values": list(WRITING_CONTRACT_RULES["figure_decision_values"]),
+            "decision_values": list(rules["figure_decision_values"]),
             "usable_insert_candidate": usable_insert_candidate,
             "allowed_usable_placeholder_reasons": list(
-                WRITING_CONTRACT_RULES["allowed_usable_placeholder_reasons"]
+                rules["allowed_usable_placeholder_reasons"]
             ),
             "manual_visual_review_required_statuses": list(
-                WRITING_CONTRACT_RULES["manual_visual_review_required_statuses"]
+                rules["manual_visual_review_required_statuses"]
             ),
             "automatic_fail_closed_visual_statuses": list(
-                WRITING_CONTRACT_RULES["automatic_fail_closed_visual_statuses"]
+                rules["automatic_fail_closed_visual_statuses"]
             ),
             "manual_review_claim_requires_image_inspection": True,
             "visual_review": visual_review_contract,
         },
         "analysis_coverage_contract": analysis_coverage,
     }
+    abstract_contract = rules.get("abstract_contract")
+    if abstract_contract:
+        contract["abstract_contract"] = deepcopy(abstract_contract)
+    return contract
 
 
 def bundle(
@@ -416,6 +430,7 @@ def bundle(
     assets_wrapper: dict,
     source_manifest: dict | None = None,
     figure_decisions_wrapper: dict | None = None,
+    output_language: str | None = None,
 ) -> dict:
     evidence_pack = (
         evidence_wrapper.get("evidence_pack", {})
@@ -429,12 +444,25 @@ def bundle(
     )
     source_manifest = source_manifest or {}
     figure_decisions_wrapper = figure_decisions_wrapper or {}
+    config = runtime_config(cli_overrides={"output_language": output_language or ""})
+    resolved_output_language = normalize_output_language(config["output_language"])
+    require_artifact_output_language(
+        figures_wrapper,
+        "Figure Plan",
+        resolved_output_language,
+    )
+    require_artifact_output_language(
+        figure_decisions_wrapper,
+        "Figure/Table Decisions",
+        resolved_output_language,
+    )
     identity_contract = identity_contract_summary(metadata, source_manifest)
     canonical_metadata = accepted_bundle_metadata(metadata, identity_contract)
 
     return {
         "status": "ok",
         "script": "build_synthesis_bundle.py",
+        "output_language": resolved_output_language,
         "paper_id": identity_contract.get("paper_id")
         or canonical_metadata.get("paper_id")
         or evidence_wrapper.get("paper_id", ""),
@@ -476,7 +504,7 @@ def bundle(
             "coverage": source_manifest.get("coverage", {}) or {},
         },
         "source_index": source_index(source_manifest),
-        "references": {"candidates": sanitize_reference_candidates(evidence_pack)},
+        "references": {"candidates": sanitize_reference_candidates(evidence_pack, config)},
         "figure_plan": figure_plan,
         "figure_table_manifest": figure_table_manifest(
             figure_decisions_wrapper,
@@ -491,7 +519,7 @@ def bundle(
             "figure_assets": sanitize_figure_assets(assets_wrapper),
             "ocr_available": assets_wrapper.get("ocr_available", False),
         },
-        "writing_contract": compact_writing_contract(),
+        "writing_contract": compact_writing_contract(resolved_output_language),
     }
 
 
@@ -510,7 +538,15 @@ def main() -> None:
         if decision_path.exists():
             figure_decisions.setdefault("decisions_path", str(decision_path.resolve()))
     emit(
-        bundle(metadata, evidence, figures, assets, source_manifest, figure_decisions),
+        bundle(
+            metadata,
+            evidence,
+            figures,
+            assets,
+            source_manifest,
+            figure_decisions,
+            args.language,
+        ),
         args.output,
     )
 

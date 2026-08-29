@@ -22,7 +22,7 @@
   <em>Read one paper deeply. Add one durable page to your academic wiki.</em>
 </p>
 
-**Do you know this situation? You sit down to study an important paper, but the exhausting part is not simply reading it. It is turning what you understood into a note you can still use later.** The time usually disappears into work like this:
+**You sit down to study an important paper. The hard part is not reading it—it is turning what you understood into a note you can still use later.** The time usually disappears into work like this:
 
 - switching between the PDF, Zotero, web pages, and your note app
 - manually organizing metadata, the abstract, figures, and the method backbone
@@ -45,9 +45,9 @@ DeepPaperNote is an agent skill for reading **one paper at a time**. The same co
 
 ## 📰 News
 
+- **[v2.3.0]** 🌐 Added complete English note support across note structure, figure callouts, validation, and Formal Save. [Release notes](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.0)
 - **[2026-07-16]** 🧩 Added [`paper-glossary`](./skills/paper-glossary/README.md), an optional companion skill for building reusable Obsidian terminology notes.
 - **[2026-07-16]** 🔌 DeepPaperNote is now distributed as a plugin for multiple agents, with support for selecting multiple skills from the repository. [PR #12](https://github.com/917Dhj/DeepPaperNote/pull/12)
-- **[v2.0.0]** 🚀 Released a deeper evidence-first paper-reading workflow with stronger note planning and figure handling. [Release notes](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.0.0)
 
 News lists only the three most recent user-facing milestones. See the [changelog](./CHANGELOG.md) and [GitHub Releases](https://github.com/917Dhj/DeepPaperNote/releases) for the full history.
 
@@ -77,8 +77,6 @@ A title, DOI, URL, arXiv ID, or local PDF all work. Zotero items are also suppor
 Generate a deep-reading note for this paper: <title, DOI, URL, arXiv ID, or local PDF>
 Turn this paper into an Obsidian note: <paper>
 ```
-
-DeepPaperNote currently generates Chinese notes by default, and its writing and validation rules are optimized for Chinese output.
 
 ## 🎯 Why DeepPaperNote?
 
@@ -110,17 +108,18 @@ You do not need to install every skill. Choose the ones that match your workflow
 
 The canonical execution contract lives in [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md).
 
-## 🗂️ Obsidian Setup
+## 🗂️ First-Run Preferences
 
-To make an Obsidian vault the default save target, set:
+The first time you hand a paper to your Agent, DeepPaperNote helps you choose:
 
-```bash
-export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/vault"
-```
+- the default note language: English or Simplified Chinese
+- the default save target: the current workspace or your Obsidian Vault
 
-- When a usable vault is configured or provided, DeepPaperNote saves the validated note and its paper-local `images/` directory there.
-- When no vault is configured, DeepPaperNote asks first. It writes to the current workspace only after you explicitly choose not to use a vault.
-- If a configured vault save fails, DeepPaperNote reports the blocked save instead of silently switching to another destination.
+Once confirmed, these preferences are saved on your device and reused for future papers. You can still request a different language or save target for any individual run without changing your defaults.
+
+DeepPaperNote never silently overwrites an existing note or switches save destinations when a save is blocked.
+
+For advanced environment-variable and CLI configuration, see [User Configuration](./skills/deeppapernote/references/user-configuration.md).
 
 ## 🔧 Optional Enhancements
 

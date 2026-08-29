@@ -55,11 +55,15 @@ def run_lint_grounding(
     bundle: dict | None = None,
     figure_decisions: dict | None = None,
 ) -> dict:
+    if figure_decisions is not None:
+        figure_decisions = {"output_language": "zh-CN", **figure_decisions}
     note_plan_path = write_json(tmp_path / "note_plan.json", note_plan)
     source_manifest_path = write_json(tmp_path / "source_manifest.json", source_manifest)
     figure_decisions_path = write_json(
         tmp_path / "figure_decisions.json",
-        figure_decisions if figure_decisions is not None else {"decisions": []},
+        figure_decisions
+        if figure_decisions is not None
+        else {"output_language": "zh-CN", "decisions": []},
     )
     output_path = tmp_path / "grounding.json"
     cmd = [
@@ -113,6 +117,7 @@ def note_plan_with_sources(sources_by_section: dict[str, list[dict] | list[str]]
         for section, sources in sources_by_section.items()
     ]
     return {
+        "output_language": "zh-CN",
         "paper_type": "AI_method",
         "paper_type_rationale": "method paper",
         "dominant_domain": "AI",
@@ -152,11 +157,28 @@ def grounded_note_plan() -> dict:
 
 def slim_bundle() -> dict:
     return {
+        "output_language": "zh-CN",
         "writing_contract": {
+            "language": "zh-CN",
             "contracts_by_paper_type": PAPER_TYPE_CONTRACTS,
             "paper_type_selection": {"source_of_truth": "note_plan.paper_type"},
         }
     }
+
+
+def test_lint_grounding_rejects_mismatched_note_plan_language(tmp_path: Path) -> None:
+    plan = grounded_note_plan()
+    plan["output_language"] = "en"
+
+    result = run_lint_grounding(tmp_path, plan, source_manifest(), slim_bundle())
+    failures = [
+        item for item in result["issues"] if item["code"] == "output_language_contract_failed"
+    ]
+
+    assert result["output_language"] == "zh-CN"
+    assert result["passes_grounding"] is False
+    assert failures[0]["artifact"] == "Note Plan"
+    assert "does not match resolved output_language zh-CN" in failures[0]["reason"]
 
 
 def test_lint_grounding_accepts_section_id_or_page_range(tmp_path: Path) -> None:

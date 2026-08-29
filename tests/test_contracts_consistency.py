@@ -52,6 +52,15 @@ PDF_FAIL_CLOSED_NEGATIONS = (
 
 
 def bundle(**kwargs: object) -> dict:
+    if not kwargs.get("figures_wrapper"):
+        kwargs["figures_wrapper"] = {"output_language": "zh-CN", "figure_plan": {}}
+    if not kwargs.get("figure_decisions_wrapper"):
+        kwargs["figure_decisions_wrapper"] = {"output_language": "zh-CN", "decisions": []}
+    elif "output_language" not in kwargs["figure_decisions_wrapper"]:
+        kwargs["figure_decisions_wrapper"] = {
+            "output_language": "zh-CN",
+            **kwargs["figure_decisions_wrapper"],
+        }
     source_manifest = dict(kwargs.pop("source_manifest", {}) or {})
     source_manifest["identity_contract"] = {
         "artifact_type": "canonical_identity",
@@ -90,6 +99,53 @@ def test_topic_references_do_not_redefine_canonical_workflow() -> None:
     assert "weak-but-honest note" not in deep_analysis
     assert "based mostly on abstract plus metadata" not in deep_analysis
     assert "three-stage model-first pipeline" not in evidence_first
+
+
+def test_skill_owns_one_final_user_report_contract() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+    assert skill.count("Final user report:") == 1
+    for required in (
+        "user's conversation language",
+        "actual saved domain",
+        "report that directory's existing domain",
+        "materialized and retained-placeholder figure/table counts",
+        "Final Note Lint `note_sha256`",
+        "derive every claim from current-run artifacts",
+    ):
+        assert required in skill
+
+    for reference in (SKILL_ROOT / "references").glob("*.md"):
+        assert "Final user report:" not in reference.read_text(encoding="utf-8")
+
+
+def test_skill_owns_one_fail_closed_output_language_contract() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    output_reference = (SKILL_ROOT / "references" / "output-language.md").read_text(
+        encoding="utf-8"
+    )
+    evidence_reference = (SKILL_ROOT / "references" / "evidence-first.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert skill.count("## Language Integrity Contract") == 1
+    for stage in (
+        "Figure Plan",
+        "Figure/Table Decisions",
+        "Synthesis Bundle",
+        "Note Plan",
+        "Grounding Lint",
+        "Final Note Lint",
+        "Final Quality Review",
+        "Final Readability Review",
+        "Formal Save",
+    ):
+        assert stage in skill
+    assert "source_manifest.language_hint" in skill
+    assert "note_sha256" in skill
+    assert "before any save side effect" in skill
+    assert "`SKILL.md` owns the cross-stage Language Integrity Contract" in output_reference
+    assert '"output_language": "zh-CN"' in evidence_reference
 
 
 def test_codex_adapter_stays_thin() -> None:
@@ -268,6 +324,7 @@ def test_bundle_exposes_exact_note_plan_types_and_grounding_command() -> None:
     note_plan_contract = writing_contract["note_plan_contract"]
 
     assert note_plan_contract["field_types"] == {
+        "output_language": "string",
         **{field: "string" for field in NOTE_PLAN_STRING_FIELDS},
         **{field: "array" for field in NOTE_PLAN_LIST_FIELDS},
     }
@@ -565,9 +622,21 @@ def test_skill_owns_formal_save_state_policy() -> None:
     assert marker not in obsidian_format_text
     assert "After such a refusal" not in skill_text
     assert "do not switch to workspace" in skill_text
-    assert "explicitly chooses not to use a vault" in skill_text
+    assert "`save_mode=workspace`" in skill_text
+    assert "references/user-configuration.md" in skill_text
     for policy_phrase in ("permission escalation", "workspace fallback", "explicit user consent"):
         assert policy_phrase not in obsidian_format_text
+
+
+def test_skill_requires_programmatic_save_target_admission_before_drafting() -> None:
+    text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    workflow = text.split("## Workflow", 1)[1].split("## Core Execution Contract", 1)[0]
+
+    assert "Save Target Admission" in workflow
+    assert "write_obsidian_note.py --preflight" in workflow
+    assert workflow.index("Save Target Admission") < workflow.index("plan figure placement")
+    assert "same_language_note_exists" in workflow
+    assert "--expected-existing-note-sha256" in workflow
 
 
 def test_topic_references_keep_separate_note_plan_responsibilities() -> None:
@@ -671,7 +740,8 @@ def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
     assert match is not None
     example = json.loads(match.group(1))
 
-    assert tuple(example.keys()) == NOTE_PLAN_REQUIRED_FIELDS
+    assert tuple(example.keys()) == ("output_language", *NOTE_PLAN_REQUIRED_FIELDS)
+    assert example["output_language"] == "zh-CN"
     assert all(isinstance(example[field], str) for field in NOTE_PLAN_REQUIRED_FIELDS[:3])
     assert all(isinstance(example[field], list) for field in NOTE_PLAN_REQUIRED_FIELDS[3:])
     assert example["paper_type"] in PAPER_TYPE_VALUES

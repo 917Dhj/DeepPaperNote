@@ -11,6 +11,7 @@ from common import (
     default_pdf_path,
     emit,
     fetch_record_from_canonical_identity,
+    file_sha256,
     http_get_bytes,
     maybe_load_json_record,
     paper_id_for_record,
@@ -103,6 +104,7 @@ def main(argv: list[str] | None = None) -> None:
                 "pdf_source": "local_pdf",
                 "source_url": record.get("source_url", "") or str(pdf_path),
                 "pdf_url": "",
+                "source_sha256": file_sha256(pdf_path),
             }
             if identity_summary:
                 payload["identity_contract"] = identity_summary
@@ -157,6 +159,7 @@ def main(argv: list[str] | None = None) -> None:
         "source_url": record.get("source_url", ""),
         "pdf_url": source_value,
         "file_size": target_path.stat().st_size,
+        "source_sha256": file_sha256(target_path),
     }
     if identity_summary:
         payload["identity_contract"] = identity_summary

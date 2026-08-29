@@ -525,6 +525,52 @@ def test_runtime_config_ignores_read_arxiv_obsidian_vault(tmp_path: Path, monkey
     assert root == tmp_path / "DeepPaperNote_output"
 
 
+def test_runtime_config_accepts_complete_environment_without_user_configuration(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config_path = tmp_path / "missing" / "config.json"
+    monkeypatch.setenv("DEEPPAPERNOTE_CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("DEEPPAPERNOTE_OUTPUT_LANGUAGE", "en")
+    monkeypatch.setenv("DEEPPAPERNOTE_SAVE_MODE", "workspace")
+
+    config = common.runtime_config()
+
+    assert config["output_language"] == "en"
+    assert config["save_mode"] == "workspace"
+    assert not config_path.exists()
+
+
+def test_runtime_config_fills_partial_environment_from_user_configuration(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("DEEPPAPERNOTE_OUTPUT_LANGUAGE", "en")
+
+    config = common.runtime_config()
+
+    assert config["output_language"] == "en"
+    assert config["save_mode"] == "workspace"
+
+
+def test_runtime_config_uses_complete_obsidian_environment_without_reading_invalid_file(
+    tmp_path: Path, monkeypatch
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{broken", encoding="utf-8")
+    monkeypatch.setenv("DEEPPAPERNOTE_CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("DEEPPAPERNOTE_OUTPUT_LANGUAGE", "zh-CN")
+    monkeypatch.setenv("DEEPPAPERNOTE_SAVE_MODE", "obsidian")
+    monkeypatch.setenv("DEEPPAPERNOTE_OBSIDIAN_VAULT", str(vault))
+    monkeypatch.setenv("DEEPPAPERNOTE_PAPERS_DIR", "Research/Papers")
+
+    config = common.runtime_config()
+
+    assert config["obsidian_vault"] == str(vault)
+    assert config["papers_dir"] == "Research/Papers"
+    assert config_path.read_text(encoding="utf-8") == "{broken"
+
+
 def test_resolve_obsidian_note_path_in_workspace_mode(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     config = {
@@ -681,7 +727,10 @@ def test_existing_domain_dirs_excludes_root_level_paper_folder(tmp_path: Path) -
     (papers / "大模型").mkdir(parents=True)
     paper_dir = papers / "Attention_Is_All_You_Need"
     paper_dir.mkdir(parents=True)
-    (paper_dir / "Attention_Is_All_You_Need.md").write_text("# note\n", encoding="utf-8")
+    (paper_dir / "Attention_Is_All_You_Need.zh-CN.md").write_text(
+        "# note\n",
+        encoding="utf-8",
+    )
 
     config = {
         "obsidian_vault": str(vault),

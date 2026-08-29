@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+from common import runtime_config
 
 
 def parser() -> argparse.ArgumentParser:
@@ -28,15 +31,48 @@ def parser() -> argparse.ArgumentParser:
         default="auto",
         help="Local Zotero lookup policy used by the resolve stage.",
     )
+    p.add_argument(
+        "--language",
+        default="",
+        choices=("", "en", "zh-CN"),
+        help="Run Override for the output language contract.",
+    )
+    p.add_argument("--save-mode", choices=("workspace", "obsidian"), default="")
+    p.add_argument("--vault", default="", help="Run Override for the Obsidian Vault.")
+    p.add_argument("--papers-dir", default="", help="Run Override for the Vault paper directory.")
     return p
 
 
-def run_step(cmd: list[str]) -> None:
-    subprocess.run(cmd, check=True)
+def run_step(cmd: list[str], *, env: dict[str, str]) -> None:
+    subprocess.run(cmd, check=True, env=env)
 
 
 def main() -> None:
     args = parser().parse_args()
+    try:
+        config = runtime_config(
+            cli_overrides={
+                "output_language": args.language,
+                "save_mode": args.save_mode,
+                "obsidian_vault": args.vault,
+                "papers_dir": args.papers_dir,
+            }
+        )
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    args.language = config["output_language"]
+    run_environment = os.environ.copy()
+    for field, name in {
+        "output_language": "DEEPPAPERNOTE_OUTPUT_LANGUAGE",
+        "save_mode": "DEEPPAPERNOTE_SAVE_MODE",
+        "obsidian_vault": "DEEPPAPERNOTE_OBSIDIAN_VAULT",
+        "papers_dir": "DEEPPAPERNOTE_PAPERS_DIR",
+    }.items():
+        value = str(config.get(field, "")).strip()
+        if value:
+            run_environment[name] = value
+        else:
+            run_environment.pop(name, None)
     scripts_dir = Path(__file__).resolve().parent
     workdir = Path(args.workdir).expanduser().resolve()
     workdir.mkdir(parents=True, exist_ok=True)
@@ -46,11 +82,13 @@ def main() -> None:
     identity_json = workdir / f"{args.prefix}_identity.json"
     identity_trace_json = workdir / f"{args.prefix}_identity_repair_trace.json"
     fetch_json = workdir / f"{args.prefix}_fetch.json"
+    pdf_dir = workdir / f"{args.prefix}_pdfs"
     source_manifest_json = workdir / f"{args.prefix}_source_manifest.json"
     raw_sections_jsonl = workdir / f"{args.prefix}_raw_sections.jsonl"
     full_text_md = workdir / f"{args.prefix}_full_text.md"
     evidence_json = workdir / f"{args.prefix}_evidence.json"
     assets_json = workdir / f"{args.prefix}_assets.json"
+    assets_dir = workdir / f"{args.prefix}_assets"
     figures_json = workdir / f"{args.prefix}_figures.json"
     figure_decisions_json = workdir / f"{args.prefix}_figure_table_decisions.json"
     bundle_json = workdir / f"{args.prefix}_bundle.json"
@@ -65,7 +103,8 @@ def main() -> None:
             args.zotero_mode,
             "--output",
             str(resolve_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -75,7 +114,8 @@ def main() -> None:
             str(resolve_json),
             "--output",
             str(metadata_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -89,7 +129,8 @@ def main() -> None:
             str(identity_trace_json),
             "--output",
             str(identity_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -99,9 +140,12 @@ def main() -> None:
             str(metadata_json),
             "--identity",
             str(identity_json),
+            "--dest-dir",
+            str(pdf_dir),
             "--output",
             str(fetch_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -115,7 +159,8 @@ def main() -> None:
             str(raw_sections_jsonl),
             "--full-text-output",
             str(full_text_md),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -127,7 +172,8 @@ def main() -> None:
             str(source_manifest_json),
             "--output",
             str(evidence_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -135,9 +181,12 @@ def main() -> None:
             str(scripts_dir / "extract_pdf_assets.py"),
             "--input",
             str(fetch_json),
+            "--assets-dir",
+            str(assets_dir),
             "--output",
             str(assets_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -147,9 +196,12 @@ def main() -> None:
             str(evidence_json),
             "--assets",
             str(assets_json),
+            "--language",
+            args.language,
             "--output",
             str(figures_json),
-        ]
+        ],
+        env=run_environment,
     )
     run_step(
         [
@@ -161,12 +213,14 @@ def main() -> None:
             str(figures_json),
             "--assets",
             str(assets_json),
+            "--language",
+            args.language,
             "--output",
             str(figure_decisions_json),
-        ]
+        ],
+        env=run_environment,
     )
-    run_step(
-        [
+    bundle_command = [
             py,
             str(scripts_dir / "build_synthesis_bundle.py"),
             "--metadata",
@@ -184,7 +238,9 @@ def main() -> None:
             "--output",
             str(bundle_json),
         ]
-    )
+    if args.language:
+        bundle_command.extend(["--language", args.language])
+    run_step(bundle_command, env=run_environment)
 
     print(
         "\n".join(

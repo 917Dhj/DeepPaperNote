@@ -1505,6 +1505,57 @@ def test_collect_metadata_preserves_provider_result_as_identity_observation(
     ]
 
 
+def test_exact_swe_bench_title_admits_one_unique_arxiv_match(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    title = "SWE-bench: Can Language Models Resolve Real-world Github Issues?"
+    resolve_payload = {
+        "status": "ok",
+        "script": "resolve_paper.py",
+        "paper_id": "title:2156776fbf55",
+        "source_type": "title_query",
+        "title": title,
+        "metadata_sources": ["title_query"],
+    }
+    monkeypatch.setattr(common, "search_semantic_scholar", lambda *args, **kwargs: [])
+    monkeypatch.setattr(common, "search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(common, "search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        common,
+        "safe_fetch_arxiv_entries",
+        lambda **kwargs: [
+            {
+                "source": "arxiv",
+                "source_type": "arxiv",
+                "title": "SWE-bench: Can Language Models Resolve Real-World GitHub Issues?",
+                "authors": ["Carlos E. Jimenez"],
+                "published": "2023-10-10T16:47:29Z",
+                "arxiv_id": "2310.06770",
+                "pdf_url": "https://arxiv.org/pdf/2310.06770v3",
+            }
+        ],
+    )
+
+    observations = common.collect_metadata_observations(resolve_payload)
+    identity, _ = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload=resolve_payload,
+        metadata_payload={
+            **resolve_payload,
+            "script": "collect_metadata.py",
+            "identity_observations": observations,
+        },
+    )
+
+    assert identity["identity_verdict"] == "accepted"
+    assert identity["accepted_metadata"]["arxiv_id"] == "2310.06770"
+    assert identity["accepted_observations"][0]["reason"] == (
+        "unique_exact_arxiv_title"
+    )
+
+
 @pytest.mark.parametrize(
     "module",
     [extract_source_text, extract_evidence, extract_pdf_assets],

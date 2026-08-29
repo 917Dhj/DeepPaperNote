@@ -21,7 +21,9 @@ from contracts import (
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
     required_field_value_error,
+    writing_contract_rules,
 )
+from localization import normalize_output_language, require_artifact_output_language
 from source_corpus import SourceCorpusLoadError, load_source_corpus
 
 
@@ -186,6 +188,11 @@ def parser() -> argparse.ArgumentParser:
         help="Figure/table decisions JSON path or JSON string.",
     )
     p.add_argument("--output", default="", help="Output JSON path.")
+    p.add_argument(
+        "--language",
+        default="",
+        help="Run Override for output language: en or zh-CN.",
+    )
     return p
 
 
@@ -379,6 +386,7 @@ def source_grounding_errors(source: Any, valid_ids: set[str], max_page: int) -> 
 def validate_note_plan(
     note_plan: dict[str, Any],
     source_manifest: dict[str, Any],
+    language: str | None = None,
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
     required_checks = WRITING_CONTRACT_RULES["note_plan_required_field_checks"]
@@ -400,7 +408,7 @@ def validate_note_plan(
 
     valid_ids = source_section_ids(source_manifest)
     max_page = total_pages(source_manifest)
-    required_sections = set(WRITING_CONTRACT_RULES["grounding_required_sections"])
+    required_sections = set(writing_contract_rules(language)["grounding_required_sections"])
     grounded_sections: set[str] = set()
     section_plan = note_plan.get("section_plan", [])
     if not isinstance(section_plan, list):
@@ -638,14 +646,35 @@ def validate_figure_decisions(
 
 
 def main() -> None:
+    from common import runtime_config
+
     args = parser().parse_args()
     note_plan = load_record(args.note_plan)
     source_manifest = load_record(args.source_manifest)
     bundle = load_record(args.bundle_json) if args.bundle_json else {}
     decisions = load_record(args.figure_decisions)
 
+    language = normalize_output_language(
+        runtime_config(cli_overrides={"output_language": args.language})["output_language"]
+    )
+    writing_contract = bundle.get("writing_contract", {}) if isinstance(bundle, dict) else {}
     issues = []
-    issues.extend(validate_note_plan(note_plan, source_manifest))
+    for artifact, name in (
+        (bundle, "Synthesis Bundle"),
+        (note_plan, "Note Plan"),
+        (decisions, "Figure/Table Decisions"),
+        (
+            {"output_language": writing_contract.get("language")}
+            if isinstance(writing_contract, dict)
+            else {},
+            "Synthesis Bundle writing_contract",
+        ),
+    ):
+        try:
+            require_artifact_output_language(artifact, name, language)
+        except ValueError as exc:
+            issues.append(issue("output_language_contract_failed", artifact=name, reason=str(exc)))
+    issues.extend(validate_note_plan(note_plan, source_manifest, language))
     issues.extend(validate_bundle_contract(note_plan, bundle))
     issues.extend(validate_figure_decisions(source_manifest, decisions, args.source_manifest))
     error_issues = [item for item in issues if item.get("severity", "error") == "error"]
@@ -653,6 +682,7 @@ def main() -> None:
         "status": "ok",
         "script": "lint_grounding.py",
         "paper_id": source_manifest.get("paper_id", note_plan.get("paper_id", "")),
+        "output_language": language,
         "issues": issues,
         "warnings": [item for item in issues if item.get("severity") == "warning"],
         "passes_grounding": not error_issues,

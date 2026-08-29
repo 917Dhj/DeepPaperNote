@@ -11,6 +11,7 @@ from pathlib import Path
 
 from _zotero_local import probe_zotero_local_api
 from common import emit, env_config_value, runtime_config
+from user_configuration import inspect_configuration
 
 
 def parser() -> argparse.ArgumentParser:
@@ -68,7 +69,8 @@ def find_local_zotero_hints() -> list[str]:
 
 def main() -> None:
     args = parser().parse_args()
-    config = runtime_config()
+    configuration = inspect_configuration()
+    config = runtime_config() if configuration["state"] == "ready" else {}
     zotero_local_api = probe_zotero_local_api()
 
     obsidian_vault = str(config.get("obsidian_vault", "")).strip()
@@ -81,6 +83,7 @@ def main() -> None:
         "status": "ok",
         "script": "check_environment.py",
         "tool_role": "maintenance",
+        "user_configuration": configuration,
         "python": {
             "executable": sys.executable,
             "version": sys.version.split()[0],
@@ -101,8 +104,7 @@ def main() -> None:
             "current_working_directory": str(Path.cwd().resolve()),
             "workspace_output_dir": str(config.get("workspace_output_dir", "DeepPaperNote_output")),
             "note": (
-                "If no Obsidian vault is configured, DeepPaperNote can still save notes under "
-                "the current working directory."
+                "With save_mode=workspace, DeepPaperNote saves under the current working directory."
             ),
         },
         "zotero": {

@@ -163,6 +163,54 @@ def test_fetch_pdf_uses_only_identity_bound_sources(
     assert payload["paper_id"] == "doi:10.1234/trusted"
     assert payload["title"] == "Trusted Paper"
     assert payload["pdf_url"] == "https://example.test/trusted.pdf"
+    assert payload["source_sha256"] == (
+        "0cdae4135f26b10e67e6c4972b573c29913948373e8dc6210624b283b99c830d"
+    )
+
+
+def test_fetch_pdf_hashes_the_original_bound_local_pdf(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "original.pdf"
+    metadata_path = tmp_path / "metadata.json"
+    identity_path = tmp_path / "identity.json"
+    output_path = tmp_path / "fetch.json"
+    pdf_path.write_bytes(b"%PDF-1.7\nlocal-original")
+    metadata_path.write_text(
+        json.dumps({"status": "ok", "script": "collect_metadata.py"}),
+        encoding="utf-8",
+    )
+    identity_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "build_identity_contract.py",
+                "artifact_type": "canonical_identity",
+                "schema_version": 2,
+                "paper_id": "paper:local-original",
+                "identity_verdict": "accepted",
+                "work_level_identity": {"title": "Local Original"},
+                "source_manifestation": {"source_kind": "local_pdf"},
+                "bound_sources": [{"kind": "local_pdf", "value": str(pdf_path)}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    fetch_pdf.main(
+        [
+            "--input",
+            str(metadata_path),
+            "--identity",
+            str(identity_path),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["pdf_path"] == str(pdf_path.resolve())
+    assert payload["source_sha256"] == (
+        "f131d003c562388dc22cf50d93c60ae52a598b4b2c72963adeb08d812aa92fca"
+    )
 
 
 def test_fetch_pdf_refuses_legacy_identity_without_bound_sources(

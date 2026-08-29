@@ -45,9 +45,9 @@ DeepPaperNote 是一个专注于**一次精读一篇论文**的 Agent Skill。�
 
 ## 📰 最新动态
 
+- **[v2.3.0]** 🌐 新增完整英文笔记支持，从章节结构、图表标注到校验与 Formal Save，全流程保持英文一致。[版本说明](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.0)
 - **[2026-07-16]** 🧩 新增可选 companion skill [`paper-glossary`](./skills/paper-glossary/README.md)，用于构建可复用的 Obsidian 术语笔记。
 - **[2026-07-16]** 🔌 DeepPaperNote 现在以支持多个 Agent 的插件形式分发，并支持从仓库中选择多个 skill。[PR #12](https://github.com/917Dhj/DeepPaperNote/pull/12)
-- **[v2.0.0]** 🚀 发布更深入的证据优先论文精读流程，并加强笔记规划与图表处理。[版本说明](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.0.0)
 
 这里只保留最近三条用户可感知的重要动态。完整历史请查看 [CHANGELOG](./CHANGELOG.md) 与 [GitHub Releases](https://github.com/917Dhj/DeepPaperNote/releases)。
 
@@ -77,8 +77,6 @@ DeepPaperNote 需要 Python 3.10 或更高版本。核心 PDF 抽取路径依赖
 给这篇论文生成深度笔记：<论文标题、DOI、URL、arXiv ID 或本地 PDF>
 把这篇论文整理成 Obsidian 笔记：<论文>
 ```
-
-DeepPaperNote 默认生成中文笔记，当前写作与校验规则也主要针对中文输出优化。
 
 ## 🎯 为什么选择 DeepPaperNote？
 
@@ -110,17 +108,18 @@ DeepPaperNote 仍然是唯一主产品。仓库同时提供一个可选 companio
 
 规范执行契约以 [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md) 为准。
 
-## 🗂️ Obsidian 配置
+## 🗂️ 首次使用设置
 
-如果希望默认保存到 Obsidian 库，请设置：
+第一次把论文交给 Agent 时，DeepPaperNote 会引导你选择：
 
-```bash
-export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian/库/绝对路径"
-```
+- 默认使用英文还是简体中文生成笔记
+- 默认保存到当前 workspace 还是 Obsidian Vault
 
-- 配置或提供了可用的 Vault 时，DeepPaperNote 会把校验完成的笔记及其论文专属 `images/` 目录保存到该 Vault。
-- 没有配置 Vault 时，DeepPaperNote 会先询问；只有你明确选择不使用 Vault 后，才会写入当前 workspace。
-- 如果已配置的 Vault 保存失败，DeepPaperNote 会报告保存受阻，而不会静默切换到其他目标。
+确认后，这些偏好会保存在当前设备上，并自动用于后续论文。你仍然可以为某一次任务临时指定不同的语言或保存位置，而不改变默认偏好。
+
+DeepPaperNote 不会静默覆盖已有笔记，也不会在保存受阻时擅自切换保存位置。
+
+环境变量与 CLI 等高级配置请查看[用户配置说明](./skills/deeppapernote/references/user-configuration.md)。
 
 ## 🔧 可选增强
 

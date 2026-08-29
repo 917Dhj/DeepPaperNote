@@ -8,7 +8,7 @@ description: Generate a high-quality deep-reading note for a single paper and wr
 Use this skill when the user wants one outcome:
 - read one paper carefully
 - generate a high-quality Markdown note
-- save the note into an Obsidian-style vault when configured, or into the current workspace when no vault is configured
+- save the note to the workspace or Obsidian target selected by resolved configuration
 
 Chinese trigger examples:
 - `给这篇论文生成深度笔记`
@@ -16,7 +16,31 @@ Chinese trigger examples:
 - `把这篇文章整理成 obsidian 笔记`
 - `读这篇论文并生成 md 笔记`
 
+English trigger examples:
+- `Generate a deep-reading note for this paper`
+- `Turn this paper into an Obsidian research note`
+
+## User Configuration
+
+Before a normal paper run, read `references/user-configuration.md` for configuration admission, migration, repair, Run Overrides, and Preference Changes.
+
+Resolve Run Overrides from the explicit request, CLI, and current process environment first. When they form a complete valid configuration for the selected Save Mode, Configuration Readiness is complete without reading User Configuration. Only inspect User Configuration when those Run Overrides need fallback values.
+
+## Language Integrity Contract
+
+After Configuration Readiness, resolve one `output_language` (`zh-CN` or `en`) for the run. `source_manifest.language_hint` describes source text only and never selects the note profile.
+
+Bind that exact value through Save Target Admission → Figure Plan → Figure/Table Decisions → Synthesis Bundle → Note Plan → Grounding Lint → Final Note Lint → Final Quality Review → Final Readability Review → Formal Save:
+
+- Every JSON artifact in the chain carries a top-level `output_language`; the Synthesis Bundle also carries the same value at `writing_contract.language`.
+- Before producing its output, every adjacent consumer requires each input language and compares it with the resolved value. Missing, unsupported, or mismatched values stop the run; no stage infers or defaults an artifact language.
+- Final Quality Review and Final Readability Review each receive the resolved value and check the note against only that profile.
+- Final Note Lint records `note_sha256`. Any review edit invalidates the prior lint, so rerun Final Note Lint under the same language. Formal Save requires the lint language and `note_sha256` to match the final note, and validates Figure/Table Decisions language before any save side effect.
+
+This contract is complete only when every named stage is bound to the resolved value and Formal Save validates the final bytes. Read `references/output-language.md` for profile content while drafting or debugging either language.
+
 This skill is intentionally narrow:
+- it is one canonical Skill and one pipeline with two output profiles
 - it handles one paper at a time
 - it does not update daily reading lists
 - it does not treat a shallow abstract rewrite as a successful output
@@ -44,21 +68,28 @@ The note must adapt to the paper type. Use the same base structure, but shift em
 ## Workflow
 
 Follow this order:
-1. resolve the paper identity
-2. collect metadata
-3. acquire the best available PDF
-4. extract canonical raw source text: `*_raw_sections.jsonl`, `*_source_manifest.json`, and optional derived `*_full_text.md`
-5. extract structural indexes and PDF assets
-6. plan figure placement
-7. build the full figure/table decision table
-8. build the manifest synthesis bundle
-9. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract
-10. draft from the plan only after the grounding gate passes
-11. have the model write the note
-12. lint the final note against the same `note_plan` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 13, 14, or 15
-13. perform `final_quality_review` after lint passes
-14. perform `final_readability_review` after the quality review passes
-15. write into Obsidian
+1. complete Configuration Readiness: resolve Run Overrides first, and inspect User Configuration only when they are incomplete; advance only after the resolved run configuration is complete and valid
+2. resolve the paper identity
+3. collect metadata
+4. acquire the best available PDF
+5. extract canonical raw source text: `*_raw_sections.jsonl`, `*_source_manifest.json`, and optional derived `*_full_text.md`
+6. perform Save Target Admission before drafting or domain routing:
+   - for Obsidian mode, run `scripts/write_obsidian_note.py --preflight` with the resolved title, exact `output_language`, Vault, and `*_source_manifest.json`; this program result is authoritative, so do not replace it with prompt-only duplicate checking
+   - when admission returns `reuse_source_directory` or `reuse_empty_same_name_directory`, use that directory and skip domain selection
+   - when it returns `same_language_note_exists`, stop before drafting and ask whether to overwrite the reported note. If the user approves, rerun preflight with `--overwrite-existing-note --expected-existing-note-sha256 <reported_sha256>` and carry that exact confirmation into Formal Save; if the user declines, stop without writing
+   - for any other blocked conflict, report the returned ambiguity and stop without creating a second directory
+   - workspace mode does not scan an Obsidian Vault and continues through its normal domain routing
+7. extract structural indexes and PDF assets
+8. plan figure placement
+9. build the full figure/table decision table
+10. build the manifest synthesis bundle
+11. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract, including its exact `output_language`
+12. draft from the plan only after the grounding gate passes
+13. have the model write the note
+14. lint the final note against the same `note_plan` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 15, 16, or 17
+15. perform `final_quality_review` after lint passes
+16. perform `final_readability_review` after the quality review passes
+17. perform Formal Save to the admitted target with `scripts/write_obsidian_note.py`, the same Source Manifest, and any user-approved overwrite hash; the script repeats admission before the first save side effect
 
 This is the required workflow for a normal single-paper note request, not a loose suggestion.
 Unless this skill explicitly marks a stage as optional, required stages must not be silently skipped, reordered into a shortcut, or treated as complete just because a partial artifact already exists.
@@ -83,6 +114,17 @@ Completion-language rule:
 - if the workflow stopped early, name the current stage and the still-missing required stages instead of using completion language
 - lint is a floor, not the writing objective
 
+Final user report:
+- Keep the completion wording defined above. After a successful Formal Save, report in the user's conversation language.
+- Lead with the final note link or path, save mode, and actual saved domain. Read the domain from the final note path under the configured papers root in Obsidian mode or output root in workspace mode; when Save Target Admission reused an existing directory, report that directory's existing domain.
+- Then report, in order:
+  1. paper title and strongest verified identifier
+  2. Grounding Lint, Final Note Lint, Final Quality Review, and Final Readability Review results, plus the warning count
+  3. materialized and retained-placeholder figure/table counts
+  4. whether the saved note SHA-256 matches the Final Note Lint `note_sha256`
+- Add overwrite actions, preference changes, or user-relevant warnings only when they occurred.
+- Keep the report to these fields and derive every claim from current-run artifacts.
+
 ## Core Execution Contract
 
 `SKILL.md` plus the generated `synthesis_bundle.json` must be enough to complete a normal note-generation run.
@@ -92,12 +134,11 @@ Non-negotiable rules:
 - evidence-first: draft from the synthesis bundle, `source_manifest`, raw sections, coverage metadata, explicit `note_plan`, and inspected paper evidence; never finish from title/abstract/headings alone
 - raw-source authority: for ordinary PDFs, `*_raw_sections.jsonl` and `*_source_manifest.json` are the canonical reading material; old top-N evidence buckets, truncated `section_texts`, and `candidate_chunks` are not model-facing writing inputs
 - fail-closed: if a usable PDF or sufficient evidence cannot be obtained after supported acquisition paths, stop and ask for better source material rather than producing a finished degraded note
-- model-first: scripts structure evidence, but the model must decide emphasis, contribution, mechanism, limitations, and final Chinese prose
-- required structure: include the canonical required sections, with `原文摘要翻译` before `一句话总结` and a dedicated `创新点` section immediately after `原文摘要翻译`
-- abstract translation: when abstract metadata exists, `原文摘要翻译` is a faithful Chinese translation of the original abstract, not a bilingual block and not the model's own summary
-- mechanism depth: method, framework, and system papers should include `### 机制流程` under `方法主线`, normally as a 3 to 4 step numbered flow with input, operation, and output destination
+- model-first: scripts structure evidence, but the model must decide emphasis, contribution, mechanism, limitations, and final prose in the configured language
+- required structure: include the localized canonical sections in the order declared by `writing_contract.must_include_sections`
+- abstract fidelity: preserve the original abstract's meaning without adding later evidence or model judgments; translate it in `zh-CN` mode and render it faithfully in English in `en` mode
+- mechanism depth: method, framework, and system papers should include the localized mechanism-flow subsection under the localized method section, normally as a 3 to 4 step numbered flow with input, operation, and output destination
 - placeholder-first figures: plan major figure/table placeholders first; replace one only when identity match and visual usability are both strong; otherwise keep the placeholder
-- final quality gates: lint is a floor; after lint passes, first run `final_quality_review` for analytical depth, then run `final_readability_review` for language polish, and rerun lint if either review edits the note
 
 Reference usage policy:
 - do not load every reference file by default
@@ -133,27 +174,26 @@ Formal Save states:
 
 | Save Target state | Required action |
 |---|---|
-| Vault configured or provided and usable | Perform the Formal Save to that vault. |
-| Vault configured or provided, but the Formal Save fails | Keep the current Save Target and attempt an in-scope recovery. If it still cannot complete, report `blocked`; do not switch to workspace. |
-| No vault configured or provided | Ask whether the user wants to provide one. Use workspace only after the user explicitly chooses not to use a vault. |
+| `save_mode=obsidian` and the configured Vault is usable | Perform the Formal Save to that Vault. |
+| `save_mode=obsidian` and Formal Save fails | Keep the current Save Target and attempt an in-scope recovery. If it still cannot complete, report `blocked`; do not switch to workspace. |
+| `save_mode=workspace` | Perform the Formal Save inside the current workspace output root. |
 
 - A normal note-generation request should complete in one pass: note text, figure placeholder decisions, image materialization when confident, and final save.
 - Do not stop after a text-only draft just to ask whether the user wants figures inserted. Finish the figure replacement decision inside the same task unless the user explicitly asked for text only.
 - The note must use real heading levels: `#`, `##`, and `###`.
 - Every final note must start with an Obsidian YAML properties block above the `#` title heading. Include at least a `tags` field with a `papers/<domain>` value and useful `aliases`; include `date`, `doi`, or `arxiv_id` when known, and omit unavailable fields rather than inventing placeholders.
-- `## 核心信息` must be a fixed metadata block only. Use only these fields, in this order, as `- 字段名: 值` bullets: `标题`, `标题翻译`, `作者`, `机构`, `发表时间`, `发表渠道`, `DOI`, `arXiv`, `论文链接`, `代码 / 项目`, `数据 / 资源`, `论文类型`. Omit unavailable fields; put any guide sentence, takeaway, or analysis in `一句话总结` or a later section instead.
-- The note should include `原文摘要翻译` near the beginning when abstract metadata is available, before `一句话总结`.
-- When abstract metadata is available, `原文摘要翻译` should directly translate the original paper abstract into Chinese rather than restating it as your own summary.
-- The `原文摘要翻译` section itself should be Chinese-only; do not place English abstract sentences or English paragraph excerpts in that section.
-- Do not mix later judgments, innovation summaries, or hindsight explanations into `原文摘要翻译`; keep it as the original abstract translated into Chinese.
-- The note should include a dedicated `创新点` section immediately after `原文摘要翻译` and before `一句话总结`.
-- The `创新点` section should not be empty praise. It should enumerate the paper's actual innovations and briefly explain why each one matters.
+- The localized Core Information section must be a fixed metadata block only. Use only the fields and order declared by `writing_contract.core_info_fields`; omit unavailable fields and move commentary to a later analysis section.
+- Include the localized Abstract section near the beginning when abstract metadata is available, before the one-sentence summary.
+- The Abstract section should faithfully render the paper's original abstract in the configured language rather than replacing it with a model-written summary.
+- Do not mix later judgments, contribution summaries, or hindsight explanations into the Abstract section.
+- Include a dedicated localized Contributions section immediately after Abstract and before the one-sentence summary.
+- Contributions should enumerate the paper's actual innovations and explain why each matters rather than offering empty praise.
 - High-quality notes should usually contain multiple meaningful `###` subheadings in the technical sections when the paper is non-trivial.
 - Generate the complete figure/table decision table and satisfy the generated `writing_contract.figure_table_contract` before drafting or saving.
 - After the synthesis bundle is built, complete the model-led Visual Review Gate and Figure/Table Decision Freeze before creating `note_plan`; no `review_pending` item may cross that boundary.
 - Pass the grounding and final-note figure gates before advancing; revise any failed decision coverage, insertion, structure, or status check.
 - An `insert` decision is complete only after Formal Save materializes the selected image into the paper-local `images/` directory and the write succeeds.
-- The note must pass a style gate: no mixed Chinese-English prose lines except stable proper nouns or citation metadata.
+- The note must pass the style gate for its configured language: `zh-CN` rejects mixed Chinese-English prose artifacts, while `en` rejects Chinese prose outside citation metadata.
 - The style gate also rejects mechanical term-replacement artifacts such as `KV缓存 of`, `批量ing`, `In相关 Researcher`, or `Single 序列 generation`; rewrite the sentence naturally instead of preserving a partially translated phrase.
 - Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, fix the reported issues and re-run lint. Keep fixing and re-running until lint passes — multiple rounds are normal and expected. Do not decide that any failure is an acceptable exception — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only escalate to the user if the same failures appear unchanged across multiple rounds with no reduction, indicating the model is unable to make further progress independently.
 - If PDF or evidence quality is insufficient for a real deep note, fail closed: stop, report the blocked stage, and ask for the better PDF, OCR/source material, or other input needed to continue.
@@ -172,7 +212,7 @@ Model-first rule:
 - central quantitative comparisons with three or more systems, settings, tasks, datasets, metrics, or ablation rows should normally be written as compact Markdown tables, followed by interpretation; do not leave the main result table as a loose bullet list when a table would be clearer
 - short papers still need a complete deep note: use the saved space to explain protocol details, ablations, limitations, and deployment or replication implications rather than compressing the note into a terse summary
 - after `final_quality_review` passes, reread the full note once more for readability; do not stop at formal compliance only
-- in `final_readability_review`, ordinary English phrase leftovers should usually be rewritten into natural Chinese, while stable proper nouns may remain in English
+- in `final_readability_review`, rewrite language leftovers into natural prose in the configured language while preserving stable proper nouns
 - do not use `final_readability_review` to invent new facts, empty filler text, or shallower but safer wording just to satisfy lint
 
 The topic references above can improve difficult runs, but the normal execution path should not depend on reading all of them.
@@ -181,6 +221,7 @@ The topic references above can improve difficult runs, but the normal execution 
 
 Use these bundled scripts rather than rebuilding the workflow from scratch:
 - `scripts/check_environment.py`
+- `scripts/user_configuration.py`
 - `scripts/create_input_record.py`
 - `scripts/locate_zotero_attachment.py`
 - `scripts/resolve_paper.py`

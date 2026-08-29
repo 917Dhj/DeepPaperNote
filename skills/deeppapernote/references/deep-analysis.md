@@ -1,10 +1,12 @@
 # Deep Analysis
 
+Language note: the analytical standard is language-independent. Draft in the configured output language; for `en`, use the exact headings and labels in `output-language.md`. Chinese-specific examples below apply only to `zh-CN`.
+
 Use this guide when the user wants a note that feels like a real research note rather than a cleaned-up summary.
 
 ## Goal
 
-Produce a Chinese paper note that helps future rereading answer:
+Produce a paper note in the configured language that helps future rereading answer:
 - this paper is really solving what problem
 - the core route or method chain is what
 - which evidence actually supports the claim

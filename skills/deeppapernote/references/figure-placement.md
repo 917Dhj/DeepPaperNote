@@ -1,5 +1,7 @@
 # Figure Placement
 
+Language note: target sections and figure-callout labels must follow the generated writing contract. For English output, use the labels in `output-language.md`.
+
 In MVP, the skill must plan figure placement even when it cannot extract image files.
 
 ## Goal

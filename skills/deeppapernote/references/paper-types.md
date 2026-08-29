@@ -1,5 +1,7 @@
 # Paper Types
 
+Language note: use the localized `contracts_by_paper_type` and section names from the generated synthesis bundle. The examples below use the backward-compatible Chinese schema; `output-language.md` defines the English schema.
+
 Every note keeps the same 12 top-level sections from `NOTE_REQUIRED_SECTIONS`.
 Paper type only changes the typed semantics of shared sections and the recommended `###` subsections used in `note_plan.section_plan`.
 

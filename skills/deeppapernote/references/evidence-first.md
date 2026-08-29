@@ -58,6 +58,7 @@ Recommended shape:
 
 ```json
 {
+  "output_language": "zh-CN",
   "paper_type": "AI_method",
   "paper_type_rationale": "The paper proposes a model mechanism and evaluates it against baselines; the script suggestion was treated only as a hint.",
   "dominant_domain": "machine learning",
