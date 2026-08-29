@@ -45,9 +45,9 @@ DeepPaperNote 是一个专注于**一次精读一篇论文**的 Agent Skill。�
 
 ## 📰 最新动态
 
+- **[2026-08-29]** 🌐 新增完整英文笔记支持，从章节结构、图表标注到校验与 Formal Save，全流程保持英文一致。[查看更新](./CHANGELOG.md#unreleased)
 - **[2026-07-16]** 🧩 新增可选 companion skill [`paper-glossary`](./skills/paper-glossary/README.md)，用于构建可复用的 Obsidian 术语笔记。
 - **[2026-07-16]** 🔌 DeepPaperNote 现在以支持多个 Agent 的插件形式分发，并支持从仓库中选择多个 skill。[PR #12](https://github.com/917Dhj/DeepPaperNote/pull/12)
-- **[v2.0.0]** 🚀 发布更深入的证据优先论文精读流程，并加强笔记规划与图表处理。[版本说明](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.0.0)
 
 这里只保留最近三条用户可感知的重要动态。完整历史请查看 [CHANGELOG](./CHANGELOG.md) 与 [GitHub Releases](https://github.com/917Dhj/DeepPaperNote/releases)。
 
@@ -77,9 +77,6 @@ DeepPaperNote 需要 Python 3.10 或更高版本。核心 PDF 抽取路径依赖
 给这篇论文生成深度笔记：<论文标题、DOI、URL、arXiv ID 或本地 PDF>
 把这篇论文整理成 Obsidian 笔记：<论文>
 ```
-
-DeepPaperNote 完整支持英文和简体中文笔记结构。如果当前进程继承的 `DEEPPAPERNOTE_*` 环境变量已经完整，运行时不会读取 `~/.deeppapernote/config.json`；否则 Agent 才把该文件作为 fallback，并只询问仍未解析的字段。
-下方“用户配置”统一说明两种保存模式、两套语言 Profile 与单次覆盖方式。章节名称、元数据字段、图表占位、规划规则、校验与 Formal Save 都会遵循解析后的语言。
 
 ## 🎯 为什么选择 DeepPaperNote？
 
@@ -111,82 +108,18 @@ DeepPaperNote 仍然是唯一主产品。仓库同时提供一个可选 companio
 
 规范执行契约以 [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md) 为准。
 
-## 🗂️ 用户配置
+## 🗂️ 首次使用设置
 
-DeepPaperNote 可以完全使用当前进程环境变量运行；也可以在 `~/.deeppapernote/config.json` 中保存可选的设备本地长期偏好，作为 fallback 和明确的未来默认值。
+第一次把论文交给 Agent 时，DeepPaperNote 会引导你选择：
 
-| 字段 | 有效值 | 何时必填 |
-| --- | --- | --- |
-| `output_language` | `zh-CN` 或 `en` | 始终必填 |
-| `save_mode` | `workspace` 或 `obsidian` | 始终必填 |
-| `obsidian_vault` | 已存在的绝对目录 | 仅 `obsidian` 模式 |
-| `papers_dir` | Vault 内安全的相对路径 | 仅 `obsidian` 模式 |
+- 默认使用英文还是简体中文生成笔记
+- 默认保存到当前 workspace 还是 Obsidian Vault
 
-英文 workspace 配置只需要两个始终必填的字段：
+确认后，这些偏好会保存在当前设备上，并自动用于后续论文。你仍然可以为某一次任务临时指定不同的语言或保存位置，而不改变默认偏好。
 
-```bash
-export DEEPPAPERNOTE_OUTPUT_LANGUAGE=en
-export DEEPPAPERNOTE_SAVE_MODE=workspace
-```
+DeepPaperNote 不会静默覆盖已有笔记，也不会在保存受阻时擅自切换保存位置。
 
-等价的可选 User Configuration 是：
-
-```json
-{
-  "output_language": "en",
-  "save_mode": "workspace"
-}
-```
-
-简体中文 Obsidian 配置还要给出 Vault 与论文目录：
-
-```bash
-export DEEPPAPERNOTE_OUTPUT_LANGUAGE=zh-CN
-export DEEPPAPERNOTE_SAVE_MODE=obsidian
-export DEEPPAPERNOTE_OBSIDIAN_VAULT="/你的/Obsidian/Vault/绝对路径"
-export DEEPPAPERNOTE_PAPERS_DIR="Research/Papers"
-```
-
-等价的可选 User Configuration 是：
-
-```json
-{
-  "output_language": "zh-CN",
-  "save_mode": "obsidian",
-  "obsidian_vault": "/你的/Obsidian/Vault/绝对路径",
-  "papers_dir": "Research/Papers"
-}
-```
-
-配置会在论文身份解析等昂贵步骤之前完成。DeepPaperNote 会先解析显式请求、CLI 参数和当前进程环境变量；如果它们已经构成完整合法的配置，就不读取 User Configuration。否则才读取 `config.json` 作为 fallback，并通过一个 Configuration Prompt Batch 只询问仍未解析的字段；fallback 文件不可读时会失败关闭。
-
-当前进程环境变量是正式的 Run Override，不会改写可选配置文件。只有当继承的变量不完整且 `config.json` 不存在时，shell 启动文件才会作为迁移候选；确认后才写入长期偏好。Preference Change 会保留未知（unknown）JSON 字段；替换畸形 JSON 前会先备份，并且必须得到确认。
-
-### Run Override 与 Preference Change
-
-每次运行都按以下固定优先级解析：
-
-`explicit request > CLI > current process environment > User Configuration`
-
-- “这篇论文仅本次用英文生成”是 Run Override，`config.json` 保持逐字节不变。
-- “这篇论文仅本次用中文生成”是对应的 `zh-CN` Run Override。
-- “以后默认生成英文笔记”是 Preference Change，确认后才修改未来默认值。
-- CLI 选项 `--language`、`--save-mode`、`--vault`、`--papers-dir` 都是 Run Override。例如：
-
-```bash
-python3 skills/deeppapernote/scripts/run_pipeline.py --input '<paper>' --language en --save-mode obsidian --vault /absolute/path/to/vault --papers-dir Research/Papers
-```
-
-workspace 模式本次不会使用 `obsidian_vault` 与 `papers_dir`，但会保留这些偏好，供以后 Obsidian 运行继续使用。Run Override 不会自动变成 Preference Change。
-
-### 输出语言 Profile 与 Formal Save
-
-- `zh-CN` 依次使用 `核心信息`、`原文摘要翻译`、`创新点`、`一句话总结`、`研究问题`、`数据与任务定义`、`方法主线`、`关键结果`、`深度分析`、`局限`、`我的笔记`、`引用`；方法部分使用 `机制流程`。图表 callout 使用 `建议位置：`、`放置原因：`、`当前状态：`，真实图片说明以 `论文原图编号：` 开头。
-- `en` 依次使用 `Core Information`、`Abstract`、`Contributions`、`One-Sentence Summary`、`Research Question`、`Data and Task Definition`、`Method`、`Key Results`、`Deep Analysis`、`Limitations`、`Research Notes`、`References`；方法部分使用 `Mechanism Flow`。图表 callout 使用 `Suggested location:`、`Why it matters:`、`Current status:`，真实图片说明以 `Original paper item:` 开头。
-
-两种 Profile 的 Abstract 都必须忠实呈现原论文摘要，并使用请求的输出语言；后续创新点和结果解释留在后续章节。同一个 canonical Skill 与一条流水线（one pipeline）会把选定语言一直绑定到 lint 和 Formal Save。
-
-Formal Save 会把 Markdown 笔记与 paper-local `images/` 目录写入选定的 workspace 或 Obsidian 目标。在 Obsidian 模式下，DeepPaperNote 会为原始 PDF 计算指纹，并在开始写作前搜索整个 Vault；同一来源的 `<paper>.zh-CN.md` 与 `<paper>.en.md` 会共用同一个身份目录。已经存在同语言笔记时绝不会静默覆盖：保存程序会返回原笔记路径与哈希，并要求用户明确确认。目录身份保存在 `.deeppapernote.json` 中；Windows 上还会设置原生 Hidden 属性。即使没有插入图片，`images/` 仍属于论文保存布局；保存受阻时也不会静默切换模式。
+环境变量与 CLI 等高级配置请查看[用户配置说明](./skills/deeppapernote/references/user-configuration.md)。
 
 ## 🔧 可选增强
 

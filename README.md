@@ -22,7 +22,7 @@
   <em>Read one paper deeply. Add one durable page to your academic wiki.</em>
 </p>
 
-**Do you know this situation? You sit down to study an important paper, but the exhausting part is not simply reading it. It is turning what you understood into a note you can still use later.** The time usually disappears into work like this:
+**You sit down to study an important paper. The hard part is not reading it—it is turning what you understood into a note you can still use later.** The time usually disappears into work like this:
 
 - switching between the PDF, Zotero, web pages, and your note app
 - manually organizing metadata, the abstract, figures, and the method backbone
@@ -45,9 +45,9 @@ DeepPaperNote is an agent skill for reading **one paper at a time**. The same co
 
 ## 📰 News
 
+- **[2026-08-29]** 🌐 Added complete English note support across note structure, figure callouts, validation, and Formal Save. [What's new](./CHANGELOG.md#unreleased)
 - **[2026-07-16]** 🧩 Added [`paper-glossary`](./skills/paper-glossary/README.md), an optional companion skill for building reusable Obsidian terminology notes.
 - **[2026-07-16]** 🔌 DeepPaperNote is now distributed as a plugin for multiple agents, with support for selecting multiple skills from the repository. [PR #12](https://github.com/917Dhj/DeepPaperNote/pull/12)
-- **[v2.0.0]** 🚀 Released a deeper evidence-first paper-reading workflow with stronger note planning and figure handling. [Release notes](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.0.0)
 
 News lists only the three most recent user-facing milestones. See the [changelog](./CHANGELOG.md) and [GitHub Releases](https://github.com/917Dhj/DeepPaperNote/releases) for the full history.
 
@@ -77,9 +77,6 @@ A title, DOI, URL, arXiv ID, or local PDF all work. Zotero items are also suppor
 Generate a deep-reading note for this paper: <title, DOI, URL, arXiv ID, or local PDF>
 Turn this paper into an Obsidian note: <paper>
 ```
-
-DeepPaperNote supports complete English and Simplified Chinese note schemas. A complete set of inherited `DEEPPAPERNOTE_*` environment variables starts the run without reading `~/.deeppapernote/config.json`; otherwise your Agent uses that file as a fallback and asks only for unresolved fields.
-The User Configuration section below covers both save modes, both language profiles, and one-run overrides. Section names, metadata fields, figure callouts, planning guidance, linting, and Formal Save all follow the resolved language.
 
 ## 🎯 Why DeepPaperNote?
 
@@ -111,82 +108,18 @@ You do not need to install every skill. Choose the ones that match your workflow
 
 The canonical execution contract lives in [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md).
 
-## 🗂️ User Configuration
+## 🗂️ First-Run Preferences
 
-DeepPaperNote can run entirely from current-process environment variables. It also stores optional durable device-local preferences in `~/.deeppapernote/config.json` for fallback values and explicit future defaults.
+The first time you hand a paper to your Agent, DeepPaperNote helps you choose:
 
-| Field | Valid values | When required |
-| --- | --- | --- |
-| `output_language` | `zh-CN` or `en` | Always |
-| `save_mode` | `workspace` or `obsidian` | Always |
-| `obsidian_vault` | Existing absolute directory | Only for `obsidian` |
-| `papers_dir` | Safe relative path inside the Vault | Only for `obsidian` |
+- the default note language: English or Simplified Chinese
+- the default save target: the current workspace or your Obsidian Vault
 
-An English workspace configuration needs only the two always-required fields:
+Once confirmed, these preferences are saved on your device and reused for future papers. You can still request a different language or save target for any individual run without changing your defaults.
 
-```bash
-export DEEPPAPERNOTE_OUTPUT_LANGUAGE=en
-export DEEPPAPERNOTE_SAVE_MODE=workspace
-```
+DeepPaperNote never silently overwrites an existing note or switches save destinations when a save is blocked.
 
-The equivalent optional User Configuration is:
-
-```json
-{
-  "output_language": "en",
-  "save_mode": "workspace"
-}
-```
-
-A Simplified Chinese Obsidian configuration also names the Vault and paper directory:
-
-```bash
-export DEEPPAPERNOTE_OUTPUT_LANGUAGE=zh-CN
-export DEEPPAPERNOTE_SAVE_MODE=obsidian
-export DEEPPAPERNOTE_OBSIDIAN_VAULT="/absolute/path/to/your/vault"
-export DEEPPAPERNOTE_PAPERS_DIR="Research/Papers"
-```
-
-The equivalent optional User Configuration is:
-
-```json
-{
-  "output_language": "zh-CN",
-  "save_mode": "obsidian",
-  "obsidian_vault": "/absolute/path/to/your/vault",
-  "papers_dir": "Research/Papers"
-}
-```
-
-Configuration is resolved before paper identity or other expensive paper work. DeepPaperNote first resolves the explicit request, CLI arguments, and current process environment. If those values form a complete valid configuration, the run proceeds without reading User Configuration. Otherwise the Agent reads `config.json` as fallback and presents one Configuration Prompt Batch only for unresolved fields; an unreadable fallback file fails closed instead of continuing.
-
-Current-process environment values are first-class Run Overrides and never change the optional file. Shell startup files are consulted only as migration candidates when inherited values are incomplete and `config.json` is absent. Preference Changes preserve unknown JSON fields, and malformed JSON is backed up before confirmed replacement.
-
-### Run Overrides and Preference Changes
-
-Runtime values follow this exact precedence:
-
-`explicit request > CLI > current process environment > User Configuration`
-
-- “Generate this paper's note in English just this once” is a Run Override and leaves `config.json` byte-for-byte unchanged.
-- “Generate this paper's note in Simplified Chinese just this once” is the corresponding `zh-CN` Run Override.
-- “Change my default output language to English” is a Preference Change and updates the future default after confirmation.
-- CLI options `--language`, `--save-mode`, `--vault`, and `--papers-dir` are Run Overrides. For example:
-
-```bash
-python3 skills/deeppapernote/scripts/run_pipeline.py --input '<paper>' --language en --save-mode obsidian --vault /absolute/path/to/vault --papers-dir Research/Papers
-```
-
-Workspace mode does not use `obsidian_vault` or `papers_dir` for that run, but it preserves those preferences for future Obsidian runs. Run Overrides never become Preference Changes automatically.
-
-### Output Language Profiles and Formal Save
-
-- `zh-CN` uses `核心信息`, `原文摘要翻译`, `创新点`, `一句话总结`, `研究问题`, `数据与任务定义`, `方法主线`, `关键结果`, `深度分析`, `局限`, `我的笔记`, and `引用`, with `机制流程` under the method section. Figure callouts use `建议位置：`, `放置原因：`, and `当前状态：`; a materialized-image caption begins with `论文原图编号：`.
-- `en` uses `Core Information`, `Abstract`, `Contributions`, `One-Sentence Summary`, `Research Question`, `Data and Task Definition`, `Method`, `Key Results`, `Deep Analysis`, `Limitations`, `Research Notes`, and `References`, with `Mechanism Flow`. Figure callouts use `Suggested location:`, `Why it matters:`, and `Current status:`; a materialized-image caption begins with `Original paper item:`.
-
-In either profile, Abstract faithfully renders the source abstract in the requested language; later contribution claims and interpretation stay in later sections. The same canonical Skill and one pipeline carry the chosen language through lint and Formal Save.
-
-Formal Save writes the Markdown note and its paper-local `images/` directory to the selected workspace or Obsidian target. In Obsidian mode, DeepPaperNote fingerprints the original PDF, searches the entire Vault before drafting, and keeps language variants such as `<paper>.zh-CN.md` and `<paper>.en.md` in one source-identified directory. A same-language note is never silently overwritten: the save reports its path and hash and requires explicit confirmation. The directory identity lives in `.deeppapernote.json`; Windows saves also apply the native Hidden attribute. The `images/` directory remains part of the saved paper layout even when no image is inserted, and a blocked save never silently switches modes.
+For advanced environment-variable and CLI configuration, see [User Configuration](./skills/deeppapernote/references/user-configuration.md).
 
 ## 🔧 Optional Enhancements
 

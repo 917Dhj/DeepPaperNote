@@ -37,6 +37,19 @@ Current process environment values are first-class Run Overrides and may satisfy
 
 Preference Changes preserve unknown JSON fields and report a warning. Malformed or non-object JSON receives a unique invalid backup before a confirmed replacement. Writes use a same-directory temporary file, atomic replacement, and exact reread comparison.
 
+## Advanced Run Overrides
+
+Normal Agent use does not require these options. For direct CLI or environment-based runs, use the following mappings:
+
+| Preference | Current-process environment | CLI option |
+|---|---|---|
+| `output_language` | `DEEPPAPERNOTE_OUTPUT_LANGUAGE` | `--language` |
+| `save_mode` | `DEEPPAPERNOTE_SAVE_MODE` | `--save-mode` |
+| `obsidian_vault` | `DEEPPAPERNOTE_OBSIDIAN_VAULT` | `--vault` |
+| `papers_dir` | `DEEPPAPERNOTE_PAPERS_DIR` | `--papers-dir` |
+
+These values are Run Overrides for the current process or command. They do not become saved preferences unless the user separately confirms a Preference Change.
+
 ## Completion criteria
 
 Configuration is ready only when every active field is present and valid, the resolved values contain no missing or invalid field, and the workflow has not begun identity resolution. A User Configuration file is not required when Run Overrides already meet that condition. Obsidian mode requires an existing absolute Vault and a traversal-safe relative paper directory. Workspace mode requires neither Obsidian field and cannot be redirected by stale values.

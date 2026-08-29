@@ -42,7 +42,7 @@
         <text id="AGENT-SKILL" xml:space="preserve" x="110" y="80" font-family="Georgia" font-size="18" fill="#b8c6dd" letter-spacing="1.6">AGENT SKILL</text>
         <text id="DeepPaperNote" xml:space="preserve" x="81" y="203" font-family="Avenir Next" font-size="86" font-weight="700" fill="#f3f6fb" letter-spacing="-2.6">DeepPaperNote</text>
         <path id="path96" fill="none" stroke="#7085ab" stroke-width="1.2" d="M 85 247 L 391 247"/>
-        <text id="Turn-comples-papers-into" xml:space="preserve" x="83" y="311" font-family="Georgia" font-size="34" font-style="italic" fill="#d7dfec" letter-spacing="0.2">Turn comples papers into notes worth keeping.</text>
+        <text id="Turn-complex-papers-into" xml:space="preserve" x="83" y="311" font-family="Georgia" font-size="34" font-style="italic" fill="#d7dfec" letter-spacing="0.2">Turn complex papers into notes worth keeping.</text>
         <text id="Understand-faster-Write-less" xml:space="preserve" x="83" y="413" font-family="Avenir Next" font-size="26" fill="#99abc7">Understand faster. Write less. Keep more.</text>
         <text id="Structured-notes-for-deep" xml:space="preserve" x="83" y="451" font-family="Avenir Next" font-size="26" fill="#99abc7">Structured notes for deep reading and real research workflows.</text>
         <g id="g3" opacity="0.95">
