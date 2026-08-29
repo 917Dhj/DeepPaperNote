@@ -114,6 +114,17 @@ Completion-language rule:
 - if the workflow stopped early, name the current stage and the still-missing required stages instead of using completion language
 - lint is a floor, not the writing objective
 
+Final user report:
+- Keep the completion wording defined above. After a successful Formal Save, report in the user's conversation language.
+- Lead with the final note link or path, save mode, and actual saved domain. Read the domain from the final note path under the configured papers root in Obsidian mode or output root in workspace mode; when Save Target Admission reused an existing directory, report that directory's existing domain.
+- Then report, in order:
+  1. paper title and strongest verified identifier
+  2. Grounding Lint, Final Note Lint, Final Quality Review, and Final Readability Review results, plus the warning count
+  3. materialized and retained-placeholder figure/table counts
+  4. whether the saved note SHA-256 matches the Final Note Lint `note_sha256`
+- Add overwrite actions, preference changes, or user-relevant warnings only when they occurred.
+- Keep the report to these fields and derive every claim from current-run artifacts.
+
 ## Core Execution Contract
 
 `SKILL.md` plus the generated `synthesis_bundle.json` must be enough to complete a normal note-generation run.

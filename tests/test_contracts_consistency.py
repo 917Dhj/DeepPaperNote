@@ -101,6 +101,24 @@ def test_topic_references_do_not_redefine_canonical_workflow() -> None:
     assert "three-stage model-first pipeline" not in evidence_first
 
 
+def test_skill_owns_one_final_user_report_contract() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+    assert skill.count("Final user report:") == 1
+    for required in (
+        "user's conversation language",
+        "actual saved domain",
+        "report that directory's existing domain",
+        "materialized and retained-placeholder figure/table counts",
+        "Final Note Lint `note_sha256`",
+        "derive every claim from current-run artifacts",
+    ):
+        assert required in skill
+
+    for reference in (SKILL_ROOT / "references").glob("*.md"):
+        assert "Final user report:" not in reference.read_text(encoding="utf-8")
+
+
 def test_skill_owns_one_fail_closed_output_language_contract() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
     output_reference = (SKILL_ROOT / "references" / "output-language.md").read_text(
