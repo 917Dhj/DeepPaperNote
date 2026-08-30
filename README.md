@@ -16,7 +16,7 @@
 
 </div>
 
-[![DeepPaperNote Hero](./assets/hero-academic.svg)](https://917dhj.github.io/DeepPaperNote/)
+[![DeepPaperNote Hero](./assets/hero-deep-reading-workshop.png)](https://917dhj.github.io/DeepPaperNote/)
 
 <p align="center">
   <em>Read one paper deeply. Add one durable page to your academic wiki.</em>

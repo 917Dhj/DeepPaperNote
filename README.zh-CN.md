@@ -16,7 +16,7 @@
 
 </div>
 
-[![DeepPaperNote Hero](./assets/hero-academic.svg)](https://917dhj.github.io/DeepPaperNote/)
+[![DeepPaperNote Hero](./assets/hero-deep-reading-workshop.png)](https://917dhj.github.io/DeepPaperNote/)
 
 <p align="center">
   <em>深读一篇论文，沉淀一页学术 Wiki。</em>
