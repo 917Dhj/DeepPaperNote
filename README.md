@@ -67,6 +67,12 @@ The installer lets you choose which skills to install and which agents should re
 python3 -m pip install PyMuPDF
 ```
 
+If you use `uv`, install `PyMuPDF` into the same Python environment that DeepPaperNote will use:
+
+```bash
+uv pip install PyMuPDF
+```
+
 DeepPaperNote requires Python 3.10 or newer. `PyMuPDF` powers the core PDF extraction path.
 
 ### 3. Hand a paper to your agent
