@@ -16,7 +16,7 @@
 
 </div>
 
-[![DeepPaperNote Hero](./assets/hero-academic.svg)](https://917dhj.github.io/DeepPaperNote/)
+[![DeepPaperNote Hero](./assets/hero-deep-reading-workshop.png)](https://917dhj.github.io/DeepPaperNote/)
 
 <p align="center">
   <em>Read one paper deeply. Add one durable page to your academic wiki.</em>
@@ -65,6 +65,12 @@ The installer lets you choose which skills to install and which agents should re
 
 ```bash
 python3 -m pip install PyMuPDF
+```
+
+If you use `uv`, install `PyMuPDF` into the same Python environment that DeepPaperNote will use:
+
+```bash
+uv pip install PyMuPDF
 ```
 
 DeepPaperNote requires Python 3.10 or newer. `PyMuPDF` powers the core PDF extraction path.

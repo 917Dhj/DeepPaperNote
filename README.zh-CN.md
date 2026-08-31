@@ -16,7 +16,7 @@
 
 </div>
 
-[![DeepPaperNote Hero](./assets/hero-academic.svg)](https://917dhj.github.io/DeepPaperNote/)
+[![DeepPaperNote Hero](./assets/hero-deep-reading-workshop.png)](https://917dhj.github.io/DeepPaperNote/)
 
 <p align="center">
   <em>深读一篇论文，沉淀一页学术 Wiki。</em>
@@ -65,6 +65,12 @@ npx skills add 917Dhj/DeepPaperNote
 
 ```bash
 python3 -m pip install PyMuPDF
+```
+
+如果你使用 `uv`，请将 `PyMuPDF` 安装到 DeepPaperNote 实际使用的同一 Python 环境中：
+
+```bash
+uv pip install PyMuPDF
 ```
 
 DeepPaperNote 需要 Python 3.10 或更高版本。核心 PDF 抽取路径依赖 `PyMuPDF`。
