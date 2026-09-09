@@ -106,6 +106,8 @@ DeepPaperNote remains the main product. The repository also includes an optional
 
 You do not need to install every skill. Choose the ones that match your workflow during installation.
 
+**When the paper isn't native-PDF text yet.** The core path is PyMuPDF over a real PDF. But the material often arrives otherwise: a lecture video or talk recording instead of a paper, a web page that hosts the paper with in-page video/attachments, or a PDF that never yields extractable text. DeepPaperNote can only deep-read what is actually text — so run those through [cue-omni-reader](https://github.com/sensedeal/cue-skills/tree/main/cue-omni-reader) first and hand over clean Markdown (web pages including in-page video/attachments, plus authorized local documents, audio, or video; several local files at once). Install: `npx skills add sensedeal/cue-skills --skill cue-omni-reader` (MIT; may bill).
+
 ## ✅ Quality Promise
 
 - The result should be a deep-reading note for one paper, not an abstract rewrite.

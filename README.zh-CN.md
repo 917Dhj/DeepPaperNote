@@ -106,6 +106,8 @@ DeepPaperNote 仍然是唯一主产品。仓库同时提供一个可选 companio
 
 你不需要一次安装所有 skill。安装时选择适合自己工作流的部分即可。
 
+**当论文还不是「原生 PDF 文本」时。** 核心路径是 PyMuPDF 读取真实 PDF，但材料常常不是这种形态：讲座视频或报告录音而不是论文、托管论文且带页内视频/附件的网页、或根本提不出可提取文本的 PDF。DeepPaperNote 只能精读真正是文本的内容——所以先用 [cue-omni-reader](https://github.com/sensedeal/cue-skills/tree/main/cue-omni-reader) 收成干净的 Markdown（网页含页内视频/附件，加已授权本地文档/音频/视频，一次可选多个本地文件），再交给它精读。安装：`npx skills add sensedeal/cue-skills --skill cue-omni-reader`（MIT，可能计费）。
+
 ## ✅ 质量承诺
 
 - 最终结果应该是一篇单篇论文深度笔记，而不是摘要改写。
