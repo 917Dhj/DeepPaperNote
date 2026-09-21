@@ -43,6 +43,8 @@ DeepPaperNote is an agent skill for reading **one paper at a time**. The same co
 > [!tip]
 > If you already use Obsidian or Zotero, DeepPaperNote automates the most time-consuming and error-prone parts of evidence gathering, organization, and note production.
 
+DeepPaperNote works with [DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector): collect a paper PDF into Obsidian, then generate its note in the same verified directory. Different PDF versions can coexist with separate source-bound notes; existing notes remain protected.
+
 ## 📰 News
 
 - **[v2.3.0]** 🌐 Added complete English note support across note structure, figure callouts, validation, and Formal Save. [Release notes](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.0)

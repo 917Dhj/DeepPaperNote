@@ -341,6 +341,8 @@ def build_manifest(
         "language_hint": language_hint_for_text(full_text),
         "text_hash_sha256": text_hash(full_text),
     }
+    if isinstance(record.get("archive_source"), dict):
+        manifest["archive_source"] = record["archive_source"]
     if isinstance(record.get("identity_contract"), dict):
         manifest["identity_contract"] = record.get("identity_contract")
     if isinstance(record.get("source_manifestation"), dict):

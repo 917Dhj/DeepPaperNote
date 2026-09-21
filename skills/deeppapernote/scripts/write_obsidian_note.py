@@ -11,6 +11,7 @@ import re
 import shutil
 import sys
 import tempfile
+from contextlib import nullcontext
 from pathlib import Path
 
 from common import (
@@ -26,6 +27,23 @@ from common import (
 )
 from lint_note import inspect_reference_hygiene
 from localization import normalize_output_language, require_artifact_output_language
+from paper_archive import (
+    ArchiveError,
+    admit_directory,
+    archive_lock,
+    directory_candidates,
+    new_record,
+    pdf_identity,
+    read_record,
+    record_work_evidence,
+    register_source,
+    safe_path,
+    select_directory,
+    source_details,
+    verify_pdf,
+    work_identity,
+    write_record,
+)
 
 PAPER_DIRECTORY_SIDECAR = ".deeppapernote.json"
 SOURCE_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -107,6 +125,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--subdir", default="", help="Vault-relative subdirectory.")
     p.add_argument("--filename", default="", help="Explicit note filename.")
     p.add_argument("--asset-subdir", default="images", help="Asset folder name relative to the note directory.")
+    p.add_argument("--target-directory", default="", help="Previously selected existing paper directory.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
     p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
     p.add_argument(
@@ -334,48 +353,6 @@ def language_note_path(target_path: Path, output_language: str) -> Path:
     return target_path.with_name(f"{stem}.{output_language}{suffix}")
 
 
-def same_name_directories(vault: Path, directory_name: str) -> list[Path]:
-    return sorted(
-        {
-            path.resolve()
-            for path in vault.rglob("*")
-            if (
-                path.is_dir()
-                and path.name == directory_name
-                and path.resolve().is_relative_to(vault.resolve())
-            )
-        }
-    )
-
-
-def read_paper_directory_sidecar(path: Path) -> dict | None:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8-sig"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if (
-        not isinstance(payload, dict)
-        or payload.get("artifact_type") != "deeppapernote_paper_directory"
-        or payload.get("schema_version") != 1
-        or not SOURCE_SHA256_RE.fullmatch(str(payload.get("source_sha256", "")))
-        or not str(payload.get("note_stem", "")).strip()
-        or Path(str(payload.get("note_stem", ""))).name != payload.get("note_stem")
-    ):
-        return None
-    return payload
-
-
-def source_directories(vault: Path, source_sha256: str) -> list[tuple[Path, dict]]:
-    matches: list[tuple[Path, dict]] = []
-    for sidecar_path in vault.rglob(PAPER_DIRECTORY_SIDECAR):
-        if not sidecar_path.resolve().is_relative_to(vault.resolve()):
-            continue
-        payload = read_paper_directory_sidecar(sidecar_path)
-        if payload is not None and payload["source_sha256"] == source_sha256:
-            matches.append((sidecar_path.parent.resolve(), payload))
-    return sorted(matches, key=lambda item: str(item[0]))
-
-
 def block_directory_conflict(
     args: argparse.Namespace,
     *,
@@ -433,118 +410,62 @@ def resolve_obsidian_save_target(
     source_sha256: str,
     output_language: str,
 ) -> tuple[Path, str, str, bool, str]:
-    source_matches = source_directories(vault, source_sha256)
-    if len(source_matches) > 1:
+    archive_input = getattr(args, "archive_input", {"title": title})
+    details = getattr(args, "source_details", {})
+    identity_path = resolve_obsidian_note_path(config, title=title, filename=args.filename)
+    resolved_subdir = ""
+    try:
+        candidates = directory_candidates(
+            vault, archive_input, source_sha256, identity_path.parent.name
+        )
+        existing_dir = select_directory(candidates, getattr(args, "target_directory", ""))
+        if existing_dir:
+            registry = admit_directory(existing_dir, archive_input, source_sha256)
+            if getattr(args, 'pdf_identity', None):
+                record_work_evidence(registry['work'], source_sha256, args.pdf_identity)
+            source = register_source(registry, source_sha256, details)
+            notes = source["notes"]
+            if output_language in notes:
+                target_path = safe_path(existing_dir, notes[output_language]["filename"])
+                if not target_path.is_file():
+                    raise ArchiveError("recorded_language_note_missing", [existing_dir])
+            else:
+                target_path = safe_path(existing_dir, f"{source['note_stem']}.{output_language}.md")
+            admission = (
+                "reuse_source_directory"
+                if read_record(existing_dir)
+                else (
+                    "reuse_pdf_directory"
+                    if any(existing_dir.iterdir())
+                    else "reuse_empty_same_name_directory"
+                )
+            )
+            domain_routing_skipped = True
+        else:
+            resolved_subdir = resolve_domain_subdir(
+                config, title=title, abstract=abstract, subdir=args.subdir
+            )
+            target_path = resolve_obsidian_note_path(
+                config, title=title, subdir=resolved_subdir, filename=args.filename
+            )
+            registry = new_record(title, target_path.stem, archive_input)
+            source = register_source(registry, source_sha256, details)
+            target_path = language_note_path(target_path, output_language)
+            admission = "new_directory"
+            domain_routing_skipped = False
+        args.archive_registry = registry
+        args.admitted_asset_subdir = source["asset_subdir"]
+        if target_path.is_symlink() or not target_path.resolve().is_relative_to(vault.resolve()):
+            raise ArchiveError("unsafe_archive_path", [target_path])
+    except ArchiveError as exc:
         block_directory_conflict(
             args,
-            conflict_code="multiple_source_directories",
-            target_directories=[path for path, _ in source_matches],
+            conflict_code=exc.code,
+            target_directories=[Path(p) for p in exc.paths] or [identity_path.parent],
             source_sha256=source_sha256,
             output_language=output_language,
         )
 
-    resolved_subdir = ""
-    recorded_language_target = False
-    if source_matches:
-        existing_dir, sidecar = source_matches[0]
-        notes = sidecar.get("notes", {})
-        if not isinstance(notes, dict):
-            block_directory_conflict(
-                args,
-                conflict_code="invalid_language_note_record",
-                target_directories=[existing_dir],
-                source_sha256=source_sha256,
-                output_language=output_language,
-            )
-        if output_language in notes:
-            note_record = notes[output_language]
-            filename = (
-                str(note_record.get("filename", "")).strip()
-                if isinstance(note_record, dict)
-                else ""
-            )
-            if (
-                not filename
-                or filename in {".", ".."}
-                or "/" in filename
-                or "\\" in filename
-                or Path(filename).is_absolute()
-                or Path(filename).suffix.lower() != ".md"
-            ):
-                block_directory_conflict(
-                    args,
-                    conflict_code="invalid_language_note_record",
-                    target_directories=[existing_dir],
-                    source_sha256=source_sha256,
-                    output_language=output_language,
-                )
-            target_path = existing_dir / filename
-            recorded_language_target = True
-            if not target_path.is_file():
-                block_directory_conflict(
-                    args,
-                    conflict_code="recorded_language_note_missing",
-                    target_directories=[existing_dir],
-                    source_sha256=source_sha256,
-                    output_language=output_language,
-                )
-        else:
-            target_path = existing_dir / f"{sidecar['note_stem']}.md"
-        admission = "reuse_source_directory"
-        domain_routing_skipped = True
-    else:
-        identity_path = resolve_obsidian_note_path(
-            config,
-            title=title,
-            filename=args.filename,
-        )
-        name_matches = same_name_directories(vault, identity_path.parent.name)
-        if len(name_matches) > 1:
-            block_directory_conflict(
-                args,
-                conflict_code="multiple_same_name_directories",
-                target_directories=name_matches,
-                source_sha256=source_sha256,
-                output_language=output_language,
-            )
-        if name_matches:
-            existing_dir = name_matches[0]
-            if any(existing_dir.iterdir()):
-                existing_sidecar = read_paper_directory_sidecar(
-                    existing_dir / PAPER_DIRECTORY_SIDECAR
-                )
-                block_directory_conflict(
-                    args,
-                    conflict_code=(
-                        "same_name_different_source"
-                        if existing_sidecar is not None
-                        else "unidentified_same_name_directory"
-                    ),
-                    target_directories=name_matches,
-                    source_sha256=source_sha256,
-                    output_language=output_language,
-                )
-            target_path = existing_dir / identity_path.name
-            admission = "reuse_empty_same_name_directory"
-            domain_routing_skipped = True
-        else:
-            resolved_subdir = resolve_domain_subdir(
-                config,
-                title=title,
-                abstract=abstract,
-                subdir=args.subdir,
-            )
-            target_path = resolve_obsidian_note_path(
-                config,
-                title=title,
-                subdir=resolved_subdir,
-                filename=args.filename,
-            )
-            admission = "new_directory"
-            domain_routing_skipped = False
-
-    if not recorded_language_target:
-        target_path = language_note_path(target_path, output_language)
     approved_existing_note_sha256 = ""
     if target_path.is_file():
         existing_note_sha256 = file_sha256(target_path)
@@ -594,39 +515,21 @@ def write_paper_directory_sidecar(
     source_sha256: str,
     output_language: str,
     note_sha256: str,
+    registry: dict | None = None,
 ) -> Path:
     sidecar_path = target_path.parent / PAPER_DIRECTORY_SIDECAR
-    payload = read_paper_directory_sidecar(sidecar_path) or {
-        "artifact_type": "deeppapernote_paper_directory",
-        "schema_version": 1,
-        "paper_id": paper_id,
-        "title": title,
-        "source_sha256": source_sha256,
-        "note_stem": target_path.name.removesuffix(f".{output_language}{target_path.suffix}"),
-        "notes": {},
-    }
-    if payload["source_sha256"] != source_sha256:
-        raise SystemExit(f"Paper directory sidecar source mismatch: {sidecar_path}")
-    notes = payload.get("notes")
-    if not isinstance(notes, dict):
-        notes = {}
-        payload["notes"] = notes
-    notes[output_language] = {
-        "filename": target_path.name,
-        "note_sha256": note_sha256,
-    }
-    fd, temp_name = tempfile.mkstemp(
-        dir=sidecar_path.parent,
-        prefix=f"{PAPER_DIRECTORY_SIDECAR}.",
-        suffix=".tmp",
+    payload = (
+        registry
+        or read_record(target_path.parent)
+        or new_record(
+            title,
+            target_path.name.removesuffix(f".{output_language}{target_path.suffix}"),
+            {"title": title, "paper_id": paper_id},
+        )
     )
-    temp_path = Path(temp_name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
-        os.replace(temp_path, sidecar_path)
-    finally:
-        temp_path.unlink(missing_ok=True)
+    source = register_source(payload, source_sha256, {})
+    source["notes"][output_language] = {"filename": target_path.name, "note_sha256": note_sha256}
+    write_record(target_path.parent, payload)
     ensure_sidecar_hidden(sidecar_path)
     return sidecar_path
 
@@ -683,7 +586,9 @@ def main() -> None:
             "papers_dir": args.papers_dir,
         }
     )
-    output_language = normalize_output_language(args.language or str(config.get("output_language", "")) or None)
+    output_language = normalize_output_language(
+        args.language or str(config.get("output_language", "")) or None
+    )
     output_mode, root_path = resolve_note_output_mode(config)
 
     record = maybe_load_json_record(args.input) or {}
@@ -694,6 +599,33 @@ def main() -> None:
     source_manifest = (
         require_source_manifest(args.source_manifest) if output_mode == "obsidian" else {}
     )
+    args.archive_input = {**record, **source_manifest, "title": title}
+    if not args.target_directory:
+        args.target_directory = (source_manifest.get("archive_source") or {}).get(
+            "target_directory", ""
+        )
+    pdf_value = (source_manifest.get("pdf") or {}).get("path") or source_manifest.get(
+        "pdf_path", ""
+    )
+    pdf_path = Path(pdf_value).expanduser() if pdf_value else None
+    if pdf_path and (
+        not pdf_path.is_file() or file_sha256(pdf_path) != source_manifest["source_sha256"]
+    ):
+        raise SystemExit("Source Manifest PDF does not match source_sha256.")
+    if pdf_path:
+        expected_work = work_identity(args.archive_input)
+        try:
+            observed = (
+                verify_pdf(pdf_path, args.archive_input)
+                if expected_work["identifiers"]
+                else pdf_identity(pdf_path)
+            )
+            args.pdf_identity = observed
+            record_work_evidence(expected_work, source_manifest['source_sha256'], observed)
+            args.archive_input["work"] = expected_work
+        except ArchiveError as exc:
+            raise SystemExit(str(exc)) from exc
+    args.source_details = source_details(args.archive_input, pdf_path)
     admission = "workspace"
     domain_routing_skipped = False
     approved_existing_note_sha256 = ""
@@ -739,6 +671,7 @@ def main() -> None:
                 "domain_routing_skipped": domain_routing_skipped,
                 "target_directory": str(target_path.parent),
                 "note_path": str(target_path),
+                "asset_subdir": args.admitted_asset_subdir,
                 "source_sha256": str(source_manifest["source_sha256"]),
                 "output_language": output_language,
             },
@@ -804,138 +737,141 @@ def main() -> None:
         )
     require_reference_hygiene(note_text, "before save")
 
-    overwrote_existing_note = bool(approved_existing_note_sha256)
-    if output_mode == "obsidian":
-        # ponytail: this closes sequential TOCTOU changes; add a Vault lock only
-        # if concurrent DeepPaperNote writers must be fully serialized.
-        rechecked_target, _, _, _, rechecked_existing_sha256 = resolve_obsidian_save_target(
-            args,
-            config,
-            root_path,
-            title=title,
-            abstract=str(record.get("abstract", "")),
-            source_sha256=str(source_manifest["source_sha256"]),
-            output_language=output_language,
-        )
-        if (
-            rechecked_target.resolve() != target_path.resolve()
-            or rechecked_existing_sha256 != approved_existing_note_sha256
-        ):
-            block_directory_conflict(
+    with archive_lock(root_path) if output_mode == "obsidian" else nullcontext():
+        if pdf_path and file_sha256(pdf_path) != source_manifest["source_sha256"]:
+            raise SystemExit("Source Manifest PDF changed before save.")
+        overwrote_existing_note = bool(approved_existing_note_sha256)
+        if output_mode == "obsidian":
+            rechecked_target, _, _, _, rechecked_existing_sha256 = resolve_obsidian_save_target(
                 args,
-                conflict_code="save_target_changed",
-                target_directories=[target_path.parent, rechecked_target.parent],
-                source_sha256=str(source_manifest["source_sha256"]),
-                output_language=output_language,
-            )
-
-    asset_dir = resolve_note_asset_dir(target_path, args.asset_subdir)
-    asset_subdir = asset_dir.relative_to(target_path.parent).as_posix()
-    asset_directory_existed = asset_dir.exists()
-    ensure_parent(target_path)
-    paper_id = (
-        args.paper_id
-        or str(source_manifest.get("paper_id", ""))
-        or str(record.get("paper_id", ""))
-    )
-    sidecar_path = (
-        target_path.parent / PAPER_DIRECTORY_SIDECAR
-        if output_mode == "obsidian"
-        else None
-    )
-    note_backup = None
-    sidecar_backup = None
-    created_assets: list[Path] = []
-    note_attempted = False
-    sidecar_attempted = False
-    try:
-        note_backup = backup_file(target_path)
-        sidecar_backup = backup_file(sidecar_path) if sidecar_path is not None else None
-        materialized_figures = (
-            materialize_insert_decisions(
-                note_text,
-                target_path,
-                figure_decisions,
-                asset_subdir,
-                created_assets,
-            )
-            if figure_decisions
-            else []
-        )
-        if (
-            approved_existing_note_sha256
-            and file_sha256(target_path) != approved_existing_note_sha256
-        ):
-            block_note_conflict(
-                args,
-                target_path,
-                conflict_code="stale_overwrite_confirmation",
-                source_sha256=str(source_manifest["source_sha256"]),
-                output_language=output_language,
-            )
-        note_attempted = True
-        atomic_write_note(target_path, note_text)
-        require_reference_hygiene(
-            target_path.read_text(encoding="utf-8"),
-            "after save",
-        )
-        asset_dir.mkdir(parents=True, exist_ok=True)
-        if sidecar_path is not None:
-            sidecar_attempted = True
-            write_paper_directory_sidecar(
-                target_path,
-                paper_id=paper_id,
+                config,
+                root_path,
                 title=title,
+                abstract=str(record.get("abstract", "")),
                 source_sha256=str(source_manifest["source_sha256"]),
                 output_language=output_language,
-                note_sha256=note_sha256,
             )
-    except BaseException:
-        if sidecar_attempted and sidecar_path is not None:
-            restore_file(sidecar_path, sidecar_backup)
-            if sidecar_backup is not None:
+            if (
+                rechecked_target.resolve() != target_path.resolve()
+                or rechecked_existing_sha256 != approved_existing_note_sha256
+            ):
+                block_directory_conflict(
+                    args,
+                    conflict_code="save_target_changed",
+                    target_directories=[target_path.parent, rechecked_target.parent],
+                    source_sha256=str(source_manifest["source_sha256"]),
+                    output_language=output_language,
+                )
+
+        asset_subdir = args.admitted_asset_subdir if output_mode == 'obsidian' else args.asset_subdir
+        asset_dir = resolve_note_asset_dir(target_path, asset_subdir)
+        asset_subdir = asset_dir.relative_to(target_path.parent).as_posix()
+        asset_directory_existed = asset_dir.exists()
+        ensure_parent(target_path)
+        paper_id = (
+            args.paper_id
+            or str(source_manifest.get("paper_id", ""))
+            or str(record.get("paper_id", ""))
+        )
+        sidecar_path = (
+            target_path.parent / PAPER_DIRECTORY_SIDECAR
+            if output_mode == "obsidian"
+            else None
+        )
+        note_backup = None
+        sidecar_backup = None
+        created_assets: list[Path] = []
+        note_attempted = False
+        sidecar_attempted = False
+        try:
+            note_backup = backup_file(target_path)
+            sidecar_backup = backup_file(sidecar_path) if sidecar_path is not None else None
+            materialized_figures = (
+                materialize_insert_decisions(
+                    note_text,
+                    target_path,
+                    figure_decisions,
+                    asset_subdir,
+                    created_assets,
+                )
+                if figure_decisions
+                else []
+            )
+            if (
+                approved_existing_note_sha256
+                and file_sha256(target_path) != approved_existing_note_sha256
+            ):
+                block_note_conflict(
+                    args,
+                    target_path,
+                    conflict_code="stale_overwrite_confirmation",
+                    source_sha256=str(source_manifest["source_sha256"]),
+                    output_language=output_language,
+                )
+            note_attempted = True
+            atomic_write_note(target_path, note_text)
+            require_reference_hygiene(
+                target_path.read_text(encoding="utf-8"),
+                "after save",
+            )
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            if sidecar_path is not None:
+                sidecar_attempted = True
+                write_paper_directory_sidecar(
+                    target_path,
+                    paper_id=paper_id,
+                    title=title,
+                    source_sha256=str(source_manifest["source_sha256"]),
+                    output_language=output_language,
+                    note_sha256=note_sha256,
+                    registry=args.archive_registry,
+                )
+        except BaseException:
+            if sidecar_attempted and sidecar_path is not None:
+                restore_file(sidecar_path, sidecar_backup)
+                if sidecar_backup is not None:
+                    try:
+                        ensure_sidecar_hidden(sidecar_path)
+                    except OSError:
+                        pass
+            if note_attempted:
+                restore_file(target_path, note_backup)
+            for created_asset in reversed(created_assets):
+                created_asset.unlink(missing_ok=True)
+            if not asset_directory_existed:
                 try:
-                    ensure_sidecar_hidden(sidecar_path)
+                    asset_dir.rmdir()
                 except OSError:
                     pass
-        if note_attempted:
-            restore_file(target_path, note_backup)
-        for created_asset in reversed(created_assets):
-            created_asset.unlink(missing_ok=True)
-        if not asset_directory_existed:
-            try:
-                asset_dir.rmdir()
-            except OSError:
-                pass
-        raise
-    finally:
-        if note_backup is not None:
-            note_backup.unlink(missing_ok=True)
-        if sidecar_backup is not None:
-            sidecar_backup.unlink(missing_ok=True)
+            raise
+        finally:
+            if note_backup is not None:
+                note_backup.unlink(missing_ok=True)
+            if sidecar_backup is not None:
+                sidecar_backup.unlink(missing_ok=True)
 
-    payload = {
-        "status": "ok",
-        "script": "write_obsidian_note.py",
-        "output_language": output_language,
-        "paper_id": paper_id,
-        "title": title,
-        "note_path": str(target_path),
-        "subdir": resolved_subdir,
-        "images_dir": str(asset_dir),
-        "materialized_figures": materialized_figures,
-        "overwrote_existing_note": overwrote_existing_note,
-        "admission": admission,
-        "domain_routing_skipped": domain_routing_skipped,
-    }
-    if sidecar_path is not None:
-        payload["sidecar_path"] = str(sidecar_path)
-        payload["source_sha256"] = str(source_manifest["source_sha256"])
-    payload["output_mode"] = output_mode
-    payload["base_output_root"] = str(root_path)
-    if config.get("obsidian_vault"):
-        payload["vault"] = str(Path(config["obsidian_vault"]).expanduser().resolve())
-    emit(payload, args.output)
+        payload = {
+            "status": "ok",
+            "script": "write_obsidian_note.py",
+            "output_language": output_language,
+            "paper_id": paper_id,
+            "title": title,
+            "note_path": str(target_path),
+            "subdir": resolved_subdir,
+            "images_dir": str(asset_dir),
+            "materialized_figures": materialized_figures,
+            "overwrote_existing_note": overwrote_existing_note,
+            "admission": admission,
+            "domain_routing_skipped": domain_routing_skipped,
+        }
+        if sidecar_path is not None:
+            payload["sidecar_path"] = str(sidecar_path)
+            payload["source_sha256"] = str(source_manifest["source_sha256"])
+        payload["output_mode"] = output_mode
+        payload["base_output_root"] = str(root_path)
+        if config.get("obsidian_vault"):
+            payload["vault"] = str(Path(config["obsidian_vault"]).expanduser().resolve())
+        emit(payload, args.output)
 
 
 if __name__ == "__main__":

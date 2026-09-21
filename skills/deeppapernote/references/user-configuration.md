@@ -53,3 +53,7 @@ These values are Run Overrides for the current process or command. They do not b
 ## Completion criteria
 
 Configuration is ready only when every active field is present and valid, the resolved values contain no missing or invalid field, and the workflow has not begun identity resolution. A User Configuration file is not required when Run Overrides already meet that condition. Obsidian mode requires an existing absolute Vault and a traversal-safe relative paper directory. Workspace mode requires neither Obsidian field and cannot be redirected by stale values.
+
+## Connector archive location
+
+DeepPaperNote Connector reads `obsidian_vault` and `papers_dir` from this same persistent User Configuration. It keeps extension/native-host settings separately and does not change `output_language`, `save_mode`, or unknown preferences. Missing or invalid location fields require explicit configuration repair; old Connector destinations are not a fallback. Skill Run Overrides remain temporary and do not redirect future Connector saves. See [the shared archive contract](paper-archive.md).
