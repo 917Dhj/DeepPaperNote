@@ -120,7 +120,7 @@ def same_work(left: dict, right: dict) -> bool:
 
 def pdf_identity(path: Path) -> dict:
     try:
-        import fitz
+        import pymupdf as fitz
 
         with fitz.open(path) as doc:
             text = doc[0].get_text() if len(doc) else ""
