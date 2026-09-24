@@ -39,6 +39,11 @@ def parser() -> argparse.ArgumentParser:
         default="",
         help="Existing decision JSON whose requested bounded repairs should be applied.",
     )
+    p.add_argument(
+        "--asset-subdir",
+        default="images",
+        help="Paper-relative images directory from save preflight.",
+    )
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
     p.add_argument(
@@ -283,6 +288,7 @@ def validate_normalized_bbox(value: Any) -> list[float]:
 
 
 def apply_requested_repairs(wrapper: dict[str, Any]) -> dict[str, Any]:
+    asset_subdir = checked_asset_subdir(wrapper.get("asset_subdir", "images"))
     decisions = wrapper.get("decisions", [])
     if not isinstance(decisions, list):
         raise SystemExit("--review-decisions requires a decisions list.")
@@ -359,7 +365,7 @@ def apply_requested_repairs(wrapper: dict[str, Any]) -> dict[str, Any]:
         if item.get("relative_markdown_embed"):
             item["relative_markdown_embed"] = (
                 f"![{item.get('source_id') or repair_path.name}]"
-                f"(images/{repair_path.name})"
+                f"({asset_subdir}/{repair_path.name})"
             )
         evidence.update(
             {
@@ -388,6 +394,7 @@ def decide(
     caption: dict[str, Any],
     plan_item: dict[str, Any] | None,
     assets_wrapper: dict[str, Any] | None = None,
+    asset_subdir: str = "images",
 ) -> dict[str, Any]:
     label = normalize_whitespace(str(caption.get("label", "")))
     fallback_caption = normalize_whitespace(str(caption.get("caption", "")))[:40]
@@ -425,7 +432,7 @@ def decide(
     image_path = str(prepared.get("path") or source_image_path(plan_item))
     if filename:
         base["source_image_filename"] = filename
-        base["relative_markdown_embed"] = f"![{label or filename}](images/{filename})"
+        base["relative_markdown_embed"] = f"![{label or filename}]({asset_subdir}/{filename})"
     if image_path:
         base["source_image_path"] = image_path
     if status in {"reject", "reject_visual_quality"}:
@@ -463,6 +470,7 @@ def build_decisions(
     figures_wrapper: dict[str, Any],
     source_manifest_input: str = "",
     assets_wrapper: dict[str, Any] | None = None,
+    asset_subdir: str = "images",
 ) -> list[dict[str, Any]]:
     planned = planned_items(figures_wrapper)
     decisions = [
@@ -470,6 +478,7 @@ def build_decisions(
             caption,
             planned.get(normalize_label(str(caption.get("label", "")))),
             assets_wrapper,
+            checked_asset_subdir(asset_subdir),
         )
         for caption in source_caption_items(source_manifest, source_manifest_input)
     ]
@@ -478,6 +487,12 @@ def build_decisions(
             decision["decision"] = "skip"
             decision["skip_reason"] = "invalid_decision_normalized_to_skip"
     return decisions
+
+
+def checked_asset_subdir(value: str) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"images(?:/[0-9a-f]{64})?", value):
+        raise SystemExit("Asset directory must be images or images/<source-sha256> from preflight.")
+    return value
 
 
 def main() -> None:
@@ -507,12 +522,14 @@ def main() -> None:
         figures,
         args.source_manifest,
         assets,
+        checked_asset_subdir(args.asset_subdir),
     )
     payload = {
         "status": "ok",
         "script": "plan_figure_table_decisions.py",
         "output_language": language,
         "paper_id": args.paper_id or source_manifest.get("paper_id", ""),
+        "asset_subdir": args.asset_subdir,
         "decisions": decisions,
         "summary": {
             "total_items": len(decisions),

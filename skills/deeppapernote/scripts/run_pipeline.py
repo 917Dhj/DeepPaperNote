@@ -39,6 +39,8 @@ def parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--save-mode", choices=("workspace", "obsidian"), default="")
     p.add_argument("--vault", default="", help="Run Override for the Obsidian Vault.")
+    p.add_argument("--target-directory", default="", help="Chosen existing paper directory.")
+    p.add_argument("--source-sha256", default="", help="Chosen archived source.")
     p.add_argument("--papers-dir", default="", help="Run Override for the Vault paper directory.")
     return p
 
@@ -140,6 +142,12 @@ def main() -> None:
             str(metadata_json),
             "--identity",
             str(identity_json),
+            "--reference",
+            args.input,
+            "--target-directory",
+            args.target_directory,
+            "--source-sha256",
+            args.source_sha256,
             "--dest-dir",
             str(pdf_dir),
             "--output",

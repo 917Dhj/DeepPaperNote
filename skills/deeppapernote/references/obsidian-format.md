@@ -28,9 +28,9 @@ Default file name:
 - always create the paper-local `images/` directory during final save, even if no real image is inserted
 - the paper-local `images/` directory is part of the required note layout, not an optional optimization
 
-The hidden `.deeppapernote.json` sidecar is the program-owned directory identity record. It stores the exact original PDF SHA-256, the frozen note stem, and the language variants already saved in that directory. Keep the dot-prefixed name on every platform; on Windows the save script also applies the native Hidden file attribute and verifies it after each sidecar replacement.
+The hidden `.deeppapernote.json` sidecar is the program-owned directory identity record. It groups verified source PDFs for one work and binds each saved note to exact source bytes and language. Keep the dot-prefixed name on every platform; on Windows the save script also applies and verifies the native Hidden attribute.
 
-Before an Obsidian draft begins, use the save script's preflight result rather than inspecting names manually. It searches the entire Vault for the source SHA-256 and same-name directories. An exact source match reuses its frozen directory without domain routing; another language is added beside the existing note, while an existing note in the requested language requires explicit hash-bound overwrite confirmation. A nonempty same-name directory without a valid sidecar, a same-name directory for different source bytes, or multiple identity matches fails closed.
+Before drafting, run the save script's preflight and use its directory, note path, and `asset_subdir`. Verified PDF-only directories can be reused automatically. Multiple source versions share the paper directory with separate notes and assets. Follow [the shared archive contract](paper-archive.md) for migration, candidate selection, and hash-bound overwrite rules.
 
 If the user already has a vault convention, preserve it.
 

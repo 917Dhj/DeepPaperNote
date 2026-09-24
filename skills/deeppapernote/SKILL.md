@@ -71,12 +71,13 @@ Follow this order:
 1. complete Configuration Readiness: resolve Run Overrides first, and inspect User Configuration only when they are incomplete; advance only after the resolved run configuration is complete and valid
 2. resolve the paper identity
 3. collect metadata
-4. acquire the best available PDF
+4. acquire the best available PDF using the accepted identity and original user reference (`fetch_pdf.py --reference`); in Obsidian mode, verify and reuse a matching local archive before downloading, following `references/paper-archive.md` for version/source selection
 5. extract canonical raw source text: `*_raw_sections.jsonl`, `*_source_manifest.json`, and optional derived `*_full_text.md`
 6. perform Save Target Admission before drafting or domain routing:
    - for Obsidian mode, run `scripts/write_obsidian_note.py --preflight` with the resolved title, exact `output_language`, Vault, and `*_source_manifest.json`; this program result is authoritative, so do not replace it with prompt-only duplicate checking
-   - when admission returns `reuse_source_directory` or `reuse_empty_same_name_directory`, use that directory and skip domain selection
+   - when admission returns a reuse result, use that directory and skip domain selection; a verified PDF-only directory needs no registration confirmation. Read `asset_subdir` from preflight and use it for source-bound figure embeds
    - when it returns `same_language_note_exists`, stop before drafting and ask whether to overwrite the reported note. If the user approves, rerun preflight with `--overwrite-existing-note --expected-existing-note-sha256 <reported_sha256>` and carry that exact confirmation into Formal Save; if the user declines, stop without writing
+   - when multiple directories or sources match, follow `references/paper-archive.md`: ask for the current selection and carry it through preflight and Formal Save
    - for any other blocked conflict, report the returned ambiguity and stop without creating a second directory
    - workspace mode does not scan an Obsidian Vault and continues through its normal domain routing
 7. extract structural indexes and PDF assets
@@ -144,6 +145,7 @@ Reference usage policy:
 - do not load every reference file by default
 - consult `references/evidence-first.md`, `references/deep-analysis.md`, or `references/final-writing.md` only when the paper is complex or the draft is too shallow
 - consult `references/figure-placement.md` only for ambiguous figure/table placement or image replacement decisions
+- consult `references/paper-archive.md` for existing Obsidian directories, local PDF version selection, or Connector handoff
 - consult `references/obsidian-format.md` only for Markdown, vault, frontmatter, or reference-link formatting details
 - consult `references/note-quality.md` or `references/paper-types.md` only for final review or domain adaptation
 - consult `references/metadata-sources.md` only when metadata is incomplete, and `references/architecture.md` only for repository maintenance decisions
@@ -153,9 +155,10 @@ Reference usage policy:
 Prefer the strongest available source in this order:
 1. local PDF path given by the user
 2. local Zotero item and local Zotero attachment if available
-3. DOI and publisher metadata
-4. arXiv or open-access PDF sources
-5. Semantic Scholar or OpenAlex for metadata backfill
+3. verified local Obsidian PDF for the accepted work and requested version
+4. DOI and publisher metadata
+5. arXiv or open-access PDF sources
+6. Semantic Scholar or OpenAlex for metadata backfill
 
 Before web resolution, use the bundled `scripts/resolve_paper.py` Zotero Local API path to check the desktop library. Its default `--zotero-mode auto` prefers a unique local match and falls back to the existing providers when Zotero is unavailable or has no match. An explicit Zotero key has no safe web fallback and must be verified locally. Use `off` to make no Local API request, or `required` when the reference must resolve through Zotero. A trusted JSON artifact or explicit local PDF remains authoritative and bypasses this lookup. A compatible session-scoped Zotero/MCP integration may still provide a trusted input artifact when available, but it is not required for the built-in path.
 

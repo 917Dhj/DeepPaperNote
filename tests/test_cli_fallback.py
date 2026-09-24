@@ -93,20 +93,13 @@ def test_write_note_creates_language_variant_and_directory_sidecar(tmp_path: Pat
     sidecar_path = note_path.parent / ".deeppapernote.json"
     assert note_path.name == "My_Test_Paper.zh-CN.md"
     assert note_path.read_text(encoding="utf-8") == note_text
-    assert json.loads(sidecar_path.read_text(encoding="utf-8")) == {
-        "artifact_type": "deeppapernote_paper_directory",
-        "schema_version": 1,
-        "paper_id": "paper:test",
-        "title": "My Test Paper",
-        "source_sha256": "a" * 64,
-        "note_stem": "My_Test_Paper",
-        "notes": {
-            "zh-CN": {
-                "filename": "My_Test_Paper.zh-CN.md",
-                "note_sha256": hashlib.sha256(note_text.encode("utf-8")).hexdigest(),
-            }
-        },
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    assert sidecar['schema_version'] == 2
+    assert sidecar['sources']['a' * 64]['notes'] == {
+        'zh-CN': {'filename': note_path.name,
+                  'note_sha256': hashlib.sha256(note_text.encode('utf-8')).hexdigest()}
     }
+
 
 
 def test_write_note_reuses_empty_same_name_directory_before_domain_routing(
@@ -205,7 +198,7 @@ def test_write_note_reuses_source_directory_for_another_language(tmp_path: Path)
     assert english_path.parent == chinese_path.parent
     assert english_path.name == "My_Test_Paper.en.md"
     sidecar = json.loads((english_path.parent / ".deeppapernote.json").read_text(encoding="utf-8"))
-    assert set(sidecar["notes"]) == {"zh-CN", "en"}
+    assert set(sidecar["sources"]["a" * 64]["notes"]) == {"zh-CN", "en"}
 
 
 def test_write_note_does_not_replace_another_language_note_image(tmp_path: Path) -> None:
@@ -489,7 +482,7 @@ def test_write_note_overwrites_only_with_matching_existing_note_sha256(
     assert Path(payload["note_path"]) == note_path
     assert note_path.read_text(encoding="utf-8") == replacement_note
     sidecar = json.loads((note_path.parent / ".deeppapernote.json").read_text(encoding="utf-8"))
-    assert sidecar["notes"]["zh-CN"]["note_sha256"] == hashlib.sha256(
+    assert sidecar["sources"]["a" * 64]["notes"]["zh-CN"]["note_sha256"] == hashlib.sha256(
         replacement_note.encode("utf-8")
     ).hexdigest()
 
@@ -834,7 +827,7 @@ def test_save_target_preflight_honors_recorded_language_note_filename(
     original_path.rename(renamed_path)
     sidecar_path = renamed_path.parent / ".deeppapernote.json"
     sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
-    sidecar["notes"]["zh-CN"]["filename"] = renamed_path.name
+    sidecar["sources"]["a" * 64]["notes"]["zh-CN"]["filename"] = renamed_path.name
     updated_sidecar_path = sidecar_path.with_name(f"{sidecar_path.name}.tmp")
     updated_sidecar_path.write_text(json.dumps(sidecar), encoding="utf-8")
     os.replace(updated_sidecar_path, sidecar_path)

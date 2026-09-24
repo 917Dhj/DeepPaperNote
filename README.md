@@ -84,6 +84,14 @@ Generate a deep-reading note for this paper: <title, DOI, URL, arXiv ID, or loca
 Turn this paper into an Obsidian note: <paper>
 ```
 
+## 🔌 Collect Papers from Your Browser
+
+Use [DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector) to save paper PDFs from your browser into your Obsidian paper library. When you are ready to read deeply, hand the saved PDF to DeepPaperNote and generate a note in the same paper directory, keeping the source and your understanding together. Different PDF versions can have their own corresponding notes; existing notes remain protected.
+
+Connector is an optional browser extension, currently supporting **Chrome on macOS** with a local saving component. You can also continue giving DeepPaperNote a title, DOI, URL, or local PDF directly.
+
+**[Explore Connector and installation instructions →](https://github.com/917Dhj/DeepPaperNote-Connector)**
+
 ## 🎯 Why DeepPaperNote?
 
 ![DeepPaperNote usage example](./assets/usage-example.png)

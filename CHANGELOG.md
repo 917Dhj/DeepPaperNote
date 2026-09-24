@@ -12,6 +12,20 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+## v2.3.1
+
+### Improved
+
+- Papers collected with DeepPaperNote Connector can now be read and saved as notes in the same Obsidian paper directory.
+- DeepPaperNote can reuse PDFs already in the Vault and follow an explicitly requested arXiv version, reducing repeated downloads.
+- Different PDF versions of one paper can have separate notes and figures in the same directory, while existing notes, filenames, and links are preserved.
+- When it is unclear which paper directory or PDF to use, DeepPaperNote asks the user to choose.
+
+### Documentation
+
+- Added a dedicated DeepPaperNote Connector introduction and installation link to the English and Chinese READMEs.
+- Refreshed the README illustration and added installation guidance for uv users.
+
 ## v2.3.0
 
 ### Added
