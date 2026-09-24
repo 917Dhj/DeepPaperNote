@@ -21,6 +21,10 @@ Add an entry here when the project meaningfully changes for users, for example:
 - Different PDF versions of one paper can have separate notes and figures in the same directory, while existing notes, filenames, and links are preserved.
 - When it is unclear which paper directory or PDF to use, DeepPaperNote asks the user to choose.
 
+### Fixed
+
+- Fixed reading and saving archived PDFs with newer PyMuPDF releases.
+
 ### Documentation
 
 - Added a dedicated DeepPaperNote Connector introduction and installation link to the English and Chinese READMEs.
