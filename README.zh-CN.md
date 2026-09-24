@@ -43,8 +43,6 @@ DeepPaperNote 是一个专注于**一次精读一篇论文**的 Agent Skill。�
 > [!tip]
 > 如果你已经有自己的 Obsidian 或 Zotero 工作流，DeepPaperNote 会把最耗时、也最容易出错的取证、整理和成稿环节自动化。
 
-DeepPaperNote 可与 [DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector) 配合：先将论文 PDF 收藏到 Obsidian，再直接在同一已验证目录中生成笔记。不同版本的 PDF 可以共存并分别生成对应笔记，已有笔记仍受覆盖保护。
-
 ## 📰 最新动态
 
 - **[v2.3.0]** 🌐 新增完整英文笔记支持，从章节结构、图表标注到校验与 Formal Save，全流程保持英文一致。[版本说明](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.0)
@@ -85,6 +83,14 @@ DeepPaperNote 需要 Python 3.10 或更高版本。核心 PDF 抽取路径依赖
 给这篇论文生成深度笔记：<论文标题、DOI、URL、arXiv ID 或本地 PDF>
 把这篇论文整理成 Obsidian 笔记：<论文>
 ```
+
+## 🔌 从浏览器收藏论文
+
+浏览论文时，可以使用 [DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector) 将 PDF 直接收藏到你的 Obsidian 论文库。准备精读时，再把已收藏的 PDF 交给 DeepPaperNote，在同一论文目录中生成深度笔记，让原文与理解一起积累。不同版本的 PDF 可以拥有各自对应的笔记，已有笔记仍受保护。
+
+Connector 是可选的浏览器扩展，目前支持 **macOS 上的 Chrome**，需要配合本地保存组件使用。你也可以继续直接向 DeepPaperNote 提供标题、DOI、URL 或本地 PDF。
+
+**[了解 Connector 与安装方法 →](https://github.com/917Dhj/DeepPaperNote-Connector/blob/main/README.zh-CN.md)**
 
 ## 🎯 为什么选择 DeepPaperNote？
 

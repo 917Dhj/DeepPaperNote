@@ -43,8 +43,6 @@ DeepPaperNote is an agent skill for reading **one paper at a time**. The same co
 > [!tip]
 > If you already use Obsidian or Zotero, DeepPaperNote automates the most time-consuming and error-prone parts of evidence gathering, organization, and note production.
 
-DeepPaperNote works with [DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector): collect a paper PDF into Obsidian, then generate its note in the same verified directory. Different PDF versions can coexist with separate source-bound notes; existing notes remain protected.
-
 ## 📰 News
 
 - **[v2.3.0]** 🌐 Added complete English note support across note structure, figure callouts, validation, and Formal Save. [Release notes](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.0)
@@ -85,6 +83,14 @@ A title, DOI, URL, arXiv ID, or local PDF all work. Zotero items are also suppor
 Generate a deep-reading note for this paper: <title, DOI, URL, arXiv ID, or local PDF>
 Turn this paper into an Obsidian note: <paper>
 ```
+
+## 🔌 Collect Papers from Your Browser
+
+Use [DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector) to save paper PDFs from your browser into your Obsidian paper library. When you are ready to read deeply, hand the saved PDF to DeepPaperNote and generate a note in the same paper directory, keeping the source and your understanding together. Different PDF versions can have their own corresponding notes; existing notes remain protected.
+
+Connector is an optional browser extension, currently supporting **Chrome on macOS** with a local saving component. You can also continue giving DeepPaperNote a title, DOI, URL, or local PDF directly.
+
+**[Explore Connector and installation instructions →](https://github.com/917Dhj/DeepPaperNote-Connector)**
 
 ## 🎯 Why DeepPaperNote?
 
