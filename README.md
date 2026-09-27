@@ -55,11 +55,23 @@ News lists only the three most recent user-facing milestones. See the [changelog
 
 ### 1. Install the plugin
 
+**Claude Code** — install from the plugin marketplace:
+
+```bash
+claude plugin marketplace add 917Dhj/DeepPaperNote
+```
+
+```bash
+claude plugin install deeppapernote@deeppapernote
+```
+
+**Any agent** — install with the skills CLI:
+
 ```bash
 npx skills add 917Dhj/DeepPaperNote
 ```
 
-The installer lets you choose which skills to install and which agents should receive them. For most users, start with `deeppapernote`; add `paper-glossary` only if you want reusable terminology notes.
+Both routes install the same skills. The plugin route brings both `deeppapernote` and `paper-glossary`; the skills CLI installer lets you choose which skills to install and which agents should receive them. For most users, start with `deeppapernote`; add `paper-glossary` only if you want reusable terminology notes.
 
 ### 2. Install the core PDF dependency
 

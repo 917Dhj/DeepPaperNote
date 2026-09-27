@@ -1,0 +1,16 @@
+{
+  "name": "deeppapernote",
+  "description": "Official marketplace for the DeepPaperNote paper-reading skills.",
+  "owner": {
+    "name": "917Dhj",
+    "url": "https://github.com/917Dhj"
+  },
+  "plugins": [
+    {
+      "name": "deeppapernote",
+      "source": "./",
+      "description": "Academic paper reading and Obsidian note generation skills for building a research WIKI.",
+      "category": "research"
+    }
+  ]
+}

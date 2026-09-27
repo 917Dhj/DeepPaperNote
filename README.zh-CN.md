@@ -55,11 +55,23 @@ DeepPaperNote 是一个专注于**一次精读一篇论文**的 Agent Skill。�
 
 ### 1. 安装插件
 
+**Claude Code** —— 通过插件市场安装：
+
+```bash
+claude plugin marketplace add 917Dhj/DeepPaperNote
+```
+
+```bash
+claude plugin install deeppapernote@deeppapernote
+```
+
+**任意 Agent** —— 通过 skills CLI 安装：
+
 ```bash
 npx skills add 917Dhj/DeepPaperNote
 ```
 
-安装程序会让你选择需要安装的 skill，以及要安装到哪些 Agent。大多数用户可以先选择 `deeppapernote`；只有需要可复用术语笔记时，再选择 `paper-glossary`。
+两条路径安装的是同一组 skill。插件路径会一并装上 `deeppapernote` 与 `paper-glossary`；skills CLI 安装程序则让你选择需要安装的 skill，以及要安装到哪些 Agent。大多数用户可以先选择 `deeppapernote`；只有需要可复用术语笔记时，再选择 `paper-glossary`。
 
 ### 2. 安装核心 PDF 依赖
 

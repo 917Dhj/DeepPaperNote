@@ -46,7 +46,7 @@ The repository is layered as follows:
 
 - `skills/deeppapernote/SKILL.md` is the canonical workflow definition and the skill entrypoint for both Claude Code and other agents
 - `CLAUDE.md` provides Claude Code project-level guidance and includes `AGENTS.md` via `@AGENTS.md`
-- `.claude-plugin/plugin.json` identifies the Claude Code plugin
+- `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` identify the Claude Code plugin and its marketplace entry
 - `.codex-plugin/plugin.json` identifies the Codex plugin
 - `skills/deeppapernote/references/` stores durable workflow and writing guidance
 - `skills/deeppapernote/scripts/` implements the deterministic pipeline and support utilities
