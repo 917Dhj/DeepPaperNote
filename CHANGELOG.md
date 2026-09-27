@@ -12,6 +12,10 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+### Added
+
+- DeepPaperNote can now be installed as a Claude Code plugin from the repository's own marketplace, with `claude plugin marketplace add 917Dhj/DeepPaperNote`. The skills CLI (`npx skills add`) remains the agent-neutral route.
+
 ## v2.3.1
 
 ### Improved
