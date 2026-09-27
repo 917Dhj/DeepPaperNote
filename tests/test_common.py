@@ -988,15 +988,15 @@ def test_domain_rules_missing_or_invalid_falls_back(tmp_path: Path, monkeypatch)
 def test_env_config_value_falls_back_to_shell_file(tmp_path: Path, monkeypatch) -> None:
     shell_file = tmp_path / ".zshenv"
     shell_file.write_text(
-        '\n# comment\nexport DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY="file_based_key"\n',
+        '\n# comment\nexport DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY="redacted"\n',
         encoding="utf-8",
     )
     monkeypatch.delenv("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY", raising=False)
     monkeypatch.delenv("SEMANTIC_SCHOLAR_API_KEY", raising=False)
     monkeypatch.setattr("common.SHELL_CONFIG_FILES", [shell_file])
 
-    assert env_config_value("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY") == "file_based_key"
-    assert semantic_scholar_headers()["x-api-key"] == "file_based_key"
+    assert env_config_value("DEEPPAPERNOTE_SEMANTIC_SCHOLAR_API_KEY") == "redacted"
+    assert semantic_scholar_headers()["x-api-key"] == "redacted"
 
 
 def test_check_environment_reports_semantic_scholar_key_from_env(tmp_path: Path) -> None:
