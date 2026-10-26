@@ -90,7 +90,7 @@ def render_svg(
     step = _nice_step(max_y)
     y_max = max(step, math.ceil(max_y / step) * step)
 
-    left, top, right, bottom = 82, 92, 928, 472
+    left, top, right, bottom = 76, 112, 864, 284
 
     def x(day: dt.date) -> float:
         return left + ((day - start).days / span_days) * (right - left)
@@ -99,57 +99,79 @@ def render_svg(
         return bottom - (value / y_max) * (bottom - top)
 
     polyline = " ".join(f"{x(day):.1f},{y(value):.1f}" for day, value in points)
-    if points:
-        area = f"{left},{bottom} {polyline} {x(end):.1f},{bottom}"
-    else:
-        area = f"{left},{bottom} {right},{bottom}"
-
     y_ticks = range(0, y_max + 1, step)
-    label_days = [start + dt.timedelta(days=round(span_days * ratio / 3)) for ratio in range(4)]
+    label_days = list(dict.fromkeys(
+        start + dt.timedelta(days=round((end - start).days * ratio / 3))
+        for ratio in range(4)
+    ))
     repo_label = html.escape(repo)
     star_word = "star" if total == 1 else "stars"
     updated = generated_at.strftime("%Y-%m-%d %H:%M UTC")
 
     grid = "".join(
         f'<line x1="{left}" y1="{y(value):.1f}" x2="{right}" y2="{y(value):.1f}" '
-        f'stroke="#2e4264" stroke-width="1"/>'
+        f'stroke="#b2a28a" stroke-opacity="0.18" stroke-width="0.7" '
+        f'stroke-dasharray="3 4"/>'
         f'<text x="{left - 12}" y="{y(value) + 4:.1f}" text-anchor="end" '
-        f'font-size="12" fill="#99abc7">{value:,}</text>'
+        f'font-size="12" fill="#ad9f89">{value:,}</text>'
         for value in y_ticks
     )
     x_labels = "".join(
-        f'<line x1="{x(day):.1f}" y1="{top}" x2="{x(day):.1f}" y2="{bottom}" '
-        f'stroke="#253652" stroke-width="1"/>'
-        f'<text x="{x(day):.1f}" y="506" text-anchor="middle" font-size="12" '
-        f'fill="#99abc7">{day.isoformat()}</text>'
+        f'<line x1="{x(day):.1f}" y1="{bottom}" x2="{x(day):.1f}" y2="{bottom + 6}" '
+        f'stroke="#ad9f89" stroke-opacity="0.4" stroke-width="0.7"/>'
+        f'<text x="{x(day):.1f}" y="309" text-anchor="middle" font-size="12" '
+        f'fill="#ad9f89">{day.strftime("%b %d")}</text>'
         for day in label_days
     )
     end_x = x(end) if points else left
     end_y = y(total) if points else bottom
 
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560"
-  viewBox="0 0 960 560" role="img" aria-labelledby="title desc">
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360"
+  style="max-width:100%;height:auto"
+  viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
   <title id="title">Star history for {repo_label}</title>
   <desc id="desc">Static star history chart for {repo_label}, generated {updated}.</desc>
-  <rect width="960" height="560" rx="18" fill="#0e1729"/>
-  <text x="82" y="38" font-family="Inter, ui-sans-serif, system-ui, sans-serif"
-    font-size="24" font-weight="700" fill="#f3f6fb">Star History</text>
-  <text x="82" y="64" font-family="Inter, ui-sans-serif, system-ui, sans-serif"
-    font-size="13" fill="#99abc7">{repo_label} · {total:,} {star_word} · updated {updated}</text>
+  <defs>
+    <clipPath id="card"><rect width="960" height="360" rx="14"/></clipPath>
+    <radialGradient id="lamplight" cx="98%" cy="0%" r="85%">
+      <stop stop-color="#c18b47" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#c18b47" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="paper" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.7 0.35" numOctaves="3"
+        seed="17" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <filter id="glow" x="-10%" y="-30%" width="120%" height="160%"
+      color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="2.5"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.55"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g clip-path="url(#card)">
+    <rect width="960" height="360" fill="#101820"/>
+    <rect width="960" height="360" fill="url(#lamplight)"/>
+    <rect width="960" height="360" filter="url(#paper)" opacity="0.055"/>
+  </g>
+  <text x="76" y="53" font-family="Georgia, 'Times New Roman', serif"
+    font-size="32" font-weight="700" fill="#e8ddc8">Star History</text>
   <g font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+    <text x="76" y="78" font-size="13" fill="#ad9f89">{repo_label}</text>
     {grid}
     {x_labels}
-    <line x1="{left}" y1="{top}" x2="{left}" y2="{bottom}" stroke="#7085ab" stroke-width="1.2"/>
-    <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#7085ab" stroke-width="1.2"/>
-    <polygon points="{area}" fill="#77a2ff" opacity="0.18"/>
-    <polyline points="{polyline}" fill="none" stroke="#77a2ff" stroke-width="3"
-      stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="{end_x:.1f}" cy="{end_y:.1f}" r="5" fill="#d69a4a"
-      stroke="#f3f6fb" stroke-width="2"/>
-    <text x="{right}" y="82" text-anchor="end" font-size="13" font-weight="700"
-      fill="#d69a4a">{total:,} {star_word}</text>
-    <text x="82" y="542" font-size="12" fill="#7085ab">
-      GitHub repository metadata · sampled every three days
+    <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}"
+      stroke="#ad9f89" stroke-opacity="0.5" stroke-width="0.7"/>
+    <g filter="url(#glow)">
+      <polyline points="{polyline}" fill="none" stroke="#e8b86a" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="{end_x:.1f}" cy="{end_y:.1f}" r="4" fill="#e8b86a"
+        stroke="#fff0ce" stroke-width="1"/>
+    </g>
+    <text x="{end_x + 48:.1f}" y="{end_y - 16:.1f}" text-anchor="end" font-size="14"
+      fill="#e8b86a">{total:,} {star_word}</text>
+    <text x="912" y="340" text-anchor="end" font-size="10" fill="#ad9f89">
+      Updated {generated_at.strftime("%b %d, %Y")}
     </text>
   </g>
 </svg>
