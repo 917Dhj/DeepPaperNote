@@ -2,7 +2,67 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
+
+
+def canonical_note_path(tmp_path: Path, note_text: str, language: str = "zh-CN") -> Path:
+    path = tmp_path / f"review-note.{language}.md"
+    path.write_bytes(
+        note_text.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n").encode()
+    )
+    return path
+
+
+def final_review_args(
+    tmp_path: Path,
+    note_text: str,
+    output_language: str,
+    *,
+    plan_path: Path,
+    content_path: Path | None = None,
+) -> list[str]:
+    if content_path is None:
+        content_path = canonical_note_path(tmp_path, note_text, output_language)
+    note_hash = hashlib.sha256(content_path.read_bytes()).hexdigest()
+    quality_path = tmp_path / f"quality-review.{output_language}.json"
+    quality_path.write_text(json.dumps({
+        "schema_version": 1,
+        "output_language": output_language,
+        "verdict": "pass",
+        "reviewed_note_sha256": note_hash,
+        "reviewed_plan_sha256": hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+        "checks": {
+            "central_claims": True,
+            "mechanism_result_map": True,
+            "claim_boundaries": True,
+        },
+        "blocking_findings": [],
+    }), encoding="utf-8")
+    readability_path = tmp_path / f"readability-review.{output_language}.json"
+    readability_path.write_text(json.dumps({
+        "schema_version": 1,
+        "output_language": output_language,
+        "verdict": "pass",
+        "reviewed_note_sha256": note_hash,
+    }), encoding="utf-8")
+    writer = (
+        Path(__file__).resolve().parents[1]
+        / "skills/deeppapernote/scripts/write_obsidian_note.py"
+    )
+    result = subprocess.run([
+        sys.executable, str(writer), "--record-final-quality-review",
+        "--language", output_language,
+        "--content-file", str(content_path), "--plan-file", str(plan_path),
+        "--final-quality-review", str(quality_path),
+    ], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return [
+        "--content-file", str(content_path),
+        "--final-quality-review", str(quality_path),
+        "--final-readability-review", str(readability_path),
+    ]
 
 
 def formal_save_args(
@@ -14,10 +74,19 @@ def formal_save_args(
     decisions_path: Path | None = None,
     source_manifest_path: Path | None = None,
     plan_path: Path | None = None,
+    content_path: Path | None = None,
 ) -> list[str]:
     plan_path = plan_path or tmp_path / f"save-plan.{output_language}.json"
     if not plan_path.exists():
-        plan_path.write_text(json.dumps({"output_language": output_language}), encoding="utf-8")
+        plan_path.write_text(json.dumps({
+            "output_language": output_language,
+            "central_claims": [{
+                "claim": "The reported evidence supports this reading.",
+                "what_it_does_not_prove": "It does not establish broader validity.",
+            }],
+            "mechanism_result_map": ["The described mechanism explains the reported result."],
+            "claim_boundaries": ["The conclusion is limited to the reported evidence."],
+        }), encoding="utf-8")
     source_manifest_path = source_manifest_path or tmp_path / "source-manifest.json"
     if not source_manifest_path.exists():
         source_manifest_path.write_text(
@@ -76,6 +145,10 @@ def formal_save_args(
         "--plan-file", str(plan_path),
         "--grounding-lint-json", str(grounding_path),
         "--source-manifest", str(source_manifest_path),
+        *final_review_args(
+            tmp_path, note_text, output_language,
+            plan_path=plan_path, content_path=content_path,
+        ),
     ]
 
 

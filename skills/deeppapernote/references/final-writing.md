@@ -227,7 +227,7 @@ Use `figure-placement.md` for semantic placement, identity matching, and visual-
 
 ## Final Self-Review
 
-Before outputting the final Markdown, first run `final_quality_review` and explicitly check:
+Before handing the draft to `final_quality_review`, the author must explicitly check:
 - does the note reconstruct the central evidence chain rather than only restating claims?
 - does it separate what the evidence actually proves from what the paper has not proven?
 - does it map mechanisms, protocols, constructs, data decisions, or study design choices to the result pattern they explain?
@@ -244,9 +244,11 @@ Before outputting the final Markdown, first run `final_quality_review` and expli
 - are there any suspicious mid-sentence line breaks left in the prose?
 - if the note includes LaTeX formulas, did you quickly check that the final Markdown uses directly renderable TeX rather than double-escaped commands or broken math delimiters?
 
-If `final_quality_review` finds missing evidence-chain coverage, missing mechanism-to-result explanation, missing comparative positioning, missing boundary judgment, missing negative/limiting result discussion, or generic reusable takeaways or follow-up questions, return to the source artifacts and revise the note before saving.
+If the author's self-review finds missing evidence-chain coverage, missing mechanism-to-result explanation, missing comparative positioning, missing boundary judgment, missing negative/limiting result discussion, or generic reusable takeaways or follow-up questions, return to the source artifacts and revise the note before saving.
 
-After `final_quality_review`, run `final_readability_review`.
+Use `final-quality-review.md` for the dedicated review, strict artifacts, and revision protocol. These broader writing checks remain required; the V1 save gate records its three plan-coverage checks separately.
+
+After a recorded passing `final_quality_review`, run `final_readability_review` and retain its receipt for the final draft bytes.
 This review is a language-and-expression pass, not a second evidence-judgment pass:
 - improve fluency and readability
 - remove stiff translations
@@ -256,4 +258,6 @@ This review is a language-and-expression pass, not a second evidence-judgment pa
 - do not invent new facts, numbers, comparisons, or failure cases during this pass
 - do not use polish as an excuse to flatten the note into a safer but shallower summary
 
-If the answer to the first four quality-review questions is `no`, the draft is still too shallow and should be revised before save.
+Any readability edit requires fresh lint, a new full quality review, and a final readability reread and receipt for the resulting version.
+
+If the answer to the first four self-review questions is `no`, the draft is still too shallow and should be revised before save.

@@ -8,15 +8,18 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from test_final_quality_review import plan_payload, review_payload
-
 
 WRITER = Path(__file__).resolve().parents[1] / "skills/deeppapernote/scripts/write_obsidian_note.py"
 NOTE = b"# Final Quality Gate\n\nRecorded states explain the measured improvement.\n"
 GATES = (
-    "passes_basic_structure", "passes_style_gate", "passes_math_gate", "passes_figure_gate",
-    "passes_plan_gate", "passes_substantive_content", "passes_reference_hygiene_gate",
+    "passes_basic_structure",
+    "passes_style_gate",
+    "passes_math_gate",
+    "passes_figure_gate",
+    "passes_plan_gate",
+    "passes_substantive_content",
+    "passes_reference_hygiene_gate",
 )
 
 
@@ -29,68 +32,127 @@ def digest(path: Path) -> str:
 
 
 def inputs(tmp_path: Path) -> dict[str, Path]:
-    paths = {name: tmp_path / f"{name}.json" for name in (
-        "plan", "source", "decisions", "lint", "grounding", "quality", "readability",
-    )}
+    paths = {
+        name: tmp_path / f"{name}.json"
+        for name in (
+            "plan",
+            "source",
+            "decisions",
+            "lint",
+            "grounding",
+            "quality",
+            "readability",
+        )
+    }
     paths["note"] = tmp_path / "note.md"
     paths["note"].write_bytes(NOTE)
     write_json(paths["plan"], plan_payload())
-    write_json(paths["source"], {"status": "ok", "source_sha256": "a" * 64, "paper_id": "paper:quality"})
+    write_json(
+        paths["source"], {"status": "ok", "source_sha256": "a" * 64, "paper_id": "paper:quality"}
+    )
     write_json(paths["decisions"], {"output_language": "en", "decisions": []})
-    write_json(paths["lint"], {
-        "status": "ok", "script": "lint_note.py", "output_language": "en",
-        "note_sha256": digest(paths["note"]), "note_plan_sha256": digest(paths["plan"]),
-        **dict.fromkeys(GATES, True),
-    })
-    write_json(paths["grounding"], {
-        "status": "ok", "script": "lint_grounding.py", "output_language": "en",
-        "passes_grounding": True, "note_plan_sha256": digest(paths["plan"]),
-        "source_manifest_sha256": digest(paths["source"]),
-        "figure_decisions_sha256": digest(paths["decisions"]),
-    })
+    write_json(
+        paths["lint"],
+        {
+            "status": "ok",
+            "script": "lint_note.py",
+            "output_language": "en",
+            "note_sha256": digest(paths["note"]),
+            "note_plan_sha256": digest(paths["plan"]),
+            **dict.fromkeys(GATES, True),
+        },
+    )
+    write_json(
+        paths["grounding"],
+        {
+            "status": "ok",
+            "script": "lint_grounding.py",
+            "output_language": "en",
+            "passes_grounding": True,
+            "note_plan_sha256": digest(paths["plan"]),
+            "source_manifest_sha256": digest(paths["source"]),
+            "figure_decisions_sha256": digest(paths["decisions"]),
+        },
+    )
     refresh_review(paths)
     return paths
 
 
 def refresh_review(paths: dict[str, Path], *, failed: str = "") -> None:
-    write_json(paths["quality"], review_payload(digest(paths["note"]), digest(paths["plan"]), failed=failed))
-    write_json(paths["readability"], {
-        "schema_version": 1, "output_language": "en", "verdict": "pass",
-        "reviewed_note_sha256": digest(paths["note"]),
-    })
+    write_json(
+        paths["quality"],
+        review_payload(digest(paths["note"]), digest(paths["plan"]), failed=failed),
+    )
+    write_json(
+        paths["readability"],
+        {
+            "schema_version": 1,
+            "output_language": "en",
+            "verdict": "pass",
+            "reviewed_note_sha256": digest(paths["note"]),
+        },
+    )
 
 
 def execute(tmp_path: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(WRITER), *args], cwd=tmp_path, capture_output=True, text=True,
-        env={**os.environ, "DEEPPAPERNOTE_DISABLE_SHELL_CONFIG": "1",
-             "DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR": "saved"},
+        [sys.executable, str(WRITER), *args],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "DEEPPAPERNOTE_DISABLE_SHELL_CONFIG": "1",
+            "DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR": "saved",
+        },
     )
 
 
 def record(tmp_path: Path, paths: dict[str, Path]) -> subprocess.CompletedProcess[str]:
-    return execute(tmp_path, [
-        "--record-final-quality-review", "--language", "en", "--content-file", str(paths["note"]),
-        "--plan-file", str(paths["plan"]), "--final-quality-review", str(paths["quality"]),
-    ])
+    return execute(
+        tmp_path,
+        [
+            "--record-final-quality-review",
+            "--language",
+            "en",
+            "--content-file",
+            str(paths["note"]),
+            "--plan-file",
+            str(paths["plan"]),
+            "--final-quality-review",
+            str(paths["quality"]),
+        ],
+    )
 
 
-def save(tmp_path: Path, paths: dict[str, Path], *, mode: str = "workspace",
-         reviews: bool = True, omit: str = "") -> subprocess.CompletedProcess[str]:
+def save(
+    tmp_path: Path,
+    paths: dict[str, Path],
+    *,
+    mode: str = "workspace",
+    reviews: bool = True,
+    omit: str = "",
+    extra_args: list[str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     vault = tmp_path / "vault"
     vault.mkdir(exist_ok=True)
     args = ["--language", "en", "--title", "Final Quality Gate", "--save-mode", mode]
     if mode == "obsidian":
         args += ["--vault", str(vault)]
     flags = {
-        "note": "--content-file", "plan": "--plan-file", "source": "--source-manifest",
-        "decisions": "--figure-decisions", "lint": "--lint-json", "grounding": "--grounding-lint-json",
+        "note": "--content-file",
+        "plan": "--plan-file",
+        "source": "--source-manifest",
+        "decisions": "--figure-decisions",
+        "lint": "--lint-json",
+        "grounding": "--grounding-lint-json",
     }
     if reviews:
         flags.update(quality="--final-quality-review", readability="--final-readability-review")
     for name, flag in flags.items():
         if name != omit:
             args += [flag, str(paths[name])]
+    args += extra_args or []
     return execute(tmp_path, args)
 
 
@@ -102,14 +164,17 @@ def assert_no_save(tmp_path: Path, result: subprocess.CompletedProcess[str]) -> 
 
 @pytest.mark.parametrize("mode", ["workspace", "obsidian"])
 def test_formal_save_refuses_missing_quality_and_readability_even_when_both_lints_pass(
-    tmp_path: Path, mode: str,
+    tmp_path: Path,
+    mode: str,
 ) -> None:
     result = save(tmp_path, inputs(tmp_path), mode=mode, reviews=False)
     assert_no_save(tmp_path, result)
 
 
 @pytest.mark.parametrize("mode", ["workspace", "obsidian"])
-def test_recorded_quality_and_readability_save_identical_reviewed_bytes(tmp_path: Path, mode: str) -> None:
+def test_recorded_quality_and_readability_save_identical_reviewed_bytes(
+    tmp_path: Path, mode: str
+) -> None:
     paths = inputs(tmp_path)
     recorded = record(tmp_path, paths)
     assert recorded.returncode == 0, recorded.stderr
@@ -124,12 +189,25 @@ def test_recorded_quality_and_readability_save_identical_reviewed_bytes(tmp_path
 
 def test_record_phase_needs_no_configuration_title_or_vault(tmp_path: Path) -> None:
     paths = inputs(tmp_path)
-    result = subprocess.run([
-        sys.executable, str(WRITER), "--record-final-quality-review", "--language", "en",
-        "--content-file", str(paths["note"]), "--plan-file", str(paths["plan"]),
-        "--final-quality-review", str(paths["quality"]),
-    ], cwd=tmp_path, capture_output=True, text=True,
-       env={**os.environ, "DEEPPAPERNOTE_CONFIG_PATH": str(tmp_path / "absent-config.json")})
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WRITER),
+            "--record-final-quality-review",
+            "--language",
+            "en",
+            "--content-file",
+            str(paths["note"]),
+            "--plan-file",
+            str(paths["plan"]),
+            "--final-quality-review",
+            str(paths["quality"]),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "DEEPPAPERNOTE_CONFIG_PATH": str(tmp_path / "absent-config.json")},
+    )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["revisions_used"] == 0
     assert not (tmp_path / "saved").exists()
@@ -145,6 +223,124 @@ def test_formal_save_requires_explicit_review_inputs(tmp_path: Path, omit: str) 
 
 def test_passing_quality_must_have_been_recorded(tmp_path: Path) -> None:
     assert_no_save(tmp_path, save(tmp_path, inputs(tmp_path)))
+
+
+@pytest.mark.parametrize("mode", ["workspace", "obsidian"])
+def test_status_output_cannot_overwrite_the_reviewed_note(tmp_path: Path, mode: str) -> None:
+    paths = inputs(tmp_path)
+    assert record(tmp_path, paths).returncode == 0
+    root = tmp_path / "saved" if mode == "workspace" else tmp_path / "vault/papers"
+    filename = "note.md" if mode == "workspace" else "note.en.md"
+    target = root / "area/note" / filename
+    result = save(
+        tmp_path,
+        paths,
+        mode=mode,
+        extra_args=[
+            "--subdir",
+            "area",
+            "--filename",
+            "note.md",
+            "--papers-dir",
+            "papers",
+            "--output",
+            str(target),
+        ],
+    )
+    assert_no_save(tmp_path, result)
+    assert "status output" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "protected",
+    [
+        "note",
+        "plan",
+        "quality",
+        "readability",
+        "state",
+        "lint",
+        "grounding",
+        "source",
+        "decisions",
+    ],
+)
+def test_status_output_alias_cannot_overwrite_gate_inputs(tmp_path: Path, protected: str) -> None:
+    paths = inputs(tmp_path)
+    assert record(tmp_path, paths).returncode == 0
+    paths["state"] = paths["quality"].with_suffix(".state.json")
+    before = {name: path.read_bytes() for name, path in paths.items()}
+    alias = paths[protected]
+    if os.name != "nt":
+        alias = tmp_path / "status-alias.json"
+        alias.symlink_to(paths[protected])
+    result = save(tmp_path, paths, extra_args=["--output", str(alias)])
+    assert_no_save(tmp_path, result)
+    assert "status output" in result.stderr
+    assert {name: path.read_bytes() for name, path in paths.items()} == before
+
+
+@pytest.mark.parametrize("corrupt_sidecar", [False, True])
+def test_conflict_status_output_cannot_overwrite_an_existing_note(
+    tmp_path: Path,
+    corrupt_sidecar: bool,
+) -> None:
+    paths = inputs(tmp_path)
+    assert record(tmp_path, paths).returncode == 0
+    first = save(tmp_path, paths, mode="obsidian")
+    assert first.returncode == 0, first.stderr
+    target = Path(json.loads(first.stdout)["note_path"])
+    if corrupt_sidecar:
+        (target.parent / ".deeppapernote.json").write_bytes(b"{}\n")
+    before = {path: path.read_bytes() for path in target.parent.rglob("*") if path.is_file()}
+    rejected = save(tmp_path, paths, mode="obsidian", extra_args=["--output", str(target)])
+    assert rejected.returncode != 0
+    assert "status output" in rejected.stderr
+    assert {
+        path: path.read_bytes() for path in target.parent.rglob("*") if path.is_file()
+    } == before
+
+
+@pytest.mark.parametrize("mode", ["workspace", "obsidian"])
+@pytest.mark.parametrize("output_file", [".deeppapernote.json", "images/nested/existing.png"])
+def test_status_output_cannot_replace_files_in_an_existing_paper_directory(
+    tmp_path: Path,
+    mode: str,
+    output_file: str,
+) -> None:
+    paths = inputs(tmp_path)
+    assert record(tmp_path, paths).returncode == 0
+    first = save(tmp_path, paths, mode=mode)
+    assert first.returncode == 0, first.stderr
+    target = Path(json.loads(first.stdout)["note_path"])
+    output = target.parent / output_file
+    if not output.exists():
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"Existing paper artifact.\n")
+    before = {path: path.read_bytes() for path in target.parent.rglob("*") if path.is_file()}
+    extra_args = ["--output", str(output)]
+    if mode == "obsidian":
+        extra_args += [
+            "--overwrite-existing-note",
+            "--expected-existing-note-sha256",
+            digest(target),
+        ]
+    rejected = save(tmp_path, paths, mode=mode, extra_args=extra_args)
+    assert rejected.returncode != 0
+    assert {
+        path: path.read_bytes() for path in target.parent.rglob("*") if path.is_file()
+    } == before
+    assert "status output" in rejected.stderr
+
+
+def test_status_output_outside_the_paper_directory_preserves_reviewed_bytes(tmp_path: Path) -> None:
+    paths = inputs(tmp_path)
+    assert record(tmp_path, paths).returncode == 0
+    status = tmp_path / "save-status.json"
+    result = save(tmp_path, paths, extra_args=["--output", str(status)])
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(status.read_text(encoding="utf-8"))
+    assert Path(payload["note_path"]).read_bytes() == NOTE
 
 
 @pytest.mark.parametrize("raw", [b"\xef\xbb\xbf" + NOTE, NOTE.replace(b"\n", b"\r\n"), b"\xff"])
@@ -224,10 +420,20 @@ def test_preflight_does_not_require_final_reviews(tmp_path: Path) -> None:
     paths = inputs(tmp_path)
     vault = tmp_path / "vault"
     vault.mkdir()
-    result = execute(tmp_path, [
-        "--preflight", "--vault", str(vault), "--title", "Preflight Quality",
-        "--language", "en", "--source-manifest", str(paths["source"]),
-    ])
+    result = execute(
+        tmp_path,
+        [
+            "--preflight",
+            "--vault",
+            str(vault),
+            "--title",
+            "Preflight Quality",
+            "--language",
+            "en",
+            "--source-manifest",
+            str(paths["source"]),
+        ],
+    )
     assert result.returncode == 0, result.stderr
     assert list(vault.iterdir()) == []
 
