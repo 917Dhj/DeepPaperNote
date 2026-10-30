@@ -346,7 +346,20 @@ def test_extract_local_pdf_hints_falls_back_to_first_page_title(tmp_path: Path, 
     assert hints["doi"] == "10.1038/s44184-025-00175-1"
 
 
-def test_extract_local_pdf_hints_prefers_concise_first_page_title(tmp_path: Path, monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("header", "title"),
+    [
+        ("", "Segment Anything"),
+        ("Research Article", "Segment Anything"),
+        ("Original Article", "Segment Anything"),
+        ("Review Article", "Segment Anything"),
+        ("RESEARCH ARTICLE", "Segment Anything"),
+        ("", "Research Article Segmentation With Prompted Masks"),
+    ],
+)
+def test_extract_local_pdf_hints_prefers_concise_first_page_title(
+    tmp_path: Path, monkeypatch, header: str, title: str,
+) -> None:
     pdf_path = tmp_path / "paper.pdf"
     pdf_path.write_bytes(b"%PDF-1.4")
     fake_doc = FakePdfDoc(
@@ -354,7 +367,8 @@ def test_extract_local_pdf_hints_prefers_concise_first_page_title(tmp_path: Path
         pages=[
             "\n".join(
                 [
-                    "Segment Anything",
+                    header,
+                    title,
                     "Alexander Kirillov, Eric Mintun",
                     "Meta AI Research, FAIR",
                 ]
@@ -365,7 +379,7 @@ def test_extract_local_pdf_hints_prefers_concise_first_page_title(tmp_path: Path
 
     hints = extract_local_pdf_hints(pdf_path)
 
-    assert hints["title"] == "Segment Anything"
+    assert hints["title"] == title
 
 
 def test_resolve_reference_local_pdf_uses_extracted_hints(tmp_path: Path, monkeypatch) -> None:
