@@ -1250,6 +1250,16 @@ def _merge_admitted_observation(
                 merged["title"] = deepcopy(value)
                 merged.pop("local_pdf_title_source", None)
                 merged.pop("local_pdf_artifact_title", None)
+                merged["identity_confidence_reasons"] = [
+                    reason
+                    for reason in _dedupe_string_list(merged.get("identity_confidence_reasons", []))
+                    if reason.lower() not in {
+                        "first_page_title_used",
+                        "local_pdf_stem_used",
+                        "pdf_metadata_title_used",
+                        "local_pdf_artifact_title",
+                    }
+                ]
                 continue
         if merged.get(key) in ("", None, [], {}):
             merged[key] = deepcopy(value)
@@ -3702,6 +3712,7 @@ def choose_local_pdf_corrected_title(base: dict[str, Any], candidates: list[dict
 
 
 LOW_CONFIDENCE_LOCAL_TITLE_PATTERNS = (
+    r"^(?:research|original|review)\s+article$",
     r"^provided proper attribution\b",
     r"^published as\b",
     r"^submitted to\b",
