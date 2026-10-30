@@ -92,6 +92,13 @@ def file_sha256(path: str | Path) -> str:
     return digest.hexdigest()
 
 
+def json_input_sha256(value: str | Path) -> str:
+    text = str(value)
+    if text.lstrip().startswith("{"):
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return file_sha256(value)
+
+
 def emit(payload: dict[str, Any], output_path: str | None = None) -> None:
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     if output_path:
@@ -127,13 +134,13 @@ def maybe_load_json_record(value: str | None) -> dict[str, Any] | None:
     stripped = value.strip()
     if not stripped:
         return None
-    path = Path(stripped).expanduser()
-    if path.exists() and path.is_file() and path.suffix.lower() == ".json":
-        return load_json_file(path)
     if stripped.startswith("{"):
         data = json.loads(stripped)
         if isinstance(data, dict):
             return data
+    path = Path(stripped).expanduser()
+    if path.exists() and path.is_file() and path.suffix.lower() == ".json":
+        return load_json_file(path)
     return None
 
 

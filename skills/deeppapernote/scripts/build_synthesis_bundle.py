@@ -394,7 +394,7 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "reject_old_references": list(rules["old_bundle_reference_prefixes"]),
             "lint_command": (
                 "scripts/lint_grounding.py --note-plan ... "
-                "--source-manifest ... --bundle-json ... --figure-decisions ..."
+                "--source-manifest ... --bundle-json ... --figure-decisions ... --output ..."
             ),
         },
         "figure_table_contract": {

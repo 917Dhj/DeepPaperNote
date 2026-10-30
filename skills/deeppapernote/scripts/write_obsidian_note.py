@@ -18,6 +18,7 @@ from common import (
     emit,
     ensure_parent,
     file_sha256,
+    json_input_sha256,
     maybe_load_json_record,
     resolve_domain_subdir,
     resolve_note_asset_dir,
@@ -25,6 +26,7 @@ from common import (
     resolve_obsidian_note_path,
     runtime_config,
 )
+from lint_grounding import validate_figure_decisions
 from lint_note import inspect_reference_hygiene
 from localization import normalize_output_language, require_artifact_output_language
 from paper_archive import (
@@ -113,9 +115,15 @@ def parser() -> argparse.ArgumentParser:
         help="Required Figure/Table Decisions JSON for Formal Save.",
     )
     p.add_argument(
+        "--grounding-lint-json",
+        default="",
+        help="Required Grounding Lint JSON for Formal Save.",
+    )
+    p.add_argument("--plan-file", default="", help="Required Note Plan JSON file for Formal Save.")
+    p.add_argument(
         "--source-manifest",
         default="",
-        help="Required Source Manifest JSON for Obsidian Save Target Admission.",
+        help="Required Source Manifest JSON for Formal Save and Obsidian Save Target Admission.",
     )
     p.add_argument("--title", default="", help="Explicit title override.")
     p.add_argument("--output", default="", help="JSON status output path.")
@@ -326,16 +334,37 @@ def lint_failure_message(lint: dict, gate: str, lint_path: str) -> str:
 
 
 def require_lint_gate(lint: dict, key: str, gate: str, lint_path: str) -> None:
-    if not lint.get(key, False):
+    if lint.get(key) is not True:
         raise SystemExit(lint_failure_message(lint, gate, lint_path))
+
+
+def require_lint_report(path_value: str, producer: str, name: str, language: str) -> dict:
+    if not path_value:
+        raise SystemExit(f"Formal Save requires {name} with output_language.")
+    try:
+        report = json.loads(Path(path_value).expanduser().read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"Expected {name} JSON object: {path_value}") from exc
+    if not isinstance(report, dict):
+        raise SystemExit(f"Expected {name} JSON object: {path_value}")
+    if report.get("script") != producer or report.get("status") != "ok":
+        raise SystemExit(f"{name} requires a successful {producer} producer artifact.")
+    try:
+        require_artifact_output_language(report, name, language)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    return report
 
 
 def require_source_manifest(path_value: str) -> dict:
     if not path_value:
         raise SystemExit(
-            "Obsidian Save Target Admission requires a Source Manifest with source_sha256."
+            "Formal Save or Obsidian Save Target Admission requires a Source Manifest with source_sha256."
         )
-    manifest = maybe_load_json_record(path_value)
+    try:
+        manifest = maybe_load_json_record(path_value)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise SystemExit(f"Expected successful Source Manifest JSON: {path_value}") from exc
     if manifest is None or str(manifest.get("status", "")).strip() != "ok":
         raise SystemExit(f"Expected successful Source Manifest JSON: {path_value}")
     source_sha256 = str(manifest.get("source_sha256", "")).strip().lower()
@@ -602,9 +631,9 @@ def main() -> None:
     if not title:
         raise SystemExit("write_obsidian_note.py requires --title or metadata with a title.")
 
-    source_manifest = (
-        require_source_manifest(args.source_manifest) if output_mode == "obsidian" else {}
-    )
+    if args.preflight and output_mode != "obsidian":
+        raise SystemExit("--preflight requires Obsidian save mode.")
+    source_manifest = require_source_manifest(args.source_manifest)
     args.archive_input = {**record, **source_manifest, "title": title}
     if not args.target_directory:
         args.target_directory = (source_manifest.get("archive_source") or {}).get(
@@ -652,8 +681,6 @@ def main() -> None:
             output_language=output_language,
         )
     else:
-        if args.preflight:
-            raise SystemExit("--preflight requires Obsidian save mode.")
         resolved_subdir = resolve_domain_subdir(
             config,
             title=title,
@@ -685,31 +712,41 @@ def main() -> None:
         )
         return
 
-    if not args.lint_json:
-        raise SystemExit("Formal Save requires Final Note Lint with output_language.")
+    lint = require_lint_report(args.lint_json, "lint_note.py", "Final Note Lint", output_language)
     lint_path = str(Path(args.lint_json).expanduser().resolve())
-    # utf-8-sig tolerates a BOM in the lint JSON (e.g. produced/edited on
-    # Windows) that would otherwise crash json.loads before any gate check.
-    lint = json.loads(Path(lint_path).read_text(encoding="utf-8-sig"))
+    for key, gate in (
+        ("passes_basic_structure", "basic structure"),
+        ("passes_style_gate", "style"),
+        ("passes_math_gate", "math"),
+        ("passes_figure_gate", "figure"),
+        ("passes_plan_gate", "plan"),
+        ("passes_substantive_content", "substantive content"),
+        ("passes_reference_hygiene_gate", "reference hygiene"),
+    ):
+        require_lint_gate(lint, key, gate, lint_path)
+    grounding = require_lint_report(
+        args.grounding_lint_json, "lint_grounding.py", "Grounding Lint", output_language,
+    )
+    require_lint_gate(grounding, "passes_grounding", "grounding", args.grounding_lint_json)
+    if not args.plan_file or not Path(args.plan_file).expanduser().is_file():
+        raise SystemExit("Formal Save requires an existing Note Plan JSON file via --plan-file.")
     try:
-        require_artifact_output_language(lint, "lint artifact", output_language)
+        note_plan = maybe_load_json_record(args.plan_file)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise SystemExit(f"Expected Note Plan JSON object: {args.plan_file}") from exc
+    if note_plan is None:
+        raise SystemExit(f"Expected Note Plan JSON object: {args.plan_file}")
+    try:
+        require_artifact_output_language(note_plan, "Note Plan", output_language)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
-    require_lint_gate(lint, "passes_basic_structure", "basic structure", lint_path)
-    require_lint_gate(lint, "passes_style_gate", "style", lint_path)
-    require_lint_gate(lint, "passes_math_gate", "math", lint_path)
-    if "passes_figure_gate" in lint and not lint.get("passes_figure_gate", False):
-        raise SystemExit(lint_failure_message(lint, "figure", lint_path))
-    if "passes_plan_gate" in lint and not lint.get("passes_plan_gate", False):
-        raise SystemExit(lint_failure_message(lint, "plan", lint_path))
-    if "passes_substantive_content" in lint and not lint.get("passes_substantive_content", False):
-        raise SystemExit(lint_failure_message(lint, "substantive content", lint_path))
-    if "passes_reference_hygiene_gate" in lint and not lint.get("passes_reference_hygiene_gate", False):
-        raise SystemExit(lint_failure_message(lint, "reference hygiene", lint_path))
 
     if not args.figure_decisions:
         raise SystemExit("Formal Save requires Figure/Table Decisions with output_language.")
-    figure_decisions = maybe_load_json_record(args.figure_decisions)
+    try:
+        figure_decisions = maybe_load_json_record(args.figure_decisions)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise SystemExit(f"Expected JSON object for --figure-decisions: {args.figure_decisions}") from exc
     if figure_decisions is None:
         raise SystemExit(f"Expected JSON object for --figure-decisions: {args.figure_decisions}")
     try:
@@ -720,6 +757,23 @@ def main() -> None:
         )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
+
+    for report, field, value, name in (
+        (lint, "note_plan_sha256", args.plan_file, "Final Note Lint Note Plan"),
+        (grounding, "note_plan_sha256", args.plan_file, "Grounding Lint Note Plan"),
+        (grounding, "source_manifest_sha256", args.source_manifest, "Grounding Lint Source Manifest"),
+        (grounding, "figure_decisions_sha256", args.figure_decisions, "Grounding Lint Figure/Table Decisions"),
+    ):
+        current_sha256 = json_input_sha256(value)
+        if not current_sha256 or report.get(field) != current_sha256:
+            raise SystemExit(f"{name} SHA-256 does not match current input; rerun lint.")
+    figure_issues = [
+        item
+        for item in validate_figure_decisions(source_manifest, figure_decisions, args.source_manifest)
+        if item.get("severity", "error") == "error"
+    ]
+    if figure_issues:
+        raise SystemExit(f"Figure/Table Decisions validation failed: {json.dumps(figure_issues)}")
 
     if args.content_file:
         # utf-8-sig strips a leading BOM so it is never written into the saved

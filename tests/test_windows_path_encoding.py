@@ -17,6 +17,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from formal_save_helpers import formal_save_args, reviewed_insert_fields
+
 import citation_links
 import common
 import lint_grounding
@@ -241,9 +243,10 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
             "--title", "BOM Content Test",
             "--vault", str(vault),
             "--content-file", str(content_file),
-            "--lint-json", str(lint_path),
-            "--figure-decisions", str(decisions_path),
-            "--source-manifest", str(_source_manifest(tmp_path)),
+            *formal_save_args(
+                tmp_path, canonical_note_text, lint_path=lint_path,
+                decisions_path=decisions_path, source_manifest_path=_source_manifest(tmp_path),
+            ),
         ],
         cwd=tmp_path,
         env=_clean_env(),
@@ -299,9 +302,10 @@ def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
             "--title", "CRLF Note",
             "--vault", str(vault),
             "--content-file", str(content_file),
-            "--lint-json", str(lint_output),
-            "--figure-decisions", str(decisions_path),
-            "--source-manifest", str(_source_manifest(tmp_path)),
+            *formal_save_args(
+                tmp_path, crlf_text, lint_path=lint_output,
+                decisions_path=decisions_path, source_manifest_path=_source_manifest(tmp_path),
+            ),
         ],
         cwd=tmp_path,
         env=_clean_env(),
@@ -314,26 +318,34 @@ def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
     assert b"\r\n" not in saved
 
 
-def test_materialize_figure_asset_embed_uses_forward_slashes(tmp_path: Path) -> None:
+def test_formal_save_image_embed_uses_forward_slashes(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
     source_image = tmp_path / "fig.png"
-    source_image.write_bytes(b"\x89PNG\r\n\x1a\n")  # header bytes are enough
+    source_image.write_bytes(b"\x89PNG\r\n\x1a\n")
+    note_text = "# Embed Slash Test\n\n![Figure 1](images/fig.png)\n"
+    decisions_path = tmp_path / "insert-decisions.json"
+    decisions_path.write_text(json.dumps({
+        "output_language": "zh-CN",
+        "decisions": [{
+            "source_id": "Figure 1", "decision": "insert",
+            "source_image_path": str(source_image),
+            "source_image_filename": source_image.name,
+            **reviewed_insert_fields(source_image),
+        }],
+    }), encoding="utf-8")
     result = subprocess.run(
         [
-            sys.executable,
-            str(SCRIPTS / "materialize_figure_asset.py"),
-            "--title", "Embed Slash Test",
-            "--vault", str(vault),
-            "--source-image", str(source_image),
+            sys.executable, str(SCRIPTS / "write_obsidian_note.py"),
+            "--title", "Embed Slash Test", "--vault", str(vault),
+            "--content", note_text,
+            *formal_save_args(tmp_path, note_text, decisions_path=decisions_path),
         ],
-        cwd=tmp_path,
-        env=_clean_env(),
-        capture_output=True,
-        text=True,
+        cwd=tmp_path, env=_clean_env(), capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
-    # str(Path) would embed backslashes on Windows and break the Markdown link.
-    assert "\\" not in payload["absolute_markdown_embed"]
-    assert "\\" not in payload["relative_markdown_embed"]
+    materialized = payload["materialized_figures"][0]
+    assert materialized["relative_markdown_path"] == "images/fig.png"
+    assert "\\" not in materialized["relative_markdown_path"]
+    assert Path(payload["note_path"]).read_text(encoding="utf-8") == note_text

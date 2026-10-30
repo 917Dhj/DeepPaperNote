@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -79,6 +80,22 @@ class FakeFitz:
 def test_extract_doi_from_url_like_text() -> None:
     text = "Published version: https://doi.org/10.1038/s44184-025-00175-1."
     assert extract_doi(text) == "10.1038/s44184-025-00175-1"
+
+
+def test_json_input_sha256_fingerprints_exact_file_bytes(tmp_path: Path) -> None:
+    path = tmp_path / "plan.json"
+    content = b'\xef\xbb\xbf{\r\n  "title": "Paper"\r\n}\r\n'
+    path.write_bytes(content)
+
+    assert common.json_input_sha256(path) == hashlib.sha256(content).hexdigest()
+    assert common.json_input_sha256(tmp_path / "missing.json") == ""
+
+
+def test_json_input_sha256_preserves_exact_long_inline_json() -> None:
+    value = '  {"text": "' + "evidence " * 100 + '"}\n'
+
+    assert common.json_input_sha256(value) == hashlib.sha256(value.encode()).hexdigest()
+    assert common.maybe_load_json_record(value) == {"text": "evidence " * 100}
 
 
 def test_extract_arxiv_id_strips_version() -> None:

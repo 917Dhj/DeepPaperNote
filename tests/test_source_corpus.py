@@ -168,6 +168,17 @@ def issue_codes(issues: list[dict]) -> set[str]:
     return {str(issue.get("code", "")) for issue in issues}
 
 
+def test_load_source_corpus_accepts_bom_manifest(tmp_path: Path) -> None:
+    manifest_path = write_valid_corpus(tmp_path)
+    manifest_path.write_bytes(b"\xef\xbb\xbf" + manifest_path.read_bytes())
+
+    corpus = load_source_corpus(manifest_path)
+
+    assert corpus.manifest["paper_id"] == "paper:source-corpus"
+    assert corpus.caption_items()[0]["id"] == "Figure 1"
+    assert validate_source_corpus(corpus) == []
+
+
 def test_load_source_corpus_exposes_manifest_raw_records_and_views(tmp_path: Path) -> None:
     manifest_path = write_valid_corpus(tmp_path)
 

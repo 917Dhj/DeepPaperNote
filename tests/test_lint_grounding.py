@@ -188,6 +188,38 @@ def test_lint_grounding_accepts_section_id_or_page_range(tmp_path: Path) -> None
     assert [issue for issue in result["issues"] if issue.get("severity", "error") == "error"] == []
 
 
+def test_lint_grounding_records_exact_input_fingerprints(tmp_path: Path) -> None:
+    result = run_lint_grounding(tmp_path, grounded_note_plan(), source_manifest(), slim_bundle())
+
+    assert result["passes_grounding"] is True
+    for field, filename in (
+        ("note_plan_sha256", "note_plan.json"),
+        ("source_manifest_sha256", "source_manifest.json"),
+        ("figure_decisions_sha256", "figure_decisions.json"),
+    ):
+        assert result[field] == hashlib.sha256((tmp_path / filename).read_bytes()).hexdigest()
+
+
+def test_lint_grounding_fingerprints_inline_json_without_reserializing() -> None:
+    plan = ' {"output_language": "zh-CN"} '
+    source = '{"paper_id": "paper:inline"}\n'
+    decisions = '{"output_language": "zh-CN", "decisions": []}'
+    result = subprocess.run([
+        sys.executable, str(LINT_GROUNDING_SCRIPT),
+        "--note-plan", plan, "--source-manifest", source,
+        "--figure-decisions", decisions,
+    ], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    for field, value in (
+        ("note_plan_sha256", plan),
+        ("source_manifest_sha256", source),
+        ("figure_decisions_sha256", decisions),
+    ):
+        assert report[field] == hashlib.sha256(value.encode()).hexdigest()
+
+
 def test_lint_grounding_rejects_missing_section_id_and_invalid_page(tmp_path: Path) -> None:
     plan = grounded_note_plan()
     plan["section_plan"][0]["evidence_sources"] = [{"section_id": "sec:missing"}]

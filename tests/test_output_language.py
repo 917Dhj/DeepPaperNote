@@ -479,7 +479,20 @@ def test_english_local_pdf_pipeline_lints_and_formally_saves_note_with_images_di
     plan_path = workdir / "paper.plan.json"
     lint_path = workdir / "paper_lint.json"
     note_path.write_text(english_note(), encoding="utf-8")
-    plan_path.write_text(json.dumps(plan_payload()), encoding="utf-8")
+    plan = plan_payload()
+    plan["section_plan"] = [
+        {
+            "section": section,
+            "focus": f"Explain how recorded tool states bound the auditable workflow's {section}.",
+            "evidence_sources": [{"pages": [1]}],
+        }
+        for section in (
+            "Research Question", "Data and Task Definition", "Method",
+            "Key Results", "Deep Analysis", "Limitations",
+        )
+    ]
+    plan["central_claims"][0]["supporting_evidence"] = [{"pages": [1]}]
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
     subprocess.run(
         [sys.executable, str(scripts / "lint_note.py"), "--language", "en", "--input", str(note_path), "--plan-file", str(plan_path), "--output", str(lint_path)],
         check=True,
@@ -487,13 +500,35 @@ def test_english_local_pdf_pipeline_lints_and_formally_saves_note_with_images_di
     lint = json.loads(lint_path.read_text(encoding="utf-8"))
     assert all(value is True for key, value in lint.items() if key.startswith("passes_"))
 
+    grounding_path = workdir / "paper_grounding.json"
+    subprocess.run(
+        [
+            sys.executable, str(scripts / "lint_grounding.py"), "--language", "en",
+            "--note-plan", str(plan_path),
+            "--source-manifest", str(workdir / "paper_source_manifest.json"),
+            "--figure-decisions", str(workdir / "paper_figure_table_decisions.json"),
+            "--bundle-json", str(workdir / "paper_bundle.json"),
+            "--output", str(grounding_path),
+        ],
+        check=True,
+    )
+    grounding = json.loads(grounding_path.read_text(encoding="utf-8"))
+    assert grounding["passes_grounding"] is True, grounding["issues"]
+
     save_root = tmp_path / "save"
     save_root.mkdir()
     env = os.environ.copy()
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "saved"
     saved = subprocess.run(
-        [sys.executable, str(scripts / "write_obsidian_note.py"), "--language", "en", "--title", "English Local PDF", "--content-file", str(note_path), "--lint-json", str(lint_path), "--figure-decisions", str(workdir / "paper_figure_table_decisions.json")],
+        [
+            sys.executable, str(scripts / "write_obsidian_note.py"),
+            "--language", "en", "--title", "English Local PDF",
+            "--content-file", str(note_path), "--lint-json", str(lint_path),
+            "--figure-decisions", str(workdir / "paper_figure_table_decisions.json"),
+            "--source-manifest", str(workdir / "paper_source_manifest.json"),
+            "--plan-file", str(plan_path), "--grounding-lint-json", str(grounding_path),
+        ],
         cwd=save_root,
         env=env,
         check=True,
