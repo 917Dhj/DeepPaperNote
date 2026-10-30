@@ -208,6 +208,134 @@ def test_build_identity_contract_repairs_noisy_first_page_title(
     assert trace["repair_attempts"] == []
 
 
+def test_build_identity_contract_replaces_challengeable_first_page_title_with_provider_observation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf_path = tmp_path / "sam.pdf"
+    identity, trace = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload={
+            "status": "ok",
+            "script": "resolve_paper.py",
+            "paper_id": "arxiv:2304.02643",
+            "source_type": "local_pdf",
+            "source_url": str(pdf_path),
+            "local_pdf_path": str(pdf_path),
+            "title": "Meta AI Research, FAIR",
+            "local_pdf_title_source": "first_page_title_used",
+            "arxiv_id": "2304.02643",
+            "metadata_sources": ["local_pdf"],
+        },
+        metadata_payload={
+            "status": "ok",
+            "script": "collect_metadata.py",
+            "paper_id": "arxiv:2304.02643",
+            "source_type": "local_pdf",
+            "source_url": str(pdf_path),
+            "local_pdf_path": str(pdf_path),
+            "title": "Meta AI Research, FAIR",
+            "arxiv_id": "2304.02643",
+            "metadata_sources": ["local_pdf", "arxiv"],
+            "identity_observations": [
+                {
+                    "provider": "arxiv",
+                    "retrieved_by": {"kind": "arxiv_id", "value": "2304.02643"},
+                    "relation": {"kind": "shared_identifier", "value": "arxiv:2304.02643"},
+                    "record": {
+                        "source": "arxiv",
+                        "source_type": "arxiv",
+                        "arxiv_id": "2304.02643",
+                        "title": "Segment Anything",
+                        "authors": ["Alexander Kirillov"],
+                        "year": "2023",
+                    },
+                }
+            ],
+        },
+    )
+
+    assert identity["identity_verdict"] == "accepted"
+    assert identity["work_level_identity"]["title"] == "Segment Anything"
+    assert identity["accepted_metadata"]["title"] == "Segment Anything"
+    assert identity["field_provenance"]["title"]["provider"] == "arxiv"
+    assert len(trace["repair_attempts"]) == 1
+    attempt = trace["repair_attempts"][0]
+    assert attempt["action"] == "replace_challengeable_identity_anchor"
+    assert attempt["status"] == "accepted"
+    assert (
+        attempt["replacement_reason"]
+        == "challengeable_first_page_title_replaced_by_stronger_identity_evidence"
+    )
+    assert attempt["rejected_candidate_identity"]["title"] == "Meta AI Research, FAIR"
+    assert attempt["accepted_correction"]["title"] == "Segment Anything"
+
+
+@pytest.mark.parametrize(
+    "title_source",
+    ["first_page_title_used", "local_pdf_stem_used", "pdf_metadata_title_used"],
+)
+def test_build_identity_contract_preserves_corrected_title_across_provider_observations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    title_source: str,
+) -> None:
+    pdf_path = tmp_path / "sam.pdf"
+    resolved = common.apply_identity_confidence(
+        {
+            "status": "ok",
+            "script": "resolve_paper.py",
+            "paper_id": "arxiv:2304.02643",
+            "source_type": "local_pdf",
+            "source_url": str(pdf_path),
+            "local_pdf_path": str(pdf_path),
+            "title": "Meta AI Research, FAIR",
+            "local_pdf_title_source": title_source,
+            "local_pdf_artifact_title": title_source == "local_pdf_stem_used",
+            "arxiv_id": "2304.02643",
+            "metadata_sources": ["local_pdf"],
+        }
+    )
+    observations = [
+        {
+            "provider": provider,
+            "retrieved_by": {"kind": "arxiv_id", "value": "2304.02643"},
+            "record": {"arxiv_id": "2304.02643", "title": title},
+        }
+        for provider, title in [
+            ("arxiv", "Segment Anything"),
+            ("semantic_scholar", "Segment Anything (SAM)"),
+            ("openalex", "Segment Anything: A Foundation Model"),
+        ]
+    ]
+    identity, trace = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload=resolved,
+        metadata_payload={
+            **resolved,
+            "script": "collect_metadata.py",
+            "identity_observations": observations,
+        },
+    )
+
+    assert identity["identity_verdict"] == "accepted"
+    assert identity["work_level_identity"]["title"] == "Segment Anything"
+    assert identity["accepted_metadata"]["title"] == "Segment Anything"
+    assert identity["field_provenance"]["title"]["provider"] == "arxiv"
+    assert len(identity["accepted_observations"]) == 3
+    assert identity["diagnostics"]["identity_confidence_reasons"] == ["arxiv_id_present"]
+    assert identity["source_manifestation"]["title"] == "Meta AI Research, FAIR"
+    assert resolved["local_pdf_title_source"] == title_source
+    assert title_source in resolved["identity_confidence_reasons"]
+    assert len(trace["repair_attempts"]) == 1
+    attempt = trace["repair_attempts"][0]
+    assert attempt["action"] == "replace_challengeable_identity_anchor"
+    assert attempt["rejected_candidate_identity"]["title"] == "Meta AI Research, FAIR"
+    assert attempt["accepted_correction"]["title"] == "Segment Anything"
+
+
 def test_build_identity_contract_repairs_filename_only_title_with_arxiv(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
