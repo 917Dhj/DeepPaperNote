@@ -592,7 +592,13 @@ def main() -> None:
     output_mode, root_path = resolve_note_output_mode(config)
 
     record = maybe_load_json_record(args.input) or {}
-    title = args.title or str(record.get("title", "")).strip()
+    title = (
+        args.title
+        or str(
+            (record.get("work_level_identity", {}) or {}).get("title")
+            or record.get("title", "")
+        ).strip()
+    )
     if not title:
         raise SystemExit("write_obsidian_note.py requires --title or metadata with a title.")
 

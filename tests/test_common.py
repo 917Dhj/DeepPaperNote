@@ -346,6 +346,28 @@ def test_extract_local_pdf_hints_falls_back_to_first_page_title(tmp_path: Path, 
     assert hints["doi"] == "10.1038/s44184-025-00175-1"
 
 
+def test_extract_local_pdf_hints_prefers_concise_first_page_title(tmp_path: Path, monkeypatch) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    fake_doc = FakePdfDoc(
+        metadata={},
+        pages=[
+            "\n".join(
+                [
+                    "Segment Anything",
+                    "Alexander Kirillov, Eric Mintun",
+                    "Meta AI Research, FAIR",
+                ]
+            )
+        ],
+    )
+    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+
+    hints = extract_local_pdf_hints(pdf_path)
+
+    assert hints["title"] == "Segment Anything"
+
+
 def test_resolve_reference_local_pdf_uses_extracted_hints(tmp_path: Path, monkeypatch) -> None:
     pdf_path = tmp_path / "paper.pdf"
     pdf_path.write_bytes(b"%PDF-1.4")

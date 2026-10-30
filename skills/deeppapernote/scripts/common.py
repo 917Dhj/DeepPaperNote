@@ -1237,6 +1237,20 @@ def _merge_admitted_observation(
                     sources.append(source)
             merged[key] = sources
             continue
+        if key == "title":
+            observation_title = normalize_whitespace(str(value))
+            if (
+                observation_title
+                and _challengeable_title_replacement_reason(merged)
+                and (
+                    provider in PROVIDER_IDENTITY_SOURCES
+                    or _has_stronger_identity_evidence(observation)
+                )
+            ):
+                merged["title"] = deepcopy(value)
+                merged.pop("local_pdf_title_source", None)
+                merged.pop("local_pdf_artifact_title", None)
+                continue
         if merged.get(key) in ("", None, [], {}):
             merged[key] = deepcopy(value)
     sources = _dedupe_string_list(merged.get("metadata_sources", []))
@@ -1450,7 +1464,10 @@ def adjudicate_identity_observations(
             if accepted_metadata.get(field) != value:
                 continue
             if previous_metadata.get(field) not in ("", None, [], {}):
-                continue
+                if field == "title" and _challengeable_title_replacement_reason(previous_metadata):
+                    pass
+                else:
+                    continue
             field_provenance[field] = {
                 "provider": provider,
                 "retrieved_by": retrieved_by,
@@ -1537,7 +1554,7 @@ def identity_repair_decision(
             ):
                 repair_attempts.append(
                     {
-                        "attempt": 1,
+                        "attempt": len(repair_attempts) + 1,
                         "action": "replace_challengeable_identity_anchor",
                         "status": "accepted",
                         "evidence_used": _repair_evidence_used(effective),
@@ -3574,7 +3591,7 @@ def extract_pdf_text(pdf_path: Path, max_pages: int | None = None) -> str:
 def is_plausible_pdf_title_line(line: str) -> bool:
     normalized = clean_pdf_line(line)
     lower = normalized.lower()
-    if len(normalized) < 20 or len(normalized.split()) < 4:
+    if len(normalized) < 8 or (len(normalized) < 20 and len(normalized.split()) < 2):
         return False
     if normalized.count(",") >= 3:
         return False
@@ -3583,6 +3600,8 @@ def is_plausible_pdf_title_line(line: str) -> bool:
     if lower in {"abstract", "article", "preprint"}:
         return False
     if lower.startswith("npj |") or lower.startswith("arxiv:") or lower.startswith("submitted to"):
+        return False
+    if any(re.search(pattern, lower) for pattern in LOW_CONFIDENCE_LOCAL_TITLE_PATTERNS):
         return False
     if " doi:" in lower or lower.startswith("doi:"):
         return False
