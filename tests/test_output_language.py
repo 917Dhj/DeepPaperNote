@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from formal_save_helpers import final_review_args
 from build_synthesis_bundle import compact_writing_contract
 from lint_grounding import validate_note_plan
 from localization import (
@@ -478,7 +479,7 @@ def test_english_local_pdf_pipeline_lints_and_formally_saves_note_with_images_di
     note_path = workdir / "paper.md"
     plan_path = workdir / "paper.plan.json"
     lint_path = workdir / "paper_lint.json"
-    note_path.write_text(english_note(), encoding="utf-8")
+    note_path.write_bytes(english_note().encode("utf-8"))
     plan = plan_payload()
     plan["section_plan"] = [
         {
@@ -514,6 +515,9 @@ def test_english_local_pdf_pipeline_lints_and_formally_saves_note_with_images_di
     )
     grounding = json.loads(grounding_path.read_text(encoding="utf-8"))
     assert grounding["passes_grounding"] is True, grounding["issues"]
+    review_args = final_review_args(
+        workdir, english_note(), "en", plan_path=plan_path, content_path=note_path,
+    )
 
     save_root = tmp_path / "save"
     save_root.mkdir()
@@ -524,10 +528,11 @@ def test_english_local_pdf_pipeline_lints_and_formally_saves_note_with_images_di
         [
             sys.executable, str(scripts / "write_obsidian_note.py"),
             "--language", "en", "--title", "English Local PDF",
-            "--content-file", str(note_path), "--lint-json", str(lint_path),
+            "--lint-json", str(lint_path),
             "--figure-decisions", str(workdir / "paper_figure_table_decisions.json"),
             "--source-manifest", str(workdir / "paper_source_manifest.json"),
             "--plan-file", str(plan_path), "--grounding-lint-json", str(grounding_path),
+            *review_args,
         ],
         cwd=save_root,
         env=env,

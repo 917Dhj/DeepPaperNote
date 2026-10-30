@@ -9,11 +9,18 @@ import json
 import os
 import re
 import shutil
-import sys
 import tempfile
 from contextlib import nullcontext
 from pathlib import Path
 
+from _final_quality import (
+    advance_state,
+    canonical_note_text,
+    require_recorded_pass,
+    strict_json_loads,
+    validate_quality,
+    validate_readability,
+)
 from common import (
     emit,
     ensure_parent,
@@ -120,6 +127,14 @@ def parser() -> argparse.ArgumentParser:
         help="Required Grounding Lint JSON for Formal Save.",
     )
     p.add_argument("--plan-file", default="", help="Required Note Plan JSON file for Formal Save.")
+    p.add_argument("--final-quality-review", default="", help="Required Final Quality Review JSON.")
+    p.add_argument(
+        "--final-readability-review", default="", help="Required Final Readability Review JSON.",
+    )
+    p.add_argument(
+        "--record-final-quality-review", action="store_true",
+        help="Validate and record a quality review without accessing a save target.",
+    )
     p.add_argument(
         "--source-manifest",
         default="",
@@ -390,6 +405,11 @@ def block_directory_conflict(
     source_sha256: str,
     output_language: str,
 ) -> None:
+    if args.output and any(
+        Path(args.output).expanduser().resolve().is_relative_to(directory.resolve())
+        for directory in target_directories
+    ):
+        raise SystemExit("JSON status output must stay outside conflicting paper directories.")
     payload = {
         "status": "blocked",
         "script": "write_obsidian_note.py",
@@ -495,6 +515,7 @@ def resolve_obsidian_save_target(
             output_language=output_language,
         )
 
+    require_safe_status_output(args, target_path)
     approved_existing_note_sha256 = ""
     if target_path.is_file():
         existing_note_sha256 = file_sha256(target_path)
@@ -605,8 +626,97 @@ def restore_file(path: Path, backup_path: Path | None) -> None:
         os.replace(backup_path, path)
 
 
+def require_safe_status_output(args, target_path: Path | None = None) -> None:
+    if not args.output:
+        return
+    protected = {
+        Path(value).expanduser().resolve()
+        for value in (
+            args.content_file, args.plan_file, args.final_quality_review,
+            args.final_readability_review, args.lint_json, args.grounding_lint_json,
+            args.source_manifest, args.figure_decisions,
+        )
+        if value
+    }
+    if args.final_quality_review:
+        protected.add(
+            Path(args.final_quality_review).expanduser().resolve().with_suffix(".state.json")
+        )
+    output_path = Path(args.output).expanduser().resolve()
+    if output_path in protected or (
+        target_path is not None and output_path.is_relative_to(target_path.parent.resolve())
+    ):
+        raise SystemExit(
+            "JSON status output must stay outside the paper directory and protected review inputs."
+        )
+
+
+def read_quality_inputs(
+    args, language: str, *, lint_note_sha256: str | None = None,
+) -> tuple[str, str, dict, str, Path]:
+    for value, name in (
+        (args.content_file, "--content-file"), (args.plan_file, "--plan-file"),
+        (args.final_quality_review, "--final-quality-review"),
+    ):
+        if not value:
+            raise ValueError(f"Final Quality Gate requires explicit {name}.")
+    raw_note = Path(args.content_file).expanduser().read_bytes()
+    note_text = canonical_note_text(raw_note)
+    note_sha256 = hashlib.sha256(raw_note).hexdigest()
+    if lint_note_sha256 is not None and lint_note_sha256 != note_sha256:
+        raise ValueError(
+            "write_obsidian_note.py refused to write note because the final note "
+            "changed after Final Note Lint; rerun lint under the same output_language."
+        )
+    raw_plan = Path(args.plan_file).expanduser().read_bytes()
+    plan = json.loads(raw_plan.decode("utf-8-sig"))
+    review_path = Path(args.final_quality_review).expanduser().resolve()
+    review = strict_json_loads(review_path.read_text(encoding="utf-8-sig"))
+    review_id = validate_quality(
+        review, note_sha256=note_sha256, plan_sha256=hashlib.sha256(raw_plan).hexdigest(),
+        plan=plan, language=language,
+    )
+    return note_text, note_sha256, review, review_id, review_path.with_suffix(".state.json")
+
+
+def load_quality_state(path: Path) -> dict | None:
+    return strict_json_loads(path.read_text(encoding="utf-8-sig")) if path.exists() else None
+
+
+def record_final_quality_review(args) -> None:
+    if not args.language:
+        raise SystemExit("Recording Final Quality Review requires explicit --language.")
+    try:
+        language = normalize_output_language(args.language)
+        _, _, review, review_id, state_path = read_quality_inputs(args, language)
+        require_safe_status_output(args)
+        previous = load_quality_state(state_path)
+        state = advance_state(previous, review, review_id, language=language)
+        if state != previous:
+            atomic_write_note(state_path, json.dumps(state, ensure_ascii=False, indent=2) + "\n")
+    except (OSError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    revision_allowed = bool(state["pending_note_sha256"]) and state["revisions_used"] < 2
+    emit({
+        "status": "ok" if review["verdict"] == "pass" else "revision_required",
+        "script": "write_obsidian_note.py", "phase": "final_quality_review",
+        "output_language": language, "verdict": review["verdict"],
+        "revisions_used": state["revisions_used"],
+        "revisions_remaining": 2 - state["revisions_used"],
+        "revision_allowed": revision_allowed, "review_state_path": str(state_path),
+    }, args.output)
+    if review["verdict"] == "fail":
+        raise SystemExit(1)
+
+
 def main() -> None:
     args = parser().parse_args()
+    if args.record_final_quality_review:
+        if args.preflight:
+            raise SystemExit("--preflight and --record-final-quality-review cannot be combined.")
+        record_final_quality_review(args)
+        return
+    require_safe_status_output(args)
     config = runtime_config(
         cli_overrides={
             "output_language": args.language,
@@ -693,6 +803,7 @@ def main() -> None:
             subdir=resolved_subdir,
             filename=args.filename,
         )
+        require_safe_status_output(args, target_path)
 
     if args.preflight:
         emit(
@@ -775,27 +886,27 @@ def main() -> None:
     if figure_issues:
         raise SystemExit(f"Figure/Table Decisions validation failed: {json.dumps(figure_issues)}")
 
-    if args.content_file:
-        # utf-8-sig strips a leading BOM so it is never written into the saved
-        # note (a leading BOM breaks Obsidian frontmatter / the H1 title).
-        note_text = Path(args.content_file).expanduser().resolve().read_text(encoding="utf-8-sig")
-    elif args.content:
-        note_text = args.content
-    elif args.stdin:
-        note_text = sys.stdin.read()
-    else:
-        raise SystemExit("write_obsidian_note.py requires --content-file, --content, or --stdin.")
-    note_text = note_text.replace("\r\n", "\n")
     lint_note_sha256 = str(lint.get("note_sha256", "")).strip()
     if not lint_note_sha256:
         raise SystemExit("lint artifact requires note_sha256.")
-    note_sha256 = hashlib.sha256(note_text.encode("utf-8")).hexdigest()
-    if lint_note_sha256 != note_sha256:
-        raise SystemExit(
-            "write_obsidian_note.py refused to write note because the final note "
-            "changed after Final Note Lint; rerun lint under the same output_language."
-        )
+    try:
+        (
+            note_text, note_sha256, quality_review, quality_id, quality_state_path,
+        ) = read_quality_inputs(args, output_language, lint_note_sha256=lint_note_sha256)
+    except (OSError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
     require_reference_hygiene(note_text, "before save")
+    try:
+        state = load_quality_state(quality_state_path)
+        require_recorded_pass(state, quality_review, quality_id, language=output_language)
+        if not args.final_readability_review:
+            raise ValueError("Formal Save requires --final-readability-review.")
+        readability = strict_json_loads(
+            Path(args.final_readability_review).expanduser().read_text(encoding="utf-8-sig")
+        )
+        validate_readability(readability, note_sha256=note_sha256, language=output_language)
+    except (OSError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
 
     with archive_lock(root_path) if output_mode == "obsidian" else nullcontext():
         if pdf_path and file_sha256(pdf_path) != source_manifest["source_sha256"]:
@@ -870,6 +981,8 @@ def main() -> None:
                 )
             note_attempted = True
             atomic_write_note(target_path, note_text)
+            if file_sha256(target_path) != note_sha256:
+                raise SystemExit("Saved note SHA-256 does not match the reviewed final draft.")
             require_reference_hygiene(
                 target_path.read_text(encoding="utf-8"),
                 "after save",
@@ -923,6 +1036,9 @@ def main() -> None:
             "overwrote_existing_note": overwrote_existing_note,
             "admission": admission,
             "domain_routing_skipped": domain_routing_skipped,
+            "final_quality_review": "pass",
+            "final_readability_review": "pass",
+            "reviewed_note_sha256": note_sha256,
         }
         if sidecar_path is not None:
             payload["sidecar_path"] = str(sidecar_path)

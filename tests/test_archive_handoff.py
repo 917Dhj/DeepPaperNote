@@ -70,7 +70,6 @@ def write_note(tmp_path: Path, vault: Path, source: Path, *, preflight=True, ext
         )
         decisions = tmp_path / "decisions.json"
         decisions.write_text(json.dumps({"output_language": "en", "decisions": []}))
-        cmd += ["--content", content]
         cmd += formal_save_args(
             tmp_path, content, "en", lint_path=lint, decisions_path=decisions,
             source_manifest_path=manifest,

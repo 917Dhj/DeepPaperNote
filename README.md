@@ -131,6 +131,7 @@ You do not need to install every skill. Choose the ones that match your workflow
 - The result should be a deep-reading note for one paper, not an abstract rewrite.
 - Important methods, experimental results, figures, and limitations should be explained rather than merely listed.
 - If the available source is not strong enough for a real deep read, the workflow should stop and ask for better material instead of pretending the note is complete.
+- Before saving, a dedicated reviewer checks the frozen plan against the note. Quality and readability artifacts bind to the final draft bytes, with at most two revisions driven by failed quality reviews.
 
 The canonical execution contract lives in [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md).
 

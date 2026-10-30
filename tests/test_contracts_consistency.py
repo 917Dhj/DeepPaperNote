@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 
+from _final_quality import QUALITY_CHECKS
 from build_synthesis_bundle import bundle as build_synthesis_bundle
 from contracts import (
     NOTE_PLAN_LIST_FIELDS,
@@ -625,16 +626,35 @@ def test_skill_owns_formal_save_state_policy() -> None:
     assert "`save_mode=workspace`" in skill_text
     assert "references/user-configuration.md" in skill_text
     for argument in (
+        "--content-file",
         "--plan-file",
         "--lint-json",
         "--grounding-lint-json",
         "--source-manifest",
         "--figure-decisions",
+        "--final-quality-review",
+        "--final-readability-review",
     ):
         assert argument in skill_text
     assert "scripts/materialize_figure_asset.py" not in skill_text
     for policy_phrase in ("permission escalation", "workspace fallback", "explicit user consent"):
         assert policy_phrase not in obsidian_format_text
+
+
+def test_bundle_routes_to_the_final_quality_gate_contract() -> None:
+    contract = bundle(metadata={}, evidence_wrapper={}, assets_wrapper={})["writing_contract"]
+    gate = contract["final_quality_gate"]
+    assert gate["checks"] == list(QUALITY_CHECKS)
+    assert gate["schema_version"] == 1
+    assert gate["max_revisions"] == 2
+    assert gate["reviewed_bytes"] == "raw_sha256"
+    reference = (SKILL_ROOT / gate["reference"]).read_text(encoding="utf-8")
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    assert gate["reference"] in skill
+    assert gate["record_command"] in reference
+    for argument in gate["save_requires"]:
+        assert argument in reference
+        assert argument in skill
 
 
 def test_skill_requires_programmatic_save_target_admission_before_drafting() -> None:

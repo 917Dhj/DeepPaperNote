@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from formal_save_helpers import canonical_note_path, final_review_args
 
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "skills/deeppapernote/scripts"
@@ -36,7 +37,15 @@ def save_inputs(tmp_path: Path) -> dict[str, Path]:
         name: tmp_path / f"{name}.json"
         for name in ("plan", "source", "decisions", "lint", "grounding")
     }
-    write_json(paths["plan"], {"output_language": "en", "paper_type": "AI_method"})
+    write_json(paths["plan"], {
+        "output_language": "en", "paper_type": "AI_method",
+        "central_claims": [{
+            "claim": "The reported evidence supports this reading.",
+            "what_it_does_not_prove": "It does not establish broader validity.",
+        }],
+        "mechanism_result_map": ["The described mechanism explains the reported result."],
+        "claim_boundaries": ["The conclusion is limited to the reported evidence."],
+    })
     write_json(paths["source"], {
         "status": "ok", "paper_id": "paper:formal-save", "source_sha256": "a" * 64,
         "captions": {"figures": [], "tables": []},
@@ -55,6 +64,10 @@ def save_inputs(tmp_path: Path) -> dict[str, Path]:
         "source_manifest_sha256": digest(paths["source"]),
         "figure_decisions_sha256": digest(paths["decisions"]),
     })
+    paths["note"] = canonical_note_path(tmp_path, NOTE, "en")
+    final_review_args(tmp_path, NOTE, "en", plan_path=paths["plan"], content_path=paths["note"])
+    paths["quality"] = tmp_path / "quality-review.en.json"
+    paths["readability"] = tmp_path / "readability-review.en.json"
     return paths
 
 
@@ -67,16 +80,20 @@ def run_save(
     command = [
         sys.executable, str(SCRIPTS / "write_obsidian_note.py"),
         "--title", "Formal Save Gate", "--language", "en", "--save-mode", mode,
-        "--subdir", "Papers/Formal Save Gate", "--content", NOTE,
+        "--subdir", "Papers/Formal Save Gate",
     ]
     if mode == "obsidian":
         command += ["--vault", str(vault)]
     flags = {
         "lint": "--lint-json", "decisions": "--figure-decisions",
         "source": "--source-manifest",
+        "note": "--content-file",
     }
     if bound:
-        flags.update(plan="--plan-file", grounding="--grounding-lint-json")
+        flags.update(
+            plan="--plan-file", grounding="--grounding-lint-json",
+            quality="--final-quality-review", readability="--final-readability-review",
+        )
     if preflight:
         command.append("--preflight")
     for name, flag in flags.items():
