@@ -291,7 +291,9 @@ def test_conflict_status_output_cannot_overwrite_an_existing_note(
     assert first.returncode == 0, first.stderr
     target = Path(json.loads(first.stdout)["note_path"])
     if corrupt_sidecar:
-        (target.parent / ".deeppapernote.json").write_bytes(b"{}\n")
+        with (target.parent / ".deeppapernote.json").open("r+b") as sidecar:
+            sidecar.write(b"{}\n")
+            sidecar.truncate()
     before = {path: path.read_bytes() for path in target.parent.rglob("*") if path.is_file()}
     rejected = save(tmp_path, paths, mode="obsidian", extra_args=["--output", str(target)])
     assert rejected.returncode != 0
