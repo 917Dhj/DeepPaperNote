@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from formal_save_helpers import formal_save_args
+
 import pytest
 
 try:
@@ -138,10 +140,7 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
             "本地 PDF 语言完整性",
             "--content",
             note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=source_manifest_path),
         ],
         cwd=save_cwd,
         env=env,
@@ -175,10 +174,7 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
                 "本地 PDF 语言失败",
                 "--content",
                 note_text,
-                "--lint-json",
-                str(lint_path),
-                "--figure-decisions",
-                str(invalid_path),
+                *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=invalid_path, source_manifest_path=source_manifest_path),
             ],
             cwd=failure_cwd,
             env=env,

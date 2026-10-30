@@ -9,39 +9,11 @@ from pathlib import Path
 
 import pytest
 import write_obsidian_note
+from formal_save_helpers import formal_save_args, reviewed_insert_fields
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WRITE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
-MATERIALIZE_SCRIPT = (
-    PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "materialize_figure_asset.py"
-)
 ENV_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "check_environment.py"
-
-
-def formal_save_args(
-    tmp_path: Path,
-    note_text: str,
-    output_language: str = "zh-CN",
-) -> list[str]:
-    lint_path = tmp_path / "passing-lint.json"
-    lint_path.write_text(
-        json.dumps(
-            {
-                "output_language": output_language,
-                "note_sha256": hashlib.sha256(note_text.encode("utf-8")).hexdigest(),
-                "passes_basic_structure": True,
-                "passes_style_gate": True,
-                "passes_math_gate": True,
-            }
-        ),
-        encoding="utf-8",
-    )
-    decisions_path = tmp_path / "figure-decisions.json"
-    decisions_path.write_text(
-        json.dumps({"output_language": output_language, "decisions": []}),
-        encoding="utf-8",
-    )
-    return ["--lint-json", str(lint_path), "--figure-decisions", str(decisions_path)]
 
 
 def source_manifest_args(tmp_path: Path, source_sha256: str = "a" * 64) -> list[str]:
@@ -208,31 +180,21 @@ def test_write_note_does_not_replace_another_language_note_image(tmp_path: Path)
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
 
     def save_args(note_text: str, language: str, source_image: Path) -> list[str]:
-        args = formal_save_args(tmp_path, note_text, language)
-        decisions_path = Path(args[-1])
-        digest = hashlib.sha256(source_image.read_bytes()).hexdigest()
+        decisions_path = tmp_path / "insert-decisions.json"
         decisions_path.write_text(
-            json.dumps(
-                {
-                    "output_language": language,
-                    "decisions": [
-                        {
-                            "source_id": "Figure 1",
-                            "decision": "insert",
-                            "source_image_path": str(source_image),
-                            "source_image_filename": "shared.png",
-                            "source_image_sha256": digest,
-                            "visual_review": {
-                                "status": "pass",
-                                "reviewed_asset_sha256": digest,
-                            },
-                        }
-                    ],
-                }
-            ),
+            json.dumps({
+                "output_language": language,
+                "decisions": [{
+                    "source_id": "Figure 1",
+                    "decision": "insert",
+                    "source_image_path": str(source_image),
+                    "source_image_filename": "shared.png",
+                    **reviewed_insert_fields(source_image),
+                }],
+            }),
             encoding="utf-8",
         )
-        return args
+        return formal_save_args(tmp_path, note_text, language, decisions_path=decisions_path)
 
     chinese_image = tmp_path / "chinese.png"
     english_image = tmp_path / "english.png"
@@ -1059,44 +1021,41 @@ def test_write_note_rejects_asset_directory_outside_save_target(tmp_path: Path) 
     assert not outside_asset_dir.exists()
 
 
-def test_materialize_figure_rejects_asset_directory_outside_save_target(tmp_path: Path) -> None:
+def test_write_insert_rejects_asset_directory_outside_save_target(tmp_path: Path) -> None:
     env = os.environ.copy()
-    env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
     source_image = tmp_path / "figure.png"
     source_image.write_bytes(b"image")
     outside_asset_dir = tmp_path / "outside-assets"
-
+    note_text = "# Unsafe Asset Directory\n\n![Figure 1](images/figure.png)\n"
+    decisions_path = tmp_path / "insert-decisions.json"
+    decisions_path.write_text(json.dumps({
+        "output_language": "zh-CN",
+        "decisions": [{
+            "source_id": "Figure 1", "decision": "insert",
+            "source_image_path": str(source_image),
+            "source_image_filename": source_image.name,
+            **reviewed_insert_fields(source_image),
+        }],
+    }), encoding="utf-8")
     result = subprocess.run(
         [
-            sys.executable,
-            str(MATERIALIZE_SCRIPT),
-            "--source-image",
-            str(source_image),
-            "--title",
-            "Unsafe Asset Directory",
-            "--asset-subdir",
-            str(outside_asset_dir),
+            sys.executable, str(WRITE_SCRIPT),
+            "--title", "Unsafe Asset Directory", "--content", note_text,
+            "--asset-subdir", str(outside_asset_dir),
+            *formal_save_args(tmp_path, note_text, decisions_path=decisions_path),
         ],
-        cwd=tmp_path,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
+        cwd=tmp_path, env=env, capture_output=True, text=True,
     )
-
     assert result.returncode != 0
     assert "asset_subdir" in result.stderr
     assert not outside_asset_dir.exists()
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Creating symlinks requires extra privileges on Windows")
-def test_materialize_figure_rejects_symlink_destination_outside_save_target(
-    tmp_path: Path,
-) -> None:
+def test_write_insert_rejects_symlink_destination_outside_save_target(tmp_path: Path) -> None:
     env = os.environ.copy()
-    env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
     source_dir = tmp_path / "source"
@@ -1108,27 +1067,28 @@ def test_materialize_figure_rejects_symlink_destination_outside_save_target(
     asset_dir = tmp_path / "DeepPaperNote_output/Benchmark/Symlink_Asset/images"
     asset_dir.mkdir(parents=True)
     (asset_dir / "figure.png").symlink_to(outside_image)
-
+    note_text = "# Symlink Asset\n\n![Figure 1](images/figure.png)\n"
+    decisions_path = tmp_path / "insert-decisions.json"
+    decisions_path.write_text(json.dumps({
+        "output_language": "zh-CN",
+        "decisions": [{
+            "source_id": "Figure 1", "decision": "insert",
+            "source_image_path": str(source_image),
+            "source_image_filename": source_image.name,
+            **reviewed_insert_fields(source_image),
+        }],
+    }), encoding="utf-8")
     result = subprocess.run(
         [
-            sys.executable,
-            str(MATERIALIZE_SCRIPT),
-            "--source-image",
-            str(source_image),
-            "--title",
-            "Symlink Asset",
-            "--subdir",
-            "Benchmark",
+            sys.executable, str(WRITE_SCRIPT),
+            "--title", "Symlink Asset", "--subdir", "Benchmark",
+            "--content", note_text,
+            *formal_save_args(tmp_path, note_text, decisions_path=decisions_path),
         ],
-        cwd=tmp_path,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
+        cwd=tmp_path, env=env, capture_output=True, text=True,
     )
-
     assert result.returncode != 0
-    assert "asset path" in result.stderr
+    assert "Unsafe figure image destination" in result.stderr
     assert outside_image.read_bytes() == b"original"
 
 
@@ -1269,8 +1229,7 @@ def test_write_note_refuses_when_math_gate_fails(tmp_path: Path) -> None:
             "Math Gate Test",
             "--content",
             "# Math Gate Test\n\nBody.\n",
-            "--lint-json",
-            str(lint_path),
+            *formal_save_args(tmp_path, '# Math Gate Test\n\nBody.\n', lint_path=lint_path),
         ],
         cwd=tmp_path,
         env=env,
@@ -1308,8 +1267,7 @@ def test_write_note_rejects_legacy_lint_json_without_output_language_before_save
             "Legacy Lint Test",
             "--content",
             "# Legacy Lint Test\n\nBody.\n",
-            "--lint-json",
-            str(lint_path),
+            *formal_save_args(tmp_path, '# Legacy Lint Test\n\nBody.\n', lint_path=lint_path),
         ],
         cwd=tmp_path,
         env=env,
@@ -1318,7 +1276,7 @@ def test_write_note_rejects_legacy_lint_json_without_output_language_before_save
         text=True,
     )
     assert result.returncode != 0
-    assert "lint artifact requires output_language" in result.stderr
+    assert "Final Note Lint requires output_language" in result.stderr
     assert not (tmp_path / "DeepPaperNote_output").exists()
 
 
@@ -1343,7 +1301,7 @@ def test_write_note_rejects_note_edited_after_final_lint_before_save(
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
-    decisions_args = formal_save_args(tmp_path, linted_note)[2:]
+    decisions_args = formal_save_args(tmp_path, linted_note, lint_path=lint_path)[2:]
 
     result = subprocess.run(
         [
@@ -1382,7 +1340,7 @@ def test_write_note_rejects_mismatched_figure_decisions_before_save_side_effects
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
     note_text = "# Language Mismatch\n"
-    lint_args = formal_save_args(tmp_path, note_text)[:2]
+    lint_args = formal_save_args(tmp_path, note_text, decisions_path=decisions_path)
 
     result = subprocess.run(
         [
@@ -1435,8 +1393,7 @@ def test_write_note_refuses_when_reference_hygiene_gate_fails(tmp_path: Path) ->
             "Reference Hygiene Gate Test",
             "--content",
             "# Reference Hygiene Gate Test\n\nBody.\n",
-            "--lint-json",
-            str(lint_path),
+            *formal_save_args(tmp_path, '# Reference Hygiene Gate Test\n\nBody.\n', lint_path=lint_path),
         ],
         cwd=tmp_path,
         env=env,
@@ -1490,6 +1447,7 @@ def test_write_note_requires_integrity_artifacts_before_save(tmp_path: Path) -> 
             "Missing Integrity Artifacts",
             "--content",
             "# Missing Integrity Artifacts\n",
+            *source_manifest_args(tmp_path),
         ],
         cwd=tmp_path,
         env=env,
@@ -1528,8 +1486,7 @@ def test_write_note_refuses_when_figure_gate_fails(tmp_path: Path) -> None:
             "Figure Gate Test",
             "--content",
             "# Figure Gate Test\n\nBody.\n",
-            "--lint-json",
-            str(lint_path),
+            *formal_save_args(tmp_path, '# Figure Gate Test\n\nBody.\n', lint_path=lint_path),
         ],
         cwd=tmp_path,
         env=env,

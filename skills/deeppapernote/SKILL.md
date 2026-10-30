@@ -35,7 +35,7 @@ Bind that exact value through Save Target Admission → Figure Plan → Figure/T
 - Every JSON artifact in the chain carries a top-level `output_language`; the Synthesis Bundle also carries the same value at `writing_contract.language`.
 - Before producing its output, every adjacent consumer requires each input language and compares it with the resolved value. Missing, unsupported, or mismatched values stop the run; no stage infers or defaults an artifact language.
 - Final Quality Review and Final Readability Review each receive the resolved value and check the note against only that profile.
-- Final Note Lint records `note_sha256`. Any review edit invalidates the prior lint, so rerun Final Note Lint under the same language. Formal Save requires the lint language and `note_sha256` to match the final note, and validates Figure/Table Decisions language before any save side effect.
+- Final Note Lint records `note_sha256`. Any review edit invalidates the prior lint, so rerun Final Note Lint under the same language. Formal Save requires matching languages and current note, plan, source, and decision bindings before any save side effect; use the Formal Save inputs below.
 
 This contract is complete only when every named stage is bound to the resolved value and Formal Save validates the final bytes. Read `references/output-language.md` for profile content while drafting or debugging either language.
 
@@ -85,12 +85,12 @@ Follow this order:
 9. build the full figure/table decision table
 10. build the manifest synthesis bundle
 11. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract, including its exact `output_language`
-12. draft from the plan only after the grounding gate passes
+12. draft from the plan only after the grounding gate passes; retain the Grounding Lint JSON for Formal Save
 13. have the model write the note
-14. lint the final note against the same `note_plan` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 15, 16, or 17
+14. lint the final note against the same `note_plan` using explicit `--plan-file` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 15, 16, or 17
 15. perform `final_quality_review` after lint passes
 16. perform `final_readability_review` after the quality review passes
-17. perform Formal Save to the admitted target with `scripts/write_obsidian_note.py`, the same Source Manifest, and any user-approved overwrite hash; the script repeats admission before the first save side effect
+17. perform Formal Save to the admitted target with `scripts/write_obsidian_note.py`, all Formal Save inputs below, and any user-approved overwrite hash; the script repeats admission before the first save side effect
 
 This is the required workflow for a normal single-paper note request, not a loose suggestion.
 Unless this skill explicitly marks a stage as optional, required stages must not be silently skipped, reordered into a shortcut, or treated as complete just because a partial artifact already exists.
@@ -181,6 +181,12 @@ Formal Save states:
 | `save_mode=obsidian` and Formal Save fails | Keep the current Save Target and attempt an in-scope recovery. If it still cannot complete, report `blocked`; do not switch to workspace. |
 | `save_mode=workspace` | Perform the Formal Save inside the current workspace output root. |
 
+Formal Save inputs:
+
+- In either save mode, pass the final note together with explicit `--plan-file`, `--lint-json`, `--grounding-lint-json`, `--source-manifest`, and `--figure-decisions` inputs. Use the actual files checked by the linters and their successful output artifacts.
+- Both lint artifacts must bind the current plan through `note_plan_sha256`; Grounding Lint also binds the current Source Manifest and decisions through `source_manifest_sha256` and `figure_decisions_sha256`. JSON formatting changes invalidate these exact-byte hashes. Rerun both linters after a plan change, Grounding Lint after source or decision changes, and Final Note Lint after note edits.
+- Formal Save rejects missing or failed gates, stale bindings, unresolved visual reviews, and invalid review evidence before writing the note or images. Source images are materialized only through Formal Save. Save Target Admission with `--preflight` remains available before plan and lint generation.
+
 - A normal note-generation request should complete in one pass: note text, figure placeholder decisions, image materialization when confident, and final save.
 - Do not stop after a text-only draft just to ask whether the user wants figures inserted. Finish the figure replacement decision inside the same task unless the user explicitly asked for text only.
 - The note must use real heading levels: `#`, `##`, and `###`.
@@ -239,7 +245,6 @@ Use these bundled scripts rather than rebuilding the workflow from scratch:
 - `scripts/build_synthesis_bundle.py`
 - `scripts/lint_grounding.py`
 - `scripts/lint_note.py`
-- `scripts/materialize_figure_asset.py`
 - `scripts/write_obsidian_note.py`
 
 Python interpreter rule:

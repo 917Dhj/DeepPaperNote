@@ -90,7 +90,7 @@ Recommended shape:
 }
 ```
 
-Before drafting from this plan, run `scripts/lint_grounding.py --note-plan ... --source-manifest ... --bundle-json ... --figure-decisions ...`.
+Before drafting from this plan, run `scripts/lint_grounding.py --note-plan ... --source-manifest ... --bundle-json ... --figure-decisions ... --output ...` and retain the resulting Grounding Lint JSON for Formal Save.
 
 The plan should be short, structured, and directly useful for the final draft.
 

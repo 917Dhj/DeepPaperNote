@@ -12,6 +12,7 @@ from common import (
     caption_label_key,
     emit,
     file_sha256,
+    json_input_sha256,
     maybe_load_json_record,
     normalize_whitespace,
 )
@@ -653,6 +654,11 @@ def main() -> None:
     source_manifest = load_record(args.source_manifest)
     bundle = load_record(args.bundle_json) if args.bundle_json else {}
     decisions = load_record(args.figure_decisions)
+    input_hashes = {
+        "note_plan_sha256": json_input_sha256(args.note_plan),
+        "source_manifest_sha256": json_input_sha256(args.source_manifest),
+        "figure_decisions_sha256": json_input_sha256(args.figure_decisions),
+    }
 
     language = normalize_output_language(
         runtime_config(cli_overrides={"output_language": args.language})["output_language"]
@@ -683,6 +689,7 @@ def main() -> None:
         "script": "lint_grounding.py",
         "paper_id": source_manifest.get("paper_id", note_plan.get("paper_id", "")),
         "output_language": language,
+        **input_hashes,
         "issues": issues,
         "warnings": [item for item in issues if item.get("severity") == "warning"],
         "passes_grounding": not error_issues,

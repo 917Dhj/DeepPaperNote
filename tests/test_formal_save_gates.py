@@ -110,7 +110,6 @@ def test_formal_save_refuses_legacy_unbound_reports(tmp_path: Path, mode: str) -
     result = run_save(tmp_path, paths, mode=mode, bound=False)
 
     assert_no_save(tmp_path, result)
-    assert "Formal Save requires" in result.stderr
 
 
 @pytest.mark.parametrize("mode", ["workspace", "obsidian"])

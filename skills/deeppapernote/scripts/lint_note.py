@@ -1639,7 +1639,7 @@ def strip_frontmatter(text: str) -> str:
 
 
 def main() -> None:
-    from common import emit, runtime_config
+    from common import emit, json_input_sha256, runtime_config
 
     args = parser().parse_args()
     config = runtime_config(cli_overrides={"output_language": args.language})
@@ -1662,10 +1662,9 @@ def main() -> None:
     core_info_issues = core_info_structure_issues(text)
     reference_hygiene_issues = inspect_reference_hygiene(text)
     substantive_issues = inspect_substantive_content(text)
-    planning_artifact_found, planning_artifact_issues = inspect_note_plan(
-        resolve_note_plan_path(path, args.plan_file),
-        output_language,
-    )
+    plan_path = resolve_note_plan_path(path, args.plan_file)
+    note_plan_sha256 = json_input_sha256(plan_path)
+    planning_artifact_found, planning_artifact_issues = inspect_note_plan(plan_path, output_language)
     warnings.extend(inspect_figure_callouts(text))
     for issue in figure_issues:
         reason = str(issue.get("reason", ""))
@@ -1717,6 +1716,7 @@ def main() -> None:
         "paper_id": args.paper_id,
         "input_path": str(path),
         "note_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "note_plan_sha256": note_plan_sha256,
         "headers": headers,
         "missing_sections": missing_sections,
         "warnings": warnings,

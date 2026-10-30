@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from formal_save_helpers import formal_save_args, reviewed_insert_fields
+
 from lint_note import (
     core_info_structure_issues,
     figure_structure_issues,
@@ -1182,12 +1184,9 @@ def test_write_obsidian_note_refuses_failed_plan_gate(tmp_path) -> None:
             "Plan Gate Paper",
             "--content",
             "# Plan Gate Paper",
-            "--lint-json",
-            str(lint_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(tmp_path / "vault"),
+            *formal_save_args(tmp_path, '# Plan Gate Paper', lint_path=lint_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
@@ -1224,12 +1223,9 @@ def test_write_obsidian_note_reports_lint_warning_details(tmp_path) -> None:
             "Style Gate Paper",
             "--content",
             "# Style Gate Paper",
-            "--lint-json",
-            str(lint_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(tmp_path / "vault"),
+            *formal_save_args(tmp_path, '# Style Gate Paper', lint_path=lint_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
@@ -1347,12 +1343,9 @@ def test_write_obsidian_note_refuses_failed_substantive_gate(tmp_path) -> None:
             "Substantive Gate Paper",
             "--content",
             "# Substantive Gate Paper",
-            "--lint-json",
-            str(lint_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(tmp_path / "vault"),
+            *formal_save_args(tmp_path, '# Substantive Gate Paper', lint_path=lint_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
@@ -1372,23 +1365,6 @@ def passing_lint_payload(note_text: str) -> dict:
         "passes_figure_gate": True,
         "passes_plan_gate": True,
         "passes_substantive_content": True,
-    }
-
-
-def reviewed_insert_fields(source_image: Path) -> dict:
-    digest = hashlib.sha256(source_image.read_bytes()).hexdigest()
-    return {
-        "source_image_sha256": digest,
-        "visual_review": {
-            "status": "pass",
-            "reviewed_asset_sha256": digest,
-            "preserved_scientific_elements": ["complete figure"],
-            "omitted_scientific_elements": [],
-            "notes": "Caption-free visual body.",
-            "failure_reason": "",
-            "repair_attempts": 0,
-            "revised_bbox": [],
-        },
     }
 
 
@@ -1413,6 +1389,7 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
                         "source_image_path": str(source_image),
                         "source_image_filename": source_image.name,
                         "source_image_sha256": digest,
+                        "review_evidence": reviewed_insert_fields(source_image)["review_evidence"],
                         "visual_review": {
                             "status": "pass",
                             "reviewed_asset_sha256": digest,
@@ -1444,16 +1421,11 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
             "Research/Papers/Figure Insert Paper",
             "--content",
             note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
             "--output",
             str(output_path),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         check=True,
         capture_output=True,
@@ -1488,6 +1460,7 @@ def test_write_obsidian_note_rejects_stale_reviewed_insert_bytes(tmp_path) -> No
                         "source_image_path": str(source_image),
                         "source_image_filename": source_image.name,
                         "source_image_sha256": reviewed_digest,
+                        "review_evidence": reviewed_insert_fields(source_image)["review_evidence"],
                         "visual_review": {
                             "status": "pass",
                             "reviewed_asset_sha256": reviewed_digest,
@@ -1520,21 +1493,16 @@ def test_write_obsidian_note_rejects_stale_reviewed_insert_bytes(tmp_path) -> No
             "Stale Figure Review",
             "--content",
             note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
     )
 
     assert result.returncode != 0
-    assert "reviewed asset SHA-256" in result.stderr
+    assert "figure_visual_review_stale" in result.stderr
 
 
 def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> None:
@@ -1573,14 +1541,9 @@ def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> N
             "Figure Insert Paper",
             "--content",
             note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
@@ -1626,14 +1589,9 @@ def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) ->
             "Figure Insert Paper",
             "--content",
             note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
@@ -1679,14 +1637,9 @@ def test_write_obsidian_note_rejects_unsafe_insert_filename(tmp_path) -> None:
             "Figure Insert Paper",
             "--content",
             note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,

@@ -344,7 +344,7 @@ def test_bundle_exposes_exact_note_plan_types_and_grounding_command() -> None:
     )
     assert writing_contract["grounding_contract"]["lint_command"] == (
         "scripts/lint_grounding.py --note-plan ... "
-        "--source-manifest ... --bundle-json ... --figure-decisions ..."
+        "--source-manifest ... --bundle-json ... --figure-decisions ... --output ..."
     )
 
 
@@ -624,6 +624,15 @@ def test_skill_owns_formal_save_state_policy() -> None:
     assert "do not switch to workspace" in skill_text
     assert "`save_mode=workspace`" in skill_text
     assert "references/user-configuration.md" in skill_text
+    for argument in (
+        "--plan-file",
+        "--lint-json",
+        "--grounding-lint-json",
+        "--source-manifest",
+        "--figure-decisions",
+    ):
+        assert argument in skill_text
+    assert "scripts/materialize_figure_asset.py" not in skill_text
     for policy_phrase in ("permission escalation", "workspace fallback", "explicit user consent"):
         assert policy_phrase not in obsidian_format_text
 
