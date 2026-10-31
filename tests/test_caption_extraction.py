@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-from common import extract_caption_lines
-from plan_figures import classify_caption_kind
+from common import caption_label_key, extract_caption_lines, normalize_caption_label
+from plan_figure_table_decisions import matched_figure_asset
+from plan_figures import _match_figure_asset, classify_caption_kind
 from test_extract_pdf_assets_quality import EXTRACT_PDF_ASSETS_SCRIPT, write_fetch_input
 from test_extract_source_text import run_extract_source
+from test_paper_corpus import run_preparation
 
 fitz = pytest.importorskip("fitz")
 
@@ -222,3 +225,45 @@ def test_full_captions_classify_by_their_title_sentence(
     label: str, caption: str, kind: str
 ) -> None:
     assert classify_caption_kind(label, caption)[0] == kind
+
+
+@pytest.mark.parametrize(
+    ("label", "normalized"),
+    [("图１", "图 1"), ("图 １", "图 1"), ("表１２", "表 12"), ("图1", "图 1")],
+)
+def test_caption_labels_normalize_fullwidth_digits_and_spacing(label: str, normalized: str) -> None:
+    assert normalize_caption_label(label) == normalized
+    assert caption_label_key(label) == caption_label_key(normalized)
+
+
+@pytest.mark.parametrize(
+    ("caption_id", "asset_label"),
+    [
+        ("图 1", "图1"),
+        ("图 1", "图１"),
+        ("表 2", "表２"),
+        ("Fig 3", "Figure 3"),
+        ("Extended Data Fig 1", "Extended Data Fig. 1"),
+        ("Fig S1", "Fig. S1"),
+    ],
+)
+def test_figure_assets_match_their_normalized_caption_id(caption_id: str, asset_label: str) -> None:
+    asset = {"label": asset_label}
+    assert _match_figure_asset(caption_id, [asset]) == asset
+    assert matched_figure_asset({"figure_assets": [asset]}, caption_id) == asset
+
+
+@pytest.mark.parametrize(
+    ("line", "source_id"),
+    [("图1　便携式检测仪", "图 1"), ("图１　便携式检测仪", "图 1")],
+)
+def test_cjk_caption_crop_reaches_visual_review(tmp_path: Path, line: str, source_id: str) -> None:
+    doc = fitz.open()
+    page = doc.new_page()
+    add_text(page, 72, PROSE)
+    add_visual(page, top=160, height=240)
+    add_text(page, 420, line, fontname="china-s")
+    pdf_path = tmp_path / "paper.pdf"
+    doc.save(pdf_path)
+    run = run_preparation(pdf_path, tmp_path / "run", dict(os.environ))
+    assert run["decisions"] == {source_id: "review_pending"}
