@@ -48,9 +48,9 @@ Example bindings:
 }
 ```
 
-Replace the example values with the actual files and resolved run context. The bindings file path is relative to the command's current directory unless absolute. Paths inside `artifacts` are relative to `--workdir` unless absolute. Machine artifact bindings can override the pipeline filenames for an existing run.
+Replace the example values with the actual files and resolved run context. The bindings file path is relative to the command's current directory unless absolute. Paths inside `artifacts`, and the `vault`, `target_directory`, and `workspace_root` context values, are relative to `--workdir` unless absolute. Machine artifact bindings can override the pipeline filenames for an existing run.
 
-The file requires `schema_version: 1`. Its optional `artifacts` and `context` objects have closed schemas. Unknown keys, duplicate JSON keys, and invalid types are rejected. Context accepts `paper_reference`, `output_language`, `save_mode`, `vault`, `papers_dir`, and `target_directory`. Context supplies command arguments; it does not certify that a stage passed or approve an overwrite.
+The file requires `schema_version: 1`. Its optional `artifacts` and `context` objects have closed schemas. Unknown keys, duplicate JSON keys, and invalid types are rejected. Context accepts `paper_reference`, `output_language`, `save_mode`, `vault`, `papers_dir`, `target_directory`, `workspace_root`, `zotero_mode`, and `source_sha256`. Context supplies command arguments; it does not certify that a stage passed or approve an overwrite.
 
 An omitted late artifact is reported as an unresolved selection. An explicitly selected missing file is reported as missing. Neither causes the query to choose another file. The quality journal is derived from the selected review path by replacing its suffix with `.state.json`, following `final-quality-review.md`; it cannot be redirected separately.
 
@@ -73,7 +73,15 @@ Each stage reports its selected artifacts, issues, and unmet dependencies. The s
 
 Inspect all reported issues, including those after the first blocker. The query checks downstream evidence even when an earlier artifact is missing. Unmet dependencies remain visible separately from a stage's own result.
 
-`next_action` identifies the earliest actionable gap. It includes an executable argument list only when every required argument is known. Otherwise it names missing context, a model task, or a user decision. It does not fill commands with invented paths or grant permission to overwrite a note. Figure-decision commands carry the current admission's source-bound `asset_subdir` in Obsidian mode; workspace mode uses `images`. An unrecorded quality verdict needs the existing record phase. A recorded failure can require a revision or a stop when the two-revision limit is exhausted.
+`next_action` identifies the earliest actionable gap. It includes an executable argument list only when every required argument is known. Otherwise it names missing context, a model task, or a user decision. It does not fill commands with invented paths or grant permission to overwrite a note.
+
+Run a recommended command from its `cwd` with its `env` values added to the environment. `env` carries the selected Run Overrides, so the command needs no User Configuration when the context is complete. A workspace save writes below the directory it runs from, so it requires `workspace_root`: the directory where the note belongs, not the run workspace.
+
+A command is recommended only when rerunning a producer can fix the gap. A failed lint gate with current inputs is a model task on the plan or draft; once that input changes, the lint is stale and the command returns. `review_pending` decisions are a model task for the Visual Review Gate in `figure-placement.md`.
+
+Figure-decision commands carry the current admission's source-bound `asset_subdir` in Obsidian mode; workspace mode uses `images`. Decisions that disagree with the admission are `stale`. The planner replaces the whole file, so it is recommended only while no review has been recorded; with recorded reviews or an unreadable file, `next_action` is a model task to update the decisions in place.
+
+An unrecorded quality verdict needs the existing record phase. A recorded failure can require a revision or a stop when the two-revision limit is exhausted.
 
 The summary provides the evidence available for the Final user report, including gate results, warnings, figure decisions, saved path and mode, domain, and hash agreement. Saved-note claims require both a selected successful save receipt and the actual saved bytes. A missing receipt means the save cannot be verified from this selection; it does not prove that no save occurred.
 

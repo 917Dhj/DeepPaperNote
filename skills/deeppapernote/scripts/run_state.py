@@ -24,6 +24,7 @@ from common import canonical_identity_acceptance_error, safe_relative_path_parts
 from lint_grounding import validate_bundle_contract, validate_figure_decisions, validate_note_plan
 from run_pipeline import pipeline_artifact_paths
 from source_corpus import SourceCorpusLoadError, load_source_corpus, validate_source_corpus
+from user_configuration import ENV_FIELDS
 
 
 @dataclass(frozen=True)
@@ -140,6 +141,9 @@ CONTEXT_KEYS = {
     "vault",
     "papers_dir",
     "target_directory",
+    "workspace_root",
+    "zotero_mode",
+    "source_sha256",
 }
 LINT_GATES = (
     "passes_basic_structure",
@@ -152,6 +156,18 @@ LINT_GATES = (
 )
 DIRECTORIES = {"pdfs", "assets_directory"}
 SHA_RE = re.compile(r"[0-9a-f]{64}")
+OPTIONAL_FLAGS = {
+    "resolve": (("--zotero-mode", "zotero_mode"),),
+    "fetch": (("--target-directory", "target_directory"), ("--source-sha256", "source_sha256")),
+    "admission": (("--target-directory", "target_directory"),),
+    "save_receipt": (("--target-directory", "target_directory"),),
+}
+REVISIONS = {
+    "grounding_lint": ("grounding_gate_not_true", "note_plan"),
+    "note_lint": ("lint_gate_not_true", "draft"),
+}
+REPLAN_CODES = {"figure_decisions_asset_subdir_mismatch", "figure_table_caption_missing_decision"}
+VISUAL_REVIEW_CODES = ("figure_visual_review", "figure_insert", "usable_insert")
 
 
 def validate_bindings(bindings: dict) -> dict:
@@ -173,6 +189,10 @@ def validate_bindings(bindings: dict) -> dict:
         raise ValueError("Bindings output_language must be en or zh-CN.")
     if "save_mode" in context and context["save_mode"] not in {"workspace", "obsidian"}:
         raise ValueError("Bindings save_mode must be workspace or obsidian.")
+    if "zotero_mode" in context and context["zotero_mode"] not in {"auto", "off", "required"}:
+        raise ValueError("Bindings zotero_mode must be auto, off, or required.")
+    if "source_sha256" in context and SHA_RE.fullmatch(context["source_sha256"]) is None:
+        raise ValueError("Bindings source_sha256 requires a lowercase SHA-256.")
     return {"artifacts": artifacts, "context": context}
 
 
@@ -186,7 +206,7 @@ class Inspection:
         self.workdir = workdir
         self.prefix = prefix
         self.context = dict(bindings["context"])
-        for key in ("vault", "target_directory"):
+        for key in ("vault", "target_directory", "workspace_root"):
             if key in self.context:
                 self.context[key] = str(resolved_path(self.context[key], workdir))
         self.paths: dict[str, Path | None] = {
@@ -473,6 +493,18 @@ class Inspection:
             )
 
     def check_decisions(self, result: StageResult, record: dict) -> None:
+        admitted = self.data.get("admission", {}).get("asset_subdir")
+        if (
+            self.context.get("save_mode") != "workspace"
+            and isinstance(admitted, str)
+            and record.get("asset_subdir", "images") != admitted
+        ):
+            self.problem(
+                result,
+                "stale",
+                "figure_decisions_asset_subdir_mismatch",
+                f"Decisions must use the admitted asset_subdir {admitted}.",
+            )
         source = self.data.get("source_manifest")
         if source is None:
             self.problem(
@@ -927,6 +959,41 @@ COMMANDS = {
 }
 
 
+def has_review_work(record: dict) -> bool:
+    items = record.get("decisions")
+    reviews = (
+        [item.get("visual_review") for item in items if isinstance(item, dict)]
+        if isinstance(items, list)
+        else []
+    )
+    return any(
+        isinstance(review, dict)
+        and (review.get("status") != "pending" or review.get("repair_attempts"))
+        for review in reviews
+    )
+
+
+def decision_revision(run: Inspection, result: StageResult) -> str | None:
+    """Explain why rerunning the planner would discard or repeat Visual Review work."""
+    if result.id not in run.raw:
+        return None
+    if result.id not in run.data:
+        return "Repair the unreadable decisions in place; the planner would replace any reviews."
+    codes = {item["code"] for item in result.issues}
+    if has_review_work(run.data[result.id]):
+        return "Update the recorded decisions in place; the planner would discard their reviews."
+    if codes & REPLAN_CODES:
+        return None
+    if any(code.startswith(VISUAL_REVIEW_CODES) for code in codes):
+        return "Complete the Visual Review Gate and Figure/Table Decision Freeze."
+    return None
+
+
+def override_env(context: dict) -> dict[str, str]:
+    fields = {**context, "obsidian_vault": context.get("vault")}
+    return {name: fields[field] for field, name in ENV_FIELDS.items() if fields.get(field)}
+
+
 def next_action(run: Inspection) -> dict:
     for stage in STAGES:
         result = run.results[stage.id]
@@ -971,12 +1038,27 @@ def next_action(run: Inspection) -> dict:
                 kind="user_action", message="Two quality revisions are exhausted; stop rewriting."
             )
             return action
-        if stage.action == "model" and not result.details.get("record_required"):
+        revision, target = None, stage.id
+        if stage.id == "figure_table_decisions":
+            revision = decision_revision(run, result)
+            if revision:
+                action["reference"] = str(
+                    Path(__file__).resolve().parents[1] / "references" / "figure-placement.md"
+                )
+        elif (
+            stage.id in REVISIONS and result.status == "failed" and REVISIONS[stage.id][0] in codes
+        ):
+            target = REVISIONS[stage.id][1]
+            revision = f"Revise {target} to resolve the failed gates, then rerun {stage.id}."
+        if revision or (stage.action == "model" and not result.details.get("record_required")):
             action.update(
                 kind="model_action",
-                output_path=str(run.paths[stage.id]) if run.paths[stage.id] else None,
-                message="Perform the canonical model-led stage with the selected input artifacts.",
+                output_path=str(run.paths[target]) if run.paths[target] else None,
+                message=revision
+                or "Perform the canonical model-led stage with the selected input artifacts.",
             )
+            if revision:
+                action["input_paths"][stage.id] = str(run.paths[stage.id])
             for key in (
                 "source_manifest",
                 "raw_sections",
@@ -985,12 +1067,12 @@ def next_action(run: Inspection) -> dict:
                 "note_plan",
                 "draft",
             ):
-                if key != stage.id and run.paths.get(key):
+                if key != target and run.paths.get(key):
                     action["input_paths"][key] = str(run.paths[key])
             if run.context.get("output_language") is None:
                 action["missing_context"].append("output_language")
-            if run.paths[stage.id] is None:
-                action["missing_context"].append(f"artifacts.{stage.id}")
+            if run.paths[target] is None:
+                action["missing_context"].append(f"artifacts.{target}")
             return action
         recipe_id = "record_quality" if result.details.get("record_required") else stage.id
         script, recipe = COMMANDS[recipe_id]
@@ -1031,14 +1113,16 @@ def next_action(run: Inspection) -> dict:
                     action["missing_context"].append(key)
                 else:
                     argv.extend(("--" + key.replace("_", "-"), value))
-        if run.context.get("target_directory") and stage.id in {
-            "admission",
-            "fetch",
-            "save_receipt",
-        }:
-            argv.extend(("--target-directory", run.context["target_directory"]))
+        for flag, key in OPTIONAL_FLAGS.get(stage.id, ()):
+            if run.context.get(key):
+                argv.extend((flag, run.context[key]))
+        cwd = run.workdir
+        if stage.id == "save_receipt" and run.context.get("save_mode") == "workspace":
+            cwd = run.context.get("workspace_root")
+            if cwd is None:
+                action["missing_context"].append("workspace_root")
         if not action["missing_context"]:
-            action.update(kind="command", argv=argv, cwd=str(run.workdir))
+            action.update(kind="command", argv=argv, cwd=str(cwd), env=override_env(run.context))
         return action
     unresolved = [
         stage.id for stage in STAGES if run.results[stage.id].status == "present_unverified"
