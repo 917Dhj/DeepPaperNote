@@ -7,6 +7,7 @@ import argparse
 from copy import deepcopy
 from pathlib import Path
 
+from _final_quality import QUALITY_CHECKS
 from citation_links import resolve_reference_links
 from common import (
     canonical_identity_acceptance_error,
@@ -416,6 +417,18 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "visual_review": visual_review_contract,
         },
         "analysis_coverage_contract": analysis_coverage,
+        "final_quality_gate": {
+            "schema_version": 1,
+            "checks": list(QUALITY_CHECKS),
+            "reference": "references/final-quality-review.md",
+            "reviewed_bytes": "raw_sha256",
+            "max_revisions": 2,
+            "record_command": "scripts/write_obsidian_note.py --record-final-quality-review",
+            "save_requires": [
+                "--content-file", "--plan-file", "--final-quality-review",
+                "--final-readability-review",
+            ],
+        },
     }
     abstract_contract = rules.get("abstract_contract")
     if abstract_contract:

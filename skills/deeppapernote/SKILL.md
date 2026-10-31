@@ -86,10 +86,10 @@ Follow this order:
 10. build the manifest synthesis bundle
 11. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract, including its exact `output_language`
 12. draft from the plan only after the grounding gate passes; retain the Grounding Lint JSON for Formal Save
-13. have the model write the note
+13. have the model write the final disk draft as UTF-8 without BOM and with LF line endings before lint or review
 14. lint the final note against the same `note_plan` using explicit `--plan-file` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 15, 16, or 17
-15. perform `final_quality_review` after lint passes
-16. perform `final_readability_review` after the quality review passes
+15. perform and record `final_quality_review` after lint passes, following the fixed reviewer prompt and bounded revision protocol in `references/final-quality-review.md`
+16. perform `final_readability_review` after the quality review passes and write its final-byte receipt; if it changes the draft, repeat lint, a fresh full quality review, and the final readability reread
 17. perform Formal Save to the admitted target with `scripts/write_obsidian_note.py`, all Formal Save inputs below, and any user-approved overwrite hash; the script repeats admission before the first save side effect
 
 This is the required workflow for a normal single-paper note request, not a loose suggestion.
@@ -183,9 +183,10 @@ Formal Save states:
 
 Formal Save inputs:
 
-- In either save mode, pass the final note together with explicit `--plan-file`, `--lint-json`, `--grounding-lint-json`, `--source-manifest`, and `--figure-decisions` inputs. Use the actual files checked by the linters and their successful output artifacts.
+- In either save mode, pass the canonical disk draft through `--content-file`, together with explicit `--plan-file`, `--lint-json`, `--grounding-lint-json`, `--source-manifest`, `--figure-decisions`, `--final-quality-review`, and `--final-readability-review` inputs. Use the actual files checked by the linters and reviewers and their successful output artifacts.
 - Both lint artifacts must bind the current plan through `note_plan_sha256`; Grounding Lint also binds the current Source Manifest and decisions through `source_manifest_sha256` and `figure_decisions_sha256`. JSON formatting changes invalidate these exact-byte hashes. Rerun both linters after a plan change, Grounding Lint after source or decision changes, and Final Note Lint after note edits.
-- Formal Save rejects missing or failed gates, stale bindings, unresolved visual reviews, and invalid review evidence before writing the note or images. Source images are materialized only through Formal Save. Save Target Admission with `--preflight` remains available before plan and lint generation.
+- Formal Save requires a current recorded quality pass and a matching readability receipt; the reviewed draft and saved note must have identical raw bytes. Keep review artifacts and the revision journal in the run workspace, using the same quality-review path throughout the run. Use `references/final-quality-review.md` for the record phase and two-revision limit.
+- Formal Save rejects missing or failed gates, stale bindings, unresolved visual reviews, and invalid review evidence before writing the note or images. Source images are materialized only through Formal Save. Save Target Admission with `--preflight` remains available before plan, lint, or review generation.
 
 - A normal note-generation request should complete in one pass: note text, figure placeholder decisions, image materialization when confident, and final save.
 - Do not stop after a text-only draft just to ask whether the user wants figures inserted. Finish the figure replacement decision inside the same task unless the user explicitly asked for text only.

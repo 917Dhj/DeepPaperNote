@@ -227,7 +227,7 @@ def test_lint_note_detects_title_in_bom_crlf_note(tmp_path: Path) -> None:
     assert "title_heading_missing" not in payload["warnings"]
 
 
-def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
+def test_write_obsidian_note_saves_bom_draft_after_pre_review_normalization(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
     content_file = tmp_path / "note.md"
@@ -235,6 +235,7 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
         BOM.encode("utf-8") + "# 标题\n\n正文内容。\n".encode("utf-8")
     )
     canonical_note_text = "# 标题\n\n正文内容。\n"
+    content_file.write_bytes(content_file.read_text(encoding="utf-8-sig").encode("utf-8"))
     lint_path, decisions_path = _formal_save_artifacts(tmp_path, canonical_note_text)
     result = subprocess.run(
         [
@@ -242,10 +243,10 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
             str(SCRIPTS / "write_obsidian_note.py"),
             "--title", "BOM Content Test",
             "--vault", str(vault),
-            "--content-file", str(content_file),
             *formal_save_args(
                 tmp_path, canonical_note_text, lint_path=lint_path,
                 decisions_path=decisions_path, source_manifest_path=_source_manifest(tmp_path),
+                content_path=content_file,
             ),
         ],
         cwd=tmp_path,
@@ -265,7 +266,7 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
         assert sidecar.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN
 
 
-def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
+def test_write_obsidian_note_saves_crlf_draft_after_pre_review_normalization(
     tmp_path: Path,
 ) -> None:
     vault = tmp_path / "vault"
@@ -273,6 +274,7 @@ def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
     content_file = tmp_path / "note.md"
     crlf_text = "# CRLF Note\r\n\r\n正文内容。\r\n"
     content_file.write_bytes(crlf_text.encode("utf-8"))
+    content_file.write_bytes(content_file.read_text(encoding="utf-8").encode("utf-8"))
     lint_output = tmp_path / "lint-from-script.json"
 
     subprocess.run(
@@ -301,10 +303,10 @@ def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
             str(SCRIPTS / "write_obsidian_note.py"),
             "--title", "CRLF Note",
             "--vault", str(vault),
-            "--content-file", str(content_file),
             *formal_save_args(
                 tmp_path, crlf_text, lint_path=lint_output,
                 decisions_path=decisions_path, source_manifest_path=_source_manifest(tmp_path),
+                content_path=content_file,
             ),
         ],
         cwd=tmp_path,
@@ -338,7 +340,6 @@ def test_formal_save_image_embed_uses_forward_slashes(tmp_path: Path) -> None:
         [
             sys.executable, str(SCRIPTS / "write_obsidian_note.py"),
             "--title", "Embed Slash Test", "--vault", str(vault),
-            "--content", note_text,
             *formal_save_args(tmp_path, note_text, decisions_path=decisions_path),
         ],
         cwd=tmp_path, env=_clean_env(), capture_output=True, text=True,
