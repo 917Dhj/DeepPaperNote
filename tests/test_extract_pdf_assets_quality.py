@@ -13,18 +13,20 @@ except ImportError:  # pragma: no cover
     fitz = None
 
 from extract_pdf_assets import (
-    CAPTION_RE,
-    _caption_match_is_inline_reference,
-    _classify_caption_kind,
     _classify_visual_quality,
     _estimate_figure_bbox_above_caption,
-    _find_caption_blocks,
     _grow_table_region,
     _looks_like_text_table_row,
     _other_caption_labels_for_crop,
     _restrict_row_to_caption_column,
     _row_is_table_like,
     _unique_figure_asset_filename,
+)
+from pdf_captions import (
+    CAPTION_RE,
+    caption_match_is_inline_reference,
+    classify_caption_kind,
+    find_caption_blocks,
 )
 
 
@@ -291,8 +293,8 @@ def test_extract_pdf_assets_excludes_table_captions_above_and_below(
 
     doc = fitz.open(pdf_path)
     try:
-        first_caption = _find_caption_blocks(doc[0])[0]["bbox"]
-        second_caption = _find_caption_blocks(doc[1])[0]["bbox"]
+        first_caption = find_caption_blocks(doc[0])[0]["bbox"]
+        second_caption = find_caption_blocks(doc[1])[0]["bbox"]
     finally:
         doc.close()
 
@@ -391,7 +393,7 @@ def test_caption_match_rejects_inline_table_reference() -> None:
     match = CAPTION_RE.match(text)
 
     assert match is not None
-    assert _caption_match_is_inline_reference(text, match) is True
+    assert caption_match_is_inline_reference(text, match) is True
 
 
 def test_caption_match_accepts_title_style_caption_without_separator() -> None:
@@ -399,7 +401,7 @@ def test_caption_match_accepts_title_style_caption_without_separator() -> None:
     match = CAPTION_RE.match(text)
 
     assert match is not None
-    assert _caption_match_is_inline_reference(text, match) is False
+    assert caption_match_is_inline_reference(text, match) is False
 
 
 def test_caption_match_accepts_punctuated_caption() -> None:
@@ -407,7 +409,7 @@ def test_caption_match_accepts_punctuated_caption() -> None:
     match = CAPTION_RE.match(text)
 
     assert match is not None
-    assert _caption_match_is_inline_reference(text, match) is False
+    assert caption_match_is_inline_reference(text, match) is False
 
 
 def test_caption_re_keeps_ambiguous_forms_out() -> None:
@@ -416,12 +418,12 @@ def test_caption_re_keeps_ambiguous_forms_out() -> None:
 
 
 def test_supported_table_captions_classify_as_table() -> None:
-    assert _classify_caption_kind("Supplementary Table 2") == "table"
-    assert _classify_caption_kind("Extended Data Table 1") == "table"
-    assert _classify_caption_kind("Supplementary Figure 1") == "figure"
-    assert _classify_caption_kind("Extended Data Fig. 1") == "figure"
-    assert _classify_caption_kind("Scheme 2") == "figure"
-    assert _classify_caption_kind("Algorithm 1") == "figure"
+    assert classify_caption_kind("Supplementary Table 2") == "table"
+    assert classify_caption_kind("Extended Data Table 1") == "table"
+    assert classify_caption_kind("Supplementary Figure 1") == "figure"
+    assert classify_caption_kind("Extended Data Fig. 1") == "figure"
+    assert classify_caption_kind("Scheme 2") == "figure"
+    assert classify_caption_kind("Algorithm 1") == "figure"
 
 
 def test_text_table_row_accepts_compact_text_comparison_row() -> None:
@@ -534,7 +536,7 @@ def test_figure_bbox_does_not_use_caption_width_to_rescue_narrow_visual() -> Non
             "ImageNet test set results are described here in a nearby body paragraph.",
             fontsize=11,
         )
-        anchor = [item for item in _find_caption_blocks(page) if item["label"] == "Figure 2"][0]
+        anchor = [item for item in find_caption_blocks(page) if item["label"] == "Figure 2"][0]
 
         bbox = _estimate_figure_bbox_above_caption(page, anchor, None, page.rect)
 
@@ -555,7 +557,7 @@ def test_figure_bbox_clamps_visual_rects_below_caption() -> None:
             "Figure 3. Model comparison.",
             fontsize=10,
         )
-        anchor = [item for item in _find_caption_blocks(page) if item["label"] == "Figure 3"][0]
+        anchor = [item for item in find_caption_blocks(page) if item["label"] == "Figure 3"][0]
 
         bbox = _estimate_figure_bbox_above_caption(page, anchor, None, page.rect)
 

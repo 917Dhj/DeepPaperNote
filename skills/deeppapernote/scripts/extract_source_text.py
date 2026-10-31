@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from common import (
+    caption_label_key,
     clean_pdf_line,
     emit,
     ensure_parent,
@@ -27,6 +28,7 @@ from common import (
     require_accepted_fetch_artifact,
     stop_section_reason,
 )
+from pdf_captions import caption_item, select_caption_blocks
 
 MATH_SIGNAL_RE = re.compile(
     r"(?:\\(?:frac|sum|log|exp|argmax|argmin|mathbb|mathbf)|[$=]|[<>]=?|[∑∏≤≥≈∈]|O\([^)]+\))"
@@ -203,16 +205,45 @@ def primary_section_for_page(sections: list[dict[str, Any]], page_number: int) -
     return ids[0] if ids else ""
 
 
+def extract_block_captions(pdf_path: Path) -> dict[int, list[dict[str, Any]]]:
+    doc = fitz.open(pdf_path)
+    try:
+        return select_caption_blocks(doc)
+    finally:
+        doc.close()
+
+
+def page_caption_items(
+    page: dict[str, Any],
+    kind: str,
+    block_captions: dict[int, list[dict[str, Any]]],
+) -> list[dict[str, str]]:
+    text_items = extract_caption_lines(str(page.get("text", "")), kind)
+    if not any(block_captions.values()):
+        return text_items
+    text_captions = {caption_label_key(item["id"]): item["caption"] for item in text_items}
+    items = []
+    for anchor in block_captions.get(int(page["page"]), []):
+        if anchor["kind"] == kind:
+            item = caption_item(anchor)
+            item["caption"] = item["caption"] or text_captions.get(
+                caption_label_key(item["id"]), ""
+            )
+            items.append(item)
+    return items
+
+
 def caption_manifest(
     page_texts: list[dict[str, Any]],
     sections: list[dict[str, Any]],
+    block_captions: dict[int, list[dict[str, Any]]] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     captions = {"figures": [], "tables": []}
     for page in page_texts:
         page_number = int(page["page"])
         section = primary_section_for_page(sections, page_number)
         for key, kind in (("figures", "figure"), ("tables", "table")):
-            for item in extract_caption_lines(str(page.get("text", "")), kind):
+            for item in page_caption_items(page, kind, block_captions or {}):
                 captions[key].append(
                     {
                         **item,
@@ -335,7 +366,7 @@ def build_manifest(
             for section in sections
         ],
         "pages": build_pages(page_texts, sections),
-        "captions": caption_manifest(page_texts, sections),
+        "captions": caption_manifest(page_texts, sections, extract_block_captions(pdf_path)),
         "math_index": math_index(sections),
         "appendix_index": extract_appendix_index(pdf_path, coverage),
         "language_hint": language_hint_for_text(full_text),
