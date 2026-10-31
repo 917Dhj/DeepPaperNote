@@ -12,6 +12,27 @@ from pathlib import Path
 from common import runtime_config
 
 
+def pipeline_artifact_paths(workdir: Path, prefix: str) -> dict[str, Path]:
+    """Return the pipeline's filenames without reading or creating anything."""
+    return {
+        "resolve": workdir / f"{prefix}_resolve.json",
+        "metadata": workdir / f"{prefix}_metadata.json",
+        "identity": workdir / f"{prefix}_identity.json",
+        "identity_repair_trace": workdir / f"{prefix}_identity_repair_trace.json",
+        "fetch": workdir / f"{prefix}_fetch.json",
+        "pdfs": workdir / f"{prefix}_pdfs",
+        "source_manifest": workdir / f"{prefix}_source_manifest.json",
+        "raw_sections": workdir / f"{prefix}_raw_sections.jsonl",
+        "full_text": workdir / f"{prefix}_full_text.md",
+        "evidence": workdir / f"{prefix}_evidence.json",
+        "assets": workdir / f"{prefix}_assets.json",
+        "assets_directory": workdir / f"{prefix}_assets",
+        "figures": workdir / f"{prefix}_figures.json",
+        "figure_table_decisions": workdir / f"{prefix}_figure_table_decisions.json",
+        "bundle": workdir / f"{prefix}_bundle.json",
+    }
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "run pipeline")
     p.add_argument(
@@ -79,21 +100,22 @@ def main() -> None:
     workdir = Path(args.workdir).expanduser().resolve()
     workdir.mkdir(parents=True, exist_ok=True)
 
-    resolve_json = workdir / f"{args.prefix}_resolve.json"
-    metadata_json = workdir / f"{args.prefix}_metadata.json"
-    identity_json = workdir / f"{args.prefix}_identity.json"
-    identity_trace_json = workdir / f"{args.prefix}_identity_repair_trace.json"
-    fetch_json = workdir / f"{args.prefix}_fetch.json"
-    pdf_dir = workdir / f"{args.prefix}_pdfs"
-    source_manifest_json = workdir / f"{args.prefix}_source_manifest.json"
-    raw_sections_jsonl = workdir / f"{args.prefix}_raw_sections.jsonl"
-    full_text_md = workdir / f"{args.prefix}_full_text.md"
-    evidence_json = workdir / f"{args.prefix}_evidence.json"
-    assets_json = workdir / f"{args.prefix}_assets.json"
-    assets_dir = workdir / f"{args.prefix}_assets"
-    figures_json = workdir / f"{args.prefix}_figures.json"
-    figure_decisions_json = workdir / f"{args.prefix}_figure_table_decisions.json"
-    bundle_json = workdir / f"{args.prefix}_bundle.json"
+    paths = pipeline_artifact_paths(workdir, args.prefix)
+    resolve_json = paths["resolve"]
+    metadata_json = paths["metadata"]
+    identity_json = paths["identity"]
+    identity_trace_json = paths["identity_repair_trace"]
+    fetch_json = paths["fetch"]
+    pdf_dir = paths["pdfs"]
+    source_manifest_json = paths["source_manifest"]
+    raw_sections_jsonl = paths["raw_sections"]
+    full_text_md = paths["full_text"]
+    evidence_json = paths["evidence"]
+    assets_json = paths["assets"]
+    assets_dir = paths["assets_directory"]
+    figures_json = paths["figures"]
+    figure_decisions_json = paths["figure_table_decisions"]
+    bundle_json = paths["bundle"]
     py = sys.executable
     run_step(
         [
