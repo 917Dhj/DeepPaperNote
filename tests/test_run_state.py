@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -196,7 +197,12 @@ def completed_run(tmp_path: Path) -> tuple[Path, dict, dict[str, Path]]:
         "artifacts": {
             key: str(paths[key].relative_to(workdir)) for key in run_state.LATE_ARTIFACTS
         },
-        "context": {"output_language": "zh-CN", "save_mode": "workspace", "papers_dir": "Papers"},
+        "context": {
+            "output_language": "zh-CN",
+            "save_mode": "workspace",
+            "papers_dir": "Papers",
+            "workspace_root": str(tmp_path / "workspace"),
+        },
     }
     paths["admission"].unlink(missing_ok=True)
     bindings["artifacts"].pop("admission")
@@ -254,6 +260,8 @@ def test_cli_rejects_invalid_inputs_without_creating_paths(tmp_path: Path, argum
         {"schema_version": 1, "context": {"output_language": "fr"}},
         {"schema_version": 1, "context": {"overwrite": "yes"}},
         {"schema_version": 1, "context": {"save_mode": "auto"}},
+        {"schema_version": 1, "context": {"zotero_mode": "maybe"}},
+        {"schema_version": 1, "context": {"source_sha256": "ABC"}},
     ],
 )
 def test_bindings_are_closed_and_strict(tmp_path: Path, bad: dict) -> None:
@@ -940,3 +948,221 @@ def test_json_shaped_text_does_not_supply_language(tmp_path: Path, artifact: str
     )
     assert report["resolved_context"]["output_language"] == "zh-CN"
     assert stages(report)["figures"]["status"] == "present_unverified"
+
+
+def visual_decision(label: str, **review: object) -> dict:
+    return {
+        "source_id": label,
+        "decision": "review_pending",
+        "visual_review": {"status": "pending", "repair_attempts": 0, **review},
+    }
+
+
+def write_decisions(paths: dict[str, Path], items: list[dict], **fields: object) -> None:
+    record = json.loads(paths["figure_table_decisions"].read_text())
+    dump(paths["figure_table_decisions"], {**record, **fields, "decisions": items})
+
+
+def admit_source_subdir(workdir: Path, bindings: dict, paths: dict[str, Path]) -> str:
+    source_sha = json.loads(paths["source_manifest"].read_text())["source_sha256"]
+    bindings["context"].update(
+        save_mode="obsidian", vault=str(workdir.parent / "Vault"), papers_dir="Papers"
+    )
+    bindings["artifacts"]["admission"] = str(paths["admission"])
+    dump(
+        paths["admission"],
+        {
+            "script": "write_obsidian_note.py",
+            "status": "ok",
+            "phase": "save_target_admission",
+            "output_language": "zh-CN",
+            "source_sha256": source_sha,
+            "asset_subdir": f"images/{source_sha}",
+        },
+    )
+    return f"images/{source_sha}"
+
+
+def test_pending_visual_review_is_model_work_not_a_replan(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    write_decisions(paths, [visual_decision("Figure 1")])
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "figure_table_decisions"
+    assert action["kind"] == "model_action"
+    assert action["output_path"] == str(paths["figure_table_decisions"])
+    assert action["reference"].endswith("references/figure-placement.md")
+    assert "argv" not in action
+
+
+@pytest.mark.parametrize(
+    "reviewed",
+    [
+        {"status": "fail", "failure_reason": "caption_contamination"},
+        {"status": "pending", "repair_attempts": 1},
+    ],
+)
+def test_recorded_review_work_is_never_replanned(completed_run: tuple, reviewed: dict) -> None:
+    workdir, bindings, paths = completed_run
+    done = visual_decision("Figure 1", **reviewed)
+    write_decisions(paths, [done, visual_decision("Figure 2")])
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "figure_table_decisions"
+    assert action["kind"] == "model_action"
+    assert "argv" not in action
+
+
+def test_stale_reviewed_asset_requires_a_fresh_review(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    image = workdir / "figure.png"
+    image.write_bytes(b"changed")
+    review = {"status": "pass", "reviewed_asset_sha256": "0" * 64}
+    item = {**visual_decision("Figure 1", **review), "decision": "insert"}
+    write_decisions(paths, [{**item, "source_image_path": str(image)}])
+    report = run_state.inspect_run(workdir, bindings=bindings)
+    assert stages(report)["figure_table_decisions"]["status"] == "stale"
+    assert report["next_action"]["kind"] == "model_action"
+    assert "argv" not in report["next_action"]
+
+
+def test_unreadable_existing_decisions_are_not_overwritten(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    paths["figure_table_decisions"].write_text("{")
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "figure_table_decisions"
+    assert action["kind"] == "model_action"
+    assert "argv" not in action
+
+
+@pytest.mark.parametrize(
+    ("receipt", "gate", "target"),
+    [
+        ("grounding_lint", "passes_grounding", "note_plan"),
+        ("note_lint", "passes_style_gate", "draft"),
+    ],
+)
+def test_failed_lint_requires_revision_then_a_rerun_of_changed_input(
+    completed_run: tuple, receipt: str, gate: str, target: str
+) -> None:
+    workdir, bindings, paths = completed_run
+    record = json.loads(paths[receipt].read_text())
+    dump(paths[receipt], {**record, gate: False})
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == receipt
+    assert action["kind"] == "model_action"
+    assert action["output_path"] == str(paths[target])
+    assert action["input_paths"][receipt] == str(paths[receipt])
+    assert "argv" not in action
+    with paths[target].open("a", encoding="utf-8") as handle:
+        handle.write("\n")
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == receipt
+    assert action["kind"] == "command"
+
+
+def test_non_gate_lint_failure_still_reruns_the_producer(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    record = json.loads(paths["note_lint"].read_text())
+    dump(paths["note_lint"], {**record, "status": "error"})
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "note_lint"
+    assert action["kind"] == "command"
+
+
+def test_default_asset_subdir_conflicts_with_admission_until_replanned(
+    completed_run: tuple,
+) -> None:
+    workdir, bindings, paths = completed_run
+    asset_subdir = admit_source_subdir(workdir, bindings, paths)
+    write_decisions(paths, [visual_decision("Figure 1")], asset_subdir="images")
+    report = run_state.inspect_run(workdir, bindings=bindings)
+    result = stages(report)["figure_table_decisions"]
+    assert stages(report)["admission"]["status"] == "passed"
+    assert result["status"] == "stale"
+    assert {item["code"] for item in result["issues"]} >= {"figure_decisions_asset_subdir_mismatch"}
+    action = report["next_action"]
+    assert action["kind"] == "command"
+    assert action["argv"][action["argv"].index("--asset-subdir") + 1] == asset_subdir
+    write_decisions(paths, [], asset_subdir=asset_subdir)
+    result = stages(run_state.inspect_run(workdir, bindings=bindings))["figure_table_decisions"]
+    assert result["status"] == "passed"
+
+
+def test_asset_subdir_conflict_preserves_recorded_reviews(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    admit_source_subdir(workdir, bindings, paths)
+    write_decisions(paths, [visual_decision("Figure 1", status="fail")], asset_subdir="images")
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "figure_table_decisions"
+    assert action["kind"] == "model_action"
+    assert "argv" not in action
+
+
+def test_workspace_mode_ignores_an_unrequired_admission_subdir(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    bindings["artifacts"]["admission"] = str(paths["admission"])
+    dump(paths["admission"], {"asset_subdir": "images/other"})
+    write_decisions(paths, [], asset_subdir="images")
+    result = stages(run_state.inspect_run(workdir, bindings=bindings))["figure_table_decisions"]
+    assert result["status"] == "passed"
+
+
+def test_workspace_save_runs_from_the_selected_workspace_root(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    root = bindings["context"].pop("workspace_root")
+    paths["save_receipt"].unlink()
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["kind"] == "missing_context"
+    assert action["missing_context"] == ["workspace_root"]
+    assert "argv" not in action
+    bindings["context"]["workspace_root"] = root
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["kind"] == "command"
+    assert action["cwd"] == str(Path(root).resolve())
+
+
+def test_commands_carry_run_overrides_and_selected_source(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    source_sha = "a" * 64
+    vault = workdir.parent / "Vault"
+    bindings["context"].update(
+        save_mode="obsidian",
+        vault=str(vault),
+        zotero_mode="off",
+        source_sha256=source_sha,
+        paper_reference="paper",
+    )
+    paths["fetch"].unlink()
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "fetch"
+    assert action["argv"][action["argv"].index("--source-sha256") + 1] == source_sha
+    assert action["env"] == {
+        "DEEPPAPERNOTE_OUTPUT_LANGUAGE": "zh-CN",
+        "DEEPPAPERNOTE_SAVE_MODE": "obsidian",
+        "DEEPPAPERNOTE_OBSIDIAN_VAULT": str(vault.resolve()),
+        "DEEPPAPERNOTE_PAPERS_DIR": "Papers",
+    }
+    paths["resolve"].unlink()
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "resolve"
+    assert action["argv"][action["argv"].index("--zotero-mode") + 1] == "off"
+
+
+def test_recommended_command_runs_without_user_configuration(
+    completed_run: tuple, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workdir, bindings, paths = completed_run
+    for name in ("DEEPPAPERNOTE_SAVE_MODE", "DEEPPAPERNOTE_OUTPUT_LANGUAGE"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("DEEPPAPERNOTE_CONFIG_PATH", str(tmp_path / "absent" / "config.json"))
+    monkeypatch.setenv("DEEPPAPERNOTE_DISABLE_SHELL_CONFIG", "1")
+    paths["figure_table_decisions"].unlink()
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    result = subprocess.run(
+        action["argv"],
+        cwd=action["cwd"],
+        env={**os.environ, **action["env"]},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert paths["figure_table_decisions"].is_file()
