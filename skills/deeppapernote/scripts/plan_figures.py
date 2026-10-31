@@ -6,7 +6,13 @@ from __future__ import annotations
 import argparse
 import re
 
-from common import caption_preference_score, maybe_load_json_record, normalize_whitespace, runtime_config
+from common import (
+    caption_preference_score,
+    maybe_load_json_record,
+    normalize_caption_label,
+    normalize_whitespace,
+    runtime_config,
+)
 from localization import normalize_output_language
 
 
@@ -333,7 +339,7 @@ def _normalize_label_for_match(label: str) -> str:
     'Figure 3' / 'Fig. 3' / 'fig 3' / 'Figure. 3' all become 'fig 3'.
     'Table 2' / 'table. 2' / 'Table. 2' all become 'table 2'.
     """
-    text = normalize_whitespace(label).lower()
+    text = normalize_caption_label(label).lower()
     extended_figure_match = re.match(
         r"^extended\s+data\s+fig(?:ure)?\.?\s*(\d+[a-z]?)$",
         text,

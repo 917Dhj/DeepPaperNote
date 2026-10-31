@@ -47,8 +47,6 @@
   ],
   "same_visual": [],
   "known_gaps": {
-    "labels:*": "Fullwidth digits are not normalized in caption labels.",
-    "caption:*": "Fullwidth characters are not normalized in caption text.",
-    "review:*": "Asset labels such as 图１ never match manifest ids such as 图 １, so usable crops are dropped."
+    "caption:图 1": "Fullwidth Latin letters such as ＬＩＢＳ are not normalized in caption text."
   }
 }

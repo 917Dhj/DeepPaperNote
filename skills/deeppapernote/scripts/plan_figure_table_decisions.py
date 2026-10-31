@@ -62,11 +62,7 @@ def load_record(value: str) -> dict[str, Any]:
 
 
 def normalize_label(label: str) -> str:
-    text = normalize_whitespace(label).lower()
-    text = text.replace("figure", "fig")
-    text = re.sub(r"\bfig\.\s*", "fig ", text)
-    text = re.sub(r"\btable\.\s*", "table ", text)
-    return normalize_whitespace(text)
+    return caption_label_key(label)
 
 
 def input_is_file(value: str) -> bool:
