@@ -95,6 +95,8 @@ Follow this order:
 This is the required workflow for a normal single-paper note request, not a loose suggestion.
 Unless this skill explicitly marks a stage as optional, required stages must not be silently skipped, reordered into a shortcut, or treated as complete just because a partial artifact already exists.
 
+Use `scripts/run_state.py status --workdir <run_directory> --prefix <run_prefix>` for read-only progress and stale-artifact diagnostics. Select model-authored artifacts with explicit bindings as described in `references/run-state.md`. The report distinguishes verified gates from producer history that cannot be proven from existing artifacts; it does not execute stages or replace the workflow above.
+
 Global no-short-circuit rule:
 - do not stop after only the early stages and present the workflow as finished
 - do not treat slowness, inconvenience, or temporary uncertainty as permission to bypass a required stage
@@ -236,6 +238,7 @@ Use these bundled scripts rather than rebuilding the workflow from scratch:
 - `scripts/locate_zotero_attachment.py`
 - `scripts/resolve_paper.py`
 - `scripts/run_pipeline.py`
+- `scripts/run_state.py`
 - `scripts/collect_metadata.py`
 - `scripts/fetch_pdf.py`
 - `scripts/extract_source_text.py`
