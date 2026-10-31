@@ -36,6 +36,9 @@ def merge_inputs(primary: dict | None, evidence: dict | None, assets: dict | Non
     return merged
 
 
+CAPTION_SENTENCE_BREAK_RE = re.compile(r"(?<=[.!?。！？])\s*(?=[A-Z(\u3400-\u9fff])")
+
+
 def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str]:
     text = f"{item_id} {caption}".lower()
     if any(
@@ -161,8 +164,20 @@ ENGLISH_FIGURE_PLACEMENT: dict[str, tuple[str, str]] = {
 }
 
 
+def _classify_caption_by_title(item_id: str, caption: str) -> tuple[str, str, str]:
+    """Let the title sentence say what a visual is; later text only adds result evidence."""
+    title = CAPTION_SENTENCE_BREAK_RE.split(caption, maxsplit=1)[0]
+    titled = _classify_caption_kind_zh(item_id, title)
+    full = _classify_caption_kind_zh(item_id, caption)
+    if titled[0] == "supporting_figure":
+        return full
+    if full[0] == "main_result" and titled[0] != "method_overview":
+        return full
+    return titled
+
+
 def classify_caption_kind(item_id: str, caption: str, language: str | None = None) -> tuple[str, str, str]:
-    result = _classify_caption_kind_zh(item_id, caption)
+    result = _classify_caption_by_title(item_id, caption)
     if normalize_output_language(language) != "en":
         return result
     kind = result[0]

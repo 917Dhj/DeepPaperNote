@@ -3831,7 +3831,7 @@ def caption_preference_score(label: str, caption: str) -> int:
     score = len(cleaned_caption)
     if lowered_label.startswith(("figure", "table")):
         score += 25
-    if first_word in CAPTION_REFERENCE_VERBS:
+    if first_word in CAPTION_REFERENCE_VERBS or cleaned_caption[:1].islower():
         score -= 80
     if len(cleaned_caption) < 12:
         score -= 20

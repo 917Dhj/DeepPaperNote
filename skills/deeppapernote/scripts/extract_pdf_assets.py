@@ -26,6 +26,7 @@ from common import (
     normalize_whitespace,
     require_accepted_fetch_artifact,
 )
+from pdf_captions import CAPTION_RE, looks_like_data_row, select_caption_blocks
 
 try:
     from PIL import Image  # type: ignore
@@ -42,25 +43,6 @@ PAGE_PREVIEW_DPI = 96
 MIN_FIGURE_HEIGHT_PT = 60
 MIN_FIGURE_WIDTH_PT = 100
 
-CAPTION_RE = re.compile(
-    r"^((?:"
-    r"supplementary\s+(?:fig(?:ure)?|table)\.?\s*\d+[a-z]?"
-    r"|extended\s+data\s+(?:fig(?:ure)?|table)\.?\s*\d+[a-z]?"
-    r"|scheme\.?\s*\d+[a-z]?"
-    r"|algorithm\.?\s*\d+[a-z]?"
-    r"|(?:fig(?:ure)?|table)\.?\s*[AS]?\d+[a-z]?"
-    r"))(?!\.\d)(?=$|[\s:：.。,\、|—–-])",
-    re.IGNORECASE,
-)
-
-# Used to decide whether a continuation line still belongs to the caption text
-# or has already entered the data body of a table.  A row of pure tabular data
-# usually contains many short numeric tokens separated by spaces, e.g.
-# "0.283  0.321  0.236  0.282".  When such a row appears immediately after the
-# caption start, we must NOT merge it into the caption bbox; otherwise the
-# downstream "table body lives below caption" cropping logic will mistake the
-# numeric row for caption text and shrink the table bbox accordingly.
-_NUMERIC_TOKEN_RE = re.compile(r"^[+-]?(?:\d+\.\d+|\.\d+|\d+)(?:[eE][+-]?\d+)?$")
 _TEXT_TABLE_SEPARATOR_RE = re.compile(r"(?:\t+|\s{2,}|[|;])")
 _TEXT_TABLE_PROSE_STARTERS = {
     "a",
@@ -81,15 +63,6 @@ _TEXT_TABLE_PROSE_CONNECTORS = {
     "whereas",
     "which",
 }
-
-
-def _looks_like_data_row(text: str) -> bool:
-    """Heuristic: a data row from a tabular layout, not part of a caption."""
-    tokens = text.split()
-    if len(tokens) < 3:
-        return False
-    numeric_tokens = sum(1 for tok in tokens if _NUMERIC_TOKEN_RE.match(tok))
-    return numeric_tokens >= max(2, len(tokens) // 2)
 
 
 def _looks_like_text_table_row(text: str) -> bool:
@@ -218,15 +191,6 @@ def _classify_visual_quality(
     }
 
 
-def _classify_caption_kind(label: str) -> str:
-    """Return 'table' if the caption label starts with 'Table', else 'figure'."""
-    return (
-        "table"
-        if re.match(r"^(?:(?:supplementary|extended\s+data)\s+)?table\b", label.strip(), re.IGNORECASE)
-        else "figure"
-    )
-
-
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "extract pdf assets")
     p.add_argument("--input", required=True, help="Successful fetch JSON path or JSON artifact.")
@@ -301,90 +265,6 @@ def extract_page_images(doc, page, page_number: int, images_dir: Path) -> list[d
 # ---------------------------------------------------------------------------
 # Figure-level extraction: caption-anchored page-render cropping
 # ---------------------------------------------------------------------------
-
-def _find_caption_blocks(page) -> list[dict]:
-    """Return caption anchors sorted top-to-bottom by their y0 coordinate.
-
-    Each anchor contains the full multi-line caption bbox so that the
-    downstream crop includes the entire caption text, not just the first line.
-
-    Each anchor::
-
-        {
-            "label": "Figure 3",
-            "kind": "figure" | "table",
-            "bbox": (x0, y0, x1, y1),
-            "line_text": ...,
-        }
-    """
-    anchors: list[dict] = []
-    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
-    for block in blocks:
-        if block.get("type") != 0:
-            continue
-        lines = block.get("lines", [])
-        for line_idx, line in enumerate(lines):
-            spans = line.get("spans", [])
-            if not spans:
-                continue
-            line_text = "".join(s.get("text", "") for s in spans).strip()
-            match = CAPTION_RE.match(line_text)
-            if not match or _caption_match_is_inline_reference(line_text, match):
-                continue
-            label = normalize_whitespace(match.group(1))
-            kind = _classify_caption_kind(label)
-
-            caption_lines_text = [line_text]
-            first_bbox = line["bbox"]
-            x0, y0, x1, y1 = first_bbox
-            prev_line_bottom = first_bbox[3]
-            line_height = max(first_bbox[3] - first_bbox[1], 6.0)
-
-            for cont_line in lines[line_idx + 1:]:
-                cont_spans = cont_line.get("spans", [])
-                if not cont_spans:
-                    break
-                cont_text = "".join(s.get("text", "") for s in cont_spans).strip()
-                if not cont_text:
-                    break
-                if CAPTION_RE.match(cont_text):
-                    break
-                if _looks_like_data_row(cont_text):
-                    break
-                cb = cont_line["bbox"]
-                # Stop merging if the next line is too far below the previous one
-                # (it is then a separate paragraph, not a caption continuation).
-                if cb[1] - prev_line_bottom > line_height * 1.6:
-                    break
-                x0 = min(x0, cb[0])
-                y1 = max(y1, cb[3])
-                x1 = max(x1, cb[2])
-                prev_line_bottom = cb[3]
-                caption_lines_text.append(cont_text)
-
-            full_caption = " ".join(caption_lines_text)
-            anchors.append({
-                "label": label,
-                "kind": kind,
-                "bbox": (x0, y0, x1, y1),
-                "label_bbox": tuple(first_bbox),
-                "line_text": full_caption,
-            })
-    anchors.sort(key=lambda a: a["bbox"][1])
-    return anchors
-
-
-def _caption_match_is_inline_reference(line_text: str, match: re.Match[str]) -> bool:
-    """Reject prose references such as "Table 8 summarizes ..."."""
-    tail = line_text[match.end():]
-    if not tail or not tail[0].isspace():
-        return False
-    rest = tail.strip()
-    if not rest:
-        return False
-    first_word = re.match(r"[A-Za-z]+", rest)
-    return bool(first_word and first_word.group(0)[0].islower())
-
 
 def _collect_xref_rects(page) -> list[tuple[float, float, float, float]]:
     """Gather the page-level bounding boxes of all embedded images."""
@@ -490,7 +370,7 @@ def _find_paragraph_blocks(page, *, min_chars: int = 200) -> list[tuple[float, f
         numeric_line_share = 0
         for line in lines:
             line_text = "".join(s.get("text", "") for s in line.get("spans", [])).strip()
-            if _looks_like_data_row(line_text):
+            if looks_like_data_row(line_text):
                 numeric_line_share += 1
         if numeric_line_share > len(lines) * 0.4:
             continue
@@ -528,7 +408,7 @@ def _count_paragraph_text_chars_in_bbox(
             continue
         if CAPTION_RE.match(full_text):
             continue
-        numeric_rows = sum(1 for text in line_texts if _looks_like_data_row(text))
+        numeric_rows = sum(1 for text in line_texts if looks_like_data_row(text))
         if line_texts and numeric_rows > len(line_texts) * 0.4:
             continue
         chars += len(full_text)
@@ -788,7 +668,7 @@ def _row_is_table_like(row: dict) -> bool:
         # Many separated cells: the typical case for LaTeX-rendered tables
         # where every cell becomes its own PyMuPDF line.
         return True
-    return _looks_like_data_row(text) or _looks_like_text_table_row(text)
+    return looks_like_data_row(text) or _looks_like_text_table_row(text)
 
 
 def _restrict_row_to_caption_column(row: dict, caption_bbox: tuple[float, float, float, float], page_rect) -> dict | None:
@@ -922,7 +802,7 @@ def _grow_table_region(
             seen_data
             and len(row.get("members", []) or []) <= 1
             and in_paragraph_block
-            and not _looks_like_data_row(text)
+            and not looks_like_data_row(text)
         ):
             break
         # If this row sits entirely inside a real prose paragraph and does not
@@ -1113,13 +993,12 @@ def _unique_figure_asset_filename(page_number: int, label: str, used_filenames: 
 
 
 def extract_figure_regions(
-    page, page_number: int, images_dir: Path, *, dpi: int = FIGURE_RENDER_DPI
+    page, page_number: int, images_dir: Path, anchors: list[dict], *, dpi: int = FIGURE_RENDER_DPI
 ) -> list[dict]:
-    """Detect figure/table captions and crop the corresponding visual region."""
+    """Crop the visual region belonging to each selected caption anchor."""
     if fitz is None:
         return []
 
-    anchors = _find_caption_blocks(page)
     if not anchors:
         return []
 
@@ -1225,6 +1104,7 @@ def main() -> None:
     try:
         total_pages = len(doc)
         page_limit = min(total_pages, args.max_pages)
+        caption_anchors = select_caption_blocks(doc)
         asset_coverage = {
             "total_pages": total_pages,
             "asset_max_pages": args.max_pages,
@@ -1245,7 +1125,9 @@ def main() -> None:
             page_images = extract_page_images(doc, page, page_number, images_dir)
             image_assets.extend(page_images)
 
-            page_figures = extract_figure_regions(page, page_number, images_dir, dpi=figure_dpi)
+            page_figures = extract_figure_regions(
+                page, page_number, images_dir, caption_anchors[page_number], dpi=figure_dpi
+            )
             page_preview_path = ""
             if page_figures:
                 preview_path = previews_dir / f"page_{page_number:03d}.png"
