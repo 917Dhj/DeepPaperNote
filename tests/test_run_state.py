@@ -9,6 +9,7 @@ from pathlib import Path
 
 import _final_quality
 import common
+import plan_figure_table_decisions
 import pytest
 import run_pipeline
 import run_state
@@ -761,3 +762,161 @@ def test_current_visual_bytes_are_checked_and_counts_follow_decisions(completed_
     result = stages(run_state.inspect_run(workdir, bindings=bindings))["figure_table_decisions"]
     assert result["status"] == "stale"
     assert any(item["code"] == "figure_visual_review_stale" for item in result["issues"])
+
+
+@pytest.mark.parametrize("save_mode", ["workspace", "obsidian"])
+def test_decisions_command_uses_admitted_asset_subdir(completed_run: tuple, save_mode: str) -> None:
+    workdir, bindings, paths = completed_run
+    bindings["context"]["save_mode"] = save_mode
+    source_sha = json.loads(paths["source_manifest"].read_text())["source_sha256"]
+    asset_subdir = "images" if save_mode == "workspace" else f"images/{source_sha}"
+    if save_mode == "obsidian":
+        bindings["artifacts"]["admission"] = str(paths["admission"])
+        dump(
+            paths["admission"],
+            {
+                "script": "write_obsidian_note.py",
+                "status": "ok",
+                "phase": "save_target_admission",
+                "output_language": "zh-CN",
+                "source_sha256": source_sha,
+                "asset_subdir": asset_subdir,
+            },
+        )
+    paths["figure_table_decisions"].unlink()
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "figure_table_decisions"
+    assert action["kind"] == "command"
+    assert action["argv"][action["argv"].index("--asset-subdir") + 1] == asset_subdir
+    parsed = plan_figure_table_decisions.parser().parse_args(action["argv"][2:])
+    assert parsed.asset_subdir == asset_subdir
+
+
+@pytest.mark.parametrize(
+    "asset_subdir", [None, [], "", "../images", "images/../x", "assets", "images/" + "a" * 64]
+)
+def test_decisions_command_requires_valid_admission_asset_subdir(
+    completed_run: tuple, asset_subdir: object
+) -> None:
+    workdir, bindings, paths = completed_run
+    bindings["context"]["save_mode"] = "obsidian"
+    bindings["artifacts"]["admission"] = str(paths["admission"])
+    receipt = {
+        "script": "write_obsidian_note.py",
+        "status": "ok",
+        "phase": "save_target_admission",
+        "output_language": "zh-CN",
+        "source_sha256": json.loads(paths["source_manifest"].read_text())["source_sha256"],
+    }
+    if asset_subdir is not None:
+        receipt["asset_subdir"] = asset_subdir
+    dump(paths["admission"], receipt)
+    paths["figure_table_decisions"].unlink()
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "figure_table_decisions"
+    assert action["kind"] == "missing_context"
+    assert action["missing_context"] == ["admission.asset_subdir"]
+    assert "argv" not in action
+
+
+@pytest.mark.parametrize("language", [[], {}, None, True, 1])
+def test_cli_reports_malformed_artifact_language_without_context(
+    tmp_path: Path, language: object
+) -> None:
+    dump(
+        tmp_path / "run_figures.json",
+        {
+            "script": "plan_figures.py",
+            "status": "ok",
+            "figure_plan": {},
+            "output_language": language,
+        },
+    )
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "status", "--workdir", str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert stages(report)["figures"]["status"] == "invalid"
+    assert "output_language" not in report["resolved_context"]
+
+
+@pytest.mark.parametrize("language", [[], {}, None, True, 1])
+def test_cli_rejects_malformed_explicit_language(tmp_path: Path, language: object) -> None:
+    bindings = tmp_path / "bindings.json"
+    dump(bindings, {"schema_version": 1, "context": {"output_language": language}})
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "status",
+            "--workdir",
+            str(tmp_path),
+            "--bindings",
+            str(bindings),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert json.loads(result.stdout)["status"] == "error"
+
+
+def test_valid_conflicting_languages_require_context(tmp_path: Path) -> None:
+    dump(
+        tmp_path / "run_figures.json",
+        {"script": "plan_figures.py", "status": "ok", "figure_plan": {}, "output_language": "en"},
+    )
+    dump(
+        tmp_path / "run_figure_table_decisions.json",
+        {
+            "script": "plan_figure_table_decisions.py",
+            "status": "ok",
+            "decisions": [],
+            "output_language": "zh-CN",
+        },
+    )
+    report = run_state.inspect_run(tmp_path)
+    assert stages(report)["figures"]["status"] == "present_unverified"
+    assert any(
+        item["code"] == "language_context_missing" for item in stages(report)["figures"]["issues"]
+    )
+
+
+def test_json_receipt_extensions_do_not_change_language_inference(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    bindings["context"].pop("output_language")
+    baseline = run_state.inspect_run(workdir, bindings=bindings)
+    assert baseline["summary"]["saved_verified"] is True
+    for key, path in paths.items():
+        if path.suffix == ".json" and path.exists():
+            record = json.loads(path.read_text())
+            if "output_language" in record:
+                renamed = path.with_suffix(".out")
+                path.rename(renamed)
+                bindings["artifacts"][key] = str(renamed)
+    report = run_state.inspect_run(workdir, bindings=bindings)
+    assert report["resolved_context"]["output_language"] == "zh-CN"
+    assert report["summary"]["gate_verdicts"] == baseline["summary"]["gate_verdicts"]
+    assert report["summary"]["saved_verified"] is True
+
+
+@pytest.mark.parametrize("artifact", ["raw_sections", "draft"])
+def test_text_artifact_with_json_suffix_remains_text(completed_run: tuple, artifact: str) -> None:
+    workdir, bindings, paths = completed_run
+    renamed = paths[artifact].with_suffix(".json")
+    paths[artifact].rename(renamed)
+    bindings["artifacts"][artifact] = str(renamed)
+    if artifact == "raw_sections":
+        manifest = json.loads(paths["source_manifest"].read_text())
+        manifest["raw_sections_path"] = str(renamed)
+        dump(paths["source_manifest"], manifest)
+        grounding = json.loads(paths["grounding_lint"].read_text())
+        grounding["source_manifest_sha256"] = sha(paths["source_manifest"])
+        dump(paths["grounding_lint"], grounding)
+    report = run_state.inspect_run(workdir, bindings=bindings)
+    assert stages(report)["source_manifest"]["status"] == "passed"
+    assert stages(report)["draft"]["status"] == "passed"
+    assert report["summary"]["saved_verified"] is True
