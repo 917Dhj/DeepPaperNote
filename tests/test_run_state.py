@@ -920,3 +920,23 @@ def test_text_artifact_with_json_suffix_remains_text(completed_run: tuple, artif
     assert stages(report)["source_manifest"]["status"] == "passed"
     assert stages(report)["draft"]["status"] == "passed"
     assert report["summary"]["saved_verified"] is True
+
+
+@pytest.mark.parametrize("artifact", ["draft", "raw_sections", "full_text"])
+def test_json_shaped_text_does_not_supply_language(tmp_path: Path, artifact: str) -> None:
+    text_path = tmp_path / f"{artifact}.json"
+    dump(text_path, {"output_language": "en"})
+    dump(
+        tmp_path / "run_figures.json",
+        {
+            "script": "plan_figures.py",
+            "status": "ok",
+            "figure_plan": {},
+            "output_language": "zh-CN",
+        },
+    )
+    report = run_state.inspect_run(
+        tmp_path, bindings={"schema_version": 1, "artifacts": {artifact: str(text_path)}}
+    )
+    assert report["resolved_context"]["output_language"] == "zh-CN"
+    assert stages(report)["figures"]["status"] == "present_unverified"

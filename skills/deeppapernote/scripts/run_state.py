@@ -209,7 +209,7 @@ class Inspection:
             try:
                 self.raw[key] = path.read_bytes()
                 self.hashes[key] = hashlib.sha256(self.raw[key]).hexdigest()
-                if path.suffix.lower() == ".json" and key != "draft":
+                if key not in {"draft", "raw_sections", "full_text"}:
                     self.data[key] = strict_json_loads(self.raw[key].decode("utf-8-sig"))
             except FileNotFoundError:
                 pass
@@ -219,7 +219,8 @@ class Inspection:
             languages = {
                 record["output_language"]
                 for record in self.data.values()
-                if record.get("output_language") in {"en", "zh-CN"}
+                if isinstance(record.get("output_language"), str)
+                and record["output_language"] in {"en", "zh-CN"}
             }
             if len(languages) == 1:
                 self.context["output_language"] = languages.pop()
@@ -234,7 +235,6 @@ class Inspection:
         message: str,
         path: str | Path | None = None,
     ) -> None:
-        # Keep a malformed report invalid even when another check also finds a stale input.
         priority = {
             "passed": 0,
             "present_unverified": 1,
@@ -286,6 +286,15 @@ class Inspection:
             )
 
     def language(self, result: StageResult, record: dict) -> bool:
+        declared = record.get("output_language")
+        if not isinstance(declared, str) or declared not in {"en", "zh-CN"}:
+            self.problem(
+                result,
+                "invalid",
+                "output_language_invalid",
+                "Artifact output_language must be en or zh-CN.",
+            )
+            return False
         language = self.context.get("output_language")
         if language is None:
             self.problem(
@@ -359,7 +368,7 @@ class Inspection:
                         "producer_not_ok",
                         f"Producer reported {record.get('status')!r}.",
                     )
-                if stage.language:
+                if stage.language or "output_language" in record:
                     self.language(result, record)
                 for key, kind in stage.structure:
                     if not isinstance(record.get(key), kind) or (
@@ -784,7 +793,6 @@ class Inspection:
         )
 
 
-# Each argument names either an artifact or an explicit run-context field.
 COMMANDS = {
     "resolve": ("resolve_paper.py", (("--input", "@paper_reference"), ("--output", "resolve"))),
     "metadata": ("collect_metadata.py", (("--input", "resolve"), ("--output", "metadata"))),
@@ -997,6 +1005,25 @@ def next_action(run: Inspection) -> dict:
                 )
             else:
                 argv.extend((flag, str(value)))
+        if stage.id == "figure_table_decisions":
+            mode = run.context.get("save_mode")
+            if mode == "workspace":
+                argv.extend(("--asset-subdir", "images"))
+            elif mode == "obsidian":
+                admission = run.results["admission"]
+                asset_subdir = run.data.get("admission", {}).get("asset_subdir")
+                source_sha = run.data.get("source_manifest", {}).get("source_sha256")
+                if (
+                    admission.status != "passed"
+                    or admission.unmet_dependencies
+                    or not isinstance(asset_subdir, str)
+                    or asset_subdir not in ("images", f"images/{source_sha}")
+                ):
+                    action["missing_context"].append("admission.asset_subdir")
+                else:
+                    argv.extend(("--asset-subdir", asset_subdir))
+            else:
+                action["missing_context"].append("save_mode")
         if stage.id == "save_receipt" and run.context.get("save_mode") == "obsidian":
             for key in ("vault", "papers_dir"):
                 value = run.context.get(key)
