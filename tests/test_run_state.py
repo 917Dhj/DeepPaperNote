@@ -990,7 +990,7 @@ def test_pending_visual_review_is_model_work_not_a_replan(completed_run: tuple) 
     assert action["stage"] == "figure_table_decisions"
     assert action["kind"] == "model_action"
     assert action["output_path"] == str(paths["figure_table_decisions"])
-    assert action["reference"].endswith("references/figure-placement.md")
+    assert Path(action["reference"]).parts[-2:] == ("references", "figure-placement.md")
     assert "argv" not in action
 
 
