@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "pdf": "zh-libs-soil.pdf",
+  "sha256": "330ffc2f53d06c8630cd56745912402086a5f2efd611406efedfe35b33258736",
+  "split": "dev",
+  "source": "doi:10.3969/j.issn.2095-1035.2024.02.002",
+  "traits": [
+    "chinese",
+    "fullwidth-characters",
+    "cnki-export"
+  ],
+  "labels": [
+    "图 1",
+    "图 2",
+    "图 3",
+    "图 4",
+    "图 5",
+    "图 6",
+    "图 7",
+    "图 8",
+    "图 9",
+    "表 1",
+    "表 2"
+  ],
+  "captions": {
+    "图 1": {
+      "starts": "便携式土壤重金属LIBS检测仪",
+      "ends": "检测仪"
+    },
+    "表 2": {
+      "starts": "检测结果性能评价",
+      "ends": "性能评价"
+    }
+  },
+  "review": [
+    "图 1",
+    "图 2",
+    "图 3",
+    "图 4",
+    "图 5",
+    "图 6",
+    "图 7",
+    "图 8",
+    "图 9",
+    "表 1",
+    "表 2"
+  ],
+  "same_visual": [],
+  "known_gaps": {
+    "labels:*": "Fullwidth digits are not normalized in caption labels.",
+    "caption:*": "Fullwidth characters are not normalized in caption text.",
+    "review:*": "Asset labels such as 图１ never match manifest ids such as 图 １, so usable crops are dropped."
+  }
+}
