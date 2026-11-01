@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from common import caption_label_key, extract_caption_lines, normalize_caption_label
+from pdf_captions import find_caption_blocks
 from plan_figure_table_decisions import matched_figure_asset
 from plan_figures import _match_figure_asset, classify_caption_kind
 from test_extract_pdf_assets_quality import EXTRACT_PDF_ASSETS_SCRIPT, write_fetch_input
@@ -187,6 +188,74 @@ def test_equally_strong_continued_captions_keep_every_page(tmp_path: Path) -> No
     captions = manifest_captions(tmp_path, doc)
     assert [item["page"] for item in captions["tables"]] == [1, 2]
     assert [item["page_number"] for item in figure_assets(tmp_path, doc)] == [1, 2]
+
+
+BODY_TEXT = " ".join(["The running text of the paper continues in this column."] * 14)
+
+
+def caption_columns(left: str, right: str, *, caption_size: float = 7.0) -> fitz.Document:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(fitz.Rect(40, 400, 296, 480), left, fontsize=caption_size)
+    page.insert_textbox(fitz.Rect(306, 400, 562, 480), right, fontsize=caption_size)
+    page.insert_textbox(fitz.Rect(40, 520, 296, 760), BODY_TEXT, fontsize=9)
+    page.insert_textbox(fitz.Rect(306, 520, 562, 760), BODY_TEXT, fontsize=9)
+    return doc
+
+
+def test_caption_continues_in_the_next_column() -> None:
+    doc = caption_columns(
+        "Fig. 1 | Structure prediction with a shared model. a, Prediction accuracy across "
+        "every class of biomolecular complexes in the benchmark set. Sampling",
+        "and ranking details are provided in the Methods.",
+    )
+    caption = find_caption_blocks(doc[0])[0]
+    ending = "Sampling and ranking details are provided in the Methods."
+
+    assert caption["line_text"].endswith(ending)
+    assert caption["bbox"][2] < 306
+
+
+def test_small_caption_continues_after_a_finished_sentence() -> None:
+    doc = caption_columns(
+        "Fig. 1 | Structure prediction with a shared model. a, Prediction accuracy across "
+        "every class of biomolecular complexes in the benchmark set.",
+        "Sampling and ranking details are provided in the Methods.",
+    )
+
+    assert find_caption_blocks(doc[0])[0]["line_text"].endswith("in the Methods.")
+
+
+def test_finished_caption_at_body_size_keeps_the_next_column_out() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    caption = "Figure 1: Model overview with every stage of the training pipeline shown in order."
+    page.insert_textbox(fitz.Rect(40, 400, 296, 440), caption, fontsize=9)
+    page.insert_textbox(fitz.Rect(306, 400, 562, 760), BODY_TEXT.lower(), fontsize=9)
+    page.insert_textbox(fitz.Rect(40, 460, 296, 760), BODY_TEXT, fontsize=9)
+
+    assert find_caption_blocks(page)[0]["line_text"] == caption
+
+
+def test_caption_continues_in_a_text_block_right_below() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(
+        fitz.Rect(108, 400, 504, 420), "Figure 4: Two stages. Stage 2 is trained", fontsize=9.2
+    )
+    page.insert_textbox(fitz.Rect(108, 414, 504, 434), "via next-scale prediction.", fontsize=8.9)
+    page.insert_textbox(fitz.Rect(108, 460, 504, 760), BODY_TEXT, fontsize=10)
+
+    assert find_caption_blocks(page)[0]["line_text"].endswith("trained via next-scale prediction.")
+
+
+def test_table_header_below_an_unfinished_caption_stays_out() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(fitz.Rect(108, 400, 504, 420), "Table 1: Results by method", fontsize=9)
+    page.insert_textbox(fitz.Rect(108, 414, 504, 434), "Method Accuracy Recall", fontsize=9)
+
+    assert find_caption_blocks(page)[0]["line_text"] == "Table 1: Results by method"
 
 
 def test_text_fallback_prefers_a_short_caption_over_a_lowercase_reference() -> None:
