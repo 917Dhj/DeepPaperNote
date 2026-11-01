@@ -1152,11 +1152,18 @@ def inspect_run(workdir: str | Path, prefix: str = "run", bindings: dict | None 
     verified = save.status == "passed" and not save.unmet_dependencies
     decisions = run.data.get("figure_table_decisions", {}).get("decisions")
     counts = None
+    drops = None
     if isinstance(decisions, list) and all(isinstance(item, dict) for item in decisions):
         counts = {
             "insert": sum(item.get("decision") == "insert" for item in decisions),
             "placeholder": sum(item.get("decision") == "placeholder" for item in decisions),
+            "dropped": sum(item.get("decision") == "dropped" for item in decisions),
         }
+        drops = [
+            {"source_id": item.get("source_id"), "reason": item.get("skip_reason")}
+            for item in decisions
+            if item.get("decision") == "dropped"
+        ]
     metadata = (
         run.data.get("metadata", {})
         if (
@@ -1204,6 +1211,7 @@ def inspect_run(workdir: str | Path, prefix: str = "run", bindings: dict | None 
         },
         "warning_count": warning_count,
         "figure_counts": counts,
+        "figure_drops": drops,
         "saved_mode": save.details.get("output_mode") if verified else None,
         "saved_path": save.details.get("note_path") if verified else None,
         "saved_domain": save.details.get("domain") if verified else None,
