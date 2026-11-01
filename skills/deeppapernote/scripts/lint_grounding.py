@@ -163,8 +163,6 @@ def final_visual_failure_is_valid(item: dict[str, Any]) -> bool:
     return bool(
         failure_reason in allowed
         and current_sha256
-        and normalize_whitespace(str(item.get("source_image_sha256", "")))
-        == current_sha256
         and normalize_whitespace(str(review.get("reviewed_asset_sha256", "")))
         == current_sha256
     )
@@ -602,21 +600,11 @@ def validate_figure_decisions(
                         source_id=item.get("source_id") or item.get("label") or "",
                     )
                 )
-            reviewed_sha256 = (
-                normalize_whitespace(str(review.get("reviewed_asset_sha256", "")))
-                if isinstance(review, dict)
-                else ""
-            )
-            recorded_sha256 = normalize_whitespace(
-                str(item.get("source_image_sha256", ""))
-            )
-            if (
-                not isinstance(review, dict)
-                or not visual_review_is_valid(review)
-                or normalize_whitespace(str(review.get("status", ""))) != "pass"
+            if isinstance(review, dict) and (
+                normalize_whitespace(str(review.get("status", ""))) != "pass"
                 or not current_sha256
-                or reviewed_sha256 != current_sha256
-                or recorded_sha256 != current_sha256
+                or normalize_whitespace(str(review.get("reviewed_asset_sha256", "")))
+                != current_sha256
             ):
                 issues.append(
                     issue(

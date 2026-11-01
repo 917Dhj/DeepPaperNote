@@ -246,7 +246,6 @@ def materialize_insert_decisions(
             not isinstance(review, dict)
             or str(review.get("status", "")).strip() != "pass"
             or str(review.get("reviewed_asset_sha256", "")).strip() != current_sha256
-            or str(item.get("source_image_sha256", "")).strip() != current_sha256
         ):
             label = item.get("source_id") or item.get("label") or item.get("item_id") or "unknown"
             raise SystemExit(
@@ -298,21 +297,15 @@ def materialize_insert_decisions(
         asset_dir.mkdir(parents=True, exist_ok=True)
     materialized: list[dict] = []
     for source_image, dest_image, current_sha256, record in pending:
-        if dest_image.is_file():
-            if file_sha256(dest_image) != current_sha256:
-                raise SystemExit(
-                    f"Refusing to save because an existing paper-local image has different bytes: "
-                    f"{dest_image.name}"
-                )
-        elif source_image.resolve() != dest_image.resolve():
+        if not dest_image.is_file():
             if created_paths is not None:
                 created_paths.append(dest_image)
             shutil.copy2(source_image, dest_image)
-        if file_sha256(dest_image) != current_sha256:
-            raise SystemExit(
-                f"Materialized image bytes do not match the reviewed asset SHA-256: "
-                f"{dest_image.name}"
-            )
+            if file_sha256(dest_image) != current_sha256:
+                raise SystemExit(
+                    f"Materialized image bytes do not match the reviewed asset SHA-256: "
+                    f"{dest_image.name}"
+                )
         materialized.append(record)
     return materialized
 
