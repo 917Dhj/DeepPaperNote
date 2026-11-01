@@ -135,7 +135,7 @@ You do not need to install every skill. Choose the ones that match your workflow
 
 The canonical execution contract lives in [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md).
 
-To inspect a run, use `python skills/deeppapernote/scripts/run_state.py status --workdir <run_directory> --prefix <run_prefix>`. This read-only command reports missing or stale artifacts, current gate results, and the next action. See [run inspection](./skills/deeppapernote/references/run-state.md) for explicit artifact selection and freshness limits.
+To inspect a run, use `python skills/deeppapernote/scripts/run_state.py status --workdir <run_directory> --prefix <run_prefix>`. This read-only command reports missing or stale artifacts, current gate results, and the next action. See [run inspection](./skills/deeppapernote/references/run-state.md) for explicit artifact selection and freshness limits. Run artifacts default to a per-paper directory under `~/.deeppapernote/runs/` and are not cleaned up automatically.
 
 ## 🗂️ First-Run Preferences
 

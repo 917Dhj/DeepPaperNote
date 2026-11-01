@@ -22,7 +22,7 @@ from _final_quality import (
 )
 from common import canonical_identity_acceptance_error, safe_relative_path_parts
 from lint_grounding import validate_bundle_contract, validate_figure_decisions, validate_note_plan
-from run_pipeline import pipeline_artifact_paths
+from run_pipeline import has_review_work, pipeline_artifact_paths
 from source_corpus import SourceCorpusLoadError, load_source_corpus, validate_source_corpus
 from user_configuration import ENV_FIELDS
 
@@ -962,20 +962,6 @@ COMMANDS = {
         ),
     ),
 }
-
-
-def has_review_work(record: dict) -> bool:
-    items = record.get("decisions")
-    reviews = (
-        [item.get("visual_review") for item in items if isinstance(item, dict)]
-        if isinstance(items, list)
-        else []
-    )
-    return any(
-        isinstance(review, dict)
-        and (review.get("status") != "pending" or review.get("repair_attempts"))
-        for review in reviews
-    )
 
 
 def decision_revision(run: Inspection, result: StageResult) -> str | None:

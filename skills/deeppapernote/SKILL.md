@@ -72,10 +72,10 @@ Follow this order:
 2. resolve the paper identity
 3. collect metadata
 4. acquire the best available PDF using the accepted identity and original user reference (`fetch_pdf.py --reference`); in Obsidian mode, verify and reuse a matching local archive before downloading, following `references/paper-archive.md` for version/source selection
-5. extract canonical raw source text: `*_raw_sections.jsonl`, `*_source_manifest.json`, and optional derived `*_full_text.md`
+5. extract canonical raw source text: `*_raw_sections.jsonl`, `*_source_manifest.json`, and optional derived `*_full_text.md`. `scripts/run_pipeline.py acquire --input <paper> --workdir <run_directory> --prefix <run_prefix>` performs steps 2 through 5
 6. perform Save Target Admission before drafting or domain routing:
-   - for Obsidian mode, run `scripts/write_obsidian_note.py --preflight` with the resolved title, exact `output_language`, Vault, and `*_source_manifest.json`; this program result is authoritative, so do not replace it with prompt-only duplicate checking
-   - when admission returns a reuse result, use that directory and skip domain selection; a verified PDF-only directory needs no registration confirmation. Read `asset_subdir` from preflight and use it for source-bound figure embeds
+   - for Obsidian mode, run `scripts/write_obsidian_note.py --preflight` with the resolved title, exact `output_language`, Vault, and `*_source_manifest.json`, and retain its JSON with `--output <run_directory>/<run_prefix>_admission.json`; this program result is authoritative, so do not replace it with prompt-only duplicate checking
+   - when admission returns a reuse result, use that directory and skip domain selection; a verified PDF-only directory needs no registration confirmation. Pass the retained JSON to step 7, which carries its `asset_subdir` into source-bound figure embeds
    - when it returns `same_language_note_exists`, stop before drafting and ask whether to overwrite the reported note. If the user approves, rerun preflight with `--overwrite-existing-note --expected-existing-note-sha256 <reported_sha256>` and carry that exact confirmation into Formal Save; if the user declines, stop without writing
    - when multiple directories or sources match, follow `references/paper-archive.md`: ask for the current selection and carry it through preflight and Formal Save
    - for any other blocked conflict, report the returned ambiguity and stop without creating a second directory
@@ -83,8 +83,8 @@ Follow this order:
 7. extract structural indexes and PDF assets
 8. plan figure placement
 9. build the full figure/table decision table
-10. build the manifest synthesis bundle
-11. have the model read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract, including its exact `output_language`
+10. build the manifest synthesis bundle. `scripts/run_pipeline.py prepare --workdir <run_directory> --prefix <run_prefix> --admission <admission.json>` performs steps 7 through 10 offline; workspace mode omits `--admission`. It refuses to replace decisions that record Visual Review work unless the user accepts repeating those reviews and you pass `--discard-reviews`
+11. have the model complete the Visual Review Gate and Figure/Table Decision Freeze, then read the bundle plus raw sections and create a short JSON `note_plan` that satisfies the generated bundle contract, including its exact `output_language`. The bundle's `figure_table_manifest.decisions` remains the pre-review snapshot; the frozen decisions file at its `decisions_path` is authoritative
 12. draft from the plan only after the grounding gate passes; retain the Grounding Lint JSON for Formal Save
 13. have the model write the final disk draft as UTF-8 without BOM and with LF line endings before lint or review
 14. lint the final note against the same `note_plan` using explicit `--plan-file` — this stage completes only when the lint artifact exists and every reported `passes_*` gate is `true`; otherwise revise and rerun lint. If the lint output contains `passes_style_gate: false`, apply the Style Gate Enforcement rule before advancing to step 15, 16, or 17
@@ -94,6 +94,8 @@ Follow this order:
 
 This is the required workflow for a normal single-paper note request, not a loose suggestion.
 Unless this skill explicitly marks a stage as optional, required stages must not be silently skipped, reordered into a shortcut, or treated as complete just because a partial artifact already exists.
+
+Both pipeline phases use one `--workdir` and `--prefix`. Without `--workdir`, `acquire` selects a per-paper directory under `~/.deeppapernote/runs/` and prints it as `workdir=`; pass that value to the later stages, and name a writable `--workdir` when a sandbox blocks the default. Running `run_pipeline.py` without a phase performs both phases in workspace mode only; Obsidian mode stops because admission needs its own step between them. A failed phase is rerun whole: `prepare` reuses the acquired artifacts and needs no network.
 
 Use `scripts/run_state.py status --workdir <run_directory> --prefix <run_prefix>` for read-only progress and stale-artifact diagnostics. Select model-authored artifacts with explicit bindings as described in `references/run-state.md`. The report distinguishes verified gates from producer history that cannot be proven from existing artifacts; it does not execute stages or replace the workflow above.
 
@@ -266,7 +268,7 @@ Troubleshooting rule:
 
 Current status:
 - the single-paper deterministic core pipeline is implemented as an MVP
-- `scripts/run_pipeline.py` now defaults to building a model-facing synthesis bundle
+- `scripts/run_pipeline.py` runs the `acquire` and `prepare` phases around Save Target Admission and builds a model-facing synthesis bundle
 - `scripts/write_obsidian_note.py` can write the final note into a target vault
 - patch the scripts rather than replacing the workflow ad hoc
 
