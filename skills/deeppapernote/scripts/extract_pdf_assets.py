@@ -530,6 +530,10 @@ def _clip_to_page(
     return (x0, y0, x1, y1)
 
 
+def _running_header_bottom(page) -> float:
+    return page.rect.y0 + page.rect.height * RUNNING_HEADER_RATIO
+
+
 def _grow_bbox_over_figure_labels(
     page,
     bbox: tuple[float, float, float, float],
@@ -540,7 +544,7 @@ def _grow_bbox_over_figure_labels(
 ) -> tuple[float, float, float, float]:
     """Extend a visual bbox over short nearby text such as axis labels."""
     paragraph_blocks = _find_paragraph_blocks(page)
-    header_bottom = page.rect.y0 + page.rect.height * RUNNING_HEADER_RATIO
+    header_bottom = _running_header_bottom(page)
     labels = []
     for line in _collect_text_lines(page):
         text = normalize_whitespace(str(line.get("text", "")))
@@ -655,6 +659,16 @@ def _column_x_range(
     )
 
 
+def _is_framed(box: tuple[float, ...], visuals: list[tuple[float, float, float, float]]) -> bool:
+    return any(
+        rect[0] <= box[0] + 2.0
+        and rect[1] <= box[1] + 2.0
+        and rect[2] >= box[2] - 2.0
+        and rect[3] >= box[3] - 2.0
+        for rect in visuals
+    )
+
+
 def _figure_ceiling(page, caption_anchor: dict, prev_anchor: dict | None) -> float:
     """Return the highest y a figure can reach: the previous caption or its column's prose."""
     ceiling = prev_anchor["bbox"][3] + 2.0 if prev_anchor is not None else 0.0
@@ -663,14 +677,18 @@ def _figure_ceiling(page, caption_anchor: dict, prev_anchor: dict | None) -> flo
     if cap_x0 < middle < cap_x1:
         return ceiling
     min_prose_width = page.rect.width * 0.3
-    prose_bottoms = [
-        block[3]
+    prose = [
+        block
         for block in _find_paragraph_blocks(page)
         if block[3] <= cap_y0
         and block[2] - block[0] >= min_prose_width
         and ((block[0] + block[2]) / 2.0 < middle) == (cap_x1 <= middle)
     ]
-    return max([ceiling, *prose_bottoms])
+    visuals = _collect_xref_rects(page) + _collect_drawing_rects(page)
+    if not prose or not visuals:
+        return ceiling
+    # Text inside a frame belongs to the figure drawn around it.
+    return max([ceiling, *(block[3] for block in prose if not _is_framed(block, visuals))])
 
 
 def _visuals_above_caption(
@@ -746,6 +764,10 @@ def _estimate_figure_bbox_above_caption(
 
     bbox = _clip_to_page((x0, y0, x1, y1), page_rect)
     bbox = (bbox[0], bbox[1], bbox[2], min(bbox[3], caption_y_top - 1.0))
+    if not relevant:
+        below_header = (bbox[0], max(bbox[1], _running_header_bottom(page)), bbox[2], bbox[3])
+        if below_header[1] >= below_header[3] or not page.get_text("text", clip=below_header).strip():
+            return None
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
     min_height = MIN_VISUAL_FIGURE_HEIGHT_PT if relevant else MIN_FIGURE_HEIGHT_PT
@@ -1154,7 +1176,7 @@ def _page_keeps_table_captions_below(
     paragraph_blocks: list[tuple[float, float, float, float, str]],
     page_rect,
 ) -> bool:
-    """Tell whether the page's last table has nothing under its caption.
+    """Tell whether the page's last table has its body above its caption.
 
     A page sets its tables one way, so its last caption shows which side the
     bodies between captions belong to.
@@ -1178,7 +1200,16 @@ def _page_keeps_table_captions_below(
         upper_bound=last["bbox"][3],
         lower_bound=page_rect.y1,
     )
-    return rows_below == 0
+    _, rows_above = _grow_table_region(
+        page,
+        last,
+        rows,
+        paragraph_blocks,
+        direction="up",
+        upper_bound=caption_anchor["bbox"][3],
+        lower_bound=last["bbox"][1],
+    )
+    return rows_below == 0 or rows_below < rows_above
 
 
 def _page_keeps_table_captions_above(
