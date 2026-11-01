@@ -770,6 +770,22 @@ def test_adjacent_tables_keep_their_own_body_below_the_caption(tmp_path: Path) -
         doc.close()
 
 
+def test_short_table_gets_its_own_crop(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.insert_text((60.0, 200.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 220.0, "Short", rows=3)
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "Short2" in crops["Table 1"]
+    finally:
+        doc.close()
+
+
 def test_grow_table_region_allows_gap_between_header_and_data_rows() -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for page rect construction.")
