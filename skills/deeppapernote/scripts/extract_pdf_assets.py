@@ -529,12 +529,12 @@ def _grow_bbox_over_figure_labels(
     x_range: tuple[float, float] | None = None,
 ) -> tuple[float, float, float, float]:
     """Extend a visual bbox over short nearby text such as axis labels."""
-    active_bbox = bbox
     paragraph_blocks = _find_paragraph_blocks(page)
+    labels = []
     for line in _collect_text_lines(page):
         text = normalize_whitespace(str(line.get("text", "")))
         bb = tuple(line.get("bbox", ()))
-        if (
+        if not (
             len(bb) != 4
             or len(text) > 80
             or CAPTION_RE.match(text)
@@ -543,19 +543,103 @@ def _grow_bbox_over_figure_labels(
             or (x_range is not None and (bb[0] < x_range[0] or bb[2] > x_range[1]))
             or _line_is_inside_any_block(bb, paragraph_blocks)
         ):
-            continue
-        horizontal_gap = max(active_bbox[0] - bb[2], bb[0] - active_bbox[2], 0.0)
-        vertical_gap = max(active_bbox[1] - bb[3], bb[1] - active_bbox[3], 0.0)
-        if (vertical_gap == 0.0 and horizontal_gap <= 36.0) or (
-            horizontal_gap == 0.0 and vertical_gap <= 12.0
-        ):
-            active_bbox = (
-                min(active_bbox[0], bb[0]),
-                min(active_bbox[1], bb[1]),
-                max(active_bbox[2], bb[2]),
-                max(active_bbox[3], min(bb[3], lower_bound - 2.0)),
-            )
+            labels.append(bb)
+
+    # Inside a known column every nearby label belongs to the figure.
+    max_horizontal_gap = 36.0 if x_range is None else 72.0
+
+    def absorb(active, *, narrow_only: bool):
+        for bb in labels:
+            horizontal_gap = max(active[0] - bb[2], bb[0] - active[2], 0.0)
+            vertical_gap = max(active[1] - bb[3], bb[1] - active[3], 0.0)
+            narrow = bb[2] - bb[0] <= (active[2] - active[0]) * 0.4
+            if (vertical_gap == 0.0 and horizontal_gap <= max_horizontal_gap) or (
+                (narrow or not narrow_only) and horizontal_gap == 0.0 and vertical_gap <= 12.0
+            ):
+                active = (
+                    min(active[0], bb[0]),
+                    min(active[1], bb[1]),
+                    max(active[2], bb[2]),
+                    max(active[3], min(bb[3], lower_bound - 2.0)),
+                )
+        return active
+
+    active_bbox = absorb(bbox, narrow_only=False)
+    # Repeat for labels narrower than the figure: full-width lines above are
+    # body text, and chaining through them would swallow the column.
+    while (grown := absorb(active_bbox, narrow_only=True)) != active_bbox:
+        active_bbox = grown
     return active_bbox
+
+
+def _captions_share_column(first: dict, second: dict) -> bool:
+    x0 = max(first["bbox"][0], second["bbox"][0])
+    x1 = min(first["bbox"][2], second["bbox"][2])
+    narrower = min(
+        first["bbox"][2] - first["bbox"][0],
+        second["bbox"][2] - second["bbox"][0],
+    )
+    return x1 - x0 > narrower * 0.3
+
+
+def _is_beside_caption(box: tuple[float, ...], caption_anchor: dict) -> bool:
+    return box[0] >= caption_anchor["bbox"][2] - 2.0 or box[2] <= caption_anchor["bbox"][0] + 2.0
+
+
+def _next_column_occupants(
+    page,
+    rects: list[tuple[float, float, float, float]],
+    caption_anchor: dict,
+    caption_anchors: list[dict],
+) -> list[tuple[float, ...]]:
+    """Return prose and other captions beside a figure's visuals.
+
+    A column-width caption can sit under a figure that spans the page, so
+    visuals beside it only belong to something else when that column is in use.
+    """
+    top = min(rect[1] for rect in rects)
+    cap_y0 = caption_anchor["bbox"][1]
+    occupants = [block[:4] for block in _find_paragraph_blocks(page)]
+    occupants += [a["bbox"] for a in caption_anchors if a["bbox"] != caption_anchor["bbox"]]
+    return [
+        box
+        for box in occupants
+        if _is_beside_caption(box, caption_anchor) and box[1] < cap_y0 - 5.0 and box[3] > top + 5.0
+    ]
+
+
+def _column_x_range(
+    bbox: tuple[float, float, float, float],
+    caption_anchor: dict,
+    occupants: list[tuple[float, ...]],
+) -> tuple[float, float]:
+    cap_x0, _, cap_x1, _ = caption_anchor["bbox"]
+    left = [box[2] for box in occupants if box[2] <= cap_x0 + 2.0]
+    right = [box[0] for box in occupants if box[0] >= cap_x1 - 2.0]
+    return (
+        max([min(bbox[0], cap_x0) - 24.0, *left]),
+        min([max(bbox[2], cap_x1) + 24.0, *right]),
+    )
+
+
+def _visuals_above_caption(
+    page,
+    caption_anchor: dict,
+    prev_anchor: dict | None,
+    caption_anchors: list[dict],
+) -> list[tuple[float, float, float, float]]:
+    caption_y_top = caption_anchor["bbox"][1]
+    upper_bound = prev_anchor["bbox"][3] + 2.0 if prev_anchor is not None else 0.0
+    relevant: list[tuple[float, float, float, float]] = []
+    for r in _collect_xref_rects(page) + _collect_drawing_rects(page):
+        ry_mid = (r[1] + r[3]) / 2.0
+        if upper_bound <= ry_mid <= caption_y_top + 5:
+            clipped_y1 = min(r[3], caption_y_top - 2.0)
+            if clipped_y1 > r[1]:
+                relevant.append((r[0], r[1], r[2], clipped_y1))
+    if relevant and _next_column_occupants(page, relevant, caption_anchor, caption_anchors):
+        return [rect for rect in relevant if not _is_beside_caption(rect, caption_anchor)]
+    return relevant
 
 
 def _estimate_figure_bbox_above_caption(
@@ -563,6 +647,7 @@ def _estimate_figure_bbox_above_caption(
     caption_anchor: dict,
     prev_anchor: dict | None,
     page_rect,
+    caption_anchors: list[dict] | None = None,
 ) -> tuple[float, float, float, float] | None:
     """Estimate the bounding box of the figure that lives ABOVE its caption.
 
@@ -579,17 +664,7 @@ def _estimate_figure_bbox_above_caption(
     if prev_anchor is not None:
         upper_bound = prev_anchor["bbox"][3] + 2.0
 
-    img_rects = _collect_xref_rects(page)
-    draw_rects = _collect_drawing_rects(page)
-    all_rects = img_rects + draw_rects
-
-    relevant: list[tuple[float, float, float, float]] = []
-    for r in all_rects:
-        ry_mid = (r[1] + r[3]) / 2.0
-        if upper_bound <= ry_mid <= caption_y_top + 5:
-            clipped_y1 = min(r[3], caption_y_top - 2.0)
-            if clipped_y1 > r[1]:
-                relevant.append((r[0], r[1], r[2], clipped_y1))
+    relevant = _visuals_above_caption(page, caption_anchor, prev_anchor, caption_anchors or [])
 
     if relevant:
         active_bbox = (
@@ -598,8 +673,14 @@ def _estimate_figure_bbox_above_caption(
             max(r[2] for r in relevant),
             max(r[3] for r in relevant),
         )
+        occupants = _next_column_occupants(page, relevant, caption_anchor, caption_anchors or [])
+        x_range = _column_x_range(active_bbox, caption_anchor, occupants) if occupants else None
         x0, y0, x1, y1 = _grow_bbox_over_figure_labels(
-            page, active_bbox, upper_bound=upper_bound, lower_bound=caption_y_top
+            page,
+            active_bbox,
+            upper_bound=upper_bound,
+            lower_bound=caption_y_top,
+            x_range=x_range,
         )
     else:
         body_blocks = _find_body_text_blocks(page)
@@ -945,6 +1026,21 @@ def _grow_table_region(
     return accepted, data_row_count
 
 
+def _rect_belongs_to_table(
+    rect: tuple[float, float, float, float],
+    rect_y_mid: float,
+    table: tuple[float, float, float, float],
+) -> bool:
+    x0, y0, x1, y1 = table
+    return (
+        y0 - 4.0 <= rect_y_mid <= y1 + 4.0
+        and rect[1] >= y0 - 12.0
+        and rect[3] <= y1 + 12.0
+        and rect[2] >= x0 - 12.0
+        and rect[0] <= x1 + 12.0
+    )
+
+
 def _finalize_table_bbox(
     page,
     caption_anchor: dict,
@@ -964,11 +1060,11 @@ def _finalize_table_bbox(
     initial_x1 = max(b[2] for b in accepted)
     for r in _collect_drawing_rects(page):
         ry_mid = (r[1] + r[3]) / 2.0
-        if y0 - 4.0 <= ry_mid <= y1 + 4.0 and r[2] >= initial_x0 - 12.0 and r[0] <= initial_x1 + 12.0:
+        if _rect_belongs_to_table(r, ry_mid, (initial_x0, y0, initial_x1, y1)):
             accepted.append(r)
     for r in _collect_xref_rects(page):
         ry_mid = (r[1] + r[3]) / 2.0
-        if y0 - 4.0 <= ry_mid <= y1 + 4.0 and r[2] >= initial_x0 - 12.0 and r[0] <= initial_x1 + 12.0:
+        if _rect_belongs_to_table(r, ry_mid, (initial_x0, y0, initial_x1, y1)):
             accepted.append(r)
 
     x0 = min(b[0] for b in accepted)
@@ -999,12 +1095,48 @@ def _estimate_table_bbox(
     return result[0] if result is not None else None
 
 
+def _page_keeps_table_captions_below(
+    page,
+    caption_anchor: dict,
+    page_anchors: list[dict],
+    rows: list[dict],
+    paragraph_blocks: list[tuple[float, float, float, float, str]],
+    page_rect,
+) -> bool:
+    """Tell whether the page's last table has nothing under its caption.
+
+    A page sets its tables one way, so its last caption shows which side the
+    bodies between captions belong to.
+    """
+    later = [
+        anchor
+        for anchor in page_anchors
+        if anchor["kind"] == "table"
+        and anchor["bbox"][1] > caption_anchor["bbox"][3]
+        and _captions_share_column(anchor, caption_anchor)
+    ]
+    if not later:
+        return False
+    last = later[-1]
+    _, rows_below = _grow_table_region(
+        page,
+        last,
+        rows,
+        paragraph_blocks,
+        direction="down",
+        upper_bound=last["bbox"][3],
+        lower_bound=page_rect.y1,
+    )
+    return rows_below == 0
+
+
 def _estimate_table_bbox_with_rows(
     page,
     caption_anchor: dict,
     prev_anchor: dict | None,
     next_anchor: dict | None,
     page_rect,
+    page_anchors: list[dict] | None = None,
 ) -> tuple[tuple[float, float, float, float], int] | None:
     r"""Estimate the bounding box of a table.
 
@@ -1034,6 +1166,11 @@ def _estimate_table_bbox_with_rows(
     lower_bound = page_rect.y1
     if next_anchor is not None:
         lower_bound = max(caption_y1 + 1.0, next_anchor["bbox"][1] - 2.0)
+        if next_anchor["kind"] == "figure":
+            # Tick labels of the figure below read like table rows.
+            visuals = _visuals_above_caption(page, next_anchor, caption_anchor, page_anchors or [])
+            if visuals:
+                lower_bound = max(caption_y1 + 1.0, min(rect[1] for rect in visuals) - 2.0)
 
     text_lines = _collect_text_lines(page)
     rows = _cluster_lines_into_rows(text_lines)
@@ -1061,24 +1198,13 @@ def _estimate_table_bbox_with_rows(
     if down_data == 0 and up_data == 0:
         return None
 
-    # A body between two captions belongs to the lower one when that caption
-    # has no body of its own below it.
-    next_table_owns_body = False
-    if down_data >= up_data > 0 and next_anchor is not None and next_anchor["kind"] == "table":
-        _, next_down_data = _grow_table_region(
-            page,
-            next_anchor,
-            rows,
-            paragraph_blocks,
-            direction="down",
-            upper_bound=next_anchor["bbox"][3],
-            lower_bound=page_rect.y1,
-        )
-        next_table_owns_body = next_down_data == 0
+    captions_below = down_data >= up_data > 0 and _page_keeps_table_captions_below(
+        page, caption_anchor, page_anchors or [], rows, paragraph_blocks, page_rect
+    )
 
     chosen: list[tuple[float, float, float, float]]
     chosen_data_rows: int
-    if up_data > down_data or next_table_owns_body:
+    if up_data > down_data or captions_below:
         chosen = up_lines
         chosen_data_rows = up_data
         direction = "up"
@@ -1140,14 +1266,22 @@ def extract_figure_regions(
     used_filenames: set[str] = set()
 
     for idx, anchor in enumerate(anchors):
-        prev_anchor = anchors[idx - 1] if idx > 0 else None
-        next_anchor = anchors[idx + 1] if idx + 1 < len(anchors) else None
+        prev_anchor = next(
+            (other for other in reversed(anchors[:idx]) if _captions_share_column(other, anchor)),
+            None,
+        )
+        next_anchor = next(
+            (other for other in anchors[idx + 1 :] if _captions_share_column(other, anchor)),
+            None,
+        )
         kind = anchor.get("kind", "figure")
 
         bbox: tuple[float, float, float, float] | None
         table_body_rows = 0
         if kind == "table":
-            table_result = _estimate_table_bbox_with_rows(page, anchor, prev_anchor, next_anchor, page_rect)
+            table_result = _estimate_table_bbox_with_rows(
+                page, anchor, prev_anchor, next_anchor, page_rect, anchors
+            )
             if table_result is not None:
                 bbox, table_body_rows = table_result
             else:
@@ -1155,11 +1289,15 @@ def extract_figure_regions(
             if bbox is None:
                 # Fall back to the figure-shape estimator in case the table is
                 # actually rendered as an embedded image.
-                bbox = _estimate_figure_bbox_above_caption(page, anchor, prev_anchor, page_rect)
+                bbox = _estimate_figure_bbox_above_caption(
+                    page, anchor, prev_anchor, page_rect, anchors
+                )
         else:
             bbox = _estimate_figure_bbox_beside_caption(page, anchor, anchors, page_rect)
             if bbox is None:
-                bbox = _estimate_figure_bbox_above_caption(page, anchor, prev_anchor, page_rect)
+                bbox = _estimate_figure_bbox_above_caption(
+                    page, anchor, prev_anchor, page_rect, anchors
+                )
             if bbox is None:
                 bbox = _estimate_table_bbox(page, anchor, prev_anchor, next_anchor, page_rect)
 

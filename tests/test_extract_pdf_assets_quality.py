@@ -893,7 +893,7 @@ def test_short_wide_figure_gets_a_crop(tmp_path: Path) -> None:
         doc.close()
 
 
-COLUMN_PROSE = "The running text of the paper continues in this column of the page. " * 10
+COLUMN_PROSE = "The running text of the paper continues in this column of the page. " * 7
 
 
 def crop_boxes(page, tmp_path: Path) -> dict[str, list[float]]:
@@ -1053,6 +1053,32 @@ def test_table_crop_ignores_a_page_sized_drawing(tmp_path: Path) -> None:
         add_table_rows(page, 320.0, "Row")
 
         assert crop_boxes(page, tmp_path)["Table 1"][1] > 290.0
+    finally:
+        doc.close()
+
+
+def test_text_box_figure_is_kept_whole_and_inside_its_column(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=612.0, height=792.0)
+        for row in range(30):
+            y = 100.0 + row * 12.0
+            page.insert_text((85.0, y), "3x3 conv, 64", fontsize=6)
+        for y in range(240, 470, 40):
+            page.draw_rect(fitz.Rect(150.0, y, 280.0, y + 20.0), fill=(0.8, 0.9, 1.0))
+        page.insert_textbox(
+            fitz.Rect(320.0, 100.0, 560.0, 300.0), COLUMN_PROSE, fontsize=9
+        )
+        for row in range(8):
+            page.insert_text((320.0, 330.0 + row * 12.0), "A short line of text.", fontsize=9)
+        page.insert_text((60.0, 490.0), "Figure 3. Example network architectures here.", fontsize=9)
+
+        bbox = crop_boxes(page, tmp_path)["Figure 3"]
+
+        assert bbox[0] < 90.0 and bbox[1] < 100.0
+        assert bbox[2] < 310.0
     finally:
         doc.close()
 

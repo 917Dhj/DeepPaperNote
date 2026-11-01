@@ -37,6 +37,7 @@ CAPTION_SENTENCE_ENDS = (".", "?", "!", "。", "？", "！")
 # downstream "table body lives below caption" cropping logic will mistake the
 # numeric row for caption text and shrink the table bbox accordingly.
 MAX_CAPTION_CONTINUATIONS = 3
+MAX_LINE_FRAGMENT_GAP_PT = 20.0
 # A sentence cut before its label ends on one of these words, as in "shown in\nFig. 2a."
 WRAPPED_REFERENCE_LEAD_RE = re.compile(
     r"\b(?:and|as|by|data|from|in|of|or|see|supplementary|the|to|with)\s*[(\[]?$",
@@ -208,6 +209,30 @@ def extend_caption_across_blocks(anchor: dict, block: dict, blocks: list[dict]) 
     anchor["line_text"] = join_caption_lines(parts)
 
 
+def merge_line_fragments(lines: list[dict]) -> list[dict]:
+    """Rejoin one visual line that justified text split into several PDF lines."""
+    merged: list[dict] = []
+    for line in lines:
+        previous = merged[-1] if merged else None
+        bbox = line["bbox"]
+        if previous is not None:
+            last = previous["bbox"]
+            overlap = min(last[3], bbox[3]) - max(last[1], bbox[1])
+            gap = bbox[0] - last[2]
+            if -1.0 <= gap <= MAX_LINE_FRAGMENT_GAP_PT and overlap > (bbox[3] - bbox[1]) / 2:
+                space = {"text": " ", "size": line["spans"][0]["size"] if line["spans"] else 0.0}
+                previous["spans"] = [*previous["spans"], space, *line["spans"]]
+                previous["bbox"] = (
+                    last[0],
+                    min(last[1], bbox[1]),
+                    bbox[2],
+                    max(last[3], bbox[3]),
+                )
+                continue
+        merged.append({"spans": line.get("spans", []), "bbox": tuple(bbox)})
+    return merged
+
+
 def find_caption_blocks(page) -> list[dict]:
     """Return caption anchors sorted top-to-bottom by their y0 coordinate.
 
@@ -231,7 +256,7 @@ def find_caption_blocks(page) -> list[dict]:
         if block.get("type") == 0
     ]
     for block in blocks:
-        lines = block.get("lines", [])
+        lines = merge_line_fragments(block.get("lines", []))
         line_texts = ["".join(s.get("text", "") for s in line.get("spans", [])) for line in lines]
         for line_idx, line in enumerate(lines):
             spans = line.get("spans", [])
