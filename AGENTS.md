@@ -67,6 +67,7 @@ Common commands for local validation and maintenance:
 - install the local development environment with `python3 -m pip install -e '.[dev]'`
 - run the test suite with `python3 -m pytest -q`
 - when checking environment-related problems, use `python3 skills/deeppapernote/scripts/check_environment.py`
+- after changing extraction or figure selection, run the local paper corpus with `python3 -m pytest -q -m corpus`, as described in `evals/paper-corpus.md`
 
 ## Verification Expectations
 

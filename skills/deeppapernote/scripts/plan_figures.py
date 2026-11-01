@@ -6,7 +6,13 @@ from __future__ import annotations
 import argparse
 import re
 
-from common import caption_preference_score, maybe_load_json_record, normalize_whitespace, runtime_config
+from common import (
+    caption_preference_score,
+    maybe_load_json_record,
+    normalize_caption_label,
+    normalize_whitespace,
+    runtime_config,
+)
 from localization import normalize_output_language
 
 
@@ -18,7 +24,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
     p.add_argument("--language", default="", help="Output language: en or zh-CN.")
-    p.add_argument("--max-items", type=int, default=12, help="Maximum number of figure/table items to keep. 0 means keep all.")
+    p.add_argument("--max-items", type=int, default=12, help="Target number of figure/table items. High-priority main items always stay, and supporting figures keep at least a third of this target. 0 means keep all.")
     return p
 
 
@@ -37,6 +43,7 @@ def merge_inputs(primary: dict | None, evidence: dict | None, assets: dict | Non
 
 
 CAPTION_SENTENCE_BREAK_RE = re.compile(r"(?<=[.!?。！？])\s*(?=[A-Z(\u3400-\u9fff])")
+SUPPLEMENTARY_LABEL_RE = re.compile(r"^(?:extended data |(?:fig|table|图|表) [as]\d)")
 
 
 def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str]:
@@ -148,7 +155,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
         ]
     ):
         return "method_detail", "方法主线", "这张图解释方法内部机制或关键执行状态，适合放在方法主线部分作为机制细节占位。"
-    if item_id.lower().startswith("table"):
+    if item_id.lower().startswith(("table", "表")):
         return "table_result", "关键结果", "这是关键结果表，适合放在关键结果部分辅助定位核心数值。"
     return "supporting_figure", "深度分析", "这张图更适合作为补充图，放在深度分析部分帮助解释作者论点。"
 
@@ -183,6 +190,27 @@ def classify_caption_kind(item_id: str, caption: str, language: str | None = Non
     kind = result[0]
     section, reason = ENGLISH_FIGURE_PLACEMENT[kind]
     return kind, section, reason
+
+
+def _is_supplementary_item(item: dict) -> bool:
+    return bool(SUPPLEMENTARY_LABEL_RE.match(_normalize_label_for_match(item["id"])))
+
+
+def _plan_sort_key(item: dict) -> tuple:
+    label = _normalize_label_for_match(item["id"])
+    numbered = [int(part) if part.isdecimal() else part for part in re.split(r"(\d+)", label)]
+    return _is_supplementary_item(item), item["priority"], numbered
+
+
+def _limit_plan_items(ranked: list[dict], limit: int) -> list[dict]:
+    """Spend the limit on main items first; supplementary items take what is left."""
+    main = [item for item in ranked if not _is_supplementary_item(item)]
+    high_priority = [item for item in main if item["priority"] <= 2]
+    supporting = [item for item in main if item["priority"] > 2]
+    # Tables default to high priority, so without this floor they can crowd out every figure.
+    kept = high_priority + supporting[: max(limit - len(high_priority), limit // 3)]
+    supplementary = [item for item in ranked if _is_supplementary_item(item)]
+    return kept + supplementary[: max(limit - len(kept), 0)]
 
 
 def build_figure_items(evidence_pack: dict, *, limit: int = 12, language: str | None = None) -> list[dict]:
@@ -240,13 +268,9 @@ def build_figure_items(evidence_pack: dict, *, limit: int = 12, language: str | 
                 "insert_mode": "placeholder",
             }
         )
-    picked.sort(key=lambda item: (item["priority"], item["id"]))
+    picked.sort(key=_plan_sort_key)
     if limit and limit > 0:
-        high_priority = [item for item in picked if int(item.get("priority", 99)) <= 2]
-        supporting = [item for item in picked if int(item.get("priority", 99)) > 2]
-        if len(high_priority) >= limit:
-            return high_priority
-        return high_priority + supporting[: limit - len(high_priority)]
+        return _limit_plan_items(picked, limit)
     return picked
 
 
@@ -333,7 +357,7 @@ def _normalize_label_for_match(label: str) -> str:
     'Figure 3' / 'Fig. 3' / 'fig 3' / 'Figure. 3' all become 'fig 3'.
     'Table 2' / 'table. 2' / 'Table. 2' all become 'table 2'.
     """
-    text = normalize_whitespace(label).lower()
+    text = normalize_caption_label(label).lower()
     extended_figure_match = re.match(
         r"^extended\s+data\s+fig(?:ure)?\.?\s*(\d+[a-z]?)$",
         text,

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "pdf": "nature-deepseek.pdf",
+  "sha256": "916fdaafc3b44143a9744481d079744f773d73d06372f82b1dba1076525927f2",
+  "split": "dev",
+  "source": "doi:10.1038/s41586-025-09422-z",
+  "traits": [
+    "nature-layout",
+    "figure-pipe",
+    "extended-data",
+    "caption-across-columns",
+    "recent-ai"
+  ],
+  "labels": [
+    "Fig 1",
+    "Fig 2",
+    "Table 1",
+    "Table 2",
+    "Extended Data Fig 1",
+    "Extended Data Fig 2",
+    "Extended Data Table 1"
+  ],
+  "captions": {
+    "Fig 1": {
+      "starts": "Accuracy and output length of DeepSeek-R1-Zero",
+      "ends": "a single policy update operation."
+    },
+    "Fig 2": {
+      "starts": "The multistage pipeline of DeepSeek-R1.",
+      "ends": "intermediate checkpoints in this pipeline."
+    }
+  },
+  "review": [
+    "Fig 1",
+    "Fig 2",
+    "Table 2"
+  ],
+  "same_visual": [],
+  "known_gaps": {
+    "labels:extra": "A body reference to Supplementary Fig. 8 at a line start survives: the label has no stronger candidate of its own.",
+    "caption:Fig 1": "The caption continues in the adjacent column, and only the first text block is read."
+  }
+}

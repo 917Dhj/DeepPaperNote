@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "pdf": "zh-aptamer-review.pdf",
+  "sha256": "1e9eecb357ad5cd40bf18e3d516b76fa322f00be8bd15b73af5c77d4c904fc30",
+  "split": "dev",
+  "source": "生物化学与生物物理进展 2023, 50(9): 2037-2050",
+  "traits": [
+    "chinese",
+    "bilingual-caption",
+    "centered-wrapped-caption",
+    "review-article"
+  ],
+  "labels": [
+    "Fig 1",
+    "Fig 2",
+    "Fig 3",
+    "Fig 4",
+    "Fig 5",
+    "Fig 6",
+    "图 1",
+    "图 2",
+    "图 3",
+    "图 4",
+    "图 5",
+    "图 6",
+    "Table 1",
+    "表 1"
+  ],
+  "captions": {
+    "Fig 2": {
+      "starts": "Schematic illustration application of aptamers in",
+      "ends": "disease diagnosis"
+    },
+    "Fig 5": {
+      "starts": "Schematic diagram of aptamer application in drug",
+      "ends": "therapy"
+    },
+    "图 2": {
+      "starts": "核酸适配体在疾病诊断中的应用示意图",
+      "ends": "示意图"
+    }
+  },
+  "review": [
+    "Fig 1",
+    "Fig 2",
+    "Fig 3",
+    "Fig 4",
+    "Fig 5",
+    "Fig 6",
+    "Table 1"
+  ],
+  "same_visual": [
+    [
+      "Fig 1",
+      "图 1"
+    ],
+    [
+      "Fig 2",
+      "图 2"
+    ],
+    [
+      "Fig 3",
+      "图 3"
+    ],
+    [
+      "Fig 4",
+      "图 4"
+    ],
+    [
+      "Fig 5",
+      "图 5"
+    ],
+    [
+      "Fig 6",
+      "图 6"
+    ],
+    [
+      "Table 1",
+      "表 1"
+    ]
+  ],
+  "known_gaps": {
+    "caption:Fig ?": "The centered last line is a separate text block, so it is not merged into the caption.",
+    "review:Table 1": "The visual quality gate rejects this crop; the cause is not analyzed yet.",
+    "same_visual:*": "A bilingual caption pair creates two decisions for one visual."
+  }
+}

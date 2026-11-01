@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "pdf": "arxiv-transformer.pdf",
+  "sha256": "bfaaec89262875f927cf1b38b2da2d775f3309b7bea3537f29b606ca67e79065",
+  "split": "dev",
+  "source": "arXiv:1706.03762v5",
+  "traits": [
+    "single-column",
+    "figure-colon"
+  ],
+  "labels": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Figure 5",
+    "Table 1",
+    "Table 2",
+    "Table 3",
+    "Table 4"
+  ],
+  "captions": {
+    "Figure 1": {
+      "starts": "The Transformer - model architecture.",
+      "ends": "model architecture."
+    },
+    "Table 2": {
+      "starts": "The Transformer achieves better BLEU scores",
+      "ends": "the training cost."
+    }
+  },
+  "review": [
+    "Figure 1",
+    "Figure 2",
+    "Table 2"
+  ],
+  "same_visual": [],
+  "known_gaps": {}
+}

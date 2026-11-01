@@ -3755,7 +3755,7 @@ def external_identity_matches(base: dict[str, Any], candidate: dict[str, Any]) -
 
 
 def normalize_caption_label(label: str) -> str:
-    label = normalize_whitespace(label)
+    label = normalize_whitespace(unicodedata.normalize("NFKC", label))
     chinese_match = re.match(r"^(图|表)\s*([A-Z]?\d+[a-z]?)$", label, re.IGNORECASE)
     if chinese_match:
         return f"{chinese_match.group(1)} {chinese_match.group(2)}"

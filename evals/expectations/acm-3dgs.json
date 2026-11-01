@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "pdf": "acm-3dgs.pdf",
+  "sha256": "f4c0c9f27e2d02b0265017f66049d471eb66cb50203bc918f51ba07d20cbbe11",
+  "split": "dev",
+  "source": "arXiv:2308.04079v1 (SIGGRAPH 2023)",
+  "traits": [
+    "two-column",
+    "acm-layout",
+    "figure-period",
+    "many-small-tables",
+    "numbered-algorithms"
+  ],
+  "labels": [
+    "Fig 1",
+    "Fig 2",
+    "Fig 3",
+    "Fig 4",
+    "Fig 5",
+    "Fig 6",
+    "Fig 7",
+    "Fig 8",
+    "Fig 9",
+    "Fig 10",
+    "Fig 11",
+    "Fig 12",
+    "Table 1",
+    "Table 2",
+    "Table 3",
+    "Table 4",
+    "Table 5",
+    "Table 6",
+    "Table 7",
+    "Table 8",
+    "Table 9",
+    "Algorithm 1",
+    "Algorithm 2"
+  ],
+  "captions": {
+    "Fig 1": {
+      "starts": "Our method achieves real-time rendering of radiance fields",
+      "ends": "Mip-NeRF360 [Barron et al. 2022]."
+    },
+    "Table 1": {
+      "starts": "Quantitative evaluation of our method compared to previous",
+      "ends": "obtained in our own experiments."
+    }
+  },
+  "review": [
+    "Fig 1",
+    "Fig 2",
+    "Fig 4",
+    "Fig 5",
+    "Table 1"
+  ],
+  "same_visual": [],
+  "known_gaps": {}
+}

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "pdf": "nature-alphafold3.pdf",
+  "sha256": "aba3109f2892454c9512570001598a069aaf422adb5aa0f3879414cb29a258fb",
+  "split": "dev",
+  "source": "doi:10.1038/s41586-024-07487-w",
+  "traits": [
+    "nature-layout",
+    "figure-pipe",
+    "extended-data",
+    "caption-across-columns"
+  ],
+  "labels": [
+    "Fig 1",
+    "Fig 2",
+    "Fig 3",
+    "Fig 4",
+    "Fig 5",
+    "Extended Data Fig 1",
+    "Extended Data Fig 2",
+    "Extended Data Fig 3",
+    "Extended Data Fig 4",
+    "Extended Data Fig 5",
+    "Extended Data Fig 6",
+    "Extended Data Fig 7",
+    "Extended Data Fig 8",
+    "Extended Data Fig 9",
+    "Extended Data Table 1"
+  ],
+  "captions": {
+    "Fig 1": {
+      "starts": "AF3 accurately predicts structures across biomolecular",
+      "ends": "represent physical atom coordinates."
+    },
+    "Extended Data Fig 9": {
+      "starts": "Correlation of DockQ and iLDDT",
+      "ends": "23.6 and 77.6 respectively."
+    }
+  },
+  "review": [
+    "Fig 1",
+    "Fig 2",
+    "Fig 3",
+    "Fig 4",
+    "Fig 5"
+  ],
+  "same_visual": [],
+  "known_gaps": {
+    "labels:extra": "A body reference to Extended Data Table 1 that wraps before Table survives as Table 1.",
+    "caption:Fig 1": "The caption continues in the adjacent column, and only the first text block is read."
+  }
+}

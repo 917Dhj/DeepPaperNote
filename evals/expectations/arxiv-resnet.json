@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "pdf": "arxiv-resnet.pdf",
+  "sha256": "1e0651b6810ecba34a3dbc5b5b0209226f889004607c1f203540a48d64e5a93a",
+  "split": "dev",
+  "source": "arXiv:1512.03385v1",
+  "traits": [
+    "two-column",
+    "figure-period",
+    "caption-below-table",
+    "prose-reference-at-line-start"
+  ],
+  "labels": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Figure 5",
+    "Figure 6",
+    "Figure 7",
+    "Table 1",
+    "Table 2",
+    "Table 3",
+    "Table 4",
+    "Table 5",
+    "Table 6",
+    "Table 7",
+    "Table 8",
+    "Table 9",
+    "Table 10",
+    "Table 11",
+    "Table 12",
+    "Table 13",
+    "Table 14"
+  ],
+  "captions": {
+    "Figure 4": {
+      "starts": "Training on ImageNet.",
+      "ends": "to their plain counterparts."
+    },
+    "Table 6": {
+      "starts": "Classification error on the CIFAR-10 test set.",
+      "ends": "as in [43]."
+    }
+  },
+  "review": [
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Table 4",
+    "Table 6"
+  ],
+  "same_visual": [],
+  "known_gaps": {
+    "review:Figure 3": "The visual quality gate rejects this crop; the cause is not analyzed yet."
+  }
+}

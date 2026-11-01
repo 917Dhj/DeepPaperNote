@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "pdf": "arxiv-yolo.pdf",
+  "sha256": "54bcd2dd05dc618849e8a94d8b88fe3eeb37f80e96e200600d38f1f733931678",
+  "split": "dev",
+  "source": "arXiv:1506.02640v5",
+  "traits": [
+    "two-column",
+    "figure-colon",
+    "short-title-sentence"
+  ],
+  "labels": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Figure 5",
+    "Figure 6",
+    "Table 1",
+    "Table 2",
+    "Table 3"
+  ],
+  "captions": {
+    "Figure 2": {
+      "starts": "The Model.",
+      "ends": "tensor."
+    },
+    "Table 1": {
+      "starts": "Real-Time Systems on PASCAL VOC 2007.",
+      "ends": "real-time in speed."
+    }
+  },
+  "review": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Table 1",
+    "Table 2"
+  ],
+  "same_visual": [],
+  "known_gaps": {
+    "review:Table 1": "No usable table crop exists for this caption."
+  }
+}

@@ -13,6 +13,12 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 
+def pytest_report_header() -> str:
+    from common import fitz
+
+    return f"PyMuPDF: {fitz.__version__ if fitz else 'unavailable'}"
+
+
 @pytest.fixture(autouse=True)
 def configured_user_home(tmp_path: Path, monkeypatch) -> Path:
     config_path = tmp_path / ".deeppapernote" / "config.json"

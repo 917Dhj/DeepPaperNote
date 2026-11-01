@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "pdf": "nature-tf-position.pdf",
+  "sha256": "642b2721f1912ceffbdccdd58fea2ee664f317b4ed2447ff05ac5635563878b9",
+  "split": "dev",
+  "source": "doi:10.1038/s41586-024-07662-z",
+  "traits": [
+    "caption-across-columns",
+    "extended-data",
+    "journal-pipe-caption",
+    "panel-reference-at-line-start",
+    "side-caption"
+  ],
+  "labels": [
+    "Fig 1",
+    "Fig 2",
+    "Fig 3",
+    "Fig 4",
+    "Fig 5",
+    "Extended Data Fig 1",
+    "Extended Data Fig 2",
+    "Extended Data Fig 3",
+    "Extended Data Fig 4",
+    "Extended Data Fig 5",
+    "Extended Data Fig 6",
+    "Extended Data Fig 7",
+    "Extended Data Fig 8",
+    "Extended Data Fig 9",
+    "Extended Data Fig 10"
+  ],
+  "captions": {
+    "Fig 1": {
+      "starts": "TF function is position dependent.",
+      "ends": "TSS derepression."
+    },
+    "Fig 3": {
+      "starts": "Capturing the TSSs of thousands of TSR variants",
+      "ends": "of TFs."
+    },
+    "Extended Data Fig 2": {
+      "starts": "TSS-centric analysis reveals a spatial grammar",
+      "ends": "by csRNA-seq."
+    }
+  },
+  "review": [
+    "Fig 1",
+    "Fig 2",
+    "Fig 3",
+    "Fig 4",
+    "Fig 5"
+  ],
+  "same_visual": [],
+  "known_gaps": {
+    "labels:extra": "Panel references such as Fig. 5g at a line start survive: the panel label has no stronger candidate of its own.",
+    "caption:Fig 3": "The caption continues in the adjacent column, and only the first text block is read."
+  }
+}
