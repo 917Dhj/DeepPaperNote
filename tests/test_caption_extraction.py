@@ -317,6 +317,18 @@ def test_caption_after_figure_text_in_one_block_survives() -> None:
     assert [caption["label"] for caption in find_caption_blocks(page)] == ["Figure 1"]
 
 
+def test_justified_label_split_across_line_fragments_is_a_caption() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    for x, word in ((60, "Figure"), (100, "7:"), (130, "Human"), (175, "evaluation")):
+        page.insert_text((x, 400), word, fontsize=10)
+
+    captions = find_caption_blocks(page)
+
+    assert [caption["label"] for caption in captions] == ["Figure 7"]
+    assert captions[0]["line_text"].endswith("Human evaluation")
+
+
 def test_text_fallback_prefers_a_short_caption_over_a_lowercase_reference() -> None:
     text = "Table 3: Zero-shot transfer.\nTable 3: recall at 50% precision is high at the cost"
     assert extract_caption_lines(text, "table") == [

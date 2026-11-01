@@ -893,6 +893,170 @@ def test_short_wide_figure_gets_a_crop(tmp_path: Path) -> None:
         doc.close()
 
 
+COLUMN_PROSE = "The running text of the paper continues in this column of the page. " * 10
+
+
+def crop_boxes(page, tmp_path: Path) -> dict[str, list[float]]:
+    assets = extract_figure_regions(page, 1, tmp_path, find_caption_blocks(page))
+    return {asset["label"]: asset["bbox_pt"] for asset in assets}
+
+
+def test_figure_crop_stays_out_of_an_occupied_column(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=612.0, height=792.0)
+        page.draw_rect(fitz.Rect(60.0, 100.0, 290.0, 300.0), fill=(0.2, 0.4, 0.8))
+        page.draw_rect(fitz.Rect(330.0, 120.0, 380.0, 170.0), fill=(0.8, 0.4, 0.2))
+        page.insert_textbox(fitz.Rect(320.0, 180.0, 560.0, 330.0), COLUMN_PROSE, fontsize=9)
+        page.insert_text((60.0, 320.0), "Figure 1. A figure in the left column.", fontsize=9)
+
+        bbox = crop_boxes(page, tmp_path)["Figure 1"]
+
+        assert bbox[2] < 310.0
+    finally:
+        doc.close()
+
+
+def test_column_width_caption_keeps_a_full_width_figure(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=612.0, height=792.0)
+        page.draw_rect(fitz.Rect(60.0, 100.0, 290.0, 300.0), fill=(0.2, 0.4, 0.8))
+        page.draw_rect(fitz.Rect(320.0, 100.0, 560.0, 300.0), fill=(0.8, 0.4, 0.2))
+        page.insert_text((60.0, 320.0), "Figure 1. A figure across the page.", fontsize=9)
+
+        bbox = crop_boxes(page, tmp_path)["Figure 1"]
+
+        assert bbox[2] > 555.0
+    finally:
+        doc.close()
+
+
+def test_caption_in_the_other_column_does_not_cut_a_figure(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=612.0, height=792.0)
+        page.draw_rect(fitz.Rect(60.0, 100.0, 290.0, 400.0), fill=(0.2, 0.4, 0.8))
+        page.draw_rect(fitz.Rect(320.0, 100.0, 560.0, 200.0), fill=(0.8, 0.4, 0.2))
+        page.insert_text((320.0, 216.0), "Figure 2. A short figure on the right.", fontsize=9)
+        page.insert_textbox(fitz.Rect(320.0, 230.0, 560.0, 420.0), COLUMN_PROSE, fontsize=9)
+        page.insert_text((60.0, 420.0), "Figure 1. A tall figure on the left.", fontsize=9)
+
+        bbox = crop_boxes(page, tmp_path)["Figure 1"]
+
+        assert bbox[1] < 105.0
+        assert bbox[2] < 310.0
+    finally:
+        doc.close()
+
+
+def test_figure_labels_join_a_crop_in_any_reading_order(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=612.0, height=792.0)
+        page.draw_rect(fitz.Rect(200.0, 100.0, 290.0, 300.0), fill=(0.2, 0.4, 0.8))
+        page.insert_text((175.0, 200.0), "conv", fontsize=8)
+        page.insert_text((145.0, 120.0), "pool", fontsize=8)
+        page.insert_text((60.0, 320.0), "Figure 1. Stacked network layers side by side here.", fontsize=9)
+
+        bbox = crop_boxes(page, tmp_path)["Figure 1"]
+
+        assert bbox[0] < 145.0
+    finally:
+        doc.close()
+
+
+def test_caption_in_the_other_column_does_not_hide_a_table(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=612.0, height=792.0)
+        for row in range(6):
+            y = 100.0 + row * 12.0
+            page.insert_text((60.0, y), f"Detector{row}", fontsize=8)
+            for x in (150.0, 200.0, 250.0):
+                page.insert_text((x, y), f"{row}.5", fontsize=8)
+        page.insert_textbox(
+            fitz.Rect(320.0, 150.0, 560.0, 200.0),
+            "Figure 4. Error analysis on the right column of this page.",
+            fontsize=9,
+        )
+        page.insert_textbox(
+            fitz.Rect(60.0, 190.0, 290.0, 230.0),
+            "Table 1. Real-time systems on the benchmark in this column.",
+            fontsize=9,
+        )
+
+        text = page.get_text(clip=fitz.Rect(crop_boxes(page, tmp_path)["Table 1"]))
+
+        assert "Detector0" in text and "Detector5" in text
+    finally:
+        doc.close()
+
+
+def test_table_crop_stops_before_the_next_figure(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=612.0, height=792.0)
+        page.insert_text((60.0, 90.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 110.0, "Row")
+        page.draw_rect(fitz.Rect(60.0, 200.0, 540.0, 360.0), fill=(0.2, 0.4, 0.8))
+        for x in (100.0, 200.0, 300.0, 400.0):
+            page.insert_text((x, 340.0), "0.5", fontsize=8)
+        page.insert_text((60.0, 380.0), "Figure 3. Training curves for every layer count.", fontsize=9)
+
+        assert crop_boxes(page, tmp_path)["Table 1"][3] < 200.0
+    finally:
+        doc.close()
+
+
+def test_every_table_on_a_page_with_captions_below_keeps_its_body(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        add_table_rows(page, 80.0, "First")
+        page.insert_text((60.0, 165.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 190.0, "Second")
+        page.insert_text((60.0, 275.0), wide_table_caption(2), fontsize=9)
+        add_table_rows(page, 300.0, "Third", rows=8)
+        page.insert_text((60.0, 410.0), wide_table_caption(3), fontsize=9)
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "First0" in crops["Table 1"] and "Second0" not in crops["Table 1"]
+        assert "Second0" in crops["Table 2"] and "Third0" not in crops["Table 2"]
+    finally:
+        doc.close()
+
+
+def test_table_crop_ignores_a_page_sized_drawing(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.draw_rect(fitz.Rect(0.0, 0.0, 600.0, 500.0), color=(0.9, 0.9, 0.9))
+        page.insert_text((60.0, 300.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 320.0, "Row")
+
+        assert crop_boxes(page, tmp_path)["Table 1"][1] > 290.0
+    finally:
+        doc.close()
+
+
 def test_grow_table_region_allows_gap_between_header_and_data_rows() -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for page rect construction.")
