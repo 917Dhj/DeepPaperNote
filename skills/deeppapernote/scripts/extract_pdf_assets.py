@@ -658,7 +658,7 @@ def _figure_bbox_in_column(
     return _grow_bbox_over_figure_labels(
         page,
         (min(r[0] for r in used), top, max(r[2] for r in used), bottom),
-        upper_bound=upper_bound,
+        upper_bound=max(upper_bound, min(top, cap_y0) - 4.0),
         lower_bound=lower_bound,
         x_range=x_range,
     )
