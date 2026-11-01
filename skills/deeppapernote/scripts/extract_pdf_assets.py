@@ -43,6 +43,7 @@ PAGE_PREVIEW_DPI = 96
 MIN_FIGURE_HEIGHT_PT = 60
 MIN_FIGURE_WIDTH_PT = 100
 MIN_TABLE_HEIGHT_PT = 24
+FULL_PAGE_IMAGE_RATIO = 0.7
 SIDE_FIGURE_PANEL_GAP_PT = 24.0
 
 _TEXT_TABLE_SEPARATOR_RE = re.compile(r"(?:\t+|\s{2,}|[|;])")
@@ -382,6 +383,27 @@ def _find_paragraph_blocks(page, *, min_chars: int = 200) -> list[tuple[float, f
     return results
 
 
+def _looks_like_table_cells(text: str) -> bool:
+    """Heuristic: a row of mixed values, marks, and short labels, not a sentence."""
+    tokens = text.split()
+    words = [
+        token
+        for token in tokens
+        if len(re.sub(r"\W", "", token)) >= 2 and not any(char.isdigit() for char in token)
+    ]
+    return len(words) * 2 < len(tokens)
+
+
+def _inner_image_rects(page) -> list[tuple[float, float, float, float]]:
+    """Return embedded figures, leaving out the full-page image of a scanned page."""
+    page_area = _rect_area(tuple(page.rect))
+    return [
+        rect
+        for rect in _collect_xref_rects(page)
+        if _rect_area(rect) <= page_area * FULL_PAGE_IMAGE_RATIO
+    ]
+
+
 def _count_paragraph_text_chars_in_bbox(
     page,
     bbox: tuple[float, float, float, float],
@@ -389,6 +411,7 @@ def _count_paragraph_text_chars_in_bbox(
 ) -> int:
     """Count prose-like text intersecting a crop, excluding the caption area."""
     chars = 0
+    images = _inner_image_rects(page)
     blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
     for block in blocks:
         if block.get("type") != 0:
@@ -397,6 +420,8 @@ def _count_paragraph_text_chars_in_bbox(
         if not _rects_intersect(bb, bbox):
             continue
         if _intersection_area(bb, caption_bbox) / max(_rect_area(bb), 1.0) > 0.6:
+            continue
+        if any(_intersection_area(bb, image) / max(_rect_area(bb), 1.0) > 0.6 for image in images):
             continue
 
         lines = block.get("lines", [])
@@ -410,7 +435,9 @@ def _count_paragraph_text_chars_in_bbox(
             continue
         if CAPTION_RE.match(full_text):
             continue
-        numeric_rows = sum(1 for text in line_texts if looks_like_data_row(text))
+        numeric_rows = sum(
+            1 for text in line_texts if looks_like_data_row(text) or _looks_like_table_cells(text)
+        )
         if line_texts and numeric_rows > len(line_texts) * 0.4:
             continue
         chars += len(full_text)

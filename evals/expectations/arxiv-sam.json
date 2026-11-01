@@ -68,7 +68,5 @@
   ],
   "crops": {},
   "same_visual": [],
-  "known_gaps": {
-    "review:Table 3": "The table body above the caption is not located, so no crop exists."
-  }
+  "known_gaps": {}
 }

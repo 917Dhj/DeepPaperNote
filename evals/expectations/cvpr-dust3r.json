@@ -70,7 +70,5 @@
     }
   },
   "same_visual": [],
-  "known_gaps": {
-    "review:Table 3": "The visual quality gate reports table text contamination for this crop; the cause is not analyzed yet."
-  }
+  "known_gaps": {}
 }
