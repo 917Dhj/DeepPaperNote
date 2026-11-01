@@ -877,6 +877,22 @@ def test_figure_crop_leaves_the_end_of_a_paragraph_out(tmp_path: Path) -> None:
         doc.close()
 
 
+def test_short_wide_figure_gets_a_crop(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.draw_rect(fitz.Rect(100.0, 200.0, 500.0, 248.0), fill=(0.2, 0.4, 0.8))
+        page.insert_text((100.0, 264.0), "Figure 1. A wide and short pipeline.", fontsize=9)
+
+        assets = extract_figure_regions(page, 1, tmp_path, find_caption_blocks(page))
+
+        assert [asset["label"] for asset in assets] == ["Figure 1"]
+    finally:
+        doc.close()
+
+
 def test_grow_table_region_allows_gap_between_header_and_data_rows() -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for page rect construction.")
