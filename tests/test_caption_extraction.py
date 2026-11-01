@@ -270,6 +270,53 @@ def test_cjk_caption_keeps_its_english_translation_out() -> None:
     assert find_caption_blocks(page)[0]["line_text"] == "表１　检测仪参数"
 
 
+def test_wrapped_reference_inside_a_caption_does_not_cut_it() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(
+        fitz.Rect(40, 400, 296, 480),
+        "Fig. 1 | Accuracy during training on the benchmark task, as illustrated in\n"
+        "Extended Data Table 1. The baseline is the average human score.",
+        fontsize=9,
+    )
+
+    captions = find_caption_blocks(page)
+
+    assert [caption["label"] for caption in captions] == ["Fig. 1"]
+    assert captions[0]["line_text"].endswith("the average human score.")
+
+
+@pytest.mark.parametrize(
+    ("previous", "line"),
+    [
+        ("the structures shown in", "Fig. 2a. This is particularly promising for discovery."),
+        ("with confidence (Fig. 4b and Extended Data", "Table 1. We use multiple seeds."),
+        ("the transcription start sites (Extended Data", "Fig. 5g,h), consistent with assembly."),
+        ("as reflected quantitatively in", "Table 3: recall at 50% precision is higher."),
+    ],
+)
+def test_reference_wrapped_after_a_connecting_word_is_not_a_caption(
+    previous: str, line: str
+) -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(fitz.Rect(40, 400, 296, 480), f"{previous}\n{line}", fontsize=9)
+
+    assert find_caption_blocks(page) == []
+
+
+def test_caption_after_figure_text_in_one_block_survives() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(
+        fitz.Rect(40, 400, 296, 480),
+        "Y coefficients\nFigure 1. We model a generative prior on scene motion.",
+        fontsize=9,
+    )
+
+    assert [caption["label"] for caption in find_caption_blocks(page)] == ["Figure 1"]
+
+
 def test_text_fallback_prefers_a_short_caption_over_a_lowercase_reference() -> None:
     text = "Table 3: Zero-shot transfer.\nTable 3: recall at 50% precision is high at the cost"
     assert extract_caption_lines(text, "table") == [
