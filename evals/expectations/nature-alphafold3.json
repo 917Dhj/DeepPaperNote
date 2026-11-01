@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "nature-alphafold3.pdf",
   "sha256": "aba3109f2892454c9512570001598a069aaf422adb5aa0f3879414cb29a258fb",
-  "split": "dev",
   "source": "doi:10.1038/s41586-024-07487-w",
   "traits": [
     "nature-layout",
@@ -44,9 +43,7 @@
     "Fig 4",
     "Fig 5"
   ],
+  "crops": {},
   "same_visual": [],
-  "known_gaps": {
-    "labels:extra": "A body reference to Extended Data Table 1 that wraps before Table survives as Table 1.",
-    "caption:Fig 1": "The caption continues in the adjacent column, and only the first text block is read."
-  }
+  "known_gaps": {}
 }

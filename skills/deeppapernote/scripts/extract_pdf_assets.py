@@ -41,7 +41,10 @@ except ImportError:  # pragma: no cover
 FIGURE_RENDER_DPI = 96
 PAGE_PREVIEW_DPI = 96
 MIN_FIGURE_HEIGHT_PT = 60
+MIN_VISUAL_FIGURE_HEIGHT_PT = 40
 MIN_FIGURE_WIDTH_PT = 100
+MIN_TABLE_HEIGHT_PT = 24
+FULL_PAGE_IMAGE_RATIO = 0.7
 SIDE_FIGURE_PANEL_GAP_PT = 24.0
 
 _TEXT_TABLE_SEPARATOR_RE = re.compile(r"(?:\t+|\s{2,}|[|;])")
@@ -381,6 +384,27 @@ def _find_paragraph_blocks(page, *, min_chars: int = 200) -> list[tuple[float, f
     return results
 
 
+def _looks_like_table_cells(text: str) -> bool:
+    """Heuristic: a row of mixed values, marks, and short labels, not a sentence."""
+    tokens = text.split()
+    words = [
+        token
+        for token in tokens
+        if len(re.sub(r"\W", "", token)) >= 2 and not any(char.isdigit() for char in token)
+    ]
+    return len(words) * 2 < len(tokens)
+
+
+def _inner_image_rects(page) -> list[tuple[float, float, float, float]]:
+    """Return embedded figures, leaving out the full-page image of a scanned page."""
+    page_area = _rect_area(tuple(page.rect))
+    return [
+        rect
+        for rect in _collect_xref_rects(page)
+        if _rect_area(rect) <= page_area * FULL_PAGE_IMAGE_RATIO
+    ]
+
+
 def _count_paragraph_text_chars_in_bbox(
     page,
     bbox: tuple[float, float, float, float],
@@ -388,6 +412,7 @@ def _count_paragraph_text_chars_in_bbox(
 ) -> int:
     """Count prose-like text intersecting a crop, excluding the caption area."""
     chars = 0
+    images = _inner_image_rects(page)
     blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
     for block in blocks:
         if block.get("type") != 0:
@@ -396,6 +421,8 @@ def _count_paragraph_text_chars_in_bbox(
         if not _rects_intersect(bb, bbox):
             continue
         if _intersection_area(bb, caption_bbox) / max(_rect_area(bb), 1.0) > 0.6:
+            continue
+        if any(_intersection_area(bb, image) / max(_rect_area(bb), 1.0) > 0.6 for image in images):
             continue
 
         lines = block.get("lines", [])
@@ -409,7 +436,9 @@ def _count_paragraph_text_chars_in_bbox(
             continue
         if CAPTION_RE.match(full_text):
             continue
-        numeric_rows = sum(1 for text in line_texts if looks_like_data_row(text))
+        numeric_rows = sum(
+            1 for text in line_texts if looks_like_data_row(text) or _looks_like_table_cells(text)
+        )
         if line_texts and numeric_rows > len(line_texts) * 0.4:
             continue
         chars += len(full_text)
@@ -501,6 +530,7 @@ def _grow_bbox_over_figure_labels(
 ) -> tuple[float, float, float, float]:
     """Extend a visual bbox over short nearby text such as axis labels."""
     active_bbox = bbox
+    paragraph_blocks = _find_paragraph_blocks(page)
     for line in _collect_text_lines(page):
         text = normalize_whitespace(str(line.get("text", "")))
         bb = tuple(line.get("bbox", ()))
@@ -511,6 +541,7 @@ def _grow_bbox_over_figure_labels(
             or bb[1] >= lower_bound - 1.0
             or bb[3] <= upper_bound
             or (x_range is not None and (bb[0] < x_range[0] or bb[2] > x_range[1]))
+            or _line_is_inside_any_block(bb, paragraph_blocks)
         ):
             continue
         horizontal_gap = max(active_bbox[0] - bb[2], bb[0] - active_bbox[2], 0.0)
@@ -585,7 +616,8 @@ def _estimate_figure_bbox_above_caption(
     bbox = (bbox[0], bbox[1], bbox[2], min(bbox[3], caption_y_top - 1.0))
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
-    if width < MIN_FIGURE_WIDTH_PT or height < MIN_FIGURE_HEIGHT_PT:
+    min_height = MIN_VISUAL_FIGURE_HEIGHT_PT if relevant else MIN_FIGURE_HEIGHT_PT
+    if width < MIN_FIGURE_WIDTH_PT or height < min_height:
         return None
     return bbox
 
@@ -951,7 +983,7 @@ def _finalize_table_bbox(
         bbox = (bbox[0], bbox[1], bbox[2], min(bbox[3], caption_y0 - 1.0))
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
-    if width < MIN_FIGURE_WIDTH_PT or height < MIN_FIGURE_HEIGHT_PT:
+    if width < MIN_FIGURE_WIDTH_PT or height < MIN_TABLE_HEIGHT_PT:
         return None
     return bbox
 
@@ -1029,9 +1061,24 @@ def _estimate_table_bbox_with_rows(
     if down_data == 0 and up_data == 0:
         return None
 
+    # A body between two captions belongs to the lower one when that caption
+    # has no body of its own below it.
+    next_table_owns_body = False
+    if down_data >= up_data > 0 and next_anchor is not None and next_anchor["kind"] == "table":
+        _, next_down_data = _grow_table_region(
+            page,
+            next_anchor,
+            rows,
+            paragraph_blocks,
+            direction="down",
+            upper_bound=next_anchor["bbox"][3],
+            lower_bound=page_rect.y1,
+        )
+        next_table_owns_body = next_down_data == 0
+
     chosen: list[tuple[float, float, float, float]]
     chosen_data_rows: int
-    if up_data > down_data:
+    if up_data > down_data or next_table_owns_body:
         chosen = up_lines
         chosen_data_rows = up_data
         direction = "up"

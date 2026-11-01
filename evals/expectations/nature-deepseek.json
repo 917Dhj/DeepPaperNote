@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "nature-deepseek.pdf",
   "sha256": "916fdaafc3b44143a9744481d079744f773d73d06372f82b1dba1076525927f2",
-  "split": "dev",
   "source": "doi:10.1038/s41586-025-09422-z",
   "traits": [
     "nature-layout",
@@ -35,9 +34,7 @@
     "Fig 2",
     "Table 2"
   ],
+  "crops": {},
   "same_visual": [],
-  "known_gaps": {
-    "labels:extra": "A body reference to Supplementary Fig. 8 at a line start survives: the label has no stronger candidate of its own.",
-    "caption:Fig 1": "The caption continues in the adjacent column, and only the first text block is read."
-  }
+  "known_gaps": {}
 }

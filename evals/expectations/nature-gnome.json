@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "nature-gnome.pdf",
   "sha256": "f1af6c92eda54f5bd84eb5012f3010d7bb9167dca337414cffca81623b4a535a",
-  "split": "holdout",
   "source": "doi:10.1038/s41586-023-06735-9",
   "traits": [
     "nature-layout",
@@ -20,6 +19,7 @@
     "Fig 2",
     "Fig 3"
   ],
+  "crops": {},
   "same_visual": [],
   "known_gaps": {}
 }

@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "arxiv-sam.pdf",
   "sha256": "c6ca524e47200c3e542587ca76ac1dbc89cc67340f948c819250d16fdbd90cfb",
-  "split": "dev",
   "source": "arXiv:2304.02643v1",
   "traits": [
     "two-column",
@@ -67,8 +66,7 @@
     "Table 3",
     "Table 5"
   ],
+  "crops": {},
   "same_visual": [],
-  "known_gaps": {
-    "review:Table 3": "The table body above the caption is not located, so no crop exists."
-  }
+  "known_gaps": {}
 }

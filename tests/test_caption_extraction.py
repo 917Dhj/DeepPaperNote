@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from common import caption_label_key, extract_caption_lines, normalize_caption_label
+from pdf_captions import find_caption_blocks
 from plan_figure_table_decisions import matched_figure_asset
 from plan_figures import _match_figure_asset, classify_caption_kind
 from test_extract_pdf_assets_quality import EXTRACT_PDF_ASSETS_SCRIPT, write_fetch_input
@@ -187,6 +188,133 @@ def test_equally_strong_continued_captions_keep_every_page(tmp_path: Path) -> No
     captions = manifest_captions(tmp_path, doc)
     assert [item["page"] for item in captions["tables"]] == [1, 2]
     assert [item["page_number"] for item in figure_assets(tmp_path, doc)] == [1, 2]
+
+
+BODY_TEXT = " ".join(["The running text of the paper continues in this column."] * 14)
+
+
+def caption_columns(left: str, right: str, *, caption_size: float = 7.0) -> fitz.Document:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(fitz.Rect(40, 400, 296, 480), left, fontsize=caption_size)
+    page.insert_textbox(fitz.Rect(306, 400, 562, 480), right, fontsize=caption_size)
+    page.insert_textbox(fitz.Rect(40, 520, 296, 760), BODY_TEXT, fontsize=9)
+    page.insert_textbox(fitz.Rect(306, 520, 562, 760), BODY_TEXT, fontsize=9)
+    return doc
+
+
+def test_caption_continues_in_the_next_column() -> None:
+    doc = caption_columns(
+        "Fig. 1 | Structure prediction with a shared model. a, Prediction accuracy across "
+        "every class of biomolecular complexes in the benchmark set. Sampling",
+        "and ranking details are provided in the Methods.",
+    )
+    caption = find_caption_blocks(doc[0])[0]
+    ending = "Sampling and ranking details are provided in the Methods."
+
+    assert caption["line_text"].endswith(ending)
+    assert caption["bbox"][2] < 306
+
+
+def test_small_caption_continues_after_a_finished_sentence() -> None:
+    doc = caption_columns(
+        "Fig. 1 | Structure prediction with a shared model. a, Prediction accuracy across "
+        "every class of biomolecular complexes in the benchmark set.",
+        "Sampling and ranking details are provided in the Methods.",
+    )
+
+    assert find_caption_blocks(doc[0])[0]["line_text"].endswith("in the Methods.")
+
+
+def test_finished_caption_at_body_size_keeps_the_next_column_out() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    caption = "Figure 1: Model overview with every stage of the training pipeline shown in order."
+    page.insert_textbox(fitz.Rect(40, 400, 296, 440), caption, fontsize=9)
+    page.insert_textbox(fitz.Rect(306, 400, 562, 760), BODY_TEXT.lower(), fontsize=9)
+    page.insert_textbox(fitz.Rect(40, 460, 296, 760), BODY_TEXT, fontsize=9)
+
+    assert find_caption_blocks(page)[0]["line_text"] == caption
+
+
+def test_caption_continues_in_a_text_block_right_below() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(
+        fitz.Rect(108, 400, 504, 420), "Figure 4: Two stages. Stage 2 is trained", fontsize=9.2
+    )
+    page.insert_textbox(fitz.Rect(108, 414, 504, 434), "via next-scale prediction.", fontsize=8.9)
+    page.insert_textbox(fitz.Rect(108, 460, 504, 760), BODY_TEXT, fontsize=10)
+
+    assert find_caption_blocks(page)[0]["line_text"].endswith("trained via next-scale prediction.")
+
+
+def test_table_header_below_an_unfinished_caption_stays_out() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(fitz.Rect(108, 400, 504, 420), "Table 1: Results by method", fontsize=9)
+    page.insert_textbox(fitz.Rect(108, 414, 504, 434), "Method Accuracy Recall", fontsize=9)
+
+    assert find_caption_blocks(page)[0]["line_text"] == "Table 1: Results by method"
+
+
+def test_cjk_caption_keeps_its_english_translation_out() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    for top, text in ((400, "表１　检测仪参数"), (414, "Ｔａｂｌｅ　１　Ｄｅｔｅｃｔｏｒ")):
+        page.insert_textbox(
+            fitz.Rect(108, top, 504, top + 20), text, fontsize=9, fontname="china-s"
+        )
+    page.insert_textbox(fitz.Rect(108, 460, 504, 760), BODY_TEXT, fontsize=10)
+
+    assert find_caption_blocks(page)[0]["line_text"] == "表１　检测仪参数"
+
+
+def test_wrapped_reference_inside_a_caption_does_not_cut_it() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(
+        fitz.Rect(40, 400, 296, 480),
+        "Fig. 1 | Accuracy during training on the benchmark task, as illustrated in\n"
+        "Extended Data Table 1. The baseline is the average human score.",
+        fontsize=9,
+    )
+
+    captions = find_caption_blocks(page)
+
+    assert [caption["label"] for caption in captions] == ["Fig. 1"]
+    assert captions[0]["line_text"].endswith("the average human score.")
+
+
+@pytest.mark.parametrize(
+    ("previous", "line"),
+    [
+        ("the structures shown in", "Fig. 2a. This is particularly promising for discovery."),
+        ("with confidence (Fig. 4b and Extended Data", "Table 1. We use multiple seeds."),
+        ("the transcription start sites (Extended Data", "Fig. 5g,h), consistent with assembly."),
+        ("as reflected quantitatively in", "Table 3: recall at 50% precision is higher."),
+    ],
+)
+def test_reference_wrapped_after_a_connecting_word_is_not_a_caption(
+    previous: str, line: str
+) -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(fitz.Rect(40, 400, 296, 480), f"{previous}\n{line}", fontsize=9)
+
+    assert find_caption_blocks(page) == []
+
+
+def test_caption_after_figure_text_in_one_block_survives() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(
+        fitz.Rect(40, 400, 296, 480),
+        "Y coefficients\nFigure 1. We model a generative prior on scene motion.",
+        fontsize=9,
+    )
+
+    assert [caption["label"] for caption in find_caption_blocks(page)] == ["Figure 1"]
 
 
 def test_text_fallback_prefers_a_short_caption_over_a_lowercase_reference() -> None:

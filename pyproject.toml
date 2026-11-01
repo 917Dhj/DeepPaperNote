@@ -59,8 +59,7 @@ target-version = "py310"
 select = ["E", "F", "I"]
 
 [tool.pytest.ini_options]
-addopts = "-m 'not corpus and not corpus_holdout'"
+addopts = "-m 'not corpus'"
 markers = [
   "corpus: checks against the local development papers in evals/papers",
-  "corpus_holdout: checks against held-out papers, run once before merging",
 ]

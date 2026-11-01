@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "nature-tf-position.pdf",
   "sha256": "642b2721f1912ceffbdccdd58fea2ee664f317b4ed2447ff05ac5635563878b9",
-  "split": "dev",
   "source": "doi:10.1038/s41586-024-07662-z",
   "traits": [
     "caption-across-columns",
@@ -35,7 +34,7 @@
     },
     "Fig 3": {
       "starts": "Capturing the TSSs of thousands of TSR variants",
-      "ends": "of TFs."
+      "ends": "for each position."
     },
     "Extended Data Fig 2": {
       "starts": "TSS-centric analysis reveals a spatial grammar",
@@ -49,9 +48,14 @@
     "Fig 4",
     "Fig 5"
   ],
+  "crops": {
+    "Fig 1": {
+      "contains": [],
+      "excludes": [
+        "TF function is position"
+      ]
+    }
+  },
   "same_visual": [],
-  "known_gaps": {
-    "labels:extra": "Panel references such as Fig. 5g at a line start survive: the panel label has no stronger candidate of its own.",
-    "caption:Fig 3": "The caption continues in the adjacent column, and only the first text block is read."
-  }
+  "known_gaps": {}
 }

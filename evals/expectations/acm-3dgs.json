@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "acm-3dgs.pdf",
   "sha256": "f4c0c9f27e2d02b0265017f66049d471eb66cb50203bc918f51ba07d20cbbe11",
-  "split": "dev",
   "source": "arXiv:2308.04079v1 (SIGGRAPH 2023)",
   "traits": [
     "two-column",
@@ -53,6 +52,7 @@
     "Fig 5",
     "Table 1"
   ],
+  "crops": {},
   "same_visual": [],
   "known_gaps": {}
 }

@@ -14,6 +14,7 @@ except ImportError:  # pragma: no cover
 
 from extract_pdf_assets import (
     _classify_visual_quality,
+    _count_paragraph_text_chars_in_bbox,
     _estimate_figure_bbox_above_caption,
     _grow_table_region,
     _looks_like_text_table_row,
@@ -706,6 +707,188 @@ def test_side_caption_asset_passes_the_visual_quality_gate(tmp_path: Path) -> No
         assert [asset["label"] for asset in assets] == ["Fig. 1"]
         assert assets[0]["quality_signals"]["visual_quality_status"] == "usable"
         assert assets[0]["bbox_pt"][2] < 306.0
+    finally:
+        doc.close()
+
+
+def add_table_rows(page, top: float, name: str, rows: int = 6) -> None:
+    for row in range(rows):
+        y = top + row * 12.0
+        page.insert_text((60.0, y), f"{name}{row}", fontsize=8)
+        for column, x in enumerate((180.0, 280.0, 380.0, 480.0)):
+            page.insert_text((x, y), f"{row}.{column}", fontsize=8)
+
+
+def wide_table_caption(number: int) -> str:
+    return (
+        f"Table {number}. Absolute error across every scene in the benchmark, "
+        "reported for each method and each training run."
+    )
+
+
+def table_crop_text(page, tmp_path: Path) -> dict[str, str]:
+    assets = extract_figure_regions(page, 1, tmp_path, find_caption_blocks(page))
+    return {
+        asset["label"]: page.get_text(clip=fitz.Rect(asset["bbox_pt"])) for asset in assets
+    }
+
+
+def test_adjacent_tables_keep_their_own_body_above_the_caption(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        add_table_rows(page, 80.0, "First")
+        page.insert_text((60.0, 165.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 190.0, "Second")
+        page.insert_text((60.0, 275.0), wide_table_caption(2), fontsize=9)
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "First0" in crops["Table 1"] and "Second0" not in crops["Table 1"]
+        assert "Second0" in crops["Table 2"] and "First0" not in crops["Table 2"]
+    finally:
+        doc.close()
+
+
+def test_adjacent_tables_keep_their_own_body_below_the_caption(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.insert_text((60.0, 80.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 100.0, "First")
+        page.insert_text((60.0, 190.0), wide_table_caption(2), fontsize=9)
+        add_table_rows(page, 210.0, "Second")
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "First0" in crops["Table 1"] and "Second0" not in crops["Table 1"]
+        assert "Second0" in crops["Table 2"] and "First0" not in crops["Table 2"]
+    finally:
+        doc.close()
+
+
+def test_short_table_gets_its_own_crop(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.insert_text((60.0, 200.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 220.0, "Short", rows=3)
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "Short2" in crops["Table 1"]
+    finally:
+        doc.close()
+
+
+def paragraph_chars_in(page) -> int:
+    return _count_paragraph_text_chars_in_bbox(page, tuple(page.rect), (0.0, 0.0, 0.0, 0.0))
+
+
+def add_page_image(page, rect: tuple[float, float, float, float]) -> None:
+    pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 40, 40), False)
+    pixmap.set_rect(pixmap.irect, (240, 240, 240))
+    page.insert_image(fitz.Rect(rect), pixmap=pixmap)
+
+
+def test_table_cells_with_mixed_symbols_are_not_paragraph_text() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for text block tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        cells = "\n".join(
+            f"DUSt3R 224 {row}/1.76 6/2.02 3/1.75 5/1.54 9/2.35 (8.1) 26.9 × ✓"
+            for row in range(5)
+        )
+        page.insert_textbox(fitz.Rect(40.0, 100.0, 560.0, 200.0), cells, fontsize=9)
+
+        assert paragraph_chars_in(page) == 0
+    finally:
+        doc.close()
+
+
+def test_prose_still_counts_as_paragraph_text() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for text block tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.insert_textbox(fitz.Rect(40.0, 100.0, 300.0, 300.0), SIDE_PROSE, fontsize=9)
+
+        assert paragraph_chars_in(page) > 200
+    finally:
+        doc.close()
+
+
+def test_text_inside_an_embedded_image_is_not_paragraph_text() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for text block tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        add_page_image(page, (60.0, 100.0, 540.0, 400.0))
+        page.insert_textbox(fitz.Rect(80.0, 120.0, 520.0, 380.0), SIDE_PROSE, fontsize=9)
+
+        assert paragraph_chars_in(page) == 0
+    finally:
+        doc.close()
+
+
+def test_scanned_page_text_still_counts_as_paragraph_text() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for text block tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        add_page_image(page, (0.0, 0.0, 600.0, 800.0))
+        page.insert_textbox(fitz.Rect(80.0, 120.0, 520.0, 380.0), SIDE_PROSE, fontsize=9)
+
+        assert paragraph_chars_in(page) > 200
+    finally:
+        doc.close()
+
+
+def test_figure_crop_leaves_the_end_of_a_paragraph_out(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        sentence = "The running text of the paper continues in this column of the page."
+        page.insert_textbox(
+            fitz.Rect(60.0, 100.0, 540.0, 180.0),
+            "\n".join([sentence] * 4 + ["This paragraph ends here."]),
+            fontsize=9,
+        )
+        page.draw_rect(fitz.Rect(100.0, 172.0, 500.0, 400.0), fill=(0.2, 0.4, 0.8))
+        page.insert_text((100.0, 416.0), "Figure 1. A figure below a paragraph.", fontsize=9)
+
+        assets = extract_figure_regions(page, 1, tmp_path, find_caption_blocks(page))
+
+        assert "ends here" not in page.get_text(clip=fitz.Rect(assets[0]["bbox_pt"]))
+    finally:
+        doc.close()
+
+
+def test_short_wide_figure_gets_a_crop(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.draw_rect(fitz.Rect(100.0, 200.0, 500.0, 248.0), fill=(0.2, 0.4, 0.8))
+        page.insert_text((100.0, 264.0), "Figure 1. A wide and short pipeline.", fontsize=9)
+
+        assets = extract_figure_regions(page, 1, tmp_path, find_caption_blocks(page))
+
+        assert [asset["label"] for asset in assets] == ["Figure 1"]
     finally:
         doc.close()
 

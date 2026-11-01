@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "iclr-diffusion-gen.pdf",
   "sha256": "dc641097561f8a0b312f6436b9cdebf0a20dfb819bb8b204bf21a655e27ed040",
-  "split": "holdout",
   "source": "arXiv:2310.02557v1 (ICLR 2024)",
   "traits": [
     "single-column",
@@ -42,6 +41,7 @@
     "Figure 2",
     "Figure 3"
   ],
+  "crops": {},
   "same_visual": [],
   "known_gaps": {}
 }

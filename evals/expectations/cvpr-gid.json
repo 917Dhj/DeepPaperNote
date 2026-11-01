@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "cvpr-gid.pdf",
   "sha256": "8f814b4fe07e435425a857a6f9c2c91ad801f7b283d274a585d4cc40ab9aeefe",
-  "split": "holdout",
   "source": "arXiv:2309.07906v3 (CVPR 2024)",
   "traits": [
     "two-column",
@@ -35,6 +34,7 @@
     "Figure 4",
     "Table 1"
   ],
+  "crops": {},
   "same_visual": [],
   "known_gaps": {}
 }
