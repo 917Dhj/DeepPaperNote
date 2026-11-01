@@ -1042,6 +1042,27 @@ def test_every_table_on_a_page_with_captions_below_keeps_its_body(tmp_path: Path
         doc.close()
 
 
+def test_every_table_on_a_page_with_captions_above_keeps_its_body(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.insert_text((60.0, 80.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 100.0, "First", rows=8)
+        page.insert_text((60.0, 225.0), wide_table_caption(2), fontsize=9)
+        add_table_rows(page, 245.0, "Second")
+        page.insert_text((60.0, 340.0), wide_table_caption(3), fontsize=9)
+        add_table_rows(page, 360.0, "Third")
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "First0" in crops["Table 1"] and "Second0" not in crops["Table 1"]
+        assert "Second0" in crops["Table 2"] and "First0" not in crops["Table 2"]
+    finally:
+        doc.close()
+
+
 def test_table_crop_ignores_a_page_sized_drawing(tmp_path: Path) -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for table bbox tests.")
