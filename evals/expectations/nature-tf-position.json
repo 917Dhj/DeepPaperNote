@@ -5,10 +5,11 @@
   "split": "dev",
   "source": "doi:10.1038/s41586-024-07662-z",
   "traits": [
-    "journal-pipe-caption",
-    "extended-data",
     "caption-across-columns",
-    "panel-reference-at-line-start"
+    "extended-data",
+    "journal-pipe-caption",
+    "panel-reference-at-line-start",
+    "side-caption"
   ],
   "labels": [
     "Fig 1",
@@ -51,9 +52,6 @@
   "same_visual": [],
   "known_gaps": {
     "labels:extra": "Panel references such as Fig. 5g at a line start survive: the panel label has no stronger candidate of its own.",
-    "caption:Fig 3": "The caption continues in the adjacent column, and only the first text block is read.",
-    "review:Fig 1": "The caption sits beside the figure at the top of the page, and crops are only searched above a caption.",
-    "review:Fig 2": "The caption sits beside the figure at the top of the page, and crops are only searched above a caption.",
-    "review:Fig 4": "The caption sits beside the figure at the top of the page, and crops are only searched above a caption."
+    "caption:Fig 3": "The caption continues in the adjacent column, and only the first text block is read."
   }
 }

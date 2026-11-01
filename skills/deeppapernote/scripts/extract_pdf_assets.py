@@ -42,6 +42,7 @@ FIGURE_RENDER_DPI = 96
 PAGE_PREVIEW_DPI = 96
 MIN_FIGURE_HEIGHT_PT = 60
 MIN_FIGURE_WIDTH_PT = 100
+SIDE_FIGURE_PANEL_GAP_PT = 24.0
 
 _TEXT_TABLE_SEPARATOR_RE = re.compile(r"(?:\t+|\s{2,}|[|;])")
 _TEXT_TABLE_PROSE_STARTERS = {
@@ -490,6 +491,42 @@ def _clip_to_page(
     return (x0, y0, x1, y1)
 
 
+def _grow_bbox_over_figure_labels(
+    page,
+    bbox: tuple[float, float, float, float],
+    *,
+    upper_bound: float,
+    lower_bound: float,
+    x_range: tuple[float, float] | None = None,
+) -> tuple[float, float, float, float]:
+    """Extend a visual bbox over short nearby text such as axis labels."""
+    active_bbox = bbox
+    for line in _collect_text_lines(page):
+        text = normalize_whitespace(str(line.get("text", "")))
+        bb = tuple(line.get("bbox", ()))
+        if (
+            len(bb) != 4
+            or len(text) > 80
+            or CAPTION_RE.match(text)
+            or bb[1] >= lower_bound - 1.0
+            or bb[3] <= upper_bound
+            or (x_range is not None and (bb[0] < x_range[0] or bb[2] > x_range[1]))
+        ):
+            continue
+        horizontal_gap = max(active_bbox[0] - bb[2], bb[0] - active_bbox[2], 0.0)
+        vertical_gap = max(active_bbox[1] - bb[3], bb[1] - active_bbox[3], 0.0)
+        if (vertical_gap == 0.0 and horizontal_gap <= 36.0) or (
+            horizontal_gap == 0.0 and vertical_gap <= 12.0
+        ):
+            active_bbox = (
+                min(active_bbox[0], bb[0]),
+                min(active_bbox[1], bb[1]),
+                max(active_bbox[2], bb[2]),
+                max(active_bbox[3], min(bb[3], lower_bound - 2.0)),
+            )
+    return active_bbox
+
+
 def _estimate_figure_bbox_above_caption(
     page,
     caption_anchor: dict,
@@ -530,34 +567,9 @@ def _estimate_figure_bbox_above_caption(
             max(r[2] for r in relevant),
             max(r[3] for r in relevant),
         )
-        for line in _collect_text_lines(page):
-            text = normalize_whitespace(str(line.get("text", "")))
-            bb = tuple(line.get("bbox", ()))
-            if (
-                len(bb) != 4
-                or len(text) > 80
-                or CAPTION_RE.match(text)
-                or bb[1] >= caption_y_top - 1.0
-                or bb[3] <= upper_bound
-            ):
-                continue
-            horizontal_gap = max(active_bbox[0] - bb[2], bb[0] - active_bbox[2], 0.0)
-            vertical_gap = max(active_bbox[1] - bb[3], bb[1] - active_bbox[3], 0.0)
-            if (vertical_gap == 0.0 and horizontal_gap <= 36.0) or (
-                horizontal_gap == 0.0 and vertical_gap <= 12.0
-            ):
-                accepted_bbox = (bb[0], bb[1], bb[2], min(bb[3], caption_y_top - 2.0))
-                relevant.append(accepted_bbox)
-                active_bbox = (
-                    min(active_bbox[0], accepted_bbox[0]),
-                    min(active_bbox[1], accepted_bbox[1]),
-                    max(active_bbox[2], accepted_bbox[2]),
-                    max(active_bbox[3], accepted_bbox[3]),
-                )
-        x0 = min(r[0] for r in relevant)
-        y0 = min(r[1] for r in relevant)
-        x1 = max(r[2] for r in relevant)
-        y1 = max(r[3] for r in relevant)
+        x0, y0, x1, y1 = _grow_bbox_over_figure_labels(
+            page, active_bbox, upper_bound=upper_bound, lower_bound=caption_y_top
+        )
     else:
         body_blocks = _find_body_text_blocks(page)
         nearest_above_y = upper_bound
@@ -576,6 +588,80 @@ def _estimate_figure_bbox_above_caption(
     if width < MIN_FIGURE_WIDTH_PT or height < MIN_FIGURE_HEIGHT_PT:
         return None
     return bbox
+
+
+def _estimate_figure_bbox_beside_caption(
+    page,
+    caption_anchor: dict,
+    caption_anchors: list[dict],
+    page_rect,
+) -> tuple[float, float, float, float] | None:
+    """Estimate the figure set in the column next to its caption.
+
+    Journals such as Nature can align a caption with a figure in the other
+    column. The caption then has no visual above it, and the figure has no
+    caption of its own.
+    """
+    cap_x0, cap_y0, cap_x1, cap_y1 = caption_anchor["bbox"]
+    rects = _collect_xref_rects(page) + _collect_drawing_rects(page)
+    if any(r[3] <= cap_y0 + 5.0 and r[0] < cap_x1 and r[2] > cap_x0 for r in rects):
+        return None
+
+    best: tuple[float, float, float, float] | None = None
+    for x_range in ((page_rect.x0, cap_x0 + 2.0), (cap_x1 - 2.0, page_rect.x1)):
+        column = [r for r in rects if r[0] >= x_range[0] and r[2] <= x_range[1]]
+        candidate = _figure_bbox_in_column(page, column, x_range, caption_anchor, caption_anchors)
+        if candidate is not None and (best is None or _rect_area(candidate) > _rect_area(best)):
+            best = candidate
+    if best is None:
+        return None
+
+    bbox = _clip_to_page(best, page_rect, padding=2.0)
+    if bbox[2] - bbox[0] < MIN_FIGURE_WIDTH_PT or bbox[3] - bbox[1] < MIN_FIGURE_HEIGHT_PT:
+        return None
+    return bbox
+
+
+def _figure_bbox_in_column(
+    page,
+    column: list[tuple[float, float, float, float]],
+    x_range: tuple[float, float],
+    caption_anchor: dict,
+    caption_anchors: list[dict],
+) -> tuple[float, float, float, float] | None:
+    """Join the visuals aligned with a caption, stopping at prose and other captions."""
+    cap_y0, cap_y1 = caption_anchor["bbox"][1], caption_anchor["bbox"][3]
+    prose = [b for b in _find_paragraph_blocks(page) if b[0] >= x_range[0] and b[2] <= x_range[1]]
+    upper_bound = max((b[3] for b in prose if b[3] <= cap_y0), default=0.0)
+    lower_bound = min((b[1] for b in prose if b[1] >= cap_y0), default=page.rect.y1)
+    visuals = [r for r in column if r[1] >= upper_bound and r[3] <= lower_bound]
+
+    aligned = [r for r in visuals if r[1] < cap_y1 and r[3] > cap_y0]
+    if not aligned:
+        return None
+    top = min(r[1] for r in aligned)
+    bottom = max(r[3] for r in aligned)
+    for rect in sorted(visuals, key=lambda r: r[1]):
+        if rect[1] <= bottom + SIDE_FIGURE_PANEL_GAP_PT:
+            top = min(top, rect[1])
+            bottom = max(bottom, rect[3])
+
+    for anchor in caption_anchors:
+        if anchor is caption_anchor or anchor["bbox"] == caption_anchor["bbox"]:
+            continue
+        x0, y0, x1, y1 = anchor["bbox"]
+        in_column = x0 >= x_range[0] and x1 <= x_range[1]
+        if in_column and y0 <= bottom + SIDE_FIGURE_PANEL_GAP_PT and y1 >= top:
+            return None
+
+    used = [r for r in visuals if r[1] >= top and r[3] <= bottom]
+    return _grow_bbox_over_figure_labels(
+        page,
+        (min(r[0] for r in used), top, max(r[2] for r in used), bottom),
+        upper_bound=upper_bound,
+        lower_bound=lower_bound,
+        x_range=x_range,
+    )
 
 
 def _collect_text_lines(page) -> list[dict]:
@@ -1024,7 +1110,9 @@ def extract_figure_regions(
                 # actually rendered as an embedded image.
                 bbox = _estimate_figure_bbox_above_caption(page, anchor, prev_anchor, page_rect)
         else:
-            bbox = _estimate_figure_bbox_above_caption(page, anchor, prev_anchor, page_rect)
+            bbox = _estimate_figure_bbox_beside_caption(page, anchor, anchors, page_rect)
+            if bbox is None:
+                bbox = _estimate_figure_bbox_above_caption(page, anchor, prev_anchor, page_rect)
             if bbox is None:
                 bbox = _estimate_table_bbox(page, anchor, prev_anchor, next_anchor, page_rect)
 
