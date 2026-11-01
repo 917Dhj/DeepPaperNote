@@ -329,7 +329,8 @@ def test_selected_current_chain_verifies_save_and_never_calls_mutating_helpers(
             ("grounding_lint", "note_lint", "quality_review", "readability_review"), "passed"
         ),
         "warning_count": 1,
-        "figure_counts": {"insert": 0, "placeholder": 0},
+        "figure_counts": {"insert": 0, "placeholder": 0, "dropped": 0},
+        "figure_drops": [],
         "saved_mode": "obsidian",
         "saved_path": str(vault / "Papers/AI/A paper/note.zh-CN.md"),
         "saved_domain": "AI",
@@ -764,6 +765,9 @@ def test_current_visual_bytes_are_checked_and_counts_follow_decisions(completed_
     workdir, bindings, paths = completed_run
     image = workdir / "scientific figure.png"
     image.write_bytes(b"image bytes")
+    dropped_image = workdir / "dropped figure.png"
+    dropped_image.write_bytes(b"dropped image bytes")
+    dropped_fields = reviewed_insert_fields(dropped_image)
     decisions = json.loads(paths["figure_table_decisions"].read_text())
     decisions["decisions"] = [
         {
@@ -775,11 +779,24 @@ def test_current_visual_bytes_are_checked_and_counts_follow_decisions(completed_
             **reviewed_insert_fields(image),
         },
         {"source_id": "Table 1", "kind": "table", "decision": "placeholder"},
+        {
+            "source_id": "Figure 2",
+            "kind": "figure",
+            "decision": "dropped",
+            "source_image_path": str(dropped_image),
+            "visual_quality_status": "usable_candidate",
+            **dropped_fields,
+            "skip_reason": "Repeats Figure 1",
+            "visual_review": {**dropped_fields["visual_review"], "status": "dropped"},
+        },
     ]
     dump(paths["figure_table_decisions"], decisions)
     report = run_state.inspect_run(workdir, bindings=bindings)
     assert stages(report)["figure_table_decisions"]["status"] == "passed"
-    assert report["summary"]["figure_counts"] == {"insert": 1, "placeholder": 1}
+    assert report["summary"]["figure_counts"] == {"insert": 1, "placeholder": 1, "dropped": 1}
+    assert report["summary"]["figure_drops"] == [
+        {"source_id": "Figure 2", "reason": "Repeats Figure 1"}
+    ]
     image.write_bytes(b"changed image bytes")
     result = stages(run_state.inspect_run(workdir, bindings=bindings))["figure_table_decisions"]
     assert result["status"] == "stale"
