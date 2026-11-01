@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,14 @@ from common import (
 )
 from pdf_captions import caption_item, select_caption_blocks
 
+# Real papers score above 0.4 on one of these; a broken font encoding scores near 0.
+MIN_READABLE_RATIO = 0.2
+READABLE_WORD_RE = re.compile(r"[(\[]?[^\W\d_]{2,}[)\],.;:]*")
+CJK_CHAR_RE = re.compile(r"[\u3400-\u9fff]")
+UNREADABLE_TEXT_MESSAGE = (
+    "The PDF text layer is unreadable, likely from a custom font encoding. "
+    "Provide an OCR version or another copy of this paper."
+)
 MATH_SIGNAL_RE = re.compile(
     r"(?:\\(?:frac|sum|log|exp|argmax|argmin|mathbb|mathbf)|[$=]|[<>]=?|[∑∏≤≥≈∈]|O\([^)]+\))"
 )
@@ -303,6 +312,21 @@ def write_full_text_markdown(records: list[dict[str, Any]], output_path: str, ti
     )
 
 
+def text_quality(full_text: str) -> dict[str, Any]:
+    """Measure whether extracted text reads as language or as a broken font encoding."""
+    tokens = full_text.split()
+    if not tokens:
+        return {"status": "empty", "readable_word_ratio": 0.0, "cjk_ratio": 0.0}
+    word_ratio = sum(1 for token in tokens if READABLE_WORD_RE.fullmatch(token)) / len(tokens)
+    cjk_ratio = len(CJK_CHAR_RE.findall(full_text)) / max(1, sum(map(len, tokens)))
+    readable = word_ratio >= MIN_READABLE_RATIO or cjk_ratio >= MIN_READABLE_RATIO
+    return {
+        "status": "readable" if readable else "unreadable",
+        "readable_word_ratio": round(word_ratio, 4),
+        "cjk_ratio": round(cjk_ratio, 4),
+    }
+
+
 def build_manifest(
     *,
     record: dict[str, Any],
@@ -370,6 +394,7 @@ def build_manifest(
         "math_index": math_index(sections),
         "appendix_index": extract_appendix_index(pdf_path, coverage),
         "language_hint": language_hint_for_text(full_text),
+        "text_quality": text_quality(full_text),
         "text_hash_sha256": text_hash(full_text),
     }
     if isinstance(record.get("archive_source"), dict):
@@ -418,6 +443,12 @@ def main() -> None:
         full_text_output=args.full_text_output,
         max_pages=args.max_pages,
     )
+    if manifest["text_quality"]["status"] == "unreadable":
+        manifest["status"] = "blocked"
+        manifest["blocked_code"] = "unreadable_text"
+        emit(manifest, args.output)
+        print(UNREADABLE_TEXT_MESSAGE, file=sys.stderr)
+        raise SystemExit(2)
     emit(manifest, args.output)
 
 

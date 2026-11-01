@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "pdf": "zh-nonferrous.pdf",
+  "sha256": "6ed76be48618d2ff4e1f238865dabad943a5c8db7854bba45de008f03f6b3707",
+  "source": "Nonferrous Metals (Mining Section) 76(3), 2024",
+  "traits": [
+    "cjk",
+    "bilingual-captions",
+    "fullwidth-digits",
+    "two-column"
+  ],
+  "readable": true,
+  "labels": [
+    "图 1",
+    "图 2",
+    "图 3",
+    "图 4"
+  ],
+  "captions": {
+    "图 1": {
+      "starts": "城市规划与建设应用",
+      "ends": "建设应用"
+    }
+  },
+  "review": [
+    "图 1",
+    "图 2",
+    "图 3",
+    "图 4"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {}
+}

@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "pdf": "tacl-lost-middle.pdf",
+  "sha256": "653b29619eae2ae4b361d7bdcdc06db4bedcb1b0eabe31814036beca8c1af0b1",
+  "source": "arXiv:2307.03172v3 (TACL 2024)",
+  "traits": [
+    "acl-layout",
+    "two-column",
+    "figure-colon",
+    "many-figures"
+  ],
+  "readable": true,
+  "labels": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Figure 5",
+    "Figure 6",
+    "Figure 7",
+    "Figure 8",
+    "Figure 9",
+    "Figure 10",
+    "Figure 11",
+    "Figure 12",
+    "Figure 13",
+    "Figure 14",
+    "Figure 15",
+    "Figure 16",
+    "Table 1",
+    "Table 2",
+    "Table 3",
+    "Table 4",
+    "Table 5",
+    "Table 6",
+    "Table 7"
+  ],
+  "captions": {
+    "Figure 5": {
+      "starts": "The effect of changing the position of relevant information",
+      "ends": "middle of their input context."
+    },
+    "Table 1": {
+      "starts": "Closed-book and oracle accuracy",
+      "ends": "question answering task."
+    }
+  },
+  "review": [
+    "Figure 5",
+    "Figure 7",
+    "Figure 9",
+    "Table 1"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {}
+}

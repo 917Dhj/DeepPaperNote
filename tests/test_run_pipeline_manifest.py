@@ -437,3 +437,25 @@ def test_run_pipeline_forwards_required_zotero_mode_only_to_resolve(
 
     assert calls[0][calls[0].index("--zotero-mode") + 1] == "required"
     assert all("--zotero-mode" not in call for call in calls[1:])
+
+
+def test_blocked_step_stops_the_pipeline_without_a_traceback(monkeypatch) -> None:
+    def blocked(cmd: list[str], **kwargs: object) -> None:
+        raise subprocess.CalledProcessError(run_pipeline.BLOCKED_EXIT_CODE, cmd)
+
+    monkeypatch.setattr(run_pipeline.subprocess, "run", blocked)
+
+    with pytest.raises(SystemExit) as stopped:
+        run_pipeline.run_step(["step"], env={})
+
+    assert stopped.value.code == run_pipeline.BLOCKED_EXIT_CODE
+
+
+def test_failed_step_keeps_its_error(monkeypatch) -> None:
+    def failed(cmd: list[str], **kwargs: object) -> None:
+        raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(run_pipeline.subprocess, "run", failed)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        run_pipeline.run_step(["step"], env={})

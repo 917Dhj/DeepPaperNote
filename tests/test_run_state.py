@@ -544,6 +544,20 @@ def test_admission_is_historical_and_blocked_receipt_requires_user_action(
     )
 
 
+def test_unreadable_source_requires_user_action_instead_of_a_rerun(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    manifest = json.loads(paths["source_manifest"].read_text(encoding="utf-8"))
+    manifest.update(status="blocked", blocked_code="unreadable_text")
+    dump(paths["source_manifest"], manifest)
+
+    report = run_state.inspect_run(workdir, bindings=bindings)
+
+    assert stages(report)["source_manifest"]["status"] == "failed"
+    assert report["next_action"]["kind"] == "user_action"
+    assert "OCR" in report["next_action"]["message"]
+    assert "argv" not in report["next_action"]
+
+
 @pytest.mark.parametrize("raw", [b"\xef\xbb\xbf# Note\n", b"# Note\r\n", b"# Note\r"])
 def test_windows_draft_normalization_is_lint_only_quality_requires_canonical_bytes(
     completed_run: tuple,

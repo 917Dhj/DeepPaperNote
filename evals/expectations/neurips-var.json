@@ -10,6 +10,7 @@
     "multi-block-caption",
     "numbered-algorithms"
   ],
+  "readable": true,
   "labels": [
     "Figure 1",
     "Figure 2",

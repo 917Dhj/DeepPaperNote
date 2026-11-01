@@ -8,6 +8,7 @@
     "figure-colon",
     "short-title-sentence"
   ],
+  "readable": true,
   "labels": [
     "Figure 1",
     "Figure 2",
@@ -36,9 +37,16 @@
     "Table 1",
     "Table 2"
   ],
-  "crops": {},
+  "crops": {
+    "Table 1": {
+      "contains": [
+        "Fastest DPM"
+      ],
+      "excludes": [
+        "Error Analysis"
+      ]
+    }
+  },
   "same_visual": [],
-  "known_gaps": {
-    "review:Table 1": "No usable table crop exists for this caption."
-  }
+  "known_gaps": {}
 }

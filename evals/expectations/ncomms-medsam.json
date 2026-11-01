@@ -9,6 +9,7 @@
     "full-width-captions",
     "caption-across-columns"
   ],
+  "readable": true,
   "labels": [
     "Fig 1",
     "Fig 2",

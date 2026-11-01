@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "pdf": "sigir-lightgcn.pdf",
+  "sha256": "e48e4c27e4dc9ffd50f531b69682da0a500ae9a8190c629aeff223b40b555306",
+  "source": "arXiv:2002.02126v4 (SIGIR 2020)",
+  "traits": [
+    "acm-layout",
+    "two-column",
+    "figure-colon"
+  ],
+  "readable": true,
+  "labels": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Figure 5",
+    "Table 1",
+    "Table 2",
+    "Table 3",
+    "Table 4",
+    "Table 5",
+    "Table 6"
+  ],
+  "captions": {
+    "Figure 2": {
+      "starts": "An illustration of LightGCN model architecture.",
+      "ends": "to obtain the final representations."
+    },
+    "Table 4": {
+      "starts": "The comparison of overall performance",
+      "ends": "competing methods."
+    }
+  },
+  "review": [
+    "Figure 2",
+    "Figure 3",
+    "Table 3",
+    "Table 4"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {}
+}

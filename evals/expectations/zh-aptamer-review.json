@@ -9,6 +9,7 @@
     "centered-wrapped-caption",
     "review-article"
   ],
+  "readable": true,
   "labels": [
     "Fig 1",
     "Fig 2",

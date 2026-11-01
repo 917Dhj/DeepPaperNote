@@ -8,6 +8,7 @@
     "figure-pipe",
     "few-figures"
   ],
+  "readable": true,
   "labels": [
     "Fig 1",
     "Fig 2",

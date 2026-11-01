@@ -10,6 +10,7 @@
     "many-small-tables",
     "numbered-algorithms"
   ],
+  "readable": true,
   "labels": [
     "Fig 1",
     "Fig 2",
@@ -52,7 +53,14 @@
     "Fig 5",
     "Table 1"
   ],
-  "crops": {},
+  "crops": {
+    "Fig 3": {
+      "contains": [],
+      "excludes": [
+        "We use"
+      ]
+    }
+  },
   "same_visual": [],
   "known_gaps": {}
 }
