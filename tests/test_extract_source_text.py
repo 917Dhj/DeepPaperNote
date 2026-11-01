@@ -279,3 +279,84 @@ def test_extract_source_text_binds_locations_to_source_manifestation(tmp_path: P
     assert manifest["pdf"]["path"] == str(pdf_path.resolve())
     assert manifest["pages"][1]["page"] == 2
     assert manifest["captions"]["figures"][0]["page"] == 2
+
+
+GARBLED_LINE = "!!\"\"!!!!# # $ # \" $ !! % !\"#$%& %&'()**&+,-)./0,1'23 4&05!\"!%&5!! %&6)78)*!#$#\""
+
+
+def write_text_pdf(path: Path, lines: list[str], **options: object) -> None:
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_textbox(fitz.Rect(50, 50, 550, 750), "\n".join(lines), fontsize=10, **options)
+    doc.save(path)
+    doc.close()
+
+
+def run_extraction(tmp_path: Path, pdf_path: Path) -> tuple[subprocess.CompletedProcess, dict]:
+    input_path = tmp_path / "fetch.json"
+    output_path = tmp_path / "manifest.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "fetch_pdf.py",
+                "paper_id": "paper:test",
+                "title": "Text Quality Paper",
+                "pdf_path": str(pdf_path),
+                "identity_contract": {
+                    "artifact_type": "canonical_identity",
+                    "schema_version": 2,
+                    "paper_id": "paper:test",
+                    "identity_verdict": "accepted",
+                    "work_level_identity": {"title": "Text Quality Paper"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_SOURCE_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    return result, json.loads(output_path.read_text(encoding="utf-8"))
+
+
+def test_garbled_text_layer_blocks_source_extraction(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "garbled.pdf"
+    write_text_pdf(pdf_path, [GARBLED_LINE] * 30)
+
+    result, manifest = run_extraction(tmp_path, pdf_path)
+
+    assert result.returncode == 2
+    assert manifest["status"] == "blocked"
+    assert manifest["blocked_code"] == "unreadable_text"
+    assert "OCR" in result.stderr
+
+
+def test_readable_text_passes_the_text_quality_check(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "readable.pdf"
+    write_text_pdf(pdf_path, ["The model reads a paper and writes a careful note."] * 30)
+
+    result, manifest = run_extraction(tmp_path, pdf_path)
+
+    assert result.returncode == 0
+    assert manifest["status"] == "ok"
+    assert manifest["text_quality"]["status"] == "readable"
+
+
+def test_cjk_text_passes_the_text_quality_check(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "cjk.pdf"
+    write_text_pdf(pdf_path, ["本文研究论文精读笔记的生成方法与质量评价。"] * 30, fontname="china-s")
+
+    result, manifest = run_extraction(tmp_path, pdf_path)
+
+    assert result.returncode == 0
+    assert manifest["text_quality"]["status"] == "readable"
