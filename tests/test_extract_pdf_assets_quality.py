@@ -1134,6 +1134,40 @@ def test_figure_crop_leaves_the_running_header_out(tmp_path: Path) -> None:
         doc.close()
 
 
+def test_figure_crop_stops_at_prose_above_it_in_the_column(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        page.draw_rect(fitz.Rect(40.0, 60.0, 555.0, 200.0), fill=(0.2, 0.4, 0.8))
+        page.insert_text((40.0, 215.0), "Fig. 3 | A figure across the page.", fontsize=7)
+        page.insert_textbox(fitz.Rect(320.0, 230.0, 560.0, 420.0), COLUMN_PROSE, fontsize=9)
+        page.draw_rect(fitz.Rect(320.0, 440.0, 560.0, 640.0), fill=(0.8, 0.3, 0.2))
+        page.insert_text((320.0, 655.0), "Fig. 4 | A figure in the right column.", fontsize=7)
+
+        assert crop_boxes(page, tmp_path)["Fig. 4"][1] > 400.0
+    finally:
+        doc.close()
+
+
+def test_figure_crop_ignores_paths_hidden_by_a_clip(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        xref = doc.get_new_xref()
+        doc.update_object(xref, "<<>>")
+        doc.update_stream(xref, b"q 40 440 250 200 re W n 2 w 60 780 m 200 480 l S Q")
+        page.set_contents(xref)
+        page.insert_text((40.0, 370.0), "Figure 3. A chart whose line leaves its axes.", fontsize=7)
+
+        assert crop_boxes(page, tmp_path)["Figure 3"][1] > 100.0
+    finally:
+        doc.close()
+
+
 def test_grow_table_region_allows_gap_between_header_and_data_rows() -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for page rect construction.")
