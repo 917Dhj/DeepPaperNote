@@ -35,8 +35,5 @@
     "Table 2"
   ],
   "same_visual": [],
-  "known_gaps": {
-    "labels:extra": "A body reference to Supplementary Fig. 8 at a line start survives: the label has no stronger candidate of its own.",
-    "caption:Fig 1": "The caption continues in the adjacent column, and only the first text block is read."
-  }
+  "known_gaps": {}
 }

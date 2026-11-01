@@ -44,7 +44,5 @@
     "Fig 5"
   ],
   "same_visual": [],
-  "known_gaps": {
-    "labels:extra": "A body reference to Extended Data Table 1 that wraps before Table survives as Table 1."
-  }
+  "known_gaps": {}
 }

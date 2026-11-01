@@ -50,7 +50,6 @@
   ],
   "same_visual": [],
   "known_gaps": {
-    "labels:extra": "Panel references such as Fig. 5g at a line start survive: the panel label has no stronger candidate of its own.",
     "caption:Fig 3": "The caption continues in the adjacent column, and only the first text block is read."
   }
 }

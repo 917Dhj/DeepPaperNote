@@ -37,6 +37,11 @@ CAPTION_SENTENCE_ENDS = (".", "?", "!", "。", "？", "！")
 # downstream "table body lives below caption" cropping logic will mistake the
 # numeric row for caption text and shrink the table bbox accordingly.
 MAX_CAPTION_CONTINUATIONS = 3
+# A sentence cut before its label ends on one of these words, as in "shown in\nFig. 2a."
+WRAPPED_REFERENCE_LEAD_RE = re.compile(
+    r"\b(?:and|as|by|data|from|in|of|or|see|supplementary|the|to|with)\s*[(\[]?$",
+    re.IGNORECASE,
+)
 MIN_CAPTION_COLUMN_CHARS = 20
 _NUMERIC_TOKEN_RE = re.compile(r"^[+-]?(?:\d+\.\d+|\.\d+|\d+)(?:[eE][+-]?\d+)?$")
 
@@ -73,6 +78,10 @@ def caption_match_is_inline_reference(line_text: str, match: re.Match[str]) -> b
         return False
     first_word = re.match(r"[A-Za-z]+", rest)
     return bool(first_word and first_word.group(0)[0].islower())
+
+
+def line_is_wrapped_reference(previous_line: str | None) -> bool:
+    return bool(previous_line and WRAPPED_REFERENCE_LEAD_RE.search(previous_line.rstrip()))
 
 
 def caption_strength(line_text: str, match: re.Match[str], *, block_start: bool) -> int:
@@ -223,13 +232,18 @@ def find_caption_blocks(page) -> list[dict]:
     ]
     for block in blocks:
         lines = block.get("lines", [])
+        line_texts = ["".join(s.get("text", "") for s in line.get("spans", [])) for line in lines]
         for line_idx, line in enumerate(lines):
             spans = line.get("spans", [])
             if not spans:
                 continue
-            line_text = "".join(s.get("text", "") for s in spans).strip()
+            line_text = line_texts[line_idx].strip()
             match = CAPTION_RE.match(line_text)
-            if not match or caption_match_is_inline_reference(line_text, match):
+            if (
+                not match
+                or caption_match_is_inline_reference(line_text, match)
+                or line_is_wrapped_reference(line_texts[line_idx - 1] if line_idx else None)
+            ):
                 continue
             label = normalize_whitespace(match.group(1))
             kind = classify_caption_kind(label)
@@ -247,7 +261,9 @@ def find_caption_blocks(page) -> list[dict]:
                 cont_text = "".join(s.get("text", "") for s in cont_spans).strip()
                 if not cont_text:
                     break
-                if CAPTION_RE.match(cont_text):
+                if CAPTION_RE.match(cont_text) and not line_is_wrapped_reference(
+                    caption_lines_text[-1]
+                ):
                     break
                 if looks_like_data_row(cont_text):
                     break
