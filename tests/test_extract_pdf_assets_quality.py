@@ -605,6 +605,28 @@ def test_side_caption_crops_the_figure_in_the_next_column(tmp_path: Path) -> Non
         doc.close()
 
 
+def test_side_caption_crop_leaves_the_page_header_out(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        page.insert_text((40.0, 40.0), "Article", fontsize=12)
+        add_side_figure(page, 40.0, 296.0)
+        page.insert_textbox(
+            fitz.Rect(306.0, 48.0, 563.0, 200.0),
+            "Fig. 1 | Position dependence. a, Frequency near starts. b, Motif profiles.",
+            fontsize=9,
+        )
+
+        bbox = side_crop_bbox(page, tmp_path, "Fig. 1")
+
+        assert bbox is not None
+        assert bbox[1] > 42.0
+    finally:
+        doc.close()
+
+
 def test_side_caption_finds_a_figure_on_its_right(tmp_path: Path) -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for figure bbox tests.")
