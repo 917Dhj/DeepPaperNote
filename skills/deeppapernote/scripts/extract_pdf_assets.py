@@ -1029,9 +1029,24 @@ def _estimate_table_bbox_with_rows(
     if down_data == 0 and up_data == 0:
         return None
 
+    # A body between two captions belongs to the lower one when that caption
+    # has no body of its own below it.
+    next_table_owns_body = False
+    if down_data >= up_data > 0 and next_anchor is not None and next_anchor["kind"] == "table":
+        _, next_down_data = _grow_table_region(
+            page,
+            next_anchor,
+            rows,
+            paragraph_blocks,
+            direction="down",
+            upper_bound=next_anchor["bbox"][3],
+            lower_bound=page_rect.y1,
+        )
+        next_table_owns_body = next_down_data == 0
+
     chosen: list[tuple[float, float, float, float]]
     chosen_data_rows: int
-    if up_data > down_data:
+    if up_data > down_data or next_table_owns_body:
         chosen = up_lines
         chosen_data_rows = up_data
         direction = "up"

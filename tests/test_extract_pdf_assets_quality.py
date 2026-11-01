@@ -738,10 +738,10 @@ def test_adjacent_tables_keep_their_own_body_above_the_caption(tmp_path: Path) -
     doc = fitz.open()
     try:
         page = doc.new_page(width=600.0, height=800.0)
-        add_table_rows(page, 80.0, "First", rows=4)
-        page.insert_text((60.0, 140.0), wide_table_caption(1), fontsize=9)
-        add_table_rows(page, 170.0, "Second")
-        page.insert_text((60.0, 250.0), wide_table_caption(2), fontsize=9)
+        add_table_rows(page, 80.0, "First")
+        page.insert_text((60.0, 165.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 190.0, "Second")
+        page.insert_text((60.0, 275.0), wide_table_caption(2), fontsize=9)
 
         crops = table_crop_text(page, tmp_path)
 
@@ -758,9 +758,9 @@ def test_adjacent_tables_keep_their_own_body_below_the_caption(tmp_path: Path) -
     try:
         page = doc.new_page(width=600.0, height=800.0)
         page.insert_text((60.0, 80.0), wide_table_caption(1), fontsize=9)
-        add_table_rows(page, 100.0, "First", rows=4)
-        page.insert_text((60.0, 180.0), wide_table_caption(2), fontsize=9)
-        add_table_rows(page, 200.0, "Second")
+        add_table_rows(page, 100.0, "First")
+        page.insert_text((60.0, 190.0), wide_table_caption(2), fontsize=9)
+        add_table_rows(page, 210.0, "Second")
 
         crops = table_crop_text(page, tmp_path)
 
