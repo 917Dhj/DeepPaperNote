@@ -21,6 +21,7 @@ from extract_pdf_assets import (
     _restrict_row_to_caption_column,
     _row_is_table_like,
     _unique_figure_asset_filename,
+    extract_figure_regions,
 )
 from pdf_captions import (
     CAPTION_RE,
@@ -563,6 +564,126 @@ def test_figure_bbox_clamps_visual_rects_below_caption() -> None:
 
         assert bbox is not None
         assert bbox[3] < 190.0
+    finally:
+        doc.close()
+
+
+SIDE_PROSE = " ".join(["The running text of the paper continues in this column."] * 12)
+
+
+def add_side_figure(page, x0: float, x1: float) -> None:
+    for top, bottom in ((50.0, 200.0), (216.0, 400.0), (416.0, 560.0)):
+        page.draw_rect(fitz.Rect(x0, top, x1, bottom), fill=(0.2, 0.4, 0.8))
+    page.insert_text((x0 + 60.0, 574.0), "Distance to TSS (bp)", fontsize=8)
+
+
+def side_crop_bbox(page, tmp_path: Path, label: str) -> list[float] | None:
+    assets = extract_figure_regions(page, 1, tmp_path, find_caption_blocks(page))
+    return next((asset["bbox_pt"] for asset in assets if asset["label"] == label), None)
+
+
+def test_side_caption_crops_the_figure_in_the_next_column(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        add_side_figure(page, 40.0, 296.0)
+        page.insert_textbox(
+            fitz.Rect(306.0, 48.0, 563.0, 200.0),
+            "Fig. 1 | Position dependence. a, Frequency near starts. b, Motif profiles.",
+            fontsize=9,
+        )
+        page.insert_textbox(fitz.Rect(40.0, 600.0, 296.0, 760.0), SIDE_PROSE, fontsize=9)
+        bbox = side_crop_bbox(page, tmp_path, "Fig. 1")
+
+        assert bbox is not None
+        assert bbox[0] < 40.0 and 296.0 < bbox[2] < 306.0
+        assert bbox[1] < 50.0
+        assert 574.0 < bbox[3] < 600.0
+    finally:
+        doc.close()
+
+
+def test_side_caption_finds_a_figure_on_its_right(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        add_side_figure(page, 306.0, 563.0)
+        page.insert_textbox(
+            fitz.Rect(40.0, 48.0, 296.0, 200.0),
+            "Fig. 2 | Natural variation. a, Variant effects. b, Classes of factors.",
+            fontsize=9,
+        )
+        bbox = side_crop_bbox(page, tmp_path, "Fig. 2")
+
+        assert bbox is not None
+        assert bbox[0] > 296.0
+    finally:
+        doc.close()
+
+
+def test_side_caption_ignores_a_figure_with_its_own_caption(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        page.draw_rect(fitz.Rect(40.0, 50.0, 296.0, 300.0), fill=(0.2, 0.4, 0.8))
+        page.insert_textbox(
+            fitz.Rect(40.0, 310.0, 296.0, 350.0), "Fig. 1 | The left figure.", fontsize=9
+        )
+        page.insert_textbox(
+            fitz.Rect(306.0, 48.0, 563.0, 90.0), "Fig. 2 | A caption above its figure.", fontsize=9
+        )
+
+        assert side_crop_bbox(page, tmp_path, "Fig. 2") is None
+    finally:
+        doc.close()
+
+
+def test_side_caption_leaves_a_figure_above_its_caption_alone(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        page.draw_rect(fitz.Rect(306.0, 50.0, 563.0, 200.0), fill=(0.2, 0.4, 0.8))
+        page.draw_rect(fitz.Rect(40.0, 150.0, 296.0, 400.0), fill=(0.8, 0.4, 0.2))
+        page.insert_textbox(
+            fitz.Rect(306.0, 210.0, 563.0, 260.0), "Fig. 1 | A figure above.", fontsize=9
+        )
+
+        bbox = side_crop_bbox(page, tmp_path, "Fig. 1")
+
+        assert bbox is not None
+        assert bbox[0] > 296.0
+        assert bbox[3] < 210.0
+    finally:
+        doc.close()
+
+
+def test_side_caption_asset_passes_the_visual_quality_gate(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        add_side_figure(page, 40.0, 296.0)
+        page.insert_textbox(
+            fitz.Rect(306.0, 48.0, 563.0, 200.0),
+            "Fig. 1 | Position dependence. a, Frequency near starts. b, Motif profiles.",
+            fontsize=9,
+        )
+        page.insert_textbox(fitz.Rect(40.0, 600.0, 296.0, 760.0), SIDE_PROSE, fontsize=9)
+
+        assets = extract_figure_regions(page, 1, tmp_path, find_caption_blocks(page))
+
+        assert [asset["label"] for asset in assets] == ["Fig. 1"]
+        assert assets[0]["quality_signals"]["visual_quality_status"] == "usable"
+        assert assets[0]["bbox_pt"][2] < 306.0
     finally:
         doc.close()
 
