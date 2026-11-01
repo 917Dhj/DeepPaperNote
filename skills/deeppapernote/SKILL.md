@@ -209,6 +209,7 @@ Formal Save inputs:
 - The style gate also rejects mechanical term-replacement artifacts such as `KV缓存 of`, `批量ing`, `In相关 Researcher`, or `Single 序列 generation`; rewrite the sentence naturally instead of preserving a partially translated phrase.
 - Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, fix the reported issues and re-run lint. Keep fixing and re-running until lint passes — multiple rounds are normal and expected. Do not decide that any failure is an acceptable exception — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only escalate to the user if the same failures appear unchanged across multiple rounds with no reduction, indicating the model is unable to make further progress independently.
 - If PDF or evidence quality is insufficient for a real deep note, fail closed: stop, report the blocked stage, and ask for the better PDF, OCR/source material, or other input needed to continue.
+- A `blocked` source manifest with `blocked_code: unreadable_text` means the PDF text layer cannot be read. Stop and ask for an OCR version or another copy; rerunning cannot fix it.
 
 Model-first rule:
 - scripts may gather and structure evidence

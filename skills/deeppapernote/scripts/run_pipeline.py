@@ -11,6 +11,8 @@ from pathlib import Path
 
 from common import runtime_config
 
+BLOCKED_EXIT_CODE = 2
+
 
 def pipeline_artifact_paths(workdir: Path, prefix: str) -> dict[str, Path]:
     """Return the pipeline's filenames without reading or creating anything."""
@@ -67,7 +69,12 @@ def parser() -> argparse.ArgumentParser:
 
 
 def run_step(cmd: list[str], *, env: dict[str, str]) -> None:
-    subprocess.run(cmd, check=True, env=env)
+    try:
+        subprocess.run(cmd, check=True, env=env)
+    except subprocess.CalledProcessError as exc:
+        if exc.returncode == BLOCKED_EXIT_CODE:
+            raise SystemExit(BLOCKED_EXIT_CODE) from exc
+        raise
 
 
 def main() -> None:

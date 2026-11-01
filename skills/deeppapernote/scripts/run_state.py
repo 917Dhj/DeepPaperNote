@@ -458,6 +458,11 @@ class Inspection:
         result.details["source_sha256"] = digest
 
     def check_source(self, result: StageResult, record: dict) -> None:
+        if record.get("blocked_code") == "unreadable_text":
+            result.details["requires_user_action"] = True
+            result.details["user_action_message"] = (
+                "The PDF text layer is unreadable. Provide an OCR version or another copy."
+            )
         pdf = record.get("pdf")
         if not isinstance(pdf, dict):
             self.problem(
@@ -1026,7 +1031,10 @@ def next_action(run: Inspection) -> dict:
             "quality_review_replay",
         }:
             action.update(
-                kind="user_action", message="Resolve the recorded conflict or review history."
+                kind="user_action",
+                message=result.details.get(
+                    "user_action_message", "Resolve the recorded conflict or review history."
+                ),
             )
             return action
         if (

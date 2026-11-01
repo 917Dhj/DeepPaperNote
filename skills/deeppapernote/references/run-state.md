@@ -77,7 +77,7 @@ Inspect all reported issues, including those after the first blocker. The query 
 
 Run a recommended command from its `cwd` with its `env` values added to the environment. `env` carries the selected Run Overrides, so the command needs no User Configuration when the context is complete. A workspace save writes below the directory it runs from, so it requires `workspace_root`: the directory where the note belongs, not the run workspace.
 
-A command is recommended only when rerunning a producer can fix the gap. A failed lint gate with current inputs is a model task on the plan or draft; once that input changes, the lint is stale and the command returns. `review_pending` decisions are a model task for the Visual Review Gate in `figure-placement.md`.
+A command is recommended only when rerunning a producer can fix the gap. A source manifest blocked with `unreadable_text` is a user decision: the PDF text layer cannot be read, so it needs an OCR version or another copy. A failed lint gate with current inputs is a model task on the plan or draft; once that input changes, the lint is stale and the command returns. `review_pending` decisions are a model task for the Visual Review Gate in `figure-placement.md`.
 
 Figure-decision commands carry the current admission's source-bound `asset_subdir` in Obsidian mode; workspace mode uses `images`. Decisions that disagree with the admission are `stale`. The planner replaces the whole file, so it is recommended only while no review has been recorded; with recorded reviews or an unreadable file, `next_action` is a model task to update the decisions in place.
 
