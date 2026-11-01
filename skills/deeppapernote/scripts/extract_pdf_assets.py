@@ -41,6 +41,8 @@ except ImportError:  # pragma: no cover
 
 FIGURE_RENDER_DPI = 96
 PAGE_PREVIEW_DPI = 96
+GRID_COLOR = (0.85, 0.1, 0.1)
+GRID_LINE_STYLE = {"color": GRID_COLOR, "width": 0.75, "stroke_opacity": 0.45}
 MIN_FIGURE_HEIGHT_PT = 60
 MIN_VISUAL_FIGURE_HEIGHT_PT = 40
 MIN_FIGURE_WIDTH_PT = 100
@@ -1358,6 +1360,26 @@ def _render_crop(page, bbox: tuple[float, float, float, float], dpi: int) -> byt
     return pix.tobytes("png")
 
 
+def _render_grid_preview(page, dpi: int) -> bytes:
+    """Render a whole page with a 10% grid, so a page-normalized bbox can be read off it."""
+    pixmap = page.get_pixmap(matrix=fitz.Matrix(dpi / 72.0, dpi / 72.0), alpha=False)
+    canvas = fitz.open()
+    try:
+        sheet = canvas.new_page(width=pixmap.width, height=pixmap.height)
+        sheet.insert_image(sheet.rect, pixmap=pixmap)
+        for step in range(1, 10):
+            x = sheet.rect.width * step / 10
+            y = sheet.rect.height * step / 10
+            sheet.draw_line((x, 0), (x, sheet.rect.height), **GRID_LINE_STYLE)
+            sheet.draw_line((0, y), (sheet.rect.width, y), **GRID_LINE_STYLE)
+            label = f"0.{step}"
+            sheet.insert_text((x + 2, 10), label, fontsize=9, color=GRID_COLOR)
+            sheet.insert_text((2, y - 2), label, fontsize=9, color=GRID_COLOR)
+        return sheet.get_pixmap(alpha=False).tobytes("png")
+    finally:
+        canvas.close()
+
+
 def _unique_figure_asset_filename(page_number: int, label: str, used_filenames: set[str]) -> str:
     safe_label = re.sub(r"[^a-zA-Z0-9]+", "_", label.lower()).strip("_") or "unlabeled"
     base = f"page_{page_number:03d}_fig_{safe_label}.png"
@@ -1525,20 +1547,11 @@ def main() -> None:
             page_figures = extract_figure_regions(
                 page, page_number, images_dir, caption_anchors[page_number], dpi=figure_dpi
             )
-            page_preview_path = ""
-            if page_figures:
-                preview_path = previews_dir / f"page_{page_number:03d}.png"
-                save_image_bytes(
-                    preview_path,
-                    _render_crop(
-                        page,
-                        (page.rect.x0, page.rect.y0, page.rect.x1, page.rect.y1),
-                        PAGE_PREVIEW_DPI,
-                    ),
-                )
-                page_preview_path = str(preview_path)
-                for figure in page_figures:
-                    figure["page_preview_path"] = page_preview_path
+            preview_path = previews_dir / f"page_{page_number:03d}.png"
+            save_image_bytes(preview_path, _render_grid_preview(page, PAGE_PREVIEW_DPI))
+            page_preview_path = str(preview_path)
+            for figure in page_figures:
+                figure["page_preview_path"] = page_preview_path
             figure_assets.extend(page_figures)
 
             page_records.append(

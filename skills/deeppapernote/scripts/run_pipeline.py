@@ -64,12 +64,9 @@ def default_workdir(reference: str) -> Path:
 
 def has_review_work(record: dict) -> bool:
     items = record.get("decisions")
-    reviews = (
-        [item.get("visual_review") for item in items if isinstance(item, dict)]
-        if isinstance(items, list)
-        else []
-    )
-    return any(
+    items = [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
+    reviews = [item.get("visual_review") for item in items]
+    return any(item.get("promoted") for item in items) or any(
         isinstance(review, dict)
         and (review.get("status") != "pending" or review.get("repair_attempts"))
         for review in reviews
