@@ -338,6 +338,90 @@ def test_limit_keeps_high_priority_result_figures_beyond_supporting_cap() -> Non
     assert len(items) == 3
 
 
+def test_figure_plan_ranks_main_figures_above_extended_data() -> None:
+    extended = [
+        {"id": f"Extended Data Fig {idx}", "caption": f"Auxiliary illustration {idx}."}
+        for idx in range(1, 11)
+    ]
+    extended[0]["caption"] = "Accuracy comparison across cell lines."
+    main = [
+        {"id": f"Fig {idx}", "caption": f"Auxiliary illustration {idx}."} for idx in range(1, 6)
+    ]
+    items = build_figure_items({"figure_captions": extended + main, "table_captions": []}, limit=6)
+
+    assert [item["id"] for item in items] == [
+        "Fig 1",
+        "Fig 2",
+        "Fig 3",
+        "Fig 4",
+        "Fig 5",
+        "Extended Data Fig 1",
+    ]
+
+
+def test_figure_plan_ranks_appendix_labels_below_main_labels() -> None:
+    items = build_figure_items(
+        {
+            "figure_captions": [
+                {"id": "Fig. S1", "caption": "Auxiliary illustration."},
+                {"id": "Figure A1", "caption": "Auxiliary illustration."},
+                {"id": "Figure 1", "caption": "Auxiliary illustration."},
+            ],
+            "table_captions": [],
+        },
+        limit=1,
+    )
+
+    assert [item["id"] for item in items] == ["Figure 1"]
+
+
+def test_figure_plan_orders_labels_by_number() -> None:
+    figures = [
+        {"id": f"Figure {idx}", "caption": f"Auxiliary illustration {idx}."}
+        for idx in range(1, 15)
+    ]
+    items = build_figure_items({"figure_captions": figures, "table_captions": []}, limit=12)
+
+    assert [item["id"] for item in items] == [f"Figure {idx}" for idx in range(1, 13)]
+
+
+def test_figure_plan_keeps_figures_when_tables_fill_the_limit() -> None:
+    tables = [
+        {"id": f"Table {idx}", "caption": f"Error rates on split {idx}."} for idx in range(1, 16)
+    ]
+    figures = [
+        {"id": f"Figure {idx}", "caption": f"Auxiliary illustration {idx}."}
+        for idx in range(1, 8)
+    ]
+    items = build_figure_items({"figure_captions": figures, "table_captions": tables}, limit=12)
+
+    ids = [item["id"] for item in items]
+    assert ids[-4:] == ["Figure 1", "Figure 2", "Figure 3", "Figure 4"]
+    assert len(ids) == 19
+
+
+def test_figure_plan_without_a_limit_keeps_every_item() -> None:
+    figures = [
+        {"id": f"Extended Data Fig {idx}", "caption": f"Auxiliary illustration {idx}."}
+        for idx in range(1, 4)
+    ]
+    items = build_figure_items({"figure_captions": figures, "table_captions": []}, limit=0)
+
+    assert len(items) == 3
+
+
+def test_figure_plan_treats_cjk_tables_as_tables() -> None:
+    items = build_figure_items(
+        {
+            "figure_captions": [],
+            "table_captions": [{"id": "表 1", "caption": "土壤样品的元素含量"}],
+        }
+    )
+
+    assert items[0]["kind"] == "table_result"
+    assert items[0]["priority"] == 2
+
+
 def test_label_normalization_matches_appendix_figure_spellings() -> None:
     assert _normalize_label_for_match("Fig. S1") == "fig s1"
     assert _normalize_label_for_match("Figure A2") == "fig a2"
