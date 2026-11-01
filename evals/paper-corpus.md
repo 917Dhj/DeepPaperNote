@@ -29,6 +29,7 @@ The test header prints the PyMuPDF version. Text block boundaries can change bet
 | `sha256` | The PDF's SHA-256 |
 | `source` | The DOI, arXiv ID, or citation |
 | `traits` | The layout features this paper covers |
+| `readable` | Whether the text layer can be read; an unreadable paper must stop at source extraction |
 | `labels` | Every real figure and table label, in normalized form |
 | `captions` | For selected labels, the `starts` and `ends` of the true caption |
 | `review` | Labels that must reach Visual Review, such as main results |

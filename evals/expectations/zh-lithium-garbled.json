@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "pdf": "zh-lithium-garbled.pdf",
+  "sha256": "1f586cd3d8d20d49bb31f4f12ce401add8e48ea0b1b6cae23019cd32bc8f7436",
+  "source": "Salt-lake brine lithium extraction review; text layer has a custom font encoding",
+  "traits": [
+    "cjk",
+    "garbled-text-layer"
+  ],
+  "readable": false,
+  "labels": [],
+  "captions": {},
+  "review": [],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {}
+}

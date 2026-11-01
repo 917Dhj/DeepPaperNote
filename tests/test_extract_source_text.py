@@ -281,7 +281,7 @@ def test_extract_source_text_binds_locations_to_source_manifestation(tmp_path: P
     assert manifest["captions"]["figures"][0]["page"] == 2
 
 
-GARBLED_LINE = "!!\"\"!!!!# # $ # \" $ !! % !\"#$%& %&'()**&+,-)./0,1'23 4&05!\"!%&5!! %&6)78)*!#$#\""
+GARBLED_LINE = "!!\"\"!!!!# # $ # \" $ !! % !\"#$%& %&'()**&+,-)./0,1'23 4&05!\"!%&5!! %&6)78"
 
 
 def write_text_pdf(path: Path, lines: list[str], **options: object) -> None:
@@ -354,7 +354,8 @@ def test_readable_text_passes_the_text_quality_check(tmp_path: Path) -> None:
 
 def test_cjk_text_passes_the_text_quality_check(tmp_path: Path) -> None:
     pdf_path = tmp_path / "cjk.pdf"
-    write_text_pdf(pdf_path, ["本文研究论文精读笔记的生成方法与质量评价。"] * 30, fontname="china-s")
+    lines = ["本文研究论文精读笔记的生成方法与质量评价。"] * 30
+    write_text_pdf(pdf_path, lines, fontname="china-s")
 
     result, manifest = run_extraction(tmp_path, pdf_path)
 

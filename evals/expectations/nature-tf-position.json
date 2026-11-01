@@ -10,6 +10,7 @@
     "panel-reference-at-line-start",
     "side-caption"
   ],
+  "readable": true,
   "labels": [
     "Fig 1",
     "Fig 2",

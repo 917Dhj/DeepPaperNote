@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "pdf": "icml-sd3.pdf",
+  "sha256": "7ba352b6ded12859cda4d47df203d5fe38ee884c45f3b67ff227549d82db1487",
+  "source": "arXiv:2403.03206v1 (ICML 2024)",
+  "traits": [
+    "icml-layout",
+    "two-column",
+    "figure-period",
+    "one-block-per-line",
+    "numbered-algorithms"
+  ],
+  "readable": true,
+  "labels": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Figure 5",
+    "Figure 6",
+    "Figure 7",
+    "Figure 8",
+    "Figure 9",
+    "Figure 10",
+    "Figure 11",
+    "Figure 12",
+    "Figure 13",
+    "Figure 14",
+    "Figure 15",
+    "Figure 16",
+    "Figure 17",
+    "Table 1",
+    "Table 2",
+    "Table 3",
+    "Table 4",
+    "Table 5",
+    "Table 6",
+    "Table 7",
+    "Algorithm 1",
+    "Algorithm 2"
+  ],
+  "captions": {
+    "Figure 2": {
+      "starts": "Our model architecture.",
+      "ends": "Best viewed zoomed in."
+    },
+    "Table 4": {
+      "starts": "Improved Captions.",
+      "ends": "benchmark."
+    }
+  },
+  "review": [
+    "Figure 2",
+    "Figure 8",
+    "Table 1",
+    "Table 2"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {}
+}

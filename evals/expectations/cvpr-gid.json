@@ -7,6 +7,7 @@
     "two-column",
     "figure-period"
   ],
+  "readable": true,
   "labels": [
     "Figure 1",
     "Figure 2",

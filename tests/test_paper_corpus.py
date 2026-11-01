@@ -22,6 +22,7 @@ EXPECTATION_FIELDS = {
     "sha256",
     "source",
     "traits",
+    "readable",
     "labels",
     "captions",
     "review",
@@ -45,6 +46,7 @@ EXPECTATIONS = load_expectations()
 def check_ids(expectation: dict) -> list[str]:
     return [
         "sha256",
+        "readable",
         "labels:missing",
         "labels:extra",
         *(f"caption:{label}" for label in expectation["captions"]),
@@ -113,7 +115,10 @@ def run_preparation(pdf_path: Path, workdir: Path, env: dict[str, str]) -> dict:
     assets = workdir / "assets.json"
     figures = workdir / "figures.json"
     decisions = workdir / "decisions.json"
-    run_step("extract_source_text.py", env, "--input", fetch, "--output", manifest)
+    try:
+        run_step("extract_source_text.py", env, "--input", fetch, "--output", manifest)
+    except subprocess.CalledProcessError:
+        return {"readable": False, "captions": {}, "crops": {}, "decisions": {}}
     run_step(
         "extract_evidence.py",
         env,
@@ -170,6 +175,7 @@ def run_preparation(pdf_path: Path, workdir: Path, env: dict[str, str]) -> dict:
             text = doc[asset["page_number"] - 1].get_text(clip=fitz.Rect(asset["bbox_pt"]))
             crops.setdefault(normalize_caption_label(asset["label"]), []).append(text)
     return {
+        "readable": True,
         "captions": captions,
         "crops": crops,
         "decisions": {
@@ -214,7 +220,9 @@ def test_paper_corpus(paper: str, check: str, corpus_runs) -> None:
         assert digest == expectation["sha256"], "The local PDF differs from the expected file."
         return
     run = corpus_runs(paper)
-    if check == "labels:missing":
+    if check == "readable":
+        assert run["readable"] == expectation["readable"]
+    elif check == "labels:missing":
         assert sorted(set(expectation["labels"]) - set(run["captions"])) == []
     elif check == "labels:extra":
         assert sorted(set(run["captions"]) - set(expectation["labels"])) == []
@@ -244,6 +252,7 @@ def test_expectations_are_well_formed() -> None:
         assert expectation["schema_version"] == 1, paper
         assert Path(expectation["pdf"]).name == expectation["pdf"], paper
         assert re.fullmatch(r"[0-9a-f]{64}", expectation["sha256"]), paper
+        assert isinstance(expectation["readable"], bool), paper
         assert set(expectation["captions"]) <= set(expectation["labels"]), paper
         assert all(
             set(item) == {"starts", "ends"} and all(item.values())

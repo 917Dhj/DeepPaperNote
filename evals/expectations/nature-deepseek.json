@@ -10,6 +10,7 @@
     "caption-across-columns",
     "recent-ai"
   ],
+  "readable": true,
   "labels": [
     "Fig 1",
     "Fig 2",

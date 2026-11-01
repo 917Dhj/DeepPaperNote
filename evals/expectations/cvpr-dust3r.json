@@ -9,6 +9,7 @@
     "full-width-figures",
     "appendix"
   ],
+  "readable": true,
   "labels": [
     "Figure 1",
     "Figure 2",

@@ -9,6 +9,7 @@
     "wrapped-caption",
     "prose-reference-at-line-start"
   ],
+  "readable": true,
   "labels": [
     "Figure 1",
     "Figure 2",

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "pdf": "zh-thermal-barrier.pdf",
+  "sha256": "ad0ee7da803d49ae6b065d9a23a2f33ff7806e4c852b0643e7a35907a3b15cfe",
+  "source": "Thermal Spray Technology 17(1), 2025",
+  "traits": [
+    "cjk",
+    "bilingual-captions",
+    "two-column",
+    "review"
+  ],
+  "readable": true,
+  "labels": [
+    "图 1",
+    "图 2",
+    "图 3",
+    "图 4",
+    "图 5",
+    "图 6",
+    "图 7",
+    "图 8",
+    "图 9",
+    "图 10",
+    "图 11",
+    "图 12",
+    "图 13",
+    "图 14",
+    "Fig 1",
+    "Fig 2",
+    "Fig 3",
+    "Fig 4",
+    "Fig 5",
+    "Fig 6",
+    "Fig 7",
+    "Fig 8",
+    "Fig 9",
+    "Fig 10",
+    "Fig 11",
+    "Fig 12",
+    "Fig 13",
+    "Fig 14",
+    "表 1",
+    "Table 1"
+  ],
+  "captions": {
+    "Fig 1": {
+      "starts": "The J-level gas turbine",
+      "ends": "turbine［2］"
+    },
+    "图 5": {
+      "starts": "焦绿石结构（a）与萤石结构（b）的示意图",
+      "ends": "示意图［52］"
+    }
+  },
+  "review": [
+    "图 3",
+    "图 10",
+    "表 1"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {
+    "review:图 3": "A bilingual caption pair: crops attach to the Chinese caption, but the plan keeps the English one.",
+    "review:图 10": "A bilingual caption pair: crops attach to the Chinese caption, but the plan keeps the English one."
+  }
+}

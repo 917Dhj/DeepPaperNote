@@ -8,6 +8,7 @@
     "fullwidth-characters",
     "cnki-export"
   ],
+  "readable": true,
   "labels": [
     "图 1",
     "图 2",

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "pdf": "emnlp-flare.pdf",
+  "sha256": "2425bd04de6e082512ef576298ec24df770a7f576bb2c23d09b3fd498f716c52",
+  "source": "arXiv:2305.06983v2 (EMNLP 2023)",
+  "traits": [
+    "acl-layout",
+    "two-column",
+    "figure-colon"
+  ],
+  "readable": true,
+  "labels": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Figure 5",
+    "Table 1",
+    "Table 2",
+    "Table 3",
+    "Table 4",
+    "Table 5",
+    "Table 6",
+    "Table 7",
+    "Table 8",
+    "Table 9"
+  ],
+  "captions": {
+    "Figure 1": {
+      "starts": "An illustration of forward-looking active retrieval",
+      "ends": "regenerates the sentence."
+    },
+    "Table 1": {
+      "starts": "FLARE and baselines on 2WikiMultihopQA.",
+      "ends": "reimplemented for fair comparisons."
+    }
+  },
+  "review": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 4",
+    "Table 1",
+    "Table 2"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {}
+}
