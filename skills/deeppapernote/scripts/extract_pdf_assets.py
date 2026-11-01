@@ -42,6 +42,7 @@ FIGURE_RENDER_DPI = 96
 PAGE_PREVIEW_DPI = 96
 MIN_FIGURE_HEIGHT_PT = 60
 MIN_FIGURE_WIDTH_PT = 100
+MIN_TABLE_HEIGHT_PT = 24
 SIDE_FIGURE_PANEL_GAP_PT = 24.0
 
 _TEXT_TABLE_SEPARATOR_RE = re.compile(r"(?:\t+|\s{2,}|[|;])")
@@ -951,7 +952,7 @@ def _finalize_table_bbox(
         bbox = (bbox[0], bbox[1], bbox[2], min(bbox[3], caption_y0 - 1.0))
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
-    if width < MIN_FIGURE_WIDTH_PT or height < MIN_FIGURE_HEIGHT_PT:
+    if width < MIN_FIGURE_WIDTH_PT or height < MIN_TABLE_HEIGHT_PT:
         return None
     return bbox
 
