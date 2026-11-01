@@ -14,6 +14,7 @@ except ImportError:  # pragma: no cover
 
 from extract_pdf_assets import (
     _classify_visual_quality,
+    _count_paragraph_text_chars_in_bbox,
     _estimate_figure_bbox_above_caption,
     _grow_table_region,
     _looks_like_text_table_row,
@@ -782,6 +783,74 @@ def test_short_table_gets_its_own_crop(tmp_path: Path) -> None:
         crops = table_crop_text(page, tmp_path)
 
         assert "Short2" in crops["Table 1"]
+    finally:
+        doc.close()
+
+
+def paragraph_chars_in(page) -> int:
+    return _count_paragraph_text_chars_in_bbox(page, tuple(page.rect), (0.0, 0.0, 0.0, 0.0))
+
+
+def add_page_image(page, rect: tuple[float, float, float, float]) -> None:
+    pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 40, 40), False)
+    pixmap.set_rect(pixmap.irect, (240, 240, 240))
+    page.insert_image(fitz.Rect(rect), pixmap=pixmap)
+
+
+def test_table_cells_with_mixed_symbols_are_not_paragraph_text() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for text block tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        cells = "\n".join(
+            f"DUSt3R 224 {row}/1.76 6/2.02 3/1.75 5/1.54 9/2.35 (8.1) 26.9 × ✓"
+            for row in range(5)
+        )
+        page.insert_textbox(fitz.Rect(40.0, 100.0, 560.0, 200.0), cells, fontsize=9)
+
+        assert paragraph_chars_in(page) == 0
+    finally:
+        doc.close()
+
+
+def test_prose_still_counts_as_paragraph_text() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for text block tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.insert_textbox(fitz.Rect(40.0, 100.0, 300.0, 300.0), SIDE_PROSE, fontsize=9)
+
+        assert paragraph_chars_in(page) > 200
+    finally:
+        doc.close()
+
+
+def test_text_inside_an_embedded_image_is_not_paragraph_text() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for text block tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        add_page_image(page, (60.0, 100.0, 540.0, 400.0))
+        page.insert_textbox(fitz.Rect(80.0, 120.0, 520.0, 380.0), SIDE_PROSE, fontsize=9)
+
+        assert paragraph_chars_in(page) == 0
+    finally:
+        doc.close()
+
+
+def test_scanned_page_text_still_counts_as_paragraph_text() -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for text block tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        add_page_image(page, (0.0, 0.0, 600.0, 800.0))
+        page.insert_textbox(fitz.Rect(80.0, 120.0, 520.0, 380.0), SIDE_PROSE, fontsize=9)
+
+        assert paragraph_chars_in(page) > 200
     finally:
         doc.close()
 
