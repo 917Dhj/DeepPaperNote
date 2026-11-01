@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "neurips-var.pdf",
   "sha256": "09bf82325072d173f99954cf971b5f748ddc8834dadd9afc135098410d6b5849",
-  "split": "dev",
   "source": "arXiv:2404.02905v2 (NeurIPS 2024)",
   "traits": [
     "single-column",

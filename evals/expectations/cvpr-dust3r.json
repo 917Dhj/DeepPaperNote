@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "cvpr-dust3r.pdf",
   "sha256": "400fea3f874aed6a9570a0651a701c2a3c635dcfbc2159348e04e83013a0099a",
-  "split": "dev",
   "source": "arXiv:2312.14132v3 (CVPR 2024)",
   "traits": [
     "two-column",

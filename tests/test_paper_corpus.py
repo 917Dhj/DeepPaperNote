@@ -20,7 +20,6 @@ EXPECTATION_FIELDS = {
     "schema_version",
     "pdf",
     "sha256",
-    "split",
     "source",
     "traits",
     "labels",
@@ -63,10 +62,7 @@ def gap_reason(expectation: dict, check: str) -> str | None:
 def corpus_params() -> list:
     params = []
     for paper, expectation in EXPECTATIONS.items():
-        split_mark = pytest.mark.corpus
-        if expectation["split"] == "holdout":
-            split_mark = pytest.mark.corpus_holdout
-        marks = [split_mark]
+        marks = [pytest.mark.corpus]
         for check in check_ids(expectation):
             reason = gap_reason(expectation, check)
             if reason:
@@ -233,7 +229,6 @@ def test_expectations_are_well_formed() -> None:
         assert expectation["schema_version"] == 1, paper
         assert Path(expectation["pdf"]).name == expectation["pdf"], paper
         assert re.fullmatch(r"[0-9a-f]{64}", expectation["sha256"]), paper
-        assert expectation["split"] in {"dev", "holdout"}, paper
         assert set(expectation["captions"]) <= set(expectation["labels"]), paper
         assert all(
             set(item) == {"starts", "ends"} and all(item.values())

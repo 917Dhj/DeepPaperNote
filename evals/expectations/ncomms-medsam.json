@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "ncomms-medsam.pdf",
   "sha256": "78925a99aaf7f17d728bc1e4e4c262fc234d33f4319d258d9f6b2080b42ded2b",
-  "split": "dev",
   "source": "doi:10.1038/s41467-024-44824-z",
   "traits": [
     "nature-communications-layout",

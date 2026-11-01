@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "nature-deepseek.pdf",
   "sha256": "916fdaafc3b44143a9744481d079744f773d73d06372f82b1dba1076525927f2",
-  "split": "dev",
   "source": "doi:10.1038/s41586-025-09422-z",
   "traits": [
     "nature-layout",

@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "arxiv-transformer.pdf",
   "sha256": "bfaaec89262875f927cf1b38b2da2d775f3309b7bea3537f29b606ca67e79065",
-  "split": "dev",
   "source": "arXiv:1706.03762v5",
   "traits": [
     "single-column",

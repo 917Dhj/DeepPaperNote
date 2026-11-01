@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "zh-libs-soil.pdf",
   "sha256": "330ffc2f53d06c8630cd56745912402086a5f2efd611406efedfe35b33258736",
-  "split": "dev",
   "source": "doi:10.3969/j.issn.2095-1035.2024.02.002",
   "traits": [
     "chinese",

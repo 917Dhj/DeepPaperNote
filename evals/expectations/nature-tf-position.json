@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "nature-tf-position.pdf",
   "sha256": "642b2721f1912ceffbdccdd58fea2ee664f317b4ed2447ff05ac5635563878b9",
-  "split": "dev",
   "source": "doi:10.1038/s41586-024-07662-z",
   "traits": [
     "caption-across-columns",

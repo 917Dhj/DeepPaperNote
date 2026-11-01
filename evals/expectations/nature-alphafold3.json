@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "nature-alphafold3.pdf",
   "sha256": "aba3109f2892454c9512570001598a069aaf422adb5aa0f3879414cb29a258fb",
-  "split": "dev",
   "source": "doi:10.1038/s41586-024-07487-w",
   "traits": [
     "nature-layout",

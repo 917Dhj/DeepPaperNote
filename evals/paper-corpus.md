@@ -27,7 +27,6 @@ The test header prints the PyMuPDF version. Text block boundaries can change bet
 | `schema_version` | `1` |
 | `pdf` | The filename in `evals/papers/` |
 | `sha256` | The PDF's SHA-256 |
-| `split` | `dev` or `holdout` |
 | `source` | The DOI, arXiv ID, or citation |
 | `traits` | The layout features this paper covers |
 | `labels` | Every real figure and table label, in normalized form |
@@ -41,13 +40,3 @@ Read expected values from the paper, not from the current output. Otherwise a sn
 ## Known gaps
 
 A check matching `known_gaps` is a strict expected failure. When a fix makes it pass, the run fails until you remove the gap, so fixes are always recorded. Patterns use shell-style wildcards against the check IDs shown in the test names.
-
-## Held-out papers
-
-Heuristics can overfit papers they are tuned against. Keep some papers as `holdout`, and run them once before merging a change to extraction or selection:
-
-```sh
-python3 -m pytest -q -m corpus_holdout
-```
-
-If a held-out paper fails, move it to `dev`, fix the problem, and add a new paper to `holdout`. Only papers not yet used for tuning belong in `holdout`. A paper whose pipeline output you inspected belongs in `dev`, so a run that fails uses that paper up, and a run that passes uses it up once you inspect its results.

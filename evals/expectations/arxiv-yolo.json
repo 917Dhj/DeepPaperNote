@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "arxiv-yolo.pdf",
   "sha256": "54bcd2dd05dc618849e8a94d8b88fe3eeb37f80e96e200600d38f1f733931678",
-  "split": "dev",
   "source": "arXiv:1506.02640v5",
   "traits": [
     "two-column",

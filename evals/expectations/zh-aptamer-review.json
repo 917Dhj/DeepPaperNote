@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "zh-aptamer-review.pdf",
   "sha256": "1e9eecb357ad5cd40bf18e3d516b76fa322f00be8bd15b73af5c77d4c904fc30",
-  "split": "dev",
   "source": "生物化学与生物物理进展 2023, 50(9): 2037-2050",
   "traits": [
     "chinese",

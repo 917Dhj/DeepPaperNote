@@ -2,7 +2,6 @@
   "schema_version": 1,
   "pdf": "arxiv-resnet.pdf",
   "sha256": "1e0651b6810ecba34a3dbc5b5b0209226f889004607c1f203540a48d64e5a93a",
-  "split": "dev",
   "source": "arXiv:1512.03385v1",
   "traits": [
     "two-column",
