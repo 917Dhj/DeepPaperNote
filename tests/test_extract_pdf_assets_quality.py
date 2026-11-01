@@ -710,6 +710,66 @@ def test_side_caption_asset_passes_the_visual_quality_gate(tmp_path: Path) -> No
         doc.close()
 
 
+def add_table_rows(page, top: float, name: str, rows: int = 6) -> None:
+    for row in range(rows):
+        y = top + row * 12.0
+        page.insert_text((60.0, y), f"{name}{row}", fontsize=8)
+        for column, x in enumerate((180.0, 280.0, 380.0, 480.0)):
+            page.insert_text((x, y), f"{row}.{column}", fontsize=8)
+
+
+def wide_table_caption(number: int) -> str:
+    return (
+        f"Table {number}. Absolute error across every scene in the benchmark, "
+        "reported for each method and each training run."
+    )
+
+
+def table_crop_text(page, tmp_path: Path) -> dict[str, str]:
+    assets = extract_figure_regions(page, 1, tmp_path, find_caption_blocks(page))
+    return {
+        asset["label"]: page.get_text(clip=fitz.Rect(asset["bbox_pt"])) for asset in assets
+    }
+
+
+def test_adjacent_tables_keep_their_own_body_above_the_caption(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        add_table_rows(page, 80.0, "First", rows=4)
+        page.insert_text((60.0, 140.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 170.0, "Second")
+        page.insert_text((60.0, 250.0), wide_table_caption(2), fontsize=9)
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "First0" in crops["Table 1"] and "Second0" not in crops["Table 1"]
+        assert "Second0" in crops["Table 2"] and "First0" not in crops["Table 2"]
+    finally:
+        doc.close()
+
+
+def test_adjacent_tables_keep_their_own_body_below_the_caption(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.insert_text((60.0, 80.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 100.0, "First", rows=4)
+        page.insert_text((60.0, 180.0), wide_table_caption(2), fontsize=9)
+        add_table_rows(page, 200.0, "Second")
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "First0" in crops["Table 1"] and "Second0" not in crops["Table 1"]
+        assert "Second0" in crops["Table 2"] and "First0" not in crops["Table 2"]
+    finally:
+        doc.close()
+
+
 def test_grow_table_region_allows_gap_between_header_and_data_rows() -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for page rect construction.")

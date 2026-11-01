@@ -36,6 +36,7 @@
     "Table 1",
     "Table 2"
   ],
+  "crops": {},
   "same_visual": [],
   "known_gaps": {
     "review:Table 1": "No usable table crop exists for this caption."

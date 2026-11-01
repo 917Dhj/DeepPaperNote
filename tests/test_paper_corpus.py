@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from common import normalize_whitespace
+from common import fitz, normalize_caption_label, normalize_whitespace
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts"
@@ -25,6 +25,7 @@ EXPECTATION_FIELDS = {
     "labels",
     "captions",
     "review",
+    "crops",
     "same_visual",
     "known_gaps",
 }
@@ -48,6 +49,7 @@ def check_ids(expectation: dict) -> list[str]:
         "labels:extra",
         *(f"caption:{label}" for label in expectation["captions"]),
         *(f"review:{label}" for label in expectation["review"]),
+        *(f"crop:{label}" for label in expectation["crops"]),
         *(f"same_visual:{'|'.join(pair)}" for pair in expectation["same_visual"]),
     ]
 
@@ -162,8 +164,14 @@ def run_preparation(pdf_path: Path, workdir: Path, env: dict[str, str]) -> dict:
     source_captions = json.loads(manifest.read_text(encoding="utf-8"))["captions"]
     for item in source_captions["figures"] + source_captions["tables"]:
         captions.setdefault(item["id"], []).append(normalize_whitespace(item["caption"]))
+    crops: dict[str, list[str]] = {}
+    with fitz.open(pdf_path) as doc:
+        for asset in json.loads(assets.read_text(encoding="utf-8"))["figure_assets"]:
+            text = doc[asset["page_number"] - 1].get_text(clip=fitz.Rect(asset["bbox_pt"]))
+            crops.setdefault(normalize_caption_label(asset["label"]), []).append(text)
     return {
         "captions": captions,
+        "crops": crops,
         "decisions": {
             item["source_id"]: item["decision"]
             for item in json.loads(decisions.read_text(encoding="utf-8"))["decisions"]
@@ -218,6 +226,13 @@ def test_paper_corpus(paper: str, check: str, corpus_runs) -> None:
         ), run["captions"].get(target, [])
     elif kind == "review":
         assert run["decisions"].get(target) == "review_pending"
+    elif kind == "crop":
+        expected = expectation["crops"][target]
+        assert any(
+            all(word in text for word in expected["contains"])
+            and not any(word in text for word in expected["excludes"])
+            for text in run["crops"].get(target, [])
+        ), run["crops"].get(target, [])
     else:
         assert len(set(target.split("|")) & set(run["decisions"])) == 1
 
@@ -233,6 +248,11 @@ def test_expectations_are_well_formed() -> None:
         assert all(
             set(item) == {"starts", "ends"} and all(item.values())
             for item in expectation["captions"].values()
+        ), paper
+        assert set(expectation["crops"]) <= set(expectation["labels"]), paper
+        assert all(
+            set(item) == {"contains", "excludes"} and (item["contains"] or item["excludes"])
+            for item in expectation["crops"].values()
         ), paper
         assert all(len(pair) == 2 for pair in expectation["same_visual"]), paper
         checks = check_ids(expectation)

@@ -32,6 +32,7 @@ The test header prints the PyMuPDF version. Text block boundaries can change bet
 | `labels` | Every real figure and table label, in normalized form |
 | `captions` | For selected labels, the `starts` and `ends` of the true caption |
 | `review` | Labels that must reach Visual Review, such as main results |
+| `crops` | For selected labels, text the crop must contain (`contains`) and must leave out (`excludes`) |
 | `same_visual` | Label pairs that describe one visual |
 | `known_gaps` | Check patterns mapped to the reason each one fails today |
 

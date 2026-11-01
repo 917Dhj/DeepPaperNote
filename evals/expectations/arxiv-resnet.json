@@ -49,6 +49,7 @@
     "Table 4",
     "Table 6"
   ],
+  "crops": {},
   "same_visual": [],
   "known_gaps": {
     "review:Figure 3": "The visual quality gate rejects this crop; the cause is not analyzed yet."

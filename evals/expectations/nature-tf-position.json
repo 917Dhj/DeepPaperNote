@@ -48,6 +48,14 @@
     "Fig 4",
     "Fig 5"
   ],
+  "crops": {
+    "Fig 1": {
+      "contains": [],
+      "excludes": [
+        "TF function is position"
+      ]
+    }
+  },
   "same_visual": [],
   "known_gaps": {}
 }

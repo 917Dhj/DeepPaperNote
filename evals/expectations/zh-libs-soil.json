@@ -44,8 +44,40 @@
     "表 1",
     "表 2"
   ],
+  "crops": {
+    "图 1": {
+      "contains": [],
+      "excludes": [
+        "胡梦颖"
+      ]
+    },
+    "图 7": {
+      "contains": [],
+      "excludes": [
+        "如图７所示"
+      ]
+    },
+    "表 1": {
+      "contains": [
+        "Ｅｘｃｉｔａｔｉｏｎ"
+      ],
+      "excludes": [
+        "火花放电对电极"
+      ]
+    },
+    "表 2": {
+      "contains": [
+        "Ｃｄ"
+      ],
+      "excludes": [
+        "自主研制"
+      ]
+    }
+  },
   "same_visual": [],
   "known_gaps": {
-    "caption:图 1": "Fullwidth Latin letters such as ＬＩＢＳ are not normalized in caption text."
+    "caption:图 1": "Fullwidth Latin letters such as ＬＩＢＳ are not normalized in caption text.",
+    "crop:图 ?": "The crop takes in body text from a neighboring column or the line above.",
+    "crop:表 ?": "The crop runs past the table into body text."
   }
 }

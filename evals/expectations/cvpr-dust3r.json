@@ -45,6 +45,30 @@
     "Table 2",
     "Table 3"
   ],
+  "crops": {
+    "Table 1": {
+      "contains": [
+        "HLoc"
+      ],
+      "excludes": [
+        "DPT-BEiT"
+      ]
+    },
+    "Table 2": {
+      "contains": [
+        "DPT-BEiT"
+      ],
+      "excludes": [
+        "HLoc"
+      ]
+    },
+    "Table 3": {
+      "contains": [
+        "COLMAP Dense"
+      ],
+      "excludes": []
+    }
+  },
   "same_visual": [],
   "known_gaps": {
     "review:Table 3": "The visual quality gate reports table text contamination for this crop; the cause is not analyzed yet."
