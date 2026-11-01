@@ -52,8 +52,6 @@
   ],
   "same_visual": [],
   "known_gaps": {
-    "review:Figure 2": "The 12-item figure plan drops this figure: higher-priority tables fill it.",
-    "review:Figure 4": "The 12-item figure plan drops this figure: higher-priority tables fill it.",
     "review:Figure 3": "The visual quality gate rejects this crop; the cause is not analyzed yet."
   }
 }
