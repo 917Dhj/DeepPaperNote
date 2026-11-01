@@ -23,7 +23,7 @@
     },
     "Fig 3": {
       "starts": "Quantitative and qualitative evaluation results on the internal",
-      "ends": "provided as a Source Data ﬁle."
+      "ends": "provided as a Source Data file."
     }
   },
   "review": [
@@ -33,7 +33,6 @@
   ],
   "same_visual": [],
   "known_gaps": {
-    "caption:Fig 3": "The caption continues in the adjacent column, and only the first text block is read.",
     "review:Fig 1": "The gate treats text labels inside this single embedded image as a large text block."
   }
 }

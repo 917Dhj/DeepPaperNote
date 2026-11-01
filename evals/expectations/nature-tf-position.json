@@ -34,7 +34,7 @@
     },
     "Fig 3": {
       "starts": "Capturing the TSSs of thousands of TSR variants",
-      "ends": "of TFs."
+      "ends": "for each position."
     },
     "Extended Data Fig 2": {
       "starts": "TSS-centric analysis reveals a spatial grammar",
@@ -49,7 +49,5 @@
     "Fig 5"
   ],
   "same_visual": [],
-  "known_gaps": {
-    "caption:Fig 3": "The caption continues in the adjacent column, and only the first text block is read."
-  }
+  "known_gaps": {}
 }
