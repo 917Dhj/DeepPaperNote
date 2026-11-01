@@ -41,6 +41,7 @@ except ImportError:  # pragma: no cover
 FIGURE_RENDER_DPI = 96
 PAGE_PREVIEW_DPI = 96
 MIN_FIGURE_HEIGHT_PT = 60
+MIN_VISUAL_FIGURE_HEIGHT_PT = 40
 MIN_FIGURE_WIDTH_PT = 100
 MIN_TABLE_HEIGHT_PT = 24
 FULL_PAGE_IMAGE_RATIO = 0.7
@@ -529,6 +530,7 @@ def _grow_bbox_over_figure_labels(
 ) -> tuple[float, float, float, float]:
     """Extend a visual bbox over short nearby text such as axis labels."""
     active_bbox = bbox
+    paragraph_blocks = _find_paragraph_blocks(page)
     for line in _collect_text_lines(page):
         text = normalize_whitespace(str(line.get("text", "")))
         bb = tuple(line.get("bbox", ()))
@@ -539,6 +541,7 @@ def _grow_bbox_over_figure_labels(
             or bb[1] >= lower_bound - 1.0
             or bb[3] <= upper_bound
             or (x_range is not None and (bb[0] < x_range[0] or bb[2] > x_range[1]))
+            or _line_is_inside_any_block(bb, paragraph_blocks)
         ):
             continue
         horizontal_gap = max(active_bbox[0] - bb[2], bb[0] - active_bbox[2], 0.0)
@@ -613,7 +616,8 @@ def _estimate_figure_bbox_above_caption(
     bbox = (bbox[0], bbox[1], bbox[2], min(bbox[3], caption_y_top - 1.0))
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
-    if width < MIN_FIGURE_WIDTH_PT or height < MIN_FIGURE_HEIGHT_PT:
+    min_height = MIN_VISUAL_FIGURE_HEIGHT_PT if relevant else MIN_FIGURE_HEIGHT_PT
+    if width < MIN_FIGURE_WIDTH_PT or height < min_height:
         return None
     return bbox
 

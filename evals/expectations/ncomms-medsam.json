@@ -33,7 +33,5 @@
   ],
   "crops": {},
   "same_visual": [],
-  "known_gaps": {
-    "review:Fig 1": "The gate treats text labels inside this single embedded image as a large text block."
-  }
+  "known_gaps": {}
 }
