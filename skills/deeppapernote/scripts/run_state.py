@@ -972,7 +972,7 @@ def decision_revision(run: Inspection, result: StageResult) -> str | None:
         return "Repair the unreadable decisions in place; the planner would replace any reviews."
     codes = {item["code"] for item in result.issues}
     if has_review_work(run.data[result.id]):
-        return "Update the recorded decisions in place; the planner would discard their reviews."
+        return "Continue with the review and promote commands; the planner would discard this work."
     if codes & REPLAN_CODES:
         return None
     if any(code.startswith(VISUAL_REVIEW_CODES) for code in codes):

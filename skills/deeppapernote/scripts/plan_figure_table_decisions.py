@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -18,15 +20,19 @@ from common import (
     runtime_config,
 )
 from contracts import WRITING_CONTRACT_RULES
-from extract_pdf_assets import _render_crop, save_image_bytes
+from extract_pdf_assets import _render_crop, _unique_figure_asset_filename, save_image_bytes
+from lint_grounding import visual_review_evidence_is_valid
 from localization import normalize_output_language, require_artifact_output_language
 from source_corpus import SourceCorpusLoadError, load_source_corpus
+from write_obsidian_note import atomic_write_note
 
 DECISION_VALUES = set(WRITING_CONTRACT_RULES["figure_decision_values"])
 INSERTABLE_KINDS = set(WRITING_CONTRACT_RULES["usable_insert_candidate"]["kinds"])
-REVIEW_RENDER_DPI = int(
-    WRITING_CONTRACT_RULES["visual_review_contract"]["selected_render_dpi"]
-)
+VISUAL_REVIEW = WRITING_CONTRACT_RULES["visual_review_contract"]
+REVIEW_RENDER_DPI = int(VISUAL_REVIEW["selected_render_dpi"])
+REPAIRABLE_FAILURES = set(VISUAL_REVIEW["repairable_failure_reasons"])
+TERMINAL_FAILURES = set(VISUAL_REVIEW["terminal_failure_reasons"])
+REPAIR_LIMIT = int(VISUAL_REVIEW["repair_limit"])
 
 
 def parser() -> argparse.ArgumentParser:
@@ -34,11 +40,6 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--source-manifest", default="", help="Source manifest JSON path or string.")
     p.add_argument("--figures", default="", help="Figure plan JSON path or string.")
     p.add_argument("--assets", default="", help="PDF assets JSON path or string.")
-    p.add_argument(
-        "--review-decisions",
-        default="",
-        help="Existing decision JSON whose requested bounded repairs should be applied.",
-    )
     p.add_argument(
         "--asset-subdir",
         default="images",
@@ -51,6 +52,53 @@ def parser() -> argparse.ArgumentParser:
         default="",
         help="Run Override for output language: en or zh-CN.",
     )
+    return p
+
+
+def review_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="plan_figure_table_decisions.py review",
+        description="Record the model's Visual Review verdict for one item.",
+    )
+    p.add_argument("--decisions", required=True, help="Decisions JSON file, updated in place.")
+    p.add_argument("--item", required=True, help='Label such as "Figure 1".')
+    p.add_argument("--verdict", required=True, choices=("pass", "fail", "repair"))
+    p.add_argument(
+        "--preserved",
+        action="append",
+        default=[],
+        help="Scientific element seen in the crop; repeat for each. Required by pass.",
+    )
+    p.add_argument(
+        "--omitted",
+        action="append",
+        default=[],
+        help="Scientific element the crop lost; repeat for each. Not allowed on pass.",
+    )
+    p.add_argument("--notes", default="", help="Short review note.")
+    p.add_argument("--failure", default="", help="Contract failure reason for fail or repair.")
+    p.add_argument(
+        "--bbox",
+        default="",
+        help="Page-normalized x0,y0,x1,y1 read off the grid preview. Required by repair.",
+    )
+    return p
+
+
+def promote_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="plan_figure_table_decisions.py promote",
+        description="Send a Figure/Table the planner left out into Visual Review.",
+    )
+    p.add_argument("--decisions", required=True, help="Decisions JSON file, updated in place.")
+    p.add_argument("--assets", required=True, help="PDF assets JSON path.")
+    p.add_argument("--item", required=True, help='Label such as "Figure 9".')
+    p.add_argument(
+        "--bbox",
+        default="",
+        help="Page-normalized x0,y0,x1,y1 read off the grid preview, when no usable crop exists.",
+    )
+    p.add_argument("--page", type=int, default=0, help="Page of --bbox; defaults to the caption's.")
     return p
 
 
@@ -283,107 +331,98 @@ def validate_normalized_bbox(value: Any) -> list[float]:
     return bbox
 
 
-def apply_requested_repairs(wrapper: dict[str, Any]) -> dict[str, Any]:
-    asset_subdir = checked_asset_subdir(wrapper.get("asset_subdir", "images"))
-    decisions = wrapper.get("decisions", [])
-    if not isinstance(decisions, list):
-        raise SystemExit("--review-decisions requires a decisions list.")
-    contract = WRITING_CONTRACT_RULES["visual_review_contract"]
-    repairable = set(contract["repairable_failure_reasons"])
-    repair_limit = int(contract["repair_limit"])
+def parse_bbox(value: str) -> list[float]:
+    try:
+        return validate_normalized_bbox([float(part) for part in value.split(",")])
+    except ValueError as exc:
+        raise SystemExit("--bbox must be four numbers: x0,y0,x1,y1.") from exc
 
-    for item in decisions:
-        if not isinstance(item, dict):
-            continue
-        review = item.get("visual_review", {})
-        if not isinstance(review, dict) or review.get("status") != "repair_requested":
-            continue
-        source_path = Path(str(item.get("source_image_path", ""))).expanduser()
-        current_sha256 = file_sha256(str(source_path))
-        if not current_sha256 or review.get("reviewed_asset_sha256") != current_sha256:
-            raise SystemExit("Bounded crop repair requires a current reviewed asset SHA-256.")
-        attempts = int(review.get("repair_attempts", 0) or 0)
-        if attempts >= repair_limit:
-            review.update(
-                {
-                    "status": "fail",
-                    "failure_reason": "repair_limit_exhausted",
-                    "reviewed_asset_sha256": current_sha256,
-                }
-            )
-            item["decision"] = "visual_defect"
-            item["skip_reason"] = "repair_limit_exhausted"
-            continue
-        failure_reason = normalize_whitespace(str(review.get("failure_reason", "")))
-        if failure_reason not in repairable:
-            raise SystemExit(
-                f"Failure reason is not repairable by recropping: {failure_reason}"
-            )
-        revised_bbox = validate_normalized_bbox(review.get("revised_bbox"))
-        evidence = item.get("review_evidence", {})
-        if not isinstance(evidence, dict):
-            raise SystemExit("Bounded crop repair requires review_evidence.")
-        pdf_path = Path(str(evidence.get("source_pdf_path", ""))).expanduser()
-        page_number = int(evidence.get("source_page", 0) or 0)
-        if not pdf_path.is_file() or page_number <= 0:
-            raise SystemExit("Bounded crop repair requires a source PDF and page.")
 
-        from common import fitz
+def render_page_region(
+    pdf_path: Path,
+    page_number: int,
+    normalized: list[float],
+    output_path: Path,
+) -> list[float]:
+    """Render a page-normalized region from the PDF and return it in page points."""
+    from common import fitz
 
-        if fitz is None:
-            raise SystemExit("Bounded crop repair requires PyMuPDF (`fitz`).")
-        doc = fitz.open(pdf_path.resolve())
-        try:
-            page = doc[page_number - 1]
-            page_rect = page.rect
-            x0, y0, x1, y1 = revised_bbox
-            bbox_pt = [
-                page_rect.x0 + x0 * page_rect.width,
-                page_rect.y0 + y0 * page_rect.height,
-                page_rect.x0 + x1 * page_rect.width,
-                page_rect.y0 + y1 * page_rect.height,
-            ]
-            repair_path = source_path.with_name(
-                f"{source_path.stem}_repair{attempts + 1}.png"
-            )
-            save_image_bytes(
-                repair_path,
-                _render_crop(page, tuple(bbox_pt), REVIEW_RENDER_DPI),
-            )
-        finally:
-            doc.close()
+    if fitz is None:
+        raise SystemExit("Rendering a review crop requires PyMuPDF (`fitz`).")
+    if not pdf_path.is_file():
+        raise SystemExit(f"Rendering a review crop requires the source PDF: {pdf_path}")
+    doc = fitz.open(pdf_path.resolve())
+    try:
+        if not 1 <= page_number <= doc.page_count:
+            raise SystemExit(f"Source PDF has no page {page_number}.")
+        page = doc[page_number - 1]
+        page_rect = page.rect
+        x0, y0, x1, y1 = normalized
+        bbox_pt = [
+            page_rect.x0 + x0 * page_rect.width,
+            page_rect.y0 + y0 * page_rect.height,
+            page_rect.x0 + x1 * page_rect.width,
+            page_rect.y0 + y1 * page_rect.height,
+        ]
+        save_image_bytes(output_path, _render_crop(page, tuple(bbox_pt), REVIEW_RENDER_DPI))
+    finally:
+        doc.close()
+    return [round(value, 6) for value in bbox_pt]
 
-        repaired_sha256 = file_sha256(str(repair_path))
-        item["decision"] = "review_pending"
-        item["source_image_path"] = str(repair_path)
-        item["source_image_filename"] = repair_path.name
-        item["source_image_sha256"] = repaired_sha256
-        if item.get("relative_markdown_embed"):
-            item["relative_markdown_embed"] = (
-                f"![{item.get('source_id') or repair_path.name}]"
-                f"({asset_subdir}/{repair_path.name})"
-            )
-        evidence.update(
-            {
-                "candidate_path": str(repair_path),
-                "bbox_pt": [round(value, 6) for value in bbox_pt],
-                "normalized_bbox": revised_bbox,
-                "render_dpi": REVIEW_RENDER_DPI,
-            }
+
+def pending_visual_review(
+    repair_attempts: int = 0,
+    revised_bbox: list[float] | None = None,
+) -> dict[str, Any]:
+    return {
+        "status": "pending",
+        "reviewed_asset_sha256": "",
+        "preserved_scientific_elements": [],
+        "omitted_scientific_elements": [],
+        "notes": "",
+        "failure_reason": "",
+        "repair_attempts": repair_attempts,
+        "revised_bbox": revised_bbox or [],
+    }
+
+
+def apply_repair(item: dict[str, Any], asset_subdir: str) -> None:
+    """Recrop a repair_requested item once, or close it once the repair limit is spent."""
+    review = item["visual_review"]
+    attempts = int(review.get("repair_attempts", 0) or 0)
+    if attempts >= REPAIR_LIMIT:
+        review.update({"status": "fail", "failure_reason": "repair_limit_exhausted"})
+        item["decision"] = "visual_defect"
+        item["skip_reason"] = "repair_limit_exhausted"
+        return
+    source_path = Path(str(item.get("source_image_path", ""))).expanduser()
+    revised_bbox = review["revised_bbox"]
+    evidence = item["review_evidence"]
+    repair_path = source_path.with_name(f"{source_path.stem}_repair{attempts + 1}.png")
+    bbox_pt = render_page_region(
+        Path(str(evidence.get("source_pdf_path", ""))).expanduser(),
+        int(evidence.get("source_page", 0) or 0),
+        revised_bbox,
+        repair_path,
+    )
+    item["decision"] = "review_pending"
+    item["source_image_path"] = str(repair_path)
+    item["source_image_filename"] = repair_path.name
+    item["source_image_sha256"] = file_sha256(str(repair_path))
+    if item.get("relative_markdown_embed"):
+        item["relative_markdown_embed"] = (
+            f"![{item.get('source_id') or repair_path.name}]"
+            f"({asset_subdir}/{repair_path.name})"
         )
-        item["review_evidence"] = evidence
-        item["visual_review"] = {
-            "status": "pending",
-            "reviewed_asset_sha256": "",
-            "preserved_scientific_elements": [],
-            "omitted_scientific_elements": [],
-            "notes": "",
-            "failure_reason": "",
-            "repair_attempts": attempts + 1,
-            "revised_bbox": revised_bbox,
+    evidence.update(
+        {
+            "candidate_path": str(repair_path),
+            "bbox_pt": bbox_pt,
+            "normalized_bbox": revised_bbox,
+            "render_dpi": REVIEW_RENDER_DPI,
         }
-    wrapper["decisions"] = decisions
-    return wrapper
+    )
+    item["visual_review"] = pending_visual_review(attempts + 1, revised_bbox)
 
 
 def decide(
@@ -440,16 +479,7 @@ def decide(
         base["skip_reason"] = ""
         base["source_image_sha256"] = str(prepared.get("sha256") or file_sha256(image_path))
         base["review_evidence"] = prepared.get("review_evidence", {})
-        base["visual_review"] = {
-            "status": "pending",
-            "reviewed_asset_sha256": "",
-            "preserved_scientific_elements": [],
-            "omitted_scientific_elements": [],
-            "notes": "",
-            "failure_reason": "",
-            "repair_attempts": 0,
-            "revised_bbox": [],
-        }
+        base["visual_review"] = pending_visual_review()
     else:
         base["decision"] = "placeholder"
         if status == "usable_candidate":
@@ -491,24 +521,222 @@ def checked_asset_subdir(value: str) -> str:
     return value
 
 
+def decision_summary(decisions: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "total_items": len(decisions),
+        "by_decision": {
+            value: sum(1 for item in decisions if item.get("decision") == value)
+            for value in sorted(DECISION_VALUES)
+        },
+    }
+
+
+def load_decisions(path: str) -> dict[str, Any]:
+    if not input_is_file(path):
+        raise SystemExit(f"--decisions must be the decisions JSON file: {path}")
+    wrapper = load_record(path)
+    if not isinstance(wrapper.get("decisions"), list):
+        raise SystemExit("--decisions requires a decisions list.")
+    return wrapper
+
+
+def item_label(item: dict[str, Any]) -> str:
+    return normalize_whitespace(str(item.get("source_id") or item.get("label") or ""))
+
+
+def find_item(wrapper: dict[str, Any], label: str) -> dict[str, Any]:
+    target = normalize_label(label)
+    for item in wrapper["decisions"]:
+        if isinstance(item, dict) and normalize_label(item_label(item)) == target:
+            return item
+    raise SystemExit(f"No decision item matches {label!r}.")
+
+
+def finish_item_command(path: str, wrapper: dict[str, Any], item: dict[str, Any]) -> None:
+    """Save the whole file and report what the model needs to look at next."""
+    decisions = wrapper["decisions"]
+    wrapper["summary"] = decision_summary(decisions)
+    text = json.dumps(wrapper, ensure_ascii=False, indent=2) + "\n"
+    atomic_write_note(Path(path).expanduser(), text)
+    evidence = item.get("review_evidence", {})
+    emit(
+        {
+            "status": "ok",
+            "script": "plan_figure_table_decisions.py",
+            "item": item_label(item),
+            "decision": item.get("decision", ""),
+            "failure_reason": item.get("visual_review", {}).get("failure_reason", ""),
+            "candidate_path": evidence.get("candidate_path", ""),
+            "page_preview_path": evidence.get("page_preview_path", ""),
+            "normalized_bbox": evidence.get("normalized_bbox", []),
+            "review_pending_items": wrapper["summary"]["by_decision"]["review_pending"],
+        }
+    )
+
+
+def verdict_failure(args: argparse.Namespace, attempts: int) -> str:
+    """Check that the flags fit the verdict and return its failure reason."""
+    if args.verdict == "pass":
+        if args.failure or args.omitted or args.bbox:
+            raise SystemExit("--verdict pass takes no --failure, --omitted, or --bbox.")
+        if not args.preserved:
+            raise SystemExit("--verdict pass requires at least one --preserved element.")
+        return ""
+    if args.verdict == "repair":
+        if args.failure not in REPAIRABLE_FAILURES:
+            raise SystemExit(f"Failure reason is not repairable by recropping: {args.failure}")
+        if not args.bbox:
+            raise SystemExit("--verdict repair requires --bbox.")
+        return args.failure
+    if args.bbox:
+        raise SystemExit("--verdict fail takes no --bbox.")
+    if args.failure in REPAIRABLE_FAILURES and attempts < REPAIR_LIMIT:
+        raise SystemExit(f"{args.failure} is repairable; use --verdict repair with --bbox.")
+    if args.failure not in TERMINAL_FAILURES | REPAIRABLE_FAILURES:
+        raise SystemExit(f"Unknown failure reason: {args.failure}")
+    return args.failure
+
+
+def run_review(argv: list[str]) -> None:
+    args = review_parser().parse_args(argv)
+    wrapper = load_decisions(args.decisions)
+    asset_subdir = checked_asset_subdir(wrapper.get("asset_subdir", "images"))
+    item = find_item(wrapper, args.item)
+    label = item_label(item)
+    review = item.get("visual_review")
+    if not isinstance(review, dict):
+        raise SystemExit(f"{label} is not in Visual Review; send it there with promote first.")
+    if not visual_review_evidence_is_valid(item):
+        raise SystemExit(f"{label} has incomplete review evidence; rerun the planner.")
+    failure = verdict_failure(args, int(review.get("repair_attempts", 0) or 0))
+    bbox = parse_bbox(args.bbox) if args.bbox else review.get("revised_bbox", [])
+    digest = file_sha256(str(item.get("source_image_path", "")))
+    if not digest or digest != item.get("source_image_sha256"):
+        raise SystemExit(f"{label}: the candidate crop changed since it was planned.")
+    review.update(
+        {
+            "status": {"pass": "pass", "fail": "fail", "repair": "repair_requested"}[args.verdict],
+            "reviewed_asset_sha256": digest,
+            "preserved_scientific_elements": args.preserved,
+            "omitted_scientific_elements": args.omitted,
+            "notes": args.notes,
+            "failure_reason": failure,
+            "revised_bbox": bbox,
+        }
+    )
+    if args.verdict == "repair":
+        apply_repair(item, asset_subdir)
+    else:
+        item["decision"] = "insert" if args.verdict == "pass" else "visual_defect"
+        item["skip_reason"] = failure
+    finish_item_command(args.decisions, wrapper, item)
+
+
+def page_preview_path(assets: dict[str, Any], page_number: int) -> str:
+    for page in assets.get("page_assets", []) or []:
+        if isinstance(page, dict) and page.get("page_number") == page_number:
+            return str(page.get("page_preview_path", ""))
+    return ""
+
+
+def crop_is_rejected(asset: dict[str, Any]) -> bool:
+    signals = asset.get("quality_signals")
+    return isinstance(signals, dict) and signals.get("visual_quality_status") == "reject"
+
+
+def measured_candidate(
+    item: dict[str, Any],
+    assets: dict[str, Any],
+    page_number: int,
+    bbox: list[float],
+) -> dict[str, Any]:
+    """Build a review candidate from a region the model measured on the grid preview."""
+    label = item_label(item)
+    filename = _unique_figure_asset_filename(page_number, label, set())
+    output_path = Path(str(assets.get("images_dir", ""))).expanduser() / filename.replace(
+        ".png", "_review.png"
+    )
+    pdf_path = Path(str(assets.get("pdf_path", ""))).expanduser()
+    bbox_pt = render_page_region(pdf_path, page_number, bbox, output_path)
+    return {
+        "path": str(output_path),
+        "filename": output_path.name,
+        "sha256": file_sha256(str(output_path)),
+        "review_evidence": {
+            "candidate_path": str(output_path),
+            "page_preview_path": page_preview_path(assets, page_number),
+            "source_pdf_path": str(pdf_path),
+            "source_page": page_number,
+            "caption": item.get("caption", ""),
+            "bbox_pt": bbox_pt,
+            "normalized_bbox": bbox,
+            "render_dpi": REVIEW_RENDER_DPI,
+        },
+    }
+
+
+def run_promote(argv: list[str]) -> None:
+    args = promote_parser().parse_args(argv)
+    if args.page and not args.bbox:
+        raise SystemExit("--page only applies with --bbox.")
+    wrapper = load_decisions(args.decisions)
+    asset_subdir = checked_asset_subdir(wrapper.get("asset_subdir", "images"))
+    assets = load_record(args.assets)
+    item = find_item(wrapper, args.item)
+    label = item_label(item)
+    if isinstance(item.get("visual_review"), dict):
+        raise SystemExit(f"{label} is already in Visual Review; record its verdict with review.")
+    if item.get("kind") not in INSERTABLE_KINDS:
+        raise SystemExit(f"{label} is not a Figure or Table.")
+    pages = item.get("pages") or [0]
+    page_number = args.page or int(pages[0] or 0)
+    asset = matched_figure_asset(assets, label)
+    if args.bbox:
+        if page_number <= 0:
+            raise SystemExit(f"{label} has no caption page; pass --page.")
+        prepared = measured_candidate(item, assets, page_number, parse_bbox(args.bbox))
+    elif asset and not crop_is_rejected(asset):
+        prepared = prepare_review_candidate(item, {"figure_asset_candidate": asset}, assets)
+    else:
+        raise SystemExit(
+            f"{label} has no usable crop. Read a page-normalized x0,y0,x1,y1 off the grid in "
+            f"{page_preview_path(assets, page_number) or 'its page preview'} and rerun with "
+            "--bbox; add --page if the body is not on that page."
+        )
+    item.update(
+        {
+            "decision": "review_pending",
+            "promoted": True,
+            "skip_reason": "",
+            "visual_quality_status": "usable_candidate",
+            "materialization_status": "pending",
+            "source_image_path": prepared["path"],
+            "source_image_filename": prepared["filename"],
+            "source_image_sha256": prepared["sha256"],
+            "relative_markdown_embed": f"![{label}]({asset_subdir}/{prepared['filename']})",
+            "review_evidence": prepared["review_evidence"],
+            "visual_review": pending_visual_review(),
+        }
+    )
+    if not visual_review_evidence_is_valid(item):
+        raise SystemExit(f"{label} could not be rendered with complete review evidence.")
+    finish_item_command(args.decisions, wrapper, item)
+
+
 def main() -> None:
-    args = parser().parse_args()
+    argv = sys.argv[1:]
+    if argv and argv[0] == "review":
+        run_review(argv[1:])
+        return
+    if argv and argv[0] == "promote":
+        run_promote(argv[1:])
+        return
+    args = parser().parse_args(argv)
     language = normalize_output_language(
         runtime_config(cli_overrides={"output_language": args.language})["output_language"]
     )
-    if args.review_decisions:
-        payload = load_record(args.review_decisions)
-        require_artifact_output_language(payload, "Figure/Table Decisions", language)
-        payload = apply_requested_repairs(payload)
-        payload["status"] = "ok"
-        payload["script"] = "plan_figure_table_decisions.py"
-        emit(payload, args.output)
-        return
     if not args.source_manifest:
-        raise SystemExit(
-            "plan_figure_table_decisions.py requires --source-manifest "
-            "or --review-decisions."
-        )
+        raise SystemExit("plan_figure_table_decisions.py requires --source-manifest.")
     source_manifest = load_record(args.source_manifest)
     figures = load_record(args.figures) if args.figures else {}
     require_artifact_output_language(figures, "Figure Plan", language)
@@ -527,13 +755,7 @@ def main() -> None:
         "paper_id": args.paper_id or source_manifest.get("paper_id", ""),
         "asset_subdir": args.asset_subdir,
         "decisions": decisions,
-        "summary": {
-            "total_items": len(decisions),
-            "by_decision": {
-                value: sum(1 for item in decisions if item.get("decision") == value)
-                for value in sorted(DECISION_VALUES)
-            },
-        },
+        "summary": decision_summary(decisions),
     }
     emit(payload, args.output)
 

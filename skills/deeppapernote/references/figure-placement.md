@@ -74,12 +74,35 @@ Fail closed when visual usability is weak: keep the placeholder instead of inser
 
 Every selected candidate begins as `review_pending`. Review it after the synthesis bundle exists and before `note_plan`:
 
-1. Open the exact candidate crop and its complete source page preview.
+1. Open the exact candidate crop and its complete source page preview. Each page preview carries a 10% grid; it stays out of every crop and saved image.
 2. Compare them with the matched Figure/Table identity and external caption.
 3. Confirm that the crop is a Visual-Body Crop: the complete scientific visual is present, all internal labels remain readable, and the external caption and surrounding paper prose are absent.
-4. Record the review in that candidate's existing decision entry using the generated `writing_contract.figure_table_contract.visual_review` fields and values.
+4. Record your verdict with the `review` command. Do not edit the decisions file by hand.
+
+```bash
+python3 scripts/plan_figure_table_decisions.py review \
+  --decisions <figure_table_decisions.json> --item "Figure 1" \
+  --verdict pass --preserved "<scientific element>" --preserved "<scientific element>"
+
+python3 scripts/plan_figure_table_decisions.py review \
+  --decisions <figure_table_decisions.json> --item "Figure 2" \
+  --verdict fail --failure <terminal failure reason> --notes "<what you saw>"
+```
+
+`pass` requires at least one `--preserved` element you actually saw, and turns the item into `insert`. `fail` turns it into `visual_defect`. The script writes the asset SHA-256 and refuses a crop whose bytes changed after planning. The verdict remains yours: the command only records it.
 
 A passing review is valid only for the decision entry's current asset SHA-256. Any asset change returns the item to `review_pending`. Complete the Figure/Table Decision Freeze before planning or drafting; grounding must reject an unresolved or stale review.
+
+## Promotion
+
+The planner's selection is only a starting point. When a Figure/Table the note needs is `low_priority`, a `placeholder`, or an automatic `visual_defect`, send it into review:
+
+```bash
+python3 scripts/plan_figure_table_decisions.py promote \
+  --decisions <figure_table_decisions.json> --assets <assets.json> --item "Figure 9"
+```
+
+With a usable crop on file, the command rerenders it at the contract's 300 dpi. Without one, it names the page preview to open; read the region off the grid and rerun with `--bbox x0,y0,x1,y1`, adding `--page <n>` when the body is not on the caption's page. The promoted item starts at `review_pending` and takes the same review as any other candidate. Items already in review cannot be promoted again.
 
 ## Visual-Body Crop Boundary
 
@@ -89,15 +112,15 @@ If the external caption cannot be separated without damaging the scientific visu
 
 ## Bounded Crop Repair
 
-Use a Bounded Crop Repair only for a geometry-only failure allowed by the generated contract. Put the page-relative normalized bbox and repair request into the same decision entry, then run:
+Use a Bounded Crop Repair only for a geometry-only failure allowed by the generated contract. Read the corrected region off the grid on the page preview. The bbox is relative to the whole page, not to the crop. Then run:
 
 ```bash
-python3 scripts/plan_figure_table_decisions.py \
-  --review-decisions <figure_table_decisions.json> \
-  --output <figure_table_decisions.json>
+python3 scripts/plan_figure_table_decisions.py review \
+  --decisions <figure_table_decisions.json> --item "Table 3" \
+  --verdict repair --failure <repairable failure reason> --bbox x0,y0,x1,y1
 ```
 
-The script validates the bbox, rerenders once from the source PDF at the contract's 300 dpi, refreshes the asset SHA-256, and returns the item to `review_pending` for a full fresh review. A terminal defect or a failed repaired crop remains a placeholder; never request a second recrop.
+The script validates the bbox, rerenders once from the source PDF at the contract's 300 dpi, refreshes the asset SHA-256, and returns the item to `review_pending` for a full fresh review. A terminal defect or a failed repaired crop remains a placeholder; a second repair request closes the item as `repair_limit_exhausted`.
 
 Reject candidates that are:
 - caption-only crops
