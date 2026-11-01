@@ -83,7 +83,7 @@ Figure-decision commands carry the current admission's source-bound `asset_subdi
 
 An unrecorded quality verdict needs the existing record phase. A recorded failure can require a revision or a stop when the two-revision limit is exhausted.
 
-The summary provides the evidence available for the Final user report, including gate results, warnings, figure decisions, saved path and mode, domain, and hash agreement. Saved-note claims require both a selected successful save receipt and the actual saved bytes. A missing receipt means the save cannot be verified from this selection; it does not prove that no save occurred.
+The summary provides the evidence available for the Final user report, including gate results, warnings, figure decisions including each dropped item and its reason, saved path and mode, domain, and hash agreement. Saved-note claims require both a selected successful save receipt and the actual saved bytes. A missing receipt means the save cannot be verified from this selection; it does not prove that no save occurred.
 
 ## Freshness limits
 

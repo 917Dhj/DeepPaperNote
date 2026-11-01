@@ -111,6 +111,7 @@ def test_skill_owns_one_final_user_report_contract() -> None:
         "actual saved domain",
         "report that directory's existing domain",
         "materialized and retained-placeholder figure/table counts",
+        "each dropped item with its reason from `figure_drops`",
         "Final Note Lint `note_sha256`",
         "derive every claim from current-run artifacts",
     ):
@@ -463,6 +464,9 @@ def test_figure_decision_script_consumes_canonical_contract() -> None:
     ).read_text(encoding="utf-8")
 
     assert DECISION_VALUES == set(WRITING_CONTRACT_RULES["figure_decision_values"])
+    assert "dropped" in DECISION_VALUES
+    assert "dropped" in WRITING_CONTRACT_RULES["visual_review_contract"]["review_status_values"]
+    assert "dropped" not in WRITING_CONTRACT_RULES["allowed_usable_placeholder_reasons"]
     assert INSERTABLE_KINDS == set(
         WRITING_CONTRACT_RULES["usable_insert_candidate"]["kinds"]
     )

@@ -125,7 +125,7 @@ Final user report:
 - Then report, in order:
   1. paper title and strongest verified identifier
   2. Grounding Lint, Final Note Lint, Final Quality Review, and Final Readability Review results, plus the warning count
-  3. materialized and retained-placeholder figure/table counts
+  3. materialized and retained-placeholder figure/table counts, plus each dropped item with its reason from `figure_drops`
   4. whether the saved note SHA-256 matches the Final Note Lint `note_sha256`
 - Add overwrite actions, preference changes, or user-relevant warnings only when they occurred.
 - Keep the report to these fields and derive every claim from current-run artifacts.
@@ -204,7 +204,7 @@ Formal Save inputs:
 - Contributions should enumerate the paper's actual innovations and explain why each matters rather than offering empty praise.
 - High-quality notes should usually contain multiple meaningful `###` subheadings in the technical sections when the paper is non-trivial.
 - Generate the complete figure/table decision table and satisfy the generated `writing_contract.figure_table_contract` before drafting or saving.
-- After the synthesis bundle is built, complete the model-led Visual Review Gate and Figure/Table Decision Freeze before creating `note_plan`; no `review_pending` item may cross that boundary.
+- After the synthesis bundle is built, complete the model-led Visual Review Gate and Figure/Table Decision Freeze before creating `note_plan`; no `review_pending` item may cross that boundary. Every usable candidate must end as `insert`, a recorded `visual_defect`, or a `dropped` item with a recorded reason, as described in `references/figure-placement.md`.
 - Pass the grounding and final-note figure gates before advancing; revise any failed decision coverage, insertion, structure, or status check.
 - An `insert` decision is complete only after Formal Save materializes the selected image into the paper-local `images/` directory and the write succeeds.
 - The note must pass the style gate for its configured language: `zh-CN` rejects mixed Chinese-English prose artifacts, while `en` rejects Chinese prose outside citation metadata.
