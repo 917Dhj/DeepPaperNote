@@ -45,6 +45,7 @@ MIN_VISUAL_FIGURE_HEIGHT_PT = 40
 MIN_FIGURE_WIDTH_PT = 100
 MIN_TABLE_HEIGHT_PT = 24
 FULL_PAGE_IMAGE_RATIO = 0.7
+RUNNING_HEADER_RATIO = 0.05
 SIDE_FIGURE_PANEL_GAP_PT = 24.0
 
 _TEXT_TABLE_SEPARATOR_RE = re.compile(r"(?:\t+|\s{2,}|[|;])")
@@ -530,6 +531,7 @@ def _grow_bbox_over_figure_labels(
 ) -> tuple[float, float, float, float]:
     """Extend a visual bbox over short nearby text such as axis labels."""
     paragraph_blocks = _find_paragraph_blocks(page)
+    header_bottom = page.rect.y0 + page.rect.height * RUNNING_HEADER_RATIO
     labels = []
     for line in _collect_text_lines(page):
         text = normalize_whitespace(str(line.get("text", "")))
@@ -540,6 +542,7 @@ def _grow_bbox_over_figure_labels(
             or CAPTION_RE.match(text)
             or bb[1] >= lower_bound - 1.0
             or bb[3] <= upper_bound
+            or bb[1] < header_bottom
             or (x_range is not None and (bb[0] < x_range[0] or bb[2] > x_range[1]))
             or _line_is_inside_any_block(bb, paragraph_blocks)
         ):
@@ -582,8 +585,20 @@ def _captions_share_column(first: dict, second: dict) -> bool:
     return x1 - x0 > narrower * 0.3
 
 
-def _is_beside_caption(box: tuple[float, ...], caption_anchor: dict) -> bool:
-    return box[0] >= caption_anchor["bbox"][2] - 2.0 or box[2] <= caption_anchor["bbox"][0] + 2.0
+def _caption_column(caption_anchor: dict, page_rect) -> tuple[float, float]:
+    """Return a caption's horizontal span, widened to its column when it is short."""
+    x0, _, x1, _ = caption_anchor["bbox"]
+    middle = (page_rect.x0 + page_rect.x1) / 2.0
+    if x1 <= middle:
+        return x0, middle
+    if x0 >= middle:
+        return middle, x1
+    return x0, x1
+
+
+def _is_beside_caption(box: tuple[float, ...], caption_anchor: dict, page_rect) -> bool:
+    x0, x1 = _caption_column(caption_anchor, page_rect)
+    return box[0] >= x1 - 2.0 or box[2] <= x0 + 2.0
 
 
 def _next_column_occupants(
@@ -599,12 +614,20 @@ def _next_column_occupants(
     """
     top = min(rect[1] for rect in rects)
     cap_y0 = caption_anchor["bbox"][1]
-    occupants = [block[:4] for block in _find_paragraph_blocks(page)]
+    # Prose fills a column; a narrow block is a label list inside the figure.
+    min_prose_width = page.rect.width * 0.3
+    occupants = [
+        block[:4]
+        for block in _find_paragraph_blocks(page)
+        if block[2] - block[0] >= min_prose_width
+    ]
     occupants += [a["bbox"] for a in caption_anchors if a["bbox"] != caption_anchor["bbox"]]
     return [
         box
         for box in occupants
-        if _is_beside_caption(box, caption_anchor) and box[1] < cap_y0 - 5.0 and box[3] > top + 5.0
+        if _is_beside_caption(box, caption_anchor, page.rect)
+        and box[1] < cap_y0 - 5.0
+        and box[3] > top + 5.0
     ]
 
 
@@ -612,8 +635,9 @@ def _column_x_range(
     bbox: tuple[float, float, float, float],
     caption_anchor: dict,
     occupants: list[tuple[float, ...]],
+    page_rect,
 ) -> tuple[float, float]:
-    cap_x0, _, cap_x1, _ = caption_anchor["bbox"]
+    cap_x0, cap_x1 = _caption_column(caption_anchor, page_rect)
     left = [box[2] for box in occupants if box[2] <= cap_x0 + 2.0]
     right = [box[0] for box in occupants if box[0] >= cap_x1 - 2.0]
     return (
@@ -638,7 +662,7 @@ def _visuals_above_caption(
             if clipped_y1 > r[1]:
                 relevant.append((r[0], r[1], r[2], clipped_y1))
     if relevant and _next_column_occupants(page, relevant, caption_anchor, caption_anchors):
-        return [rect for rect in relevant if not _is_beside_caption(rect, caption_anchor)]
+        return [rect for rect in relevant if not _is_beside_caption(rect, caption_anchor, page.rect)]
     return relevant
 
 
@@ -674,7 +698,9 @@ def _estimate_figure_bbox_above_caption(
             max(r[3] for r in relevant),
         )
         occupants = _next_column_occupants(page, relevant, caption_anchor, caption_anchors or [])
-        x_range = _column_x_range(active_bbox, caption_anchor, occupants) if occupants else None
+        x_range = None
+        if occupants:
+            x_range = _column_x_range(active_bbox, caption_anchor, occupants, page_rect)
         x0, y0, x1, y1 = _grow_bbox_over_figure_labels(
             page,
             active_bbox,
