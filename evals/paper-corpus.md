@@ -50,4 +50,4 @@ Heuristics can overfit papers they are tuned against. Keep some papers as `holdo
 python3 -m pytest -q -m corpus_holdout
 ```
 
-If a held-out paper fails, move it to `dev`, fix the problem, and add a new paper to `holdout`. Every paper in the first batch was inspected while building the corpus, so all of them are `dev`. Only papers not yet used for tuning belong in `holdout`.
+If a held-out paper fails, move it to `dev`, fix the problem, and add a new paper to `holdout`. Only papers not yet used for tuning belong in `holdout`. A paper whose pipeline output you inspected belongs in `dev`, so a run that fails uses that paper up, and a run that passes uses it up once you inspect its results.

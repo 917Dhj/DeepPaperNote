@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "pdf": "neurips-var.pdf",
+  "sha256": "09bf82325072d173f99954cf971b5f748ddc8834dadd9afc135098410d6b5849",
+  "split": "dev",
+  "source": "arXiv:2404.02905v2 (NeurIPS 2024)",
+  "traits": [
+    "single-column",
+    "figure-colon",
+    "wrapped-figure",
+    "multi-block-caption",
+    "numbered-algorithms"
+  ],
+  "labels": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Figure 5",
+    "Figure 6",
+    "Figure 7",
+    "Figure 8",
+    "Figure 9",
+    "Figure 10",
+    "Figure 11",
+    "Table 1",
+    "Table 2",
+    "Table 3",
+    "Algorithm 1",
+    "Algorithm 2"
+  ],
+  "captions": {
+    "Figure 2": {
+      "starts": "Standard autoregressive modeling (AR) vs. our proposed",
+      "ends": "VAR requires a multi-scale VQVAE to work."
+    },
+    "Figure 4": {
+      "starts": "VAR involves two separated training stages.",
+      "ends": "Standard cross-entropy loss is used."
+    },
+    "Table 2": {
+      "starts": "ImageNet 512×512 conditional generation.",
+      "ends": "due to resource limitation."
+    }
+  },
+  "review": [
+    "Figure 2",
+    "Figure 4",
+    "Figure 5",
+    "Table 1",
+    "Table 3"
+  ],
+  "same_visual": [],
+  "known_gaps": {
+    "caption:Figure 4": "The caption continues in a second text block, and only the first block is read."
+  }
+}
