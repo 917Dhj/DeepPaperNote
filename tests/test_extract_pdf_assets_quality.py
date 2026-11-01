@@ -1063,6 +1063,25 @@ def test_every_table_on_a_page_with_captions_above_keeps_its_body(tmp_path: Path
         doc.close()
 
 
+def test_stray_row_under_the_last_table_does_not_flip_the_page(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        add_table_rows(page, 80.0, "First", rows=3)
+        page.insert_text((60.0, 125.0), wide_table_caption(1), fontsize=9)
+        add_table_rows(page, 150.0, "Second")
+        page.insert_text((60.0, 235.0), wide_table_caption(2), fontsize=9)
+        add_table_rows(page, 260.0, "Stray", rows=1)
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "First0" in crops["Table 1"] and "Second0" not in crops["Table 1"]
+    finally:
+        doc.close()
+
+
 def test_table_crop_ignores_a_page_sized_drawing(tmp_path: Path) -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for table bbox tests.")
@@ -1168,6 +1187,34 @@ def test_figure_crop_stops_at_prose_above_it_in_the_column(tmp_path: Path) -> No
         page.insert_text((320.0, 655.0), "Fig. 4 | A figure in the right column.", fontsize=7)
 
         assert crop_boxes(page, tmp_path)["Fig. 4"][1] > 400.0
+    finally:
+        doc.close()
+
+
+def test_text_inside_a_framed_figure_is_not_column_prose(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        page.draw_rect(fitz.Rect(315.0, 60.0, 565.0, 400.0), color=(0.2, 0.4, 0.8))
+        page.insert_textbox(fitz.Rect(320.0, 180.0, 560.0, 390.0), COLUMN_PROSE, fontsize=9)
+        page.insert_text((320.0, 420.0), "Figure 1. Example text inside a frame.", fontsize=7)
+
+        assert crop_boxes(page, tmp_path)["Figure 1"][1] < 100.0
+    finally:
+        doc.close()
+
+
+def test_blank_page_top_above_a_caption_is_not_a_figure(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        page.insert_text((320.0, 100.0), "Figure 2. A caption at the top of its column.", fontsize=7)
+
+        assert "Figure 2" not in crop_boxes(page, tmp_path)
     finally:
         doc.close()
 
