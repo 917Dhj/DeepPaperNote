@@ -91,4 +91,4 @@ The query reuses the existing lint, visual-review, and final-review contracts. G
 
 Several early producers do not record their input hashes. Those files can remain `present_unverified` even when a later gate passes. Grounding Lint also has no bundle hash, so its receipt cannot prove that it checked the latest bundle. The report lists these provenance gaps and does not infer freshness from timestamps.
 
-Use the canonical workflow in `SKILL.md` to perform the required stages. Status inspection does not replace source reading, model judgment, final readability review, or Save Target Admission. Pipeline splitting and automatic resume are separate changes.
+Use the canonical workflow in `SKILL.md` to perform the required stages. Status inspection does not replace source reading, model judgment, final readability review, or Save Target Admission. `next_action` recommends one producer at a time and does not run the `run_pipeline.py` phases.

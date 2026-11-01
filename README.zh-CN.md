@@ -135,7 +135,7 @@ DeepPaperNote 仍然是唯一主产品。仓库同时提供一个可选 companio
 
 规范执行契约以 [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md) 为准。
 
-使用 `python skills/deeppapernote/scripts/run_state.py status --workdir <运行目录> --prefix <运行前缀>` 可以只读查询缺失或过期产物、当前门禁结果和下一步操作。[运行状态查询说明](./skills/deeppapernote/references/run-state.md)介绍了如何显式选择产物，以及哪些历史新鲜度无法从现有文件证明。
+使用 `python skills/deeppapernote/scripts/run_state.py status --workdir <运行目录> --prefix <运行前缀>` 可以只读查询缺失或过期产物、当前门禁结果和下一步操作。[运行状态查询说明](./skills/deeppapernote/references/run-state.md)介绍了如何显式选择产物，以及哪些历史新鲜度无法从现有文件证明。运行产物默认放在 `~/.deeppapernote/runs/` 下按论文区分的目录中，不会自动清理。
 
 ## 🗂️ 首次使用设置
 
