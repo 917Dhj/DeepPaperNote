@@ -1083,6 +1083,57 @@ def test_text_box_figure_is_kept_whole_and_inside_its_column(tmp_path: Path) -> 
         doc.close()
 
 
+def test_short_caption_keeps_the_rest_of_its_column(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=612.0, height=792.0)
+        page.draw_rect(fitz.Rect(60.0, 100.0, 150.0, 300.0), fill=(0.2, 0.4, 0.8))
+        page.draw_rect(fitz.Rect(180.0, 100.0, 290.0, 300.0), fill=(0.8, 0.4, 0.2))
+        page.insert_textbox(fitz.Rect(320.0, 100.0, 560.0, 330.0), COLUMN_PROSE, fontsize=9)
+        page.insert_text((60.0, 320.0), "Figure 1. Short.", fontsize=9)
+
+        assert crop_boxes(page, tmp_path)["Figure 1"][2] > 285.0
+    finally:
+        doc.close()
+
+
+def test_long_label_list_inside_a_figure_does_not_fill_a_column(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=612.0, height=792.0)
+        page.draw_rect(fitz.Rect(60.0, 100.0, 290.0, 500.0), fill=(0.2, 0.4, 0.8))
+        page.draw_rect(fitz.Rect(320.0, 100.0, 480.0, 500.0), fill=(0.8, 0.4, 0.2))
+        genes = "\n".join(["CD69 Mki67 Lag3 Tigit Havcr2 Cd44 Sell Ccr7 Tcf7"] * 12)
+        page.insert_textbox(
+            fitz.Rect(490.0, 110.0, 560.0, 490.0), genes, fontsize=4, color=(0, 0, 0)
+        )
+        page.insert_text((60.0, 520.0), "Extended Data Fig. 6: See next page.", fontsize=9)
+
+        assert crop_boxes(page, tmp_path)["Extended Data Fig. 6"][2] > 470.0
+    finally:
+        doc.close()
+
+
+def test_figure_crop_leaves_the_running_header_out(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=791.0)
+        page.insert_text((40.0, 34.0), "Article", fontsize=12)
+        page.draw_rect(fitz.Rect(40.0, 60.0, 290.0, 300.0), fill=(0.2, 0.4, 0.8))
+        page.insert_text((50.0, 50.0), "panel", fontsize=7)
+        page.insert_text((40.0, 320.0), "Fig. 2 | A figure at the top of the page.", fontsize=7)
+
+        assert crop_boxes(page, tmp_path)["Fig. 2"][1] > 34.0
+    finally:
+        doc.close()
+
+
 def test_grow_table_region_allows_gap_between_header_and_data_rows() -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for page rect construction.")
