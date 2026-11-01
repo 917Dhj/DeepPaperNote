@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import io
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from common import (
@@ -315,12 +316,18 @@ def _collect_drawing_rects(page) -> list[tuple[float, float, float, float]]:
     return rects
 
 
+@lru_cache(maxsize=1)
+def _page_visual_rects(page) -> tuple[tuple[float, float, float, float], ...]:
+    """Return a page's image and drawing boxes; every caption on it reads them."""
+    return tuple(_collect_xref_rects(page) + _collect_drawing_rects(page))
+
+
 def _visual_signal_for_bbox(page, bbox: tuple[float, float, float, float]) -> tuple[int, float]:
     """Return visual rect count and visual-area ratio inside a crop."""
     crop_area = _rect_area(bbox)
     if crop_area <= 0:
         return 0, 0.0
-    rects = _collect_xref_rects(page) + _collect_drawing_rects(page)
+    rects = _page_visual_rects(page)
     count = 0
     visual_area = 0.0
     for rect in rects:
@@ -684,7 +691,7 @@ def _figure_ceiling(page, caption_anchor: dict, prev_anchor: dict | None) -> flo
         and block[2] - block[0] >= min_prose_width
         and ((block[0] + block[2]) / 2.0 < middle) == (cap_x1 <= middle)
     ]
-    visuals = _collect_xref_rects(page) + _collect_drawing_rects(page)
+    visuals = _page_visual_rects(page)
     if not prose or not visuals:
         return ceiling
     # Text inside a frame belongs to the figure drawn around it.
@@ -700,7 +707,7 @@ def _visuals_above_caption(
     caption_y_top = caption_anchor["bbox"][1]
     upper_bound = _figure_ceiling(page, caption_anchor, prev_anchor)
     relevant: list[tuple[float, float, float, float]] = []
-    for r in _collect_xref_rects(page) + _collect_drawing_rects(page):
+    for r in _page_visual_rects(page):
         ry_mid = (r[1] + r[3]) / 2.0
         if upper_bound <= ry_mid <= caption_y_top + 5:
             clipped_y1 = min(r[3], caption_y_top - 2.0)
@@ -789,7 +796,7 @@ def _estimate_figure_bbox_beside_caption(
     caption of its own.
     """
     cap_x0, cap_y0, cap_x1, cap_y1 = caption_anchor["bbox"]
-    rects = _collect_xref_rects(page) + _collect_drawing_rects(page)
+    rects = _page_visual_rects(page)
     if any(r[3] <= cap_y0 + 5.0 and r[0] < cap_x1 and r[2] > cap_x0 for r in rects):
         return None
 
