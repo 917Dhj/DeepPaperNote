@@ -1181,6 +1181,37 @@ def _page_keeps_table_captions_below(
     return rows_below == 0
 
 
+def _page_keeps_table_captions_above(
+    page,
+    caption_anchor: dict,
+    page_anchors: list[dict],
+    rows: list[dict],
+    paragraph_blocks: list[tuple[float, float, float, float, str]],
+    page_rect,
+) -> bool:
+    """Tell whether the page's first table has nothing over its caption."""
+    earlier = [
+        anchor
+        for anchor in page_anchors
+        if anchor["kind"] == "table"
+        and anchor["bbox"][3] < caption_anchor["bbox"][1]
+        and _captions_share_column(anchor, caption_anchor)
+    ]
+    if not earlier:
+        return False
+    first = earlier[0]
+    _, rows_above = _grow_table_region(
+        page,
+        first,
+        rows,
+        paragraph_blocks,
+        direction="up",
+        upper_bound=page_rect.y0,
+        lower_bound=first["bbox"][1],
+    )
+    return rows_above == 0
+
+
 def _estimate_table_bbox_with_rows(
     page,
     caption_anchor: dict,
@@ -1253,9 +1284,13 @@ def _estimate_table_bbox_with_rows(
         page, caption_anchor, page_anchors or [], rows, paragraph_blocks, page_rect
     )
 
+    captions_above = up_data > down_data > 0 and _page_keeps_table_captions_above(
+        page, caption_anchor, page_anchors or [], rows, paragraph_blocks, page_rect
+    )
+
     chosen: list[tuple[float, float, float, float]]
     chosen_data_rows: int
-    if up_data > down_data or captions_below:
+    if (up_data > down_data and not captions_above) or captions_below:
         chosen = up_lines
         chosen_data_rows = up_data
         direction = "up"
