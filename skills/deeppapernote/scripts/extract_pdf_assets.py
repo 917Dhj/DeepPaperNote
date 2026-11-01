@@ -290,12 +290,21 @@ def _collect_xref_rects(page) -> list[tuple[float, float, float, float]]:
 def _collect_drawing_rects(page) -> list[tuple[float, float, float, float]]:
     """Gather bounding boxes of vector drawings on the page."""
     rects: list[tuple[float, float, float, float]] = []
+    clips: list[tuple[int, fitz.Rect]] = []
     try:
-        for drawing in page.get_drawings():
+        for drawing in page.get_drawings(extended=True):
+            level = drawing.get("level", 0)
+            while clips and clips[-1][0] >= level:
+                clips.pop()
+            if drawing.get("type") == "clip":
+                clips.append((level, fitz.Rect(drawing["scissor"])))
+                continue
             r = drawing.get("rect")
-            if r is None:
+            if r is None or drawing.get("type") == "group":
                 continue
             rect = fitz.Rect(r)
+            if clips:
+                rect &= clips[-1][1]
             if rect.is_empty or rect.is_infinite:
                 continue
             if rect.width < 10 or rect.height < 10:
@@ -646,6 +655,24 @@ def _column_x_range(
     )
 
 
+def _figure_ceiling(page, caption_anchor: dict, prev_anchor: dict | None) -> float:
+    """Return the highest y a figure can reach: the previous caption or its column's prose."""
+    ceiling = prev_anchor["bbox"][3] + 2.0 if prev_anchor is not None else 0.0
+    cap_x0, cap_y0, cap_x1, _ = caption_anchor["bbox"]
+    middle = (page.rect.x0 + page.rect.x1) / 2.0
+    if cap_x0 < middle < cap_x1:
+        return ceiling
+    min_prose_width = page.rect.width * 0.3
+    prose_bottoms = [
+        block[3]
+        for block in _find_paragraph_blocks(page)
+        if block[3] <= cap_y0
+        and block[2] - block[0] >= min_prose_width
+        and ((block[0] + block[2]) / 2.0 < middle) == (cap_x1 <= middle)
+    ]
+    return max([ceiling, *prose_bottoms])
+
+
 def _visuals_above_caption(
     page,
     caption_anchor: dict,
@@ -653,7 +680,7 @@ def _visuals_above_caption(
     caption_anchors: list[dict],
 ) -> list[tuple[float, float, float, float]]:
     caption_y_top = caption_anchor["bbox"][1]
-    upper_bound = prev_anchor["bbox"][3] + 2.0 if prev_anchor is not None else 0.0
+    upper_bound = _figure_ceiling(page, caption_anchor, prev_anchor)
     relevant: list[tuple[float, float, float, float]] = []
     for r in _collect_xref_rects(page) + _collect_drawing_rects(page):
         ry_mid = (r[1] + r[3]) / 2.0
@@ -684,9 +711,7 @@ def _estimate_figure_bbox_above_caption(
        the nearest body-text block above and the caption.
     """
     caption_y_top = caption_anchor["bbox"][1]
-    upper_bound = 0.0
-    if prev_anchor is not None:
-        upper_bound = prev_anchor["bbox"][3] + 2.0
+    upper_bound = _figure_ceiling(page, caption_anchor, prev_anchor)
 
     relevant = _visuals_above_caption(page, caption_anchor, prev_anchor, caption_anchors or [])
 
