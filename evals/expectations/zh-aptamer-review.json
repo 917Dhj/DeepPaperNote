@@ -79,7 +79,6 @@
     ]
   ],
   "known_gaps": {
-    "caption:Fig ?": "The centered last line is a separate text block, so it is not merged into the caption.",
     "review:Table 1": "The visual quality gate rejects this crop; the cause is not analyzed yet.",
     "same_visual:*": "A bilingual caption pair creates two decisions for one visual."
   }

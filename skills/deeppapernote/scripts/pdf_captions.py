@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 
 from common import (
     caption_label_key,
@@ -26,6 +27,7 @@ CAPTION_RE = re.compile(
 )
 CAPTION_SEPARATORS = ":：.。|—–-"
 CJK_RE = re.compile(r"[　-〿㐀-鿿＀-￯]")
+CAPTION_SENTENCE_ENDS = (".", "?", "!", "。", "？", "！")
 
 # Used to decide whether a continuation line still belongs to the caption text
 # or has already entered the data body of a table.  A row of pure tabular data
@@ -34,6 +36,8 @@ CJK_RE = re.compile(r"[　-〿㐀-鿿＀-￯]")
 # caption start, we must NOT merge it into the caption bbox; otherwise the
 # downstream "table body lives below caption" cropping logic will mistake the
 # numeric row for caption text and shrink the table bbox accordingly.
+MAX_CAPTION_CONTINUATIONS = 3
+MIN_CAPTION_COLUMN_CHARS = 20
 _NUMERIC_TOKEN_RE = re.compile(r"^[+-]?(?:\d+\.\d+|\.\d+|\d+)(?:[eE][+-]?\d+)?$")
 
 
@@ -101,6 +105,100 @@ def join_caption_lines(lines: list[str]) -> str:
     return joined
 
 
+def font_sizes(blocks: list[dict]) -> Counter:
+    """Count the characters set at each font size, rounded to absorb small jitter."""
+    sizes: Counter = Counter()
+    for block in blocks:
+        for line in block.get("lines", []):
+            for span in line.get("spans", []):
+                sizes[round(span["size"], 1)] += len(span.get("text", "").strip())
+    return sizes
+
+
+def dominant_font_size(blocks: list[dict]) -> float:
+    sizes = font_sizes(blocks)
+    return sizes.most_common(1)[0][0] if sizes else 0.0
+
+
+def block_lines(block: dict) -> list[str]:
+    lines = ("".join(s.get("text", "") for s in line.get("spans", [])) for line in block["lines"])
+    return [text for text in (line.strip() for line in lines) if text]
+
+
+def block_continues_caption(
+    block: dict,
+    caption_bbox: tuple[float, float, float, float],
+    tail_bbox: tuple[float, float, float, float],
+    text: str,
+    size: float,
+    body_size: float,
+) -> bool:
+    """Tell whether a text block carries on a caption cut by a layout break.
+
+    Text set smaller than the page body in the next column, level with the
+    caption, can only be the caption. Elsewhere a block must follow directly
+    and read as the rest of an unfinished sentence, which keeps table headers
+    and body paragraphs out.
+    """
+    lines = block_lines(block)
+    if (
+        not lines
+        or abs(dominant_font_size([block]) - size) > 0.3
+        or CAPTION_RE.match(lines[0])
+        or looks_like_data_row(lines[0])
+    ):
+        return False
+    x0, y0, x1, _ = block["bbox"]
+    small = size <= body_size - 0.5
+    unfinished = not (text.endswith(CAPTION_SENTENCE_ENDS) or CJK_RE.match(text[-1]))
+    lowercase = lines[0][0].islower()
+    if (
+        x0 >= caption_bbox[2] - 2.0
+        and abs(y0 - caption_bbox[1]) <= 3.0
+        and x1 - x0 <= (caption_bbox[2] - caption_bbox[0]) * 1.15
+        and sum(map(len, lines)) >= MIN_CAPTION_COLUMN_CHARS
+    ):
+        return small or (unfinished and lowercase)
+    follows = tail_bbox[1] < y0 and y0 - tail_bbox[3] <= size * 1.6
+    overlaps = x0 < tail_bbox[2] and x1 > tail_bbox[0]
+    return follows and overlaps and unfinished and (lowercase or small)
+
+
+def extend_caption_across_blocks(anchor: dict, block: dict, blocks: list[dict]) -> None:
+    """Append the text blocks a caption runs into when its own block ends."""
+    size = dominant_font_size([block])
+    body_size = dominant_font_size(blocks)
+    caption_bbox = anchor["bbox"]
+    tail_bbox = caption_bbox
+    parts = [anchor["line_text"]]
+    for _ in range(MAX_CAPTION_CONTINUATIONS):
+        following = next(
+            (
+                candidate
+                for candidate in blocks
+                if candidate is not block
+                and block_continues_caption(
+                    candidate, caption_bbox, tail_bbox, parts[-1], size, body_size
+                )
+            ),
+            None,
+        )
+        if following is None:
+            break
+        block = following
+        tail_bbox = tuple(following["bbox"])
+        parts.append(join_caption_lines(block_lines(following)))
+        if tail_bbox[0] < caption_bbox[2]:
+            x0, y0, x1, y1 = anchor["bbox"]
+            anchor["bbox"] = (
+                min(x0, tail_bbox[0]),
+                y0,
+                max(x1, tail_bbox[2]),
+                max(y1, tail_bbox[3]),
+            )
+    anchor["line_text"] = join_caption_lines(parts)
+
+
 def find_caption_blocks(page) -> list[dict]:
     """Return caption anchors sorted top-to-bottom by their y0 coordinate.
 
@@ -118,10 +216,12 @@ def find_caption_blocks(page) -> list[dict]:
         }
     """
     anchors: list[dict] = []
-    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+    blocks = [
+        block
+        for block in page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+        if block.get("type") == 0
+    ]
     for block in blocks:
-        if block.get("type") != 0:
-            continue
         lines = block.get("lines", [])
         for line_idx, line in enumerate(lines):
             spans = line.get("spans", [])
@@ -162,14 +262,17 @@ def find_caption_blocks(page) -> list[dict]:
                 prev_line_bottom = cb[3]
                 caption_lines_text.append(cont_text)
 
-            anchors.append({
+            anchor = {
                 "label": label,
                 "kind": kind,
                 "bbox": (x0, y0, x1, y1),
                 "label_bbox": tuple(first_bbox),
                 "line_text": join_caption_lines(caption_lines_text),
                 "strength": caption_strength(line_text, match, block_start=line_idx == 0),
-            })
+            }
+            if line_idx + len(caption_lines_text) == len(lines):
+                extend_caption_across_blocks(anchor, block, blocks)
+            anchors.append(anchor)
     anchors.sort(key=lambda a: a["bbox"][1])
     return anchors
 

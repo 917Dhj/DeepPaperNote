@@ -258,6 +258,18 @@ def test_table_header_below_an_unfinished_caption_stays_out() -> None:
     assert find_caption_blocks(page)[0]["line_text"] == "Table 1: Results by method"
 
 
+def test_cjk_caption_keeps_its_english_translation_out() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    for top, text in ((400, "表１　检测仪参数"), (414, "Ｔａｂｌｅ　１　Ｄｅｔｅｃｔｏｒ")):
+        page.insert_textbox(
+            fitz.Rect(108, top, 504, top + 20), text, fontsize=9, fontname="china-s"
+        )
+    page.insert_textbox(fitz.Rect(108, 460, 504, 760), BODY_TEXT, fontsize=10)
+
+    assert find_caption_blocks(page)[0]["line_text"] == "表１　检测仪参数"
+
+
 def test_text_fallback_prefers_a_short_caption_over_a_lowercase_reference() -> None:
     text = "Table 3: Zero-shot transfer.\nTable 3: recall at 50% precision is high at the cost"
     assert extract_caption_lines(text, "table") == [

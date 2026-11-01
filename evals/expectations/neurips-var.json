@@ -50,7 +50,5 @@
     "Table 3"
   ],
   "same_visual": [],
-  "known_gaps": {
-    "caption:Figure 4": "The caption continues in a second text block, and only the first block is read."
-  }
+  "known_gaps": {}
 }
