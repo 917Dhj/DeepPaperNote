@@ -553,6 +553,78 @@ def test_mixed_language_detector_flags_summary_section_when_mixed() -> None:
     assert len(issues) == 1
 
 
+def test_mixed_language_detector_ignores_inline_math() -> None:
+    note = r"注意力计算为 $\mathrm{softmax}(QK^T/\sqrt{d})V$，其中 KV cache 会随序列长度增长。"
+
+    assert mixed_language_issues(note) == []
+
+
+def test_mixed_language_detector_ignores_backticked_proper_nouns() -> None:
+    note = "作者在 `MMLU`、`GSM8K`、`HumanEval`、`MATH`、`BBH`、`ARC-C` 和 `LLaMA-2-7B` 上评测。"
+
+    assert mixed_language_issues(note) == []
+
+
+def test_mixed_language_detector_counts_bare_proper_noun_lists() -> None:
+    note = "作者在 MMLU、GSM8K、HumanEval、MATH、BBH、ARC-C 和 LLaMA-2-7B 上做了评测。"
+
+    issues = mixed_language_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["signal"] == "scattered_english_words"
+
+
+def test_mixed_language_detector_flags_scattered_english_words() -> None:
+    note = "下游 consumption 前要 fail closed；fetch 使用了 stale 或 wrong identity 时直接停止。"
+
+    issues = mixed_language_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["english_words"] == [
+        "consumption", "fail", "closed", "fetch", "stale", "wrong", "identity",
+    ]
+
+
+def test_mixed_language_detector_ignores_wikilinks_and_citations() -> None:
+    note = "这沿用了 [[Segment Anything in the Wild]] 的评测 (Kirillov et al., 2023) [12, 13]。"
+
+    assert mixed_language_issues(note) == []
+
+
+def test_mixed_language_detector_ignores_fenced_code() -> None:
+    note = "```python\nx = encoder(x)  # 计算 the output of the encoder layer\n```"
+
+    assert mixed_language_issues(note) == []
+
+
+def test_mixed_language_detector_reports_the_english_run() -> None:
+    note = "我们发现 the model is used to predict the mask，这是一处翻译残留。"
+
+    issues = mixed_language_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["signal"] == "english_clause"
+    assert issues[0]["english_run"] == "the model is used to predict the mask"
+
+
+def test_mixed_language_detector_flags_clause_hidden_in_backticks() -> None:
+    note = "作者认为 `the model is used to predict the mask` 是关键。"
+
+    issues = mixed_language_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["english_run"] == "the model is used to predict the mask"
+
+
+def test_mixed_language_detector_flags_clause_around_inline_math() -> None:
+    note = r"其中 the loss $\mathcal{L}$ is minimized over the training set，这一点很重要。"
+
+    issues = mixed_language_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["english_run"] == "the loss is minimized over the training set"
+
+
 def test_mid_sentence_linebreak_detector_flags_pdf_style_wrapping() -> None:
     note = "这篇论文最重要的贡献在于，\n它重新定义了视觉自回归的预测顺序。"
     issues = suspicious_mid_sentence_linebreaks(note)
