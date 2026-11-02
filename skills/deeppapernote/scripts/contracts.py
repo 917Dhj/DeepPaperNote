@@ -467,6 +467,7 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
         "placeholder",
         "low_priority",
         "visual_defect",
+        "dropped",
         "skip",
     ),
     "usable_insert_candidate": {
@@ -500,7 +501,7 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
             "repair_attempts",
             "revised_bbox",
         ),
-        "review_status_values": ("pending", "pass", "fail", "repair_requested"),
+        "review_status_values": ("pending", "pass", "fail", "repair_requested", "dropped"),
         "repair_limit": 1,
         "asset_sha256_bound": True,
         "caption_free_visual_body_required": True,

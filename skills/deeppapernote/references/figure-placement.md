@@ -89,7 +89,7 @@ python3 scripts/plan_figure_table_decisions.py review \
   --verdict fail --failure <terminal failure reason> --notes "<what you saw>"
 ```
 
-`pass` requires at least one `--preserved` element you actually saw, and turns the item into `insert`. `fail` turns it into `visual_defect`. The script writes the asset SHA-256 and refuses a crop whose bytes changed after planning. The verdict remains yours: the command only records it.
+`pass` requires at least one `--preserved` element you actually saw, and turns the item into `insert`. `fail` turns it into `visual_defect`. `drop` records that the note does not need the item; see Dropping. The script writes the asset SHA-256 and refuses a crop whose bytes changed after planning. The verdict remains yours: the command only records it.
 
 A passing review is valid only for the decision entry's current asset SHA-256. Any asset change returns the item to `review_pending`. Complete the Figure/Table Decision Freeze before planning or drafting; grounding must reject an unresolved or stale review.
 
@@ -103,6 +103,25 @@ python3 scripts/plan_figure_table_decisions.py promote \
 ```
 
 With a usable crop on file, the command rerenders it at the contract's 300 dpi. Without one, it names the page preview to open; read the region off the grid and rerun with `--bbox x0,y0,x1,y1`, adding `--page <n>` when the body is not on the caption's page. The promoted item starts at `review_pending` and takes the same review as any other candidate. Items already in review cannot be promoted again.
+
+## Dropping
+
+Review selects for the note, not only for crop quality. After opening a candidate, drop it when the note has no use for it, for example a third example gallery that repeats a pattern already shown:
+
+```bash
+python3 scripts/plan_figure_table_decisions.py review \
+  --decisions <figure_table_decisions.json> --item "Figure 12" \
+  --verdict drop --reason "<why this note does not need it>"
+```
+
+`--reason` is required, is stored as the item's `skip_reason`, and states your editorial judgment about this paper. The item becomes `dropped`, stays in the decision table with its reviewed asset SHA-256, and appears with its reason in the `run_state.py` summary and the Final user report. Keep no callout for it in the note.
+
+A drop is an editorial choice, never a visual verdict:
+
+- A crop with a visual problem takes `repair` or `fail`. If the note needs the visual, repair it instead of dropping it. A failure reason is refused as a `--reason`, and an item with a recorded visual failure cannot become a drop.
+- Do not drop a key method overview or main result figure to save work; the priorities in What to Prefer still apply.
+- An item the planner left out of review needs no drop: it is already not inserted.
+- Later verdicts replace a drop if your judgment changes. Grounding rejects a drop with no reason, no recorded review, or a stale asset hash.
 
 ## Visual-Body Crop Boundary
 

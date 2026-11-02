@@ -78,6 +78,12 @@ def visual_review_is_valid(review: Any) -> bool:
             and not failure_reason
             and not review["omitted_scientific_elements"]
         )
+    if status == "dropped":
+        return bool(
+            reviewed_sha256
+            and not failure_reason
+            and not review["omitted_scientific_elements"]
+        )
     if status == "repair_requested":
         return bool(
             reviewed_sha256
@@ -166,6 +172,14 @@ def final_visual_failure_is_valid(item: dict[str, Any]) -> bool:
         and normalize_whitespace(str(review.get("reviewed_asset_sha256", "")))
         == current_sha256
     )
+
+
+def drop_reason_is_valid(reason: Any) -> bool:
+    """A drop records why the note skips the item, so it cannot name a visual failure."""
+    text = normalize_whitespace(str(reason or "")).lower()
+    contract = WRITING_CONTRACT_RULES["visual_review_contract"]
+    failures = {*contract["terminal_failure_reasons"], *contract["repairable_failure_reasons"]}
+    return bool(text) and text not in failures
 
 
 def parser() -> argparse.ArgumentParser:
@@ -582,7 +596,8 @@ def validate_figure_decisions(
                     source_id=item.get("source_id") or item.get("label") or "",
                 )
             )
-        if decision == "insert":
+        reviewed_status = {"insert": "pass", "dropped": "dropped"}.get(decision)
+        if reviewed_status:
             source_path = normalize_whitespace(str(item.get("source_image_path", "")))
             current_sha256 = file_sha256(source_path)
             review = item.get("visual_review", {})
@@ -601,7 +616,7 @@ def validate_figure_decisions(
                     )
                 )
             if isinstance(review, dict) and (
-                normalize_whitespace(str(review.get("status", ""))) != "pass"
+                normalize_whitespace(str(review.get("status", ""))) != reviewed_status
                 or not current_sha256
                 or normalize_whitespace(str(review.get("reviewed_asset_sha256", "")))
                 != current_sha256
@@ -612,6 +627,13 @@ def validate_figure_decisions(
                         source_id=item.get("source_id") or item.get("label") or "",
                     )
                 )
+        if decision == "dropped" and not drop_reason_is_valid(item.get("skip_reason")):
+            issues.append(
+                issue(
+                    "figure_visual_review_drop_reason_invalid",
+                    source_id=item.get("source_id") or item.get("label") or "",
+                )
+            )
         is_required_insert_candidate = (
             normalize_whitespace(str(item.get("kind", ""))) in insertable_kinds
             and normalize_whitespace(str(item.get("visual_quality_status", "")))
@@ -620,7 +642,7 @@ def validate_figure_decisions(
         )
         if (
             is_required_insert_candidate
-            and decision not in {"insert", "review_pending"}
+            and decision not in {"insert", "review_pending", "dropped"}
             and not final_visual_failure_is_valid(item)
         ):
             skip_reason = normalize_whitespace(str(item.get("skip_reason", "")))

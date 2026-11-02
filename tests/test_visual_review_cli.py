@@ -519,3 +519,196 @@ def test_every_page_preview_carries_a_ten_percent_grid(tmp_path: Path) -> None:
         assert {blank.pixel(x - 1, 355), blank.pixel(x, 355)} != {white}
         assert {blank.pixel(267, y - 1), blank.pixel(267, y)} != {white}
     assert blank.pixel(440, 587) == white
+
+
+REASON = "与 Figure 1 的主流程重复，笔记用不上"
+
+
+def drop(run: dict[str, Path], item: str, *args: str) -> subprocess.CompletedProcess[str]:
+    return review(run, item, "--verdict", "drop", *args)
+
+
+def test_drop_records_the_reason_without_a_visual_failure(run: dict[str, Path]) -> None:
+    result = drop(run, "Figure 1", "--reason", f"  {REASON}\n", "--notes", "Crop is clean.")
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["skip_reason"] == REASON
+    item = entry(run, "Figure 1")
+    assert item["decision"] == "dropped"
+    assert item["skip_reason"] == REASON
+    review_record = item["visual_review"]
+    assert review_record["status"] == "dropped"
+    assert review_record["failure_reason"] == ""
+    assert review_record["notes"] == "Crop is clean."
+    assert (
+        review_record["reviewed_asset_sha256"]
+        == hashlib.sha256(Path(item["source_image_path"]).read_bytes()).hexdigest()
+    )
+    assert gate_codes(run, "Figure 1") == []
+
+
+@pytest.mark.parametrize("reason", ["", "   ", "caption_contamination", "Identity_Mismatch"])
+def test_drop_refuses_a_missing_reason_or_a_visual_failure(
+    run: dict[str, Path], reason: str
+) -> None:
+    result = drop(run, "Figure 1", "--reason", reason)
+
+    assert result.returncode != 0
+    assert entry(run, "Figure 1")["decision"] == "review_pending"
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ("--failure", "identity_mismatch"),
+        ("--omitted", "legend"),
+        ("--preserved", "panel a"),
+        ("--bbox", "0.1,0.1,0.9,0.9"),
+    ],
+)
+def test_drop_takes_no_review_findings(run: dict[str, Path], extra: tuple[str, str]) -> None:
+    result = drop(run, "Figure 1", "--reason", REASON, *extra)
+
+    assert result.returncode != 0
+    assert entry(run, "Figure 1")["decision"] == "review_pending"
+
+
+def test_reason_only_applies_to_drop(run: dict[str, Path]) -> None:
+    result = review(
+        run, "Figure 1", "--verdict", "pass", "--preserved", "axes", "--reason", REASON
+    )
+
+    assert result.returncode != 0
+    assert entry(run, "Figure 1")["decision"] == "review_pending"
+
+
+def test_drop_is_only_for_items_in_review(run: dict[str, Path]) -> None:
+    result = drop(run, "Figure 2", "--reason", REASON)
+
+    assert result.returncode != 0
+    assert "promote" in result.stderr
+    assert entry(run, "Figure 2")["decision"] == "low_priority"
+
+
+def test_drop_refuses_a_candidate_changed_since_planning(run: dict[str, Path]) -> None:
+    Path(entry(run, "Figure 1")["source_image_path"]).write_bytes(b"swapped")
+
+    assert drop(run, "Figure 1", "--reason", REASON).returncode != 0
+    assert entry(run, "Figure 1")["decision"] == "review_pending"
+
+
+def test_a_promoted_item_can_be_dropped(run: dict[str, Path]) -> None:
+    assert promote(run, "Figure 2").returncode == 0
+
+    assert drop(run, "Figure 2", "--reason", REASON).returncode == 0
+    assert entry(run, "Figure 2")["decision"] == "dropped"
+    assert gate_codes(run, "Figure 2") == []
+
+
+def test_a_dropped_item_stays_counted_and_cannot_be_replanned_away(
+    run: dict[str, Path],
+) -> None:
+    assert drop(run, "Figure 1", "--reason", REASON).returncode == 0
+
+    wrapper = load(run)
+    assert wrapper["summary"]["by_decision"]["dropped"] == 1
+    assert wrapper["summary"]["total_items"] == len(wrapper["decisions"])
+    assert run_pipeline.has_review_work(wrapper) is True
+
+
+def test_a_later_verdict_replaces_a_drop(run: dict[str, Path]) -> None:
+    assert drop(run, "Figure 1", "--reason", REASON).returncode == 0
+
+    result = review(run, "Figure 1", "--verdict", "pass", "--preserved", "axes")
+
+    assert result.returncode == 0, result.stderr
+    item = entry(run, "Figure 1")
+    assert item["decision"] == "insert"
+    assert item["skip_reason"] == ""
+    assert gate_codes(run, "Figure 1") == []
+
+
+def test_repair_after_a_drop_clears_the_reason(run: dict[str, Path]) -> None:
+    assert drop(run, "Figure 1", "--reason", REASON).returncode == 0
+
+    result = review(
+        run,
+        "Figure 1",
+        "--verdict",
+        "repair",
+        "--failure",
+        "caption_contamination",
+        "--bbox",
+        "0.1,0.2,0.9,0.5",
+    )
+
+    assert result.returncode == 0, result.stderr
+    item = entry(run, "Figure 1")
+    assert item["decision"] == "review_pending"
+    assert item["skip_reason"] == ""
+
+
+def rewrite_entry(run: dict[str, Path], label: str, **changes: object) -> None:
+    wrapper = load(run)
+    next(item for item in wrapper["decisions"] if item["source_id"] == label).update(changes)
+    run["decisions"].write_text(json.dumps(wrapper), encoding="utf-8")
+
+
+@pytest.mark.parametrize("reason", ["", "  ", "scientific_content_clipped"])
+def test_gate_rejects_a_drop_without_a_real_reason(run: dict[str, Path], reason: str) -> None:
+    assert drop(run, "Figure 1", "--reason", REASON).returncode == 0
+
+    rewrite_entry(run, "Figure 1", skip_reason=reason)
+
+    assert gate_codes(run, "Figure 1") == ["figure_visual_review_drop_reason_invalid"]
+
+
+def test_gate_rejects_a_drop_with_no_recorded_review(run: dict[str, Path]) -> None:
+    rewrite_entry(run, "Figure 1", decision="dropped", skip_reason=REASON)
+
+    assert gate_codes(run, "Figure 1") == ["figure_visual_review_stale"]
+
+
+def test_gate_rejects_a_dropped_label_on_an_unreviewed_item(run: dict[str, Path]) -> None:
+    rewrite_entry(run, "Figure 2", decision="dropped", skip_reason=REASON)
+
+    assert "figure_visual_review_invalid" in gate_codes(run, "Figure 2")
+
+
+def test_gate_rejects_a_drop_that_hides_a_visual_failure(run: dict[str, Path]) -> None:
+    assert drop(run, "Figure 1", "--reason", REASON).returncode == 0
+    item = entry(run, "Figure 1")
+    hidden = {**item["visual_review"], "failure_reason": "caption_inseparable"}
+
+    rewrite_entry(run, "Figure 1", visual_review=hidden)
+
+    assert gate_codes(run, "Figure 1") == ["figure_visual_review_invalid"]
+
+
+def test_gate_goes_stale_when_a_dropped_crop_changes(run: dict[str, Path]) -> None:
+    assert drop(run, "Figure 1", "--reason", REASON).returncode == 0
+
+    Path(entry(run, "Figure 1")["source_image_path"]).write_bytes(b"swapped")
+
+    assert gate_codes(run, "Figure 1") == ["figure_visual_review_stale"]
+
+
+def test_an_unrecorded_placeholder_still_fails_the_gate(run: dict[str, Path]) -> None:
+    rewrite_entry(run, "Figure 1", decision="placeholder", skip_reason=REASON)
+
+    assert gate_codes(run, "Figure 1") == ["usable_insert_candidate_left_placeholder"]
+
+
+def test_a_recorded_visual_failure_cannot_be_rewritten_as_a_drop(run: dict[str, Path]) -> None:
+    assert (
+        review(run, "Figure 1", "--verdict", "fail", "--failure", "identity_mismatch").returncode
+        == 0
+    )
+
+    result = drop(run, "Figure 1", "--reason", REASON)
+
+    assert result.returncode != 0
+    assert "visual failure" in result.stderr
+    item = entry(run, "Figure 1")
+    assert item["decision"] == "visual_defect"
+    assert item["visual_review"]["failure_reason"] == "identity_mismatch"

@@ -21,7 +21,7 @@ from common import (
 )
 from contracts import WRITING_CONTRACT_RULES
 from extract_pdf_assets import _render_crop, _unique_figure_asset_filename, save_image_bytes
-from lint_grounding import visual_review_evidence_is_valid
+from lint_grounding import drop_reason_is_valid, visual_review_evidence_is_valid
 from localization import normalize_output_language, require_artifact_output_language
 from source_corpus import SourceCorpusLoadError, load_source_corpus
 from write_obsidian_note import atomic_write_note
@@ -62,7 +62,7 @@ def review_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--decisions", required=True, help="Decisions JSON file, updated in place.")
     p.add_argument("--item", required=True, help='Label such as "Figure 1".')
-    p.add_argument("--verdict", required=True, choices=("pass", "fail", "repair"))
+    p.add_argument("--verdict", required=True, choices=("pass", "fail", "repair", "drop"))
     p.add_argument(
         "--preserved",
         action="append",
@@ -82,6 +82,7 @@ def review_parser() -> argparse.ArgumentParser:
         default="",
         help="Page-normalized x0,y0,x1,y1 read off the grid preview. Required by repair.",
     )
+    p.add_argument("--reason", default="", help="Why the note does not need it. Required by drop.")
     return p
 
 
@@ -395,6 +396,7 @@ def apply_repair(item: dict[str, Any], asset_subdir: str) -> None:
         item["decision"] = "visual_defect"
         item["skip_reason"] = "repair_limit_exhausted"
         return
+    item["skip_reason"] = ""
     source_path = Path(str(item.get("source_image_path", ""))).expanduser()
     revised_bbox = review["revised_bbox"]
     evidence = item["review_evidence"]
@@ -566,6 +568,7 @@ def finish_item_command(path: str, wrapper: dict[str, Any], item: dict[str, Any]
             "item": item_label(item),
             "decision": item.get("decision", ""),
             "failure_reason": item.get("visual_review", {}).get("failure_reason", ""),
+            "skip_reason": item.get("skip_reason", ""),
             "candidate_path": evidence.get("candidate_path", ""),
             "page_preview_path": evidence.get("page_preview_path", ""),
             "normalized_bbox": evidence.get("normalized_bbox", []),
@@ -576,6 +579,17 @@ def finish_item_command(path: str, wrapper: dict[str, Any], item: dict[str, Any]
 
 def verdict_failure(args: argparse.Namespace, attempts: int) -> str:
     """Check that the flags fit the verdict and return its failure reason."""
+    if args.reason and args.verdict != "drop":
+        raise SystemExit("--reason only applies to --verdict drop.")
+    if args.verdict == "drop":
+        if args.failure or args.omitted or args.preserved or args.bbox:
+            raise SystemExit(
+                "--verdict drop takes no --failure, --omitted, --preserved, or --bbox; "
+                "a crop with a visual problem takes repair or fail."
+            )
+        if not drop_reason_is_valid(args.reason):
+            raise SystemExit("--verdict drop requires a --reason that is not a failure reason.")
+        return ""
     if args.verdict == "pass":
         if args.failure or args.omitted or args.bbox:
             raise SystemExit("--verdict pass takes no --failure, --omitted, or --bbox.")
@@ -609,13 +623,20 @@ def run_review(argv: list[str]) -> None:
     if not visual_review_evidence_is_valid(item):
         raise SystemExit(f"{label} has incomplete review evidence; rerun the planner.")
     failure = verdict_failure(args, int(review.get("repair_attempts", 0) or 0))
+    if args.verdict == "drop" and review.get("status") == "fail":
+        raise SystemExit(f"{label} has a recorded visual failure; it cannot become a drop.")
     bbox = parse_bbox(args.bbox) if args.bbox else review.get("revised_bbox", [])
     digest = file_sha256(str(item.get("source_image_path", "")))
     if not digest or digest != item.get("source_image_sha256"):
         raise SystemExit(f"{label}: the candidate crop changed since it was planned.")
     review.update(
         {
-            "status": {"pass": "pass", "fail": "fail", "repair": "repair_requested"}[args.verdict],
+            "status": {
+                "pass": "pass",
+                "fail": "fail",
+                "repair": "repair_requested",
+                "drop": "dropped",
+            }[args.verdict],
             "reviewed_asset_sha256": digest,
             "preserved_scientific_elements": args.preserved,
             "omitted_scientific_elements": args.omitted,
@@ -627,8 +648,10 @@ def run_review(argv: list[str]) -> None:
     if args.verdict == "repair":
         apply_repair(item, asset_subdir)
     else:
-        item["decision"] = "insert" if args.verdict == "pass" else "visual_defect"
-        item["skip_reason"] = failure
+        item["decision"] = {"pass": "insert", "fail": "visual_defect", "drop": "dropped"}[
+            args.verdict
+        ]
+        item["skip_reason"] = failure or normalize_whitespace(args.reason)
     finish_item_command(args.decisions, wrapper, item)
 
 
