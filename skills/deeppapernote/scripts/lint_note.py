@@ -211,6 +211,22 @@ ENGLISH_CJK_MATH_LABEL_RE = re.compile(
     r"\\operatorname\{(?:输入|输出|损失|状态|动作|奖励|标签|样本|预测|目标)\}"
 )
 ENGLISH_MATH_SPAN_RE = re.compile(r"\$\$[^$\n]+\$\$|\$[^$\n]+\$")
+CHINESE_PROSE_MATH_SPAN_RE = re.compile(r"\$\$[^$\n]+\$\$|\$[^$\n]+\$|\\\([^\n]+?\\\)")
+CHINESE_PROSE_CODE_SPAN_RE = re.compile(r"`([^`\n]+)`")
+CHINESE_PROSE_WIKILINK_RE = re.compile(r"!?\[\[[^\]\n]+\]\]")
+CHINESE_PROSE_CITATION_RE = re.compile(
+    r"\[\d+(?:\s*[,–-]\s*\d+)*\]"
+    r"|\([A-Z][^()\n]*?\bet al\.,?\s*\d{4}[a-z]?\)"
+)
+# A run is ASCII text that CJK characters and CJK punctuation do not interrupt.
+ENGLISH_RUN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 \t.,'’/%+-]*")
+ENGLISH_WORD_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9.-]*\b")
+# An untranslated clause, as opposed to a list of names, joins words with function words.
+MIXED_LANGUAGE_MIN_RUN_WORDS = 4
+# Bare English words scattered through one line read as code-switching even without a clause.
+MIXED_LANGUAGE_MIN_BARE_WORDS = 7
+# Backticks keep proper nouns out of the count; a span this rich in function words is prose.
+BACKTICKED_PROSE_MIN_FUNCTION_WORDS = 3
 
 RUNTIME_ARTIFACT_REFERENCE_PATTERNS = [
     re.compile(
@@ -604,6 +620,44 @@ def subsection_name_for_line(lines: list[str], line_index: int) -> str:
     return current_subsection
 
 
+def english_function_word_hits(words: list[str]) -> list[str]:
+    return [word for word in words if word.lower() in ENGLISH_FUNCTION_WORDS]
+
+
+def chinese_prose_without_exempt_spans(line: str) -> str:
+    def code_span(match: re.Match[str]) -> str:
+        content = match.group(1)
+        hits = english_function_word_hits(ENGLISH_WORD_RE.findall(content))
+        return content if len(hits) >= BACKTICKED_PROSE_MIN_FUNCTION_WORDS else " "
+
+    checked = CHINESE_PROSE_CODE_SPAN_RE.sub(code_span, line)
+    checked = CHINESE_PROSE_MATH_SPAN_RE.sub(" ", checked)
+    checked = CHINESE_PROSE_WIKILINK_RE.sub(" ", checked)
+    return CHINESE_PROSE_CITATION_RE.sub(" ", checked)
+
+
+def chinese_prose_english_issue(line: str) -> dict[str, object] | None:
+    checked = chinese_prose_without_exempt_spans(line)
+    for match in ENGLISH_RUN_RE.finditer(checked):
+        words = ENGLISH_WORD_RE.findall(match.group(0))
+        hits = english_function_word_hits(words)
+        if len(words) >= MIXED_LANGUAGE_MIN_RUN_WORDS and hits:
+            return {
+                "signal": "english_clause",
+                "english_run": " ".join(match.group(0).split()).rstrip(".,"),
+                "english_word_count": len(words),
+                "function_word_hits": hits[:6],
+            }
+    words = ENGLISH_WORD_RE.findall(checked)
+    if len(words) >= MIXED_LANGUAGE_MIN_BARE_WORDS:
+        return {
+            "signal": "scattered_english_words",
+            "english_words": words[:12],
+            "english_word_count": len(words),
+        }
+    return None
+
+
 def mixed_language_issues(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
     lines = text.splitlines()
@@ -619,9 +673,9 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
             fence_start = None
     for idx, line in enumerate(lines, start=1):
         stripped = line.strip()
+        if idx in fenced_code_lines:
+            continue
         if ACTIVE_LANGUAGE == "en":
-            if idx in fenced_code_lines:
-                continue
             checked = stripped
             section_name = section_name_for_line(lines, idx - 1)
             if section_name in {section("core_information"), section("references")}:
@@ -646,20 +700,9 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
             continue
         if not re.search(r"[\u4e00-\u9fff]", stripped):
             continue
-        english_words = re.findall(r"\b[A-Za-z][A-Za-z0-9.-]*\b", stripped)
-        if len(english_words) < 4:
-            continue
-        function_hits = [word for word in english_words if word.lower() in ENGLISH_FUNCTION_WORDS]
-        if not function_hits and len(english_words) < 7:
-            continue
-        issues.append(
-            {
-                "line_number": idx,
-                "line": stripped,
-                "english_word_count": len(english_words),
-                "function_word_hits": function_hits[:6],
-            }
-        )
+        english_issue = chinese_prose_english_issue(stripped)
+        if english_issue is not None:
+            issues.append({"line_number": idx, "line": stripped, **english_issue})
     return issues
 
 
