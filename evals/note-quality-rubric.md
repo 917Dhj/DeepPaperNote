@@ -1,6 +1,6 @@
-# DeepPaperNote Note Evaluation Rubric v1
+# DeepPaperNote Note Evaluation Rubric v2
 
-Status: v1 stable
+Status: v2
 Audience: evaluation agents
 Scope: final DeepPaperNote Markdown notes after generation
 
@@ -8,12 +8,14 @@ This rubric is for evaluating finished notes. It is not a writing reference for 
 DeepPaperNote note-generation workflow, and it must not be used to rewrite,
 repair, or complete the note under evaluation.
 
+v2 changes from v1: the evaluator compares two blinded notes, A and B, and no longer assigns the improvement verdict; H8 and D8 judge readability in the note's output language.
+
 ## Evaluator Role
 
 The evaluation agent judges finished outputs. It must:
 
 - compare raw generated notes as they are
-- keep baseline and candidate notes unmodified
+- keep both notes unmodified
 - cite concrete evidence for every material judgment
 - separate hard failures from score differences
 - avoid rewarding a note only because it is longer, cleaner, or more polished
@@ -23,32 +25,34 @@ The evaluation agent must not:
 - generate a replacement note
 - patch missing sections
 - add citations or images
-- infer that a candidate improved simply because it came from a newer run
+- guess which note comes from which version, or let such a guess affect a judgment
 - collapse the result into one scalar score without recording the failure mode
 
 ## Required Inputs
 
-For a single-paper evaluation, the evaluator should receive:
+For one pair, the evaluator receives:
 
+- the pair id
 - the paper title and stable identity evidence, such as DOI, arXiv ID, venue, or PDF path
-- the baseline final note
-- the candidate final note
-- available source evidence, preferably `source_manifest.json` and `raw_sections.jsonl`
-- available run artifacts, such as `synthesis_bundle.json`, note plan JSON, grounding lint output, figure/table decisions, and note lint output
+- the output language of both notes
+- note A and note B
+- available source evidence for each note, preferably `source_manifest.json` and `raw_sections.jsonl`
+- available run artifacts for each note, such as `synthesis_bundle.json`, note plan JSON, grounding lint output, figure/table decisions, and note lint output
+
+It never receives which note is the baseline, commit ids, run manifests, or timestamps.
 
 If source evidence is unavailable, the evaluator may still compare note readability
 and structure, but it must mark evidence-grounded dimensions as low-confidence.
 
 ## Evaluation Order
 
-1. Run hard gates.
-2. Score baseline and candidate independently.
-3. Perform pairwise comparison.
-4. Assign the final verdict.
-5. Emit the required JSON report.
+1. Run the hard gates on each note.
+2. Score note A and note B independently.
+3. Perform the pairwise comparison.
+4. Emit the required JSON report.
 
-Hard gates override numeric scores. A note with a severe hard-gate failure cannot
-be treated as a real improvement, even if it scores well on some dimensions.
+Hard gates override numeric scores. A note that fails a severe hard gate cannot
+win the comparison on its scores alone.
 
 ## Hard Gates
 
@@ -95,12 +99,17 @@ not explicitly acknowledged.
 Fail if broken image embeds, invalid local paths, incorrect figure/table identity,
 or misleading citation links materially damage the note.
 
-### H8. Final Note Is Readable Chinese
+### H8. Final Note Is Readable In Its Output Language
 
-Fail if the note contains substantial mixed-language prose, raw extraction
-fragments, broken paragraph flow, or English clauses where natural Chinese
-analysis is expected. Stable proper nouns, model names, datasets, metrics, code
-tokens, URLs, DOI strings, and paper figure IDs may remain in English.
+Fail if the note contains raw extraction fragments, broken paragraph flow, or
+substantial prose in a language other than its output language:
+
+- `zh-CN`: English clauses where natural Chinese analysis is expected.
+- `en`: Chinese prose anywhere outside citation metadata, such as a Chinese title
+  or author list.
+
+Stable proper nouns, model names, datasets, metrics, code tokens, URLs, DOI
+strings, and paper figure IDs may stay in their original form in either language.
 
 ## Scored Dimensions
 
@@ -200,10 +209,10 @@ Weight: 5
 Weight: 5
 
 - 0: Hard to read, raw extraction-like, or heavily mixed-language.
-- 1: Frequent awkward phrasing or untranslated English prose.
+- 1: Frequent awkward phrasing or prose left in another language.
 - 2: Understandable but noticeably rough.
-- 3: Mostly fluent Chinese with minor residue.
-- 4: Clear, natural, technically precise Chinese.
+- 3: Mostly fluent in the output language with minor residue.
+- 4: Clear, natural, technically precise prose in the output language.
 - 5: Polished analytical prose that stays faithful to the paper and easy to
   reread later.
 
@@ -219,38 +228,25 @@ Scores are secondary. A high numeric score does not override a hard-gate failure
 
 ## Pairwise Comparison
 
-When comparing a baseline note with a candidate note, evaluate both notes first
-without assuming which is newer.
+Evaluate both notes before comparing them. Then assign one of:
 
-Then assign one of:
-
-- `candidate_wins`
-- `baseline_wins`
+- `a_wins`
+- `b_wins`
 - `tie`
 - `mixed`
 
-Prefer `mixed` when the candidate improves some content dimensions but regresses
-on hard gates, factuality, grounding, or important usability.
+Prefer `mixed` when one note is better on some content dimensions but worse on
+hard gates, factuality, grounding, or important usability.
 
-## Improvement Verdict
+Set `material_difference` to true only when the difference would change what a
+reader learns about the paper, not when it is cosmetic, a matter of length, or
+formatting alone. For each material difference, record the dimension, which note
+is better, and the evidence.
 
-Use exactly one final verdict:
-
-- `hard_fail`: the candidate fails any severe hard gate.
-- `regression`: the candidate is materially worse than baseline.
-- `no_material_change`: differences are cosmetic, noisy, or too small to matter.
-- `partial_improvement`: the candidate improves some dimensions but not enough to
-  claim broad quality improvement.
-- `real_improvement`: the candidate is materially better on core content
-  dimensions without introducing hard-gate failures.
-
-To assign `real_improvement`, the candidate should usually:
-
-- pass all known hard gates
-- improve Evidence Chain Coverage or Mechanism/Protocol Depth
-- not regress on Claim Boundaries and Limitations
-- avoid major factual, grounding, citation, figure, or readability regressions
-- improve for reasons tied to paper evidence, not only cleaner formatting
+The evaluator does not decide whether a change improved DeepPaperNote. The
+Regression Judge in `evals/regression-workflow.md` unblinds the pairs, compares
+them against the noise between two baseline runs, and assigns the improvement
+verdict.
 
 ## Required JSON Output
 
@@ -258,21 +254,23 @@ The evaluator must emit a JSON object with this shape:
 
 ```json
 {
-  "rubric_version": "v1",
+  "rubric_version": "v2",
+  "pair_id": "",
   "paper_id": "",
   "paper_title": "",
+  "output_language": "zh-CN|en",
   "evidence_confidence": "high|medium|low",
-  "hard_gates": {
-    "paper_identity_valid": {"status": "pass|fail|unknown", "evidence": ""},
-    "no_major_factual_error": {"status": "pass|fail|unknown", "evidence": ""},
-    "central_claims_grounded": {"status": "pass|fail|unknown", "evidence": ""},
-    "claim_boundaries_honest": {"status": "pass|fail|unknown", "evidence": ""},
-    "core_analytical_sections_exist": {"status": "pass|fail|unknown", "evidence": ""},
-    "no_degraded_source_pretending": {"status": "pass|fail|unknown", "evidence": ""},
-    "figure_table_citation_paths_not_broken": {"status": "pass|fail|unknown", "evidence": ""},
-    "readable_chinese_final_note": {"status": "pass|fail|unknown", "evidence": ""}
-  },
-  "baseline": {
+  "note_a": {
+    "hard_gates": {
+      "paper_identity_valid": {"status": "pass|fail|unknown", "evidence": ""},
+      "no_major_factual_error": {"status": "pass|fail|unknown", "evidence": ""},
+      "central_claims_grounded": {"status": "pass|fail|unknown", "evidence": ""},
+      "claim_boundaries_honest": {"status": "pass|fail|unknown", "evidence": ""},
+      "core_analytical_sections_exist": {"status": "pass|fail|unknown", "evidence": ""},
+      "no_degraded_source_pretending": {"status": "pass|fail|unknown", "evidence": ""},
+      "figure_table_citation_paths_not_broken": {"status": "pass|fail|unknown", "evidence": ""},
+      "readable_in_output_language": {"status": "pass|fail|unknown", "evidence": ""}
+    },
     "scores": {
       "evidence_chain_coverage": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "mechanism_protocol_depth": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
@@ -285,7 +283,17 @@ The evaluator must emit a JSON object with this shape:
     },
     "total_score": 0
   },
-  "candidate": {
+  "note_b": {
+    "hard_gates": {
+      "paper_identity_valid": {"status": "pass|fail|unknown", "evidence": ""},
+      "no_major_factual_error": {"status": "pass|fail|unknown", "evidence": ""},
+      "central_claims_grounded": {"status": "pass|fail|unknown", "evidence": ""},
+      "claim_boundaries_honest": {"status": "pass|fail|unknown", "evidence": ""},
+      "core_analytical_sections_exist": {"status": "pass|fail|unknown", "evidence": ""},
+      "no_degraded_source_pretending": {"status": "pass|fail|unknown", "evidence": ""},
+      "figure_table_citation_paths_not_broken": {"status": "pass|fail|unknown", "evidence": ""},
+      "readable_in_output_language": {"status": "pass|fail|unknown", "evidence": ""}
+    },
     "scores": {
       "evidence_chain_coverage": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "mechanism_protocol_depth": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
@@ -299,13 +307,13 @@ The evaluator must emit a JSON object with this shape:
     "total_score": 0
   },
   "pairwise_result": {
-    "winner": "candidate_wins|baseline_wins|tie|mixed",
-    "material_improvement": true,
-    "improvement_summary": "",
-    "candidate_regressions": []
-  },
-  "verdict": "hard_fail|regression|no_material_change|partial_improvement|real_improvement",
-  "next_recommendation": ""
+    "winner": "a_wins|b_wins|tie|mixed",
+    "material_difference": true,
+    "difference_summary": "",
+    "differences": [
+      {"dimension": "", "better": "a|b", "evidence": ""}
+    ]
+  }
 }
 ```
 
