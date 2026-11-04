@@ -9,6 +9,7 @@
     "figure-colon"
   ],
   "readable": true,
+  "title": "LightGCN: Simplifying and Powering Graph Convolution Network for Recommendation",
   "labels": [
     "Figure 1",
     "Figure 2",
@@ -40,5 +41,7 @@
   ],
   "crops": {},
   "same_visual": [],
-  "known_gaps": {}
+  "known_gaps": {
+    "title": "Crossref keeps the subtitle in a separate field; identity takes only its title (\"LightGCN\") and replaces the full PDF metadata title."
+  }
 }

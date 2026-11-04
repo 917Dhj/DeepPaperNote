@@ -10,6 +10,7 @@
     "prose-reference-at-line-start"
   ],
   "readable": true,
+  "title": "Segment Anything",
   "labels": [
     "Figure 1",
     "Figure 2",

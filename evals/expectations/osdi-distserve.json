@@ -10,6 +10,7 @@
     "numbered-algorithms"
   ],
   "readable": true,
+  "title": "DistServe: Disaggregating Prefill and Decoding for Goodput-optimized Large Language Model Serving",
   "labels": [
     "Figure 1",
     "Figure 2",

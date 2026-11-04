@@ -10,6 +10,7 @@
     "review"
   ],
   "readable": true,
+  "title": "热障涂层材料与技术发展综述",
   "labels": [
     "图 1",
     "图 2",
@@ -61,6 +62,7 @@
   "same_visual": [],
   "known_gaps": {
     "review:图 3": "A bilingual caption pair: crops attach to the Chinese caption, but the plan keeps the English one.",
-    "review:图 10": "A bilingual caption pair: crops attach to the Chinese caption, but the plan keeps the English one."
+    "review:图 10": "A bilingual caption pair: crops attach to the Chinese caption, but the plan keeps the English one.",
+    "title": "First-page title extraction picks the journal name, and a low-confidence local title with no provider confirmation is still accepted."
   }
 }
