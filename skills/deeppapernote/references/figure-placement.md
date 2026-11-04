@@ -134,6 +134,8 @@ python3 scripts/plan_figure_table_decisions.py summary \
 
 It prints one line per Figure/Table with its decision, target section, skip reason, and caption, plus `review_pending_labels`. Only `insert` items carry an `embed`; use that exact value. An empty `review_pending_labels` means the review is finished; Grounding still decides whether the freeze is valid. The command never writes the file.
 
+The planner names each item's image in the Vault after its label, such as `figure_1.png`, `table_3.png`, or `figure_s2.png`, inside the admitted `asset_subdir`. Labels that collide take a `_2` or `_3` suffix in caption order, and an item with no usable label falls back to `<kind>_unlabeled.png`. Crops in the run directory keep their working names; only the saved copy and the embed use the Vault name. Notes saved before this naming keep their old image names.
+
 ## Visual-Body Crop Boundary
 
 Keep axes, tick labels, legends, color bars, scale bars, panel letters, table headers, method labels, and other text that belongs inside the scientific visual. Keep a small safety margin so edge labels are not clipped. Exclude the source caption and unrelated running prose from the image pixels while retaining the caption as metadata and later Markdown explanation.
@@ -150,7 +152,7 @@ python3 scripts/plan_figure_table_decisions.py review \
   --verdict repair --failure <repairable failure reason> --bbox x0,y0,x1,y1
 ```
 
-The script validates the bbox, rerenders once from the source PDF at the contract's 300 dpi, refreshes the asset SHA-256, and returns the item to `review_pending` for a full fresh review. A terminal defect or a failed repaired crop remains a placeholder; a second repair request closes the item as `repair_limit_exhausted`.
+The script validates the bbox, rerenders once from the source PDF at the contract's 300 dpi, refreshes the asset SHA-256, keeps the item's vault filename and `embed`, and returns the item to `review_pending` for a full fresh review. A terminal defect or a failed repaired crop remains a placeholder; a second repair request closes the item as `repair_limit_exhausted`.
 
 Reject candidates that are:
 - caption-only crops

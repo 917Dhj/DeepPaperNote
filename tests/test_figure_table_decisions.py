@@ -461,3 +461,90 @@ def test_figure_table_decisions_insert_selected_usable_tables(tmp_path: Path) ->
 
     assert decision["decision"] == "review_pending"
     assert decision["skip_reason"] == ""
+
+
+@pytest.mark.parametrize(
+    ("items", "expected"),
+    (
+        (
+            [("figure", "Figure 1"), ("table", "Table 3"), ("figure", "Figure S2")],
+            ["figure_1.png", "table_3.png", "figure_s2.png"],
+        ),
+        (
+            [("figure", "Figure 3a"), ("figure", "Figure 3b")],
+            ["figure_3a.png", "figure_3b.png"],
+        ),
+        (
+            [("figure", "Fig. 3"), ("figure", "Figure 3"), ("figure", "FIG. 3")],
+            ["figure_3.png", "figure_3_2.png", "figure_3_3.png"],
+        ),
+        (
+            # A real label keeps its own name; a duplicate's suffix steps around it.
+            [("figure", "Figure 3"), ("figure", "Figure 3"), ("figure", "Figure 3.2")],
+            ["figure_3.png", "figure_3_3.png", "figure_3_2.png"],
+        ),
+        (
+            [("figure", ""), ("table", "表 ?"), ("figure", "图"), ("", "")],
+            [
+                "figure_unlabeled.png",
+                "table_unlabeled.png",
+                "figure_unlabeled_2.png",
+                "item_unlabeled.png",
+            ],
+        ),
+        (
+            [("table", "Table 3."), ("figure", "Extended Data Fig. 4"), ("table", "4")],
+            ["table_3.png", "extended_data_figure_4.png", "table_4.png"],
+        ),
+    ),
+)
+def test_vault_image_filenames_are_label_named_unique_and_stable(
+    items: list[tuple[str, str]], expected: list[str]
+) -> None:
+    from plan_figure_table_decisions import vault_image_filenames
+
+    records = [{"kind": kind, "label": label} for kind, label in items]
+
+    assert vault_image_filenames(records) == expected
+    assert vault_image_filenames(records) == expected
+
+
+def test_figure_table_decisions_keep_subfigure_labels_apart(tmp_path: Path) -> None:
+    images = []
+    for name in ("page_004_fig_figure_3a.png", "page_004_fig_figure_3b.png"):
+        image = tmp_path / name
+        image.write_bytes(name.encode())
+        images.append(image)
+    source_manifest = {
+        "captions": {
+            "figures": [
+                {"id": "Figure 3a", "caption": "Left panel", "page": 4},
+                {"id": "Figure 3b", "caption": "Right panel", "page": 4},
+            ],
+            "tables": [],
+        }
+    }
+    figures = {
+        "figure_plan": {
+            "figures": [
+                {
+                    "id": label,
+                    "section": "关键结果",
+                    "priority": 1,
+                    "figure_asset_candidate": {
+                        "filename": image.name,
+                        "path": str(image),
+                        "candidate_status": "usable_candidate",
+                    },
+                }
+                for label, image in zip(("Figure 3a", "Figure 3b"), images)
+            ]
+        }
+    }
+
+    payload = run_decisions(tmp_path, source_manifest, figures)
+
+    assert [item["relative_markdown_embed"] for item in payload["decisions"]] == [
+        "![Figure 3a](images/figure_3a.png)",
+        "![Figure 3b](images/figure_3b.png)",
+    ]

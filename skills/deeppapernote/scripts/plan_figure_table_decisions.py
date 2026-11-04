@@ -33,6 +33,7 @@ REVIEW_RENDER_DPI = int(VISUAL_REVIEW["selected_render_dpi"])
 REPAIRABLE_FAILURES = set(VISUAL_REVIEW["repairable_failure_reasons"])
 TERMINAL_FAILURES = set(VISUAL_REVIEW["terminal_failure_reasons"])
 REPAIR_LIMIT = int(VISUAL_REVIEW["repair_limit"])
+VAULT_IMAGE_STEM_LIMIT = 80
 
 
 def parser() -> argparse.ArgumentParser:
@@ -121,6 +122,49 @@ def load_record(value: str) -> dict[str, Any]:
 
 def normalize_label(label: str) -> str:
     return caption_label_key(label)
+
+
+def vault_image_stem(kind: str, label: str) -> str:
+    """Name an item's image in the vault after its label: figure_1, table_s2, figure_3a."""
+    words = re.sub(r"[^a-z0-9]+", " ", caption_label_key(label)).split()
+    words = ["figure" if word == "fig" else word for word in words]
+    kind_word = re.sub(r"[^a-z0-9]+", "_", str(kind or "").lower()).strip("_") or "item"
+    if not words:
+        return f"{kind_word}_unlabeled"
+    if not {"figure", "table", kind_word} & set(words):
+        words.insert(0, kind_word)
+    return "_".join(words)[:VAULT_IMAGE_STEM_LIMIT].strip("_")
+
+
+def vault_image_filenames(items: list[dict[str, Any]]) -> list[str]:
+    """Give each item a unique vault filename, in order, from its kind and label.
+
+    The first item with a name keeps it; a later duplicate takes the next free
+    ``_2``, ``_3`` suffix that no other item's own name claims.
+    """
+    stems = [
+        vault_image_stem(
+            str(item.get("kind", "")),
+            str(item.get("label") or item.get("source_id") or ""),
+        )
+        for item in items
+    ]
+    claimed = set(stems)
+    used: set[str] = set()
+    names: list[str] = []
+    for stem in stems:
+        name = stem
+        suffix = 2
+        while name in used or (name != stem and name in claimed):
+            name = f"{stem}_{suffix}"
+            suffix += 1
+        used.add(name)
+        names.append(f"{name}.png")
+    return names
+
+
+def markdown_embed(label: str, asset_subdir: str, vault_filename: str) -> str:
+    return f"![{label or vault_filename}]({asset_subdir}/{vault_filename})"
 
 
 def input_is_file(value: str) -> bool:
@@ -396,8 +440,11 @@ def pending_visual_review(
     }
 
 
-def apply_repair(item: dict[str, Any], asset_subdir: str) -> None:
-    """Recrop a repair_requested item once, or close it once the repair limit is spent."""
+def apply_repair(item: dict[str, Any]) -> None:
+    """Recrop a repair_requested item once, or close it once the repair limit is spent.
+
+    The repair replaces only the source image; the vault filename and embed stay.
+    """
     review = item["visual_review"]
     attempts = int(review.get("repair_attempts", 0) or 0)
     if attempts >= REPAIR_LIMIT:
@@ -420,11 +467,6 @@ def apply_repair(item: dict[str, Any], asset_subdir: str) -> None:
     item["source_image_path"] = str(repair_path)
     item["source_image_filename"] = repair_path.name
     item["source_image_sha256"] = file_sha256(str(repair_path))
-    if item.get("relative_markdown_embed"):
-        item["relative_markdown_embed"] = (
-            f"![{item.get('source_id') or repair_path.name}]"
-            f"({asset_subdir}/{repair_path.name})"
-        )
     evidence.update(
         {
             "candidate_path": str(repair_path),
@@ -441,6 +483,7 @@ def decide(
     plan_item: dict[str, Any] | None,
     assets_wrapper: dict[str, Any] | None = None,
     asset_subdir: str = "images",
+    vault_filename: str = "",
 ) -> dict[str, Any]:
     label = normalize_whitespace(str(caption.get("label", "")))
     fallback_caption = normalize_whitespace(str(caption.get("caption", "")))[:40]
@@ -458,6 +501,8 @@ def decide(
         "visual_quality_status": "",
         "priority": 99,
         "target_section": "",
+        "vault_image_filename": vault_filename
+        or vault_image_filenames([{"kind": caption.get("kind", ""), "label": label}])[0],
     }
     if not plan_item:
         return base
@@ -478,7 +523,9 @@ def decide(
     image_path = str(prepared.get("path") or source_image_path(plan_item))
     if filename:
         base["source_image_filename"] = filename
-        base["relative_markdown_embed"] = f"![{label or filename}]({asset_subdir}/{filename})"
+        base["relative_markdown_embed"] = markdown_embed(
+            label, asset_subdir, base["vault_image_filename"]
+        )
     if image_path:
         base["source_image_path"] = image_path
     if status in {"reject", "reject_visual_quality"}:
@@ -510,14 +557,16 @@ def build_decisions(
     asset_subdir: str = "images",
 ) -> list[dict[str, Any]]:
     planned = planned_items(figures_wrapper)
+    captions = source_caption_items(source_manifest, source_manifest_input)
     decisions = [
         decide(
             caption,
             planned.get(normalize_label(str(caption.get("label", "")))),
             assets_wrapper,
             checked_asset_subdir(asset_subdir),
+            vault_filename,
         )
-        for caption in source_caption_items(source_manifest, source_manifest_input)
+        for caption, vault_filename in zip(captions, vault_image_filenames(captions))
     ]
     for decision in decisions:
         if decision["decision"] not in DECISION_VALUES:
@@ -623,7 +672,7 @@ def verdict_failure(args: argparse.Namespace, attempts: int) -> str:
 def run_review(argv: list[str]) -> None:
     args = review_parser().parse_args(argv)
     wrapper = load_decisions(args.decisions)
-    asset_subdir = checked_asset_subdir(wrapper.get("asset_subdir", "images"))
+    checked_asset_subdir(wrapper.get("asset_subdir", "images"))
     item = find_item(wrapper, args.item)
     label = item_label(item)
     review = item.get("visual_review")
@@ -655,7 +704,7 @@ def run_review(argv: list[str]) -> None:
         }
     )
     if args.verdict == "repair":
-        apply_repair(item, asset_subdir)
+        apply_repair(item)
     else:
         item["decision"] = {"pass": "insert", "fail": "visual_defect", "drop": "dropped"}[
             args.verdict
@@ -720,6 +769,9 @@ def run_promote(argv: list[str]) -> None:
         raise SystemExit(f"{label} is already in Visual Review; record its verdict with review.")
     if item.get("kind") not in INSERTABLE_KINDS:
         raise SystemExit(f"{label} is not a Figure or Table.")
+    vault_filename = normalize_whitespace(str(item.get("vault_image_filename", "")))
+    if not vault_filename:
+        raise SystemExit(f"{label} has no vault image filename; rerun the planner.")
     pages = item.get("pages") or [0]
     page_number = args.page or int(pages[0] or 0)
     asset = matched_figure_asset(assets, label)
@@ -745,7 +797,7 @@ def run_promote(argv: list[str]) -> None:
             "source_image_path": prepared["path"],
             "source_image_filename": prepared["filename"],
             "source_image_sha256": prepared["sha256"],
-            "relative_markdown_embed": f"![{label}]({asset_subdir}/{prepared['filename']})",
+            "relative_markdown_embed": markdown_embed(label, asset_subdir, vault_filename),
             "review_evidence": prepared["review_evidence"],
             "visual_review": pending_visual_review(),
         }
