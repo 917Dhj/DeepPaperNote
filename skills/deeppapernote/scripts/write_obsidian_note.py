@@ -310,11 +310,20 @@ def materialize_insert_decisions(
     return materialized
 
 
+LINT_FAILURE_DETAIL_LIMIT = 20
+
+
+def lint_issue_text(issue: object) -> str:
+    if not isinstance(issue, dict):
+        return str(issue)
+    text = str(issue.get("reason") or issue.get("line") or issue.get("snippet") or issue)
+    line_number = issue.get("line_number")
+    return f"{text} (line {line_number})" if line_number else text
+
+
 def lint_failure_message(lint: dict, gate: str, lint_path: str) -> str:
     detail_parts: list[str] = []
-    for warning in lint.get("warnings", []) or []:
-        if warning:
-            detail_parts.append(str(warning))
+    reported: set[str] = set()
     for issue_key in (
         "core_info_structure_issues",
         "figure_structure_issues",
@@ -327,14 +336,22 @@ def lint_failure_message(lint: dict, gate: str, lint_path: str) -> str:
         "math_render_issues",
         "reference_hygiene_issues",
     ):
-        issues = lint.get(issue_key, []) or []
-        for issue in issues:
-            if isinstance(issue, dict):
-                reason = issue.get("reason") or issue.get("line") or issue.get("snippet") or issue
-                detail_parts.append(f"{issue_key}: {reason}")
-            else:
-                detail_parts.append(f"{issue_key}: {issue}")
-    details = "; ".join(detail_parts)
+        for issue in lint.get(issue_key, []) or []:
+            text = lint_issue_text(issue)
+            part = f"{issue_key}: {text}"
+            if part not in detail_parts:
+                detail_parts.append(part)
+            reported.add(text)
+            if isinstance(issue, dict) and issue.get("reason"):
+                reported.add(str(issue["reason"]))
+    # Lint also copies some issue reasons into warnings; list only the rest.
+    for warning in lint.get("warnings", []) or []:
+        if warning and str(warning) not in reported and str(warning) not in detail_parts:
+            detail_parts.append(str(warning))
+    shown = detail_parts[:LINT_FAILURE_DETAIL_LIMIT]
+    details = "; ".join(shown)
+    if len(detail_parts) > len(shown):
+        details += f"; and {len(detail_parts) - len(shown)} more"
     suffix = f" Details: {details}." if details else ""
     return f"write_obsidian_note.py refused to write note because {gate} gate failed.{suffix} See lint JSON: {lint_path}"
 

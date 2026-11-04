@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 from formal_save_helpers import canonical_note_path, final_review_args
 
+from write_obsidian_note import lint_failure_message
+
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "skills/deeppapernote/scripts"
 FINAL_GATES = (
@@ -275,3 +277,43 @@ def test_final_lint_records_exact_plan_and_normalized_note_hashes(tmp_path: Path
     report = json.loads(result.stdout)
     assert report["note_plan_sha256"] == digest(plan)
     assert report["note_sha256"] == hashlib.sha256(NOTE.encode()).hexdigest()
+
+
+def test_save_gate_failure_names_every_issue() -> None:
+    lint = {
+        "warnings": [],
+        "core_info_structure_issues": [{"reason": "core_info_missing_title"}],
+        "figure_structure_issues": [{"reason": "figure_callout_unplaced"}],
+        "planning_artifact_issues": [
+            "planning_claim_boundaries_missing",
+            "planning_section_plan_missing",
+        ],
+        "substantive_content_issues": [{"reason": "analysis_too_thin"}],
+        "mixed_language_issues": [{"line": 12, "reason": "english_fragment"}],
+        "linebreak_issues": [{"snippet": "a broken\nline"}],
+    }
+
+    message = lint_failure_message(lint, "plan", "note.lint.json")
+
+    for text in (
+        "core_info_missing_title",
+        "figure_callout_unplaced",
+        "planning_claim_boundaries_missing",
+        "planning_section_plan_missing",
+        "analysis_too_thin",
+        "english_fragment",
+        "a broken",
+    ):
+        assert text in message
+    assert "note.lint.json" in message
+
+
+def test_save_gate_failure_counts_what_it_leaves_out() -> None:
+    lint = {"planning_artifact_issues": [f"planning_issue_{index:02d}" for index in range(30)]}
+
+    message = lint_failure_message(lint, "plan", "note.lint.json")
+
+    assert "planning_issue_19" in message
+    assert "planning_issue_20" not in message
+    assert "10 more" in message
+    assert "note.lint.json" in message
