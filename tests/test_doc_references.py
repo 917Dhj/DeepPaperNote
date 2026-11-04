@@ -6,6 +6,7 @@ These checks test what the docs point at, not how they are worded.
 from __future__ import annotations
 
 import functools
+import json
 import re
 import subprocess
 import sys
@@ -22,6 +23,18 @@ DOCS = {
     path.relative_to(PROJECT_ROOT).as_posix(): path
     for path in (SKILL_ROOT / "SKILL.md", *sorted(REFERENCES_DIR.glob("*.md")))
 }
+EVALS_DIR = PROJECT_ROOT / "evals"
+EVAL_DOCS = {
+    name: EVALS_DIR / name
+    for name in (
+        "regression-workflow.md",
+        "regression-workflow-zh.md",
+        "note-quality-rubric.md",
+        "note-evaluator-prompt.md",
+    )
+}
+# Local-only paths that .gitignore keeps out of a fresh checkout.
+UNTRACKED_EVAL_PATHS = {"evals/papers"}
 
 SCRIPT_RE = re.compile(r"scripts/([A-Za-z0-9_]+\.py)")
 REFERENCE_RE = re.compile(r"references/([A-Za-z0-9_.-]+\.(?:md|yaml))")
@@ -30,6 +43,8 @@ SUBCOMMAND_RE = re.compile(r"scripts/[A-Za-z0-9_]+\.py\s+([a-z][a-z_-]*)\b")
 INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
 FENCE_RE = re.compile(r"```[a-z]*\n(.*?)```", re.DOTALL)
 BUNDLE_PATH_RE = re.compile(r"^(?:writing_contract|figure_table_manifest)(?:\.[a-z_]+)+$")
+EVAL_PATH_RE = re.compile(r"\bevals(?:/[A-Za-z0-9_.-]+)+")
+PAPER_ROW_RE = re.compile(r"^\|[^|\n]+\|\s*`([a-z0-9-]+)`\s*\|", re.MULTILINE)
 
 STALE_DOC = """
 Run `scripts/plan_figure_table_decisions.py review --decisions X --review-decisions Y`.
@@ -129,6 +144,28 @@ def missing_bundle_fields(text: str) -> list[str]:
     return sorted(path for path in named if not resolves(path))
 
 
+def missing_eval_paths(text: str) -> list[str]:
+    paths = {match.rstrip(".") for match in EVAL_PATH_RE.findall(text)}
+    return sorted(
+        path for path in paths - UNTRACKED_EVAL_PATHS if not (PROJECT_ROOT / path).exists()
+    )
+
+
+def missing_papers(text: str) -> list[str]:
+    """Return paper ids in a paper table that have no expectations entry."""
+    return sorted(
+        {
+            paper
+            for paper in PAPER_ROW_RE.findall(text)
+            if not (EVALS_DIR / "expectations" / f"{paper}.json").is_file()
+        }
+    )
+
+
+def inline_code(text: str) -> set[str]:
+    return set(INLINE_CODE_RE.findall(FENCE_RE.sub("", text)))
+
+
 def test_checks_catch_stale_pointers() -> None:
     assert missing_scripts(STALE_DOC) == ["materialize_figure_asset.py"]
     assert missing_references(STALE_DOC) == ["workflow.md"]
@@ -138,6 +175,16 @@ def test_checks_catch_stale_pointers() -> None:
         "run_pipeline.py --bogus-flag",
     ]
     assert missing_bundle_fields(STALE_DOC) == ["figure_table_manifest.decisions"]
+
+
+def test_eval_checks_catch_stale_pointers() -> None:
+    stale = """
+See `evals/paper-corpus.md`, `evals/papers/`, and `evals/old-rubric.md`.
+| primary | `arxiv-sam` | method |
+| spare | `arxiv-missing` | gone |
+"""
+    assert missing_eval_paths(stale) == ["evals/old-rubric.md"]
+    assert missing_papers(stale) == ["arxiv-missing"]
 
 
 @pytest.mark.parametrize("doc", sorted(DOCS))
@@ -157,3 +204,31 @@ def test_every_reference_file_has_a_pointer() -> None:
 
     orphans = [path.name for path in REFERENCES_DIR.glob("*.md") if path.name not in pointed]
     assert sorted(orphans) == []
+
+
+@pytest.mark.parametrize("doc", sorted(EVAL_DOCS))
+def test_eval_doc_points_only_at_things_that_exist(doc: str) -> None:
+    text = EVAL_DOCS[doc].read_text(encoding="utf-8")
+
+    assert missing_scripts(text) == []
+    assert missing_options(text) == []
+    assert missing_eval_paths(text) == []
+    assert missing_papers(text) == []
+
+
+def test_regression_workflow_translation_names_the_same_things() -> None:
+    """The translation keeps every file, field, value, and paper id the canonical doc names."""
+    canonical = inline_code(EVAL_DOCS["regression-workflow.md"].read_text(encoding="utf-8"))
+    translation = inline_code(EVAL_DOCS["regression-workflow-zh.md"].read_text(encoding="utf-8"))
+
+    assert canonical - translation == {"evals/regression-workflow-zh.md"}
+    assert translation - canonical == {"evals/regression-workflow.md"}
+
+
+def test_rubric_json_template_parses_and_matches_its_version() -> None:
+    text = EVAL_DOCS["note-quality-rubric.md"].read_text(encoding="utf-8")
+    title_version = re.search(r"^# .*Rubric (v\d+)$", text, re.MULTILINE)
+    template = re.search(r"```json\n(.*?)```", text, re.DOTALL)
+
+    assert title_version and template
+    assert json.loads(template.group(1))["rubric_version"] == title_version.group(1)
