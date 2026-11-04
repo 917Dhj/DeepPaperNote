@@ -749,3 +749,140 @@ def test_summary_lists_the_items_still_in_review(run: dict[str, Path]) -> None:
     report = json.loads(summary(run).stdout)
 
     assert report["review_pending_labels"] == ["Figure 1"]
+
+
+def test_planned_insert_embeds_a_label_named_vault_image(run: dict[str, Path]) -> None:
+    item = entry(run, "Figure 1")
+
+    assert item["vault_image_filename"] == "figure_1.png"
+    assert item["relative_markdown_embed"] == "![Figure 1](images/figure_1.png)"
+    # The working file in the run directory keeps its internal name.
+    assert Path(item["source_image_path"]).name == "page_001_fig_figure_1_review.png"
+
+
+def test_repair_keeps_the_vault_image_name(run: dict[str, Path]) -> None:
+    before = entry(run, "Figure 1")
+
+    result = review(
+        run,
+        "Figure 1",
+        "--verdict",
+        "repair",
+        "--failure",
+        "caption_contamination",
+        "--bbox",
+        "0.1,0.2,0.9,0.6",
+    )
+
+    assert result.returncode == 0, result.stderr
+    after = entry(run, "Figure 1")
+    assert after["source_image_path"] != before["source_image_path"]
+    assert after["vault_image_filename"] == before["vault_image_filename"] == "figure_1.png"
+    assert after["relative_markdown_embed"] == before["relative_markdown_embed"]
+
+
+def test_promote_embeds_a_label_named_vault_image(run: dict[str, Path]) -> None:
+    assert promote(run, "Figure 2").returncode == 0
+    assert promote(run, "Table 1", "--bbox", "0.1,0.2,0.9,0.6").returncode == 0
+
+    assert entry(run, "Figure 2")["relative_markdown_embed"] == (
+        "![Figure 2](images/figure_2.png)"
+    )
+    assert entry(run, "Table 1")["relative_markdown_embed"] == "![Table 1](images/table_1.png)"
+
+
+def test_source_version_subdir_keeps_the_label_name(run: dict[str, Path]) -> None:
+    subdir = f"images/{'b' * 64}"
+    subprocess.run(
+        [
+            sys.executable,
+            str(DECISIONS_SCRIPT),
+            "--source-manifest",
+            str(run["source"]),
+            "--figures",
+            str(run["figures"]),
+            "--assets",
+            str(run["assets"]),
+            "--asset-subdir",
+            subdir,
+            "--output",
+            str(run["decisions"]),
+        ],
+        check=True,
+    )
+    assert entry(run, "Figure 1")["relative_markdown_embed"] == (
+        f"![Figure 1]({subdir}/figure_1.png)"
+    )
+
+    result = review(
+        run,
+        "Figure 1",
+        "--verdict",
+        "repair",
+        "--failure",
+        "caption_contamination",
+        "--bbox",
+        "0.1,0.2,0.9,0.6",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert entry(run, "Figure 1")["relative_markdown_embed"] == (
+        f"![Figure 1]({subdir}/figure_1.png)"
+    )
+
+
+def test_formal_save_writes_a_repaired_insert_under_its_label_name(
+    run: dict[str, Path], tmp_path: Path
+) -> None:
+    from formal_save_helpers import formal_save_args
+
+    repair_args = ("--verdict", "repair", "--failure", "caption_contamination")
+    assert review(run, "Figure 1", *repair_args, "--bbox", "0.1,0.2,0.9,0.6").returncode == 0
+    assert review(run, "Figure 1", "--verdict", "pass", "--preserved", "axes").returncode == 0
+    embed = next(
+        item["embed"] for item in json.loads(summary(run).stdout)["items"]
+        if item["label"] == "Figure 1"
+    )
+    assert embed == "![Figure 1](images/figure_1.png)"
+    note_text = f"# Label Named Figure\n\n{embed}\n*Fig. 1 caption.*\n"
+    manifest = {**source_manifest(), "status": "ok", "source_sha256": "a" * 64}
+    manifest_path = tmp_path / "save-source-manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    output_path = tmp_path / "write.json"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPTS_DIR / "write_obsidian_note.py"),
+            "--title",
+            "Label Named Figure",
+            "--filename",
+            "Label Named Figure.md",
+            "--subdir",
+            "Research/Papers/Label Named Figure",
+            "--vault",
+            str(vault),
+            "--output",
+            str(output_path),
+            *formal_save_args(
+                tmp_path,
+                note_text,
+                decisions_path=run["decisions"],
+                source_manifest_path=manifest_path,
+            ),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    materialized = json.loads(output_path.read_text(encoding="utf-8"))["materialized_figures"]
+    assert [record["relative_markdown_path"] for record in materialized] == [
+        "images/figure_1.png"
+    ]
+    saved = Path(materialized[0]["dest_image_path"])
+    assert saved.name == "figure_1.png"
+    assert saved.read_bytes() == Path(entry(run, "Figure 1")["source_image_path"]).read_bytes()
+    assert sorted(path.name for path in saved.parent.iterdir()) == ["figure_1.png"]
