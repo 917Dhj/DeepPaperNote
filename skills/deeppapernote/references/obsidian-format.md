@@ -120,7 +120,7 @@ Prefer an Obsidian embed, or use a Markdown image embed when that is the availab
 The embed must be followed immediately by exactly one italic caption line:
 
 ```md
-![[Research/Papers/DeepPaperNote/paper_slug/images/page_003_img_01.png]]
+![[Research/Papers/DeepPaperNote/paper_slug/images/figure_2.png]]
 *论文原图编号：Fig. 2。数据生成流程图。这里插入是因为它最能帮助理解方法主线。*
 ```
 

@@ -181,6 +181,7 @@ def test_write_note_does_not_replace_another_language_note_image(tmp_path: Path)
                     "decision": "insert",
                     "source_image_path": str(source_image),
                     "source_image_filename": "shared.png",
+                    "vault_image_filename": "shared.png",
                     **reviewed_insert_fields(source_image),
                 }],
             }),
@@ -988,6 +989,7 @@ def test_write_insert_rejects_asset_directory_outside_save_target(tmp_path: Path
             "source_id": "Figure 1", "decision": "insert",
             "source_image_path": str(source_image),
             "source_image_filename": source_image.name,
+            "vault_image_filename": source_image.name,
             **reviewed_insert_fields(source_image),
         }],
     }), encoding="utf-8")
@@ -1027,6 +1029,7 @@ def test_write_insert_rejects_symlink_destination_outside_save_target(tmp_path: 
             "source_id": "Figure 1", "decision": "insert",
             "source_image_path": str(source_image),
             "source_image_filename": source_image.name,
+            "vault_image_filename": source_image.name,
             **reviewed_insert_fields(source_image),
         }],
     }), encoding="utf-8")

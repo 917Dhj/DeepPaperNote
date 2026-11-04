@@ -371,7 +371,7 @@ def test_promote_sends_an_unselected_crop_to_review(run: dict[str, Path]) -> Non
     assert item["decision"] == "review_pending"
     assert item["promoted"] is True
     assert item["visual_quality_status"] == "usable_candidate"
-    assert item["relative_markdown_embed"] == f"![Figure 2](images/{candidate.name})"
+    assert item["relative_markdown_embed"] == "![Figure 2](images/figure_2.png)"
     assert item["review_evidence"]["source_page"] == 2
     assert item["review_evidence"]["render_dpi"] == 300
     assert item["visual_review"]["status"] == "pending"
@@ -826,9 +826,18 @@ def test_source_version_subdir_keeps_the_label_name(run: dict[str, Path]) -> Non
     )
 
     assert result.returncode == 0, result.stderr
-    assert entry(run, "Figure 1")["relative_markdown_embed"] == (
-        f"![Figure 1]({subdir}/figure_1.png)"
-    )
+    embed = entry(run, "Figure 1")["relative_markdown_embed"]
+    assert embed == f"![Figure 1]({subdir}/figure_1.png)"
+
+    from write_obsidian_note import materialize_insert_decisions
+
+    assert review(run, "Figure 1", "--verdict", "pass", "--preserved", "axes").returncode == 0
+    note_path = run["decisions"].parent / "paper" / "Paper.md"
+    materialized = materialize_insert_decisions(f"{embed}\n", note_path, load(run), subdir)
+    assert [record["relative_markdown_path"] for record in materialized] == [
+        f"{subdir}/figure_1.png"
+    ]
+    assert (note_path.parent / subdir / "figure_1.png").is_file()
 
 
 def test_formal_save_writes_a_repaired_insert_under_its_label_name(

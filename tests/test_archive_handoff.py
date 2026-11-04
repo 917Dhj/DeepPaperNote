@@ -397,5 +397,5 @@ def test_figure_planner_keeps_source_specific_asset_directory(tmp_path):
     assert payload["asset_subdir"] == asset_subdir
     assert (
         payload["decisions"][0]["relative_markdown_embed"]
-        == f"![Figure 1]({asset_subdir}/figure.png)"
+        == f"![Figure 1]({asset_subdir}/figure_1.png)"
     )

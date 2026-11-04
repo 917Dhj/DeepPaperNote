@@ -333,6 +333,7 @@ def test_formal_save_image_embed_uses_forward_slashes(tmp_path: Path) -> None:
             "source_id": "Figure 1", "decision": "insert",
             "source_image_path": str(source_image),
             "source_image_filename": source_image.name,
+            "vault_image_filename": source_image.name,
             **reviewed_insert_fields(source_image),
         }],
     }), encoding="utf-8")

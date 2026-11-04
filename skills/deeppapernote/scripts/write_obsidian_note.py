@@ -180,11 +180,15 @@ def insert_decisions(decisions: dict) -> list[dict]:
     ]
 
 
-def safe_image_filename(filename: str, source_image: Path) -> str:
-    candidate = filename.strip() or source_image.name
+def safe_image_filename(filename: str, label: str) -> str:
+    candidate = filename.strip()
+    if not candidate:
+        raise SystemExit(
+            f"Insert decision for {label} has no vault_image_filename; "
+            "rerun plan_figure_table_decisions.py."
+        )
     if (
-        not candidate
-        or candidate in {".", ".."}
+        candidate in {".", ".."}
         or "/" in candidate
         or "\\" in candidate
         or Path(candidate).is_absolute()
@@ -251,9 +255,11 @@ def materialize_insert_decisions(
             raise SystemExit(
                 f"Insert decision for {label} does not match its reviewed asset SHA-256."
             )
+        # The vault name is fixed at planning time from the label; a crop
+        # repair replaces the source image but never this name.
         filename = safe_image_filename(
-            str(item.get("source_image_filename", "")),
-            source_image,
+            str(item.get("vault_image_filename", "")),
+            str(item.get("source_id") or item.get("label") or item.get("item_id") or "unknown"),
         )
         expected_relative = f"{asset_subdir}/{filename}"
         if not note_references_image_embed(note_text, expected_relative):

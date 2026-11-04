@@ -27,6 +27,7 @@ def insert_decision(image: Path, **overrides: object) -> dict:
         "visual_quality_status": "usable_candidate",
         "source_image_path": str(image),
         "source_image_filename": image.name,
+        "vault_image_filename": image.name,
         **reviewed_insert_fields(image),
         **overrides,
     }
