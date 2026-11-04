@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from formal_save_helpers import formal_save_args, reviewed_insert_fields
 
 from lint_note import (
@@ -1305,6 +1306,82 @@ def test_write_obsidian_note_reports_lint_warning_details(tmp_path) -> None:
     assert "Table 2 是主结果表" in result.stderr
 
 
+def test_write_obsidian_note_reports_all_lint_issue_details(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "passes_plan_gate": False,
+                "warnings": ["planning_required_fields_missing"],
+                "core_info_structure_issues": [
+                    {"reason": "core first", "line": "unused core line"},
+                    {"reason": "core second", "snippet": "unused core snippet"},
+                ],
+                "figure_structure_issues": [
+                    {"reason": "", "line": "figure first", "snippet": "unused figure snippet"},
+                    {"line": "figure second"},
+                ],
+                "planning_artifact_issues": [
+                    "planning_must_cover_missing",
+                    "planning_key_numbers_missing",
+                ],
+                "substantive_content_issues": [
+                    {"reason": "", "line": "", "snippet": "content first"},
+                    {"snippet": "content second"},
+                ],
+                "math_render_issues": [{"reason": "math first"}, {"reason": "math second"}],
+                "reference_hygiene_issues": [
+                    {"reason": "reference first"},
+                    {"reason": "reference second"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    script_path = (
+        Path(__file__).resolve().parents[1]
+        / "skills/deeppapernote/scripts/write_obsidian_note.py"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--title",
+            "Lint Details Paper",
+            "--vault",
+            str(vault),
+            *formal_save_args(tmp_path, "# Lint Details Paper", lint_path=lint_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "plan gate failed" in result.stderr
+    assert "planning_required_fields_missing" in result.stderr
+    for detail in (
+        "core_info_structure_issues: core first",
+        "core_info_structure_issues: core second",
+        "figure_structure_issues: figure first",
+        "figure_structure_issues: figure second",
+        "planning_artifact_issues: planning_must_cover_missing",
+        "planning_artifact_issues: planning_key_numbers_missing",
+        "substantive_content_issues: content first",
+        "substantive_content_issues: content second",
+        "math_render_issues: math first",
+        "math_render_issues: math second",
+        "reference_hygiene_issues: reference first",
+        "reference_hygiene_issues: reference second",
+    ):
+        assert detail in result.stderr
+    assert "unused" not in result.stderr
+    assert f"See lint JSON: {lint_path}" in result.stderr
+    assert not list(vault.rglob("*.md"))
+
+
 def test_real_image_embed_counts_as_figure_marker_in_full_lint(tmp_path) -> None:
     note_path = tmp_path / "Paper.md"
     note_path.write_text(
@@ -1720,6 +1797,16 @@ def test_inspect_note_plan_reports_invalid_json(tmp_path) -> None:
     assert issues == ["planning_artifact_invalid_json"]
 
 
+def test_inspect_note_plan_reports_non_object(tmp_path: Path) -> None:
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text("[]", encoding="utf-8")
+
+    found, issues = inspect_note_plan(plan_path)
+
+    assert found is True
+    assert issues == ["planning_artifact_not_object"]
+
+
 def test_inspect_note_plan_reports_missing_required_fields(tmp_path) -> None:
     plan_path = tmp_path / "note.plan.json"
     plan_path.write_text(json.dumps({"paper_type": "AI_method"}), encoding="utf-8")
@@ -1727,6 +1814,23 @@ def test_inspect_note_plan_reports_missing_required_fields(tmp_path) -> None:
     found, issues = inspect_note_plan(plan_path)
     assert found is True
     assert "planning_required_fields_missing" in issues
+
+
+def test_inspect_note_plan_names_all_missing_fields(tmp_path: Path) -> None:
+    plan = _valid_plan_payload()
+    del plan["paper_type_rationale"]
+    del plan["must_cover"]
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    found, issues = inspect_note_plan(plan_path)
+
+    assert found is True
+    assert issues == [
+        "planning_required_fields_missing",
+        "planning_paper_type_rationale_missing",
+        "planning_must_cover_missing",
+    ]
 
 
 def test_inspect_note_plan_rejects_invalid_paper_type(tmp_path) -> None:
@@ -1793,6 +1897,30 @@ def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
     found, issues = inspect_note_plan(plan_path)
     assert found is True
     assert "planning_required_fields_invalid" in issues
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected_type"),
+    [
+        ("paper_type_rationale", [], "string"),
+        ("must_cover", "method", "array"),
+    ],
+)
+def test_inspect_note_plan_reports_expected_field_types(
+    tmp_path: Path, field: str, value: object, expected_type: str
+) -> None:
+    plan = _valid_plan_payload()
+    plan[field] = value
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    found, issues = inspect_note_plan(plan_path)
+
+    assert found is True
+    assert issues == [
+        "planning_required_fields_invalid",
+        f"planning_{field}_invalid: expected {expected_type}",
+    ]
 
 
 def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
