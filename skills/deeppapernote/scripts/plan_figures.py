@@ -37,7 +37,6 @@ def merge_inputs(primary: dict | None, evidence: dict | None, assets: dict | Non
         merged["evidence_pack"] = evidence["evidence_pack"]
     if assets and assets.get("page_assets"):
         merged["page_assets"] = assets["page_assets"]
-        merged["image_assets"] = assets.get("image_assets", [])
         merged["figure_assets"] = assets.get("figure_assets", [])
     return merged
 
@@ -409,39 +408,28 @@ def _candidate_status_for_quality(asset: dict) -> str:
     return "needs_visual_quality_check"
 
 
-def _asset_candidate(asset: dict, *, include_label: bool = False) -> dict:
+def _asset_candidate(asset: dict) -> dict:
     candidate = {
         "filename": asset.get("filename", ""),
         "path": asset.get("path", ""),
         "width": asset.get("width", 0),
         "height": asset.get("height", 0),
         "size_bytes": asset.get("size_bytes", 0),
+        "label": asset.get("label", ""),
+        "extraction_level": asset.get("extraction_level", "figure"),
     }
-    if include_label:
-        candidate["label"] = asset.get("label", "")
-        candidate["extraction_level"] = asset.get("extraction_level", "figure")
-        if isinstance(asset.get("quality_signals"), dict):
-            candidate["quality_signals"] = asset.get("quality_signals")
-        candidate["candidate_status"] = _candidate_status_for_quality(asset)
+    if isinstance(asset.get("quality_signals"), dict):
+        candidate["quality_signals"] = asset.get("quality_signals")
+    candidate["candidate_status"] = _candidate_status_for_quality(asset)
     return candidate
 
 
 def attach_candidate_images(
     items: list[dict],
     page_assets: list[dict],
-    image_assets: list[dict],
     figure_assets: list[dict] | None = None,
 ) -> list[dict]:
     figure_assets = figure_assets or []
-
-    image_map: dict[int, list[dict]] = {}
-    for image in image_assets:
-        if not isinstance(image, dict):
-            continue
-        page_number = int(image.get("page_number", 0) or 0)
-        if page_number <= 0:
-            continue
-        image_map.setdefault(page_number, []).append(image)
 
     figure_map: dict[int, list[dict]] = {}
     for asset in figure_assets:
@@ -471,7 +459,7 @@ def attach_candidate_images(
 
         fig_match = _match_figure_asset(item_id, figure_assets)
         if fig_match:
-            item["figure_asset_candidate"] = _asset_candidate(fig_match, include_label=True)
+            item["figure_asset_candidate"] = _asset_candidate(fig_match)
 
         variants = label_variants(item_id)
         keywords = caption_keywords(str(item.get("caption", "")))
@@ -512,12 +500,8 @@ def attach_candidate_images(
                     "score": score,
                     "matched_terms": matched_terms[:6],
                     "snippet": snippets[0] if snippets else normalize_whitespace(str(page.get("text_preview", "")))[:220],
-                    "images": [
-                        _asset_candidate(img)
-                        for img in image_map.get(page_number, [])[:3]
-                    ],
                     "figure_assets": [
-                        _asset_candidate(asset, include_label=True)
+                        _asset_candidate(asset)
                         for asset in figure_map.get(page_number, [])[:3]
                     ],
                 }
@@ -548,13 +532,12 @@ def main() -> None:
 
     evidence_pack = data.get("evidence_pack", {}) if isinstance(data.get("evidence_pack"), dict) else {}
     page_assets = data.get("page_assets", []) if isinstance(data.get("page_assets"), list) else []
-    image_assets = data.get("image_assets", []) if isinstance(data.get("image_assets"), list) else []
     figure_assets = data.get("figure_assets", []) if isinstance(data.get("figure_assets"), list) else []
     language = normalize_output_language(
         runtime_config(cli_overrides={"output_language": args.language})["output_language"]
     )
     items = build_figure_items(evidence_pack, limit=args.max_items, language=language)
-    items = attach_candidate_images(items, page_assets, image_assets, figure_assets)
+    items = attach_candidate_images(items, page_assets, figure_assets)
     payload = {
         "status": "ok",
         "script": "plan_figures.py",

@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Extract page-level PDF assets for later model-side semantic figure matching.
 
-Two extraction strategies run in parallel:
-1. xref-level: extract raw embedded image objects (legacy behaviour).
-2. figure-level: locate Figure/Table captions on each page, compute a bounding
-   box that covers the visual content above the caption, and render that region
-   from the page pixmap at high DPI.  This produces complete, human-readable
-   figures even when the PDF stores them as many small xref fragments or as
-   pure vector art.
+Each page gets a count of its embedded image objects, and its Figure/Table
+captions become figure-level crops: a bounding box covering the visual content
+next to the caption is rendered from the page pixmap at high DPI.  This produces
+complete, human-readable figures even when the PDF stores them as many small
+xref fragments or as pure vector art, so the fragments themselves are only
+counted, never written to disk.
 
 """
 
@@ -233,41 +232,14 @@ def ocr_page(page, dpi: int) -> str:
     return normalize_whitespace(pytesseract.image_to_string(image))
 
 
-def extract_page_images(doc, page, page_number: int, images_dir: Path) -> list[dict]:
-    """Legacy xref-level extraction."""
-    assets: list[dict] = []
-    seen_xrefs = set()
-    for image_index, image_info in enumerate(page.get_images(full=True), start=1):
-        if not image_info:
-            continue
-        xref = int(image_info[0])
-        if xref in seen_xrefs:
-            continue
-        seen_xrefs.add(xref)
-        extracted = doc.extract_image(xref)
-        image_bytes = extracted.get("image")
-        if not image_bytes:
-            continue
-        ext = normalize_whitespace(str(extracted.get("ext", "png"))).lower() or "png"
-        filename = f"page_{page_number:03d}_img_{image_index:02d}.{ext}"
-        output_path = images_dir / filename
-        save_image_bytes(output_path, image_bytes)
-        assets.append(
-            {
-                "page_number": page_number,
-                "image_index": image_index,
-                "xref": xref,
-                "filename": filename,
-                "path": str(output_path),
-                "ext": ext,
-                "width": extracted.get("width", 0),
-                "height": extracted.get("height", 0),
-                "colorspace": extracted.get("colorspace", 0),
-                "size_bytes": len(image_bytes),
-                "extraction_level": "xref",
-            }
-        )
-    return assets
+def count_page_images(page) -> int:
+    """Count the distinct embedded image objects drawn on a page.
+
+    Only the count is kept: it tells figure planning that a page carries a
+    visual. The objects themselves are often fragments of one figure, so they
+    are never written out; figure crops come from extract_figure_regions.
+    """
+    return len({int(info[0]) for info in page.get_images(full=True) if info})
 
 
 # ---------------------------------------------------------------------------
@@ -1517,7 +1489,6 @@ def main() -> None:
 
     doc = fitz.open(pdf_path.resolve())
     page_records: list[dict] = []
-    image_assets: list[dict] = []
     figure_assets: list[dict] = []
     asset_coverage: dict = {}
     try:
@@ -1541,8 +1512,7 @@ def main() -> None:
                 ocr_text = ocr_page(page, args.ocr_dpi)
                 if ocr_text:
                     extraction_method = "ocr"
-            page_images = extract_page_images(doc, page, page_number, images_dir)
-            image_assets.extend(page_images)
+            image_count = count_page_images(page)
 
             page_figures = extract_figure_regions(
                 page, page_number, images_dir, caption_anchors[page_number], dpi=figure_dpi
@@ -1560,7 +1530,7 @@ def main() -> None:
                     "searchable_text_chars": searchable_chars,
                     "text_extraction_method": extraction_method,
                     "ocr_used": extraction_method == "ocr",
-                    "image_count": len(page_images),
+                    "image_count": image_count,
                     "figure_count": len(page_figures),
                     "page_preview_path": page_preview_path,
                     "page_text": text or ocr_text,
@@ -1578,7 +1548,6 @@ def main() -> None:
         "asset_root": str(asset_root),
         "images_dir": str(images_dir),
         "page_assets": page_records,
-        "image_assets": image_assets,
         "figure_assets": figure_assets,
         "asset_coverage": asset_coverage,
         "ocr_available": bool(pytesseract and Image),
