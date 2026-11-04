@@ -275,6 +275,25 @@ def figure_table_manifest(
     }
 
 
+def note_plan_template(rules: dict) -> dict:
+    """Give the plan's shape with every value empty, so an unfilled template fails the gates."""
+    empty = {"string": "", "array": []}
+    template: dict = {"output_language": rules["language"]}
+    for field in NOTE_PLAN_REQUIRED_FIELDS:
+        template[field] = deepcopy(empty[rules["note_plan_field_types"][field]])
+    claim_fields = rules["analysis_coverage_contract"]["central_claim_fields"]
+    claim_types = rules["analysis_coverage_contract"]["central_claim_field_types"]
+    template["central_claims"] = [
+        {field: deepcopy(empty[claim_types[field]]) for field in claim_fields}
+    ]
+    focus_field = rules["note_plan_depth_requirements"]["required_section_focus_fields"][0]
+    template["section_plan"] = [
+        {"section": section, focus_field: "", "subsections": [], "evidence_sources": []}
+        for section in rules["grounding_required_sections"]
+    ]
+    return template
+
+
 def compact_writing_contract(language: str | None = None) -> dict:
     rules = writing_contract_rules(language)
     depth_requirements = dict(rules["note_plan_depth_requirements"])
@@ -328,6 +347,7 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "artifact_preference": "short_json_planning_file",
             "grounding_field": "section_plan[*].evidence_sources",
             "analysis_coverage_field": "central_claims[*]",
+            "template": note_plan_template(rules),
         },
         "paper_type_selection": {
             "source_of_truth": "note_plan.paper_type",
