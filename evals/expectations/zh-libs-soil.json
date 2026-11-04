@@ -80,7 +80,6 @@
   "known_gaps": {
     "caption:图 1": "Fullwidth Latin letters such as ＬＩＢＳ are not normalized in caption text.",
     "crop:图 ?": "The crop takes in body text from a neighboring column or the line above.",
-    "crop:表 ?": "The crop runs past the table into body text.",
-    "title": "First-page title extraction picks the journal name, and a low-confidence local title with no provider confirmation is still accepted."
+    "crop:表 ?": "The crop runs past the table into body text."
   }
 }

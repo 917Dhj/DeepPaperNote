@@ -41,7 +41,5 @@
   ],
   "crops": {},
   "same_visual": [],
-  "known_gaps": {
-    "title": "Crossref keeps the subtitle in a separate field; identity takes only its title (\"LightGCN\") and replaces the full PDF metadata title."
-  }
+  "known_gaps": {}
 }

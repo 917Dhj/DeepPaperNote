@@ -2024,6 +2024,10 @@ def safe_fetch_arxiv_entries(*, search_query: str = "", id_list: str = "", max_r
 
 def normalize_crossref_work(item: dict[str, Any]) -> dict[str, Any]:
     title = normalize_whitespace(" ".join(item.get("title") or []))
+    # Crossref splits "LightGCN: Simplifying ..." into title and subtitle.
+    subtitle = normalize_whitespace(" ".join(item.get("subtitle") or []))
+    if subtitle and subtitle.casefold() not in title.casefold():
+        title = f"{title}: {subtitle}" if title else subtitle
     authors = []
     affiliations = []
     for author in item.get("author", []) or []:
@@ -3595,10 +3599,36 @@ def extract_pdf_text(pdf_path: Path, max_pages: int | None = None) -> str:
     return "\n".join(texts)
 
 
+TITLE_MIN_LETTER_SHARE = 0.6
+TITLE_MAX_GARBLE_SHARE = 0.05
+TITLE_GARBLE_CHARS = set("!\"#$%*<=>@[\\]^_`{|}~")
+TITLE_LINE_SIZE_RATIO = 0.9
+TITLE_LINE_SPACING = 1.6
+TITLE_FOOTNOTE_MARKS_RE = re.compile(r"[\s*∗†‡§¶]+$")
+CJK_CHAR_RE = re.compile(r"[\u3400-\u9fff]")
+
+
+def is_mostly_letters(text: str) -> bool:
+    """Tell readable words from a garbled text layer, which decodes to stray symbols."""
+    visible = [char for char in TITLE_FOOTNOTE_MARKS_RE.sub("", text) if not char.isspace()]
+    if not visible:
+        return False
+    letters = sum(1 for char in visible if char.isalpha())
+    garble = sum(1 for char in visible if char in TITLE_GARBLE_CHARS)
+    return (
+        letters / len(visible) >= TITLE_MIN_LETTER_SHARE
+        and garble / len(visible) <= TITLE_MAX_GARBLE_SHARE
+    )
+
+
 def is_plausible_pdf_title_line(line: str) -> bool:
     normalized = clean_pdf_line(line)
     lower = normalized.lower()
-    if len(normalized) < 8 or (len(normalized) < 20 and len(normalized.split()) < 2):
+    # A Chinese title has no spaces between words, so only its length counts.
+    single_word = len(normalized.split()) < 2 and not CJK_CHAR_RE.search(normalized)
+    if len(normalized) < 8 or (len(normalized) < 20 and single_word):
+        return False
+    if not is_mostly_letters(normalized):
         return False
     if normalized.count(",") >= 3:
         return False
@@ -3613,6 +3643,63 @@ def is_plausible_pdf_title_line(line: str) -> bool:
     if " doi:" in lower or lower.startswith("doi:"):
         return False
     return True
+
+
+def join_title_lines(lines: list[str]) -> str:
+    title = ""
+    for line in lines:
+        if not title:
+            title = line
+        elif title.endswith("-") and line[:1].islower():
+            title = title[:-1] + line
+        elif CJK_CHAR_RE.match(title[-1]) and CJK_CHAR_RE.match(line[0]):
+            title += line
+        else:
+            title = f"{title} {line}"
+    return TITLE_FOOTNOTE_MARKS_RE.sub("", title)
+
+
+def first_page_title_from_layout(page: Any) -> str:
+    """Return the first page's title: its largest plausible line plus the adjacent lines set
+    in the same type, so a journal name or volume line printed above it is passed over."""
+    try:
+        blocks = page.get_text("dict").get("blocks", [])
+    except Exception:
+        return ""
+    lines = []
+    for block in blocks:
+        for line in block.get("lines", []):
+            if tuple(line.get("dir", (1.0, 0.0))) != (1.0, 0.0):
+                continue
+            spans = line.get("spans", [])
+            text = clean_pdf_line("".join(str(span.get("text", "")) for span in spans))
+            if text:
+                sizes = [
+                    float(span.get("size", 0))
+                    for span in spans
+                    if str(span.get("text", "")).strip()
+                ]
+                size = max(sizes)
+                lines.append({"text": text, "size": size, "top": float(line["bbox"][1])})
+    candidates = [line for line in lines if is_plausible_pdf_title_line(line["text"])]
+    if not candidates:
+        return ""
+    anchor = max(candidates, key=lambda line: (line["size"], -line["top"]))
+    ordered = sorted(lines, key=lambda line: line["top"])
+    start = end = ordered.index(anchor)
+
+    def continues_title(edge: dict, neighbour: dict) -> bool:
+        return (
+            neighbour["size"] >= anchor["size"] * TITLE_LINE_SIZE_RATIO
+            and abs(neighbour["top"] - edge["top"]) <= anchor["size"] * TITLE_LINE_SPACING
+            and is_mostly_letters(neighbour["text"])
+        )
+
+    while start > 0 and continues_title(ordered[start], ordered[start - 1]):
+        start -= 1
+    while end + 1 < len(ordered) and continues_title(ordered[end], ordered[end + 1]):
+        end += 1
+    return join_title_lines([line["text"] for line in ordered[start : end + 1]])
 
 
 def first_page_title_candidate(first_page_text: str) -> str:
@@ -3637,6 +3724,7 @@ def extract_local_pdf_hints(pdf_path: Path) -> dict[str, Any]:
     metadata_title = ""
     metadata_subject = ""
     first_page_text = ""
+    layout_title = ""
     try:
         doc = fitz.open(pdf_path)
     except Exception:
@@ -3647,6 +3735,7 @@ def extract_local_pdf_hints(pdf_path: Path) -> dict[str, Any]:
         metadata_subject = normalize_whitespace(str(metadata.get("subject", "")))
         if len(doc):
             first_page_text = doc[0].get_text("text")
+            layout_title = first_page_title_from_layout(doc[0])
     except Exception:
         return hints
     finally:
@@ -3656,7 +3745,7 @@ def extract_local_pdf_hints(pdf_path: Path) -> dict[str, Any]:
         hints["title"] = metadata_title
         hints["local_pdf_title_source"] = "pdf_metadata_title_used"
     else:
-        page_title = first_page_title_candidate(first_page_text)
+        page_title = layout_title or first_page_title_candidate(first_page_text)
         if page_title:
             hints["title"] = page_title
             hints["local_pdf_title_source"] = "first_page_title_used"

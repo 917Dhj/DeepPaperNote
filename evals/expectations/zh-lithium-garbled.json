@@ -15,6 +15,6 @@
   "crops": {},
   "same_visual": [],
   "known_gaps": {
-    "title": "The text layer is garbled, yet the garbled first-page line is accepted as the title instead of failing closed."
+    "title": "The text layer is garbled, so no line reads as a title and identity falls back to the PDF filename."
   }
 }

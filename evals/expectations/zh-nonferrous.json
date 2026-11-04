@@ -31,7 +31,5 @@
   ],
   "crops": {},
   "same_visual": [],
-  "known_gaps": {
-    "title": "First-page title extraction picks the volume line, and a low-confidence local title with no provider confirmation is still accepted."
-  }
+  "known_gaps": {}
 }

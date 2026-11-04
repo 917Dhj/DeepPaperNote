@@ -83,7 +83,6 @@
   ],
   "known_gaps": {
     "review:Table 1": "The visual quality gate rejects this crop; the cause is not analyzed yet.",
-    "same_visual:*": "A bilingual caption pair creates two decisions for one visual.",
-    "title": "First-page title extraction picks the journal name, and a low-confidence local title with no provider confirmation is still accepted."
+    "same_visual:*": "A bilingual caption pair creates two decisions for one visual."
   }
 }
