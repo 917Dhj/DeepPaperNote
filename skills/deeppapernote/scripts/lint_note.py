@@ -292,7 +292,7 @@ def inspect_note_plan(
         return True, ["planning_artifact_invalid_json"]
 
     if not isinstance(plan, dict):
-        return True, ["planning_required_fields_invalid"]
+        return True, ["planning_artifact_not_object"]
 
     issues: list[str] = []
     try:
@@ -306,9 +306,10 @@ def inspect_note_plan(
     missing_fields = [field for field in NOTE_PLAN_REQUIRED_FIELDS if field not in plan]
     if missing_fields:
         issues.append("planning_required_fields_missing")
+        issues.extend(f"planning_{field}_missing" for field in missing_fields)
 
     required_checks = WRITING_CONTRACT_RULES["note_plan_required_field_checks"]
-    has_invalid_fields = False
+    invalid_fields: list[str] = []
     for field in NOTE_PLAN_REQUIRED_FIELDS:
         if field not in plan:
             continue
@@ -316,14 +317,18 @@ def inspect_note_plan(
             plan[field], NOTE_PLAN_FIELD_TYPES[field], required_checks
         )
         if validation_error == "invalid":
-            has_invalid_fields = True
+            invalid_fields.append(field)
         elif validation_error == "empty":
             issues.append(f"planning_{field}_empty")
     if isinstance(plan.get("paper_type"), str) and plan["paper_type"].strip():
         if plan["paper_type"].strip() not in PAPER_TYPE_VALUES:
             issues.append("planning_paper_type_invalid")
-    if has_invalid_fields:
+    if invalid_fields:
         issues.append("planning_required_fields_invalid")
+        issues.extend(
+            f"planning_{field}_invalid: expected {NOTE_PLAN_FIELD_TYPES[field]}"
+            for field in invalid_fields
+        )
     issues.extend(inspect_central_claims_plan(plan.get("central_claims")))
 
     return True, issues
