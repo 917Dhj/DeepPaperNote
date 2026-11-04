@@ -23,3 +23,6 @@ CONTEXT.md
 docs/
 /assets/hero-concepts/
 evals/papers/
+
+# Requests a corpus replay could not answer; regenerated on every run.
+evals/http-cassettes/*.misses

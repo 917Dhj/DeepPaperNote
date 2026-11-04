@@ -10,6 +10,7 @@
     "prompt-tables"
   ],
   "readable": true,
+  "title": "Self-Instruct: Aligning Language Models with Self-Generated Instructions",
   "labels": [
     "Figure 1",
     "Figure 2",

@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts"
 EXPECTATIONS_DIR = PROJECT_ROOT / "evals" / "expectations"
 PAPERS_DIR = PROJECT_ROOT / "evals" / "papers"
+CASSETTES_DIR = PROJECT_ROOT / "evals" / "http-cassettes"
+CASSETTE_SHIM_DIR = Path(__file__).resolve().parent / "http_cassette"
+RECORD = os.environ.get("DEEPPAPERNOTE_CORPUS_RECORD") == "1"
 EXPECTATION_FIELDS = {
     "schema_version",
     "pdf",
@@ -23,6 +27,7 @@ EXPECTATION_FIELDS = {
     "source",
     "traits",
     "readable",
+    "title",
     "labels",
     "captions",
     "review",
@@ -47,6 +52,7 @@ def check_ids(expectation: dict) -> list[str]:
     return [
         "sha256",
         "readable",
+        "title",
         "labels:missing",
         "labels:extra",
         *(f"caption:{label}" for label in expectation["captions"]),
@@ -85,6 +91,52 @@ def run_step(script: str, env: dict[str, str], *arguments: object) -> None:
         capture_output=True,
         text=True,
     )
+
+
+def run_identity(pdf_path: Path, workdir: Path, env: dict[str, str], cassette: Path) -> dict:
+    """Resolve the paper's identity from the PDF, with provider responses from the cassette."""
+    workdir.mkdir()
+    misses = cassette.with_suffix(".misses")
+    misses.unlink(missing_ok=True)
+    if RECORD:
+        cassette.unlink(missing_ok=True)
+    env = {
+        **env,
+        "PYTHONPATH": str(CASSETTE_SHIM_DIR),
+        "DEEPPAPERNOTE_HTTP_CASSETTE": str(cassette),
+        "DEEPPAPERNOTE_HTTP_RECORD": "1" if RECORD else "0",
+    }
+    resolve = workdir / "resolve.json"
+    metadata = workdir / "metadata.json"
+    identity = workdir / "identity.json"
+    run_step(
+        "resolve_paper.py", env, "--input", pdf_path, "--zotero-mode", "off", "--output", resolve
+    )
+    run_step("collect_metadata.py", env, "--input", resolve, "--output", metadata)
+    run_step(
+        "build_identity_contract.py",
+        env,
+        "--input",
+        metadata,
+        "--resolve",
+        resolve,
+        "--trace-output",
+        workdir / "identity_repair_trace.json",
+        "--output",
+        identity,
+    )
+    contract = json.loads(identity.read_text(encoding="utf-8"))
+    return {
+        "verdict": contract.get("identity_verdict"),
+        "title": contract.get("work_level_identity", {}).get("title", ""),
+        "misses": misses.read_text(encoding="utf-8").split() if misses.is_file() else [],
+    }
+
+
+def comparable_title(title: str) -> str:
+    """Fold ligatures, full-width forms, case, and spacing, which differ between sources."""
+    folded = unicodedata.normalize("NFKC", title).casefold()
+    return " ".join(folded.split()).rstrip(".")
 
 
 def run_preparation(pdf_path: Path, workdir: Path, env: dict[str, str]) -> dict:
@@ -186,7 +238,7 @@ def run_preparation(pdf_path: Path, workdir: Path, env: dict[str, str]) -> dict:
 
 
 @pytest.fixture(scope="session")
-def corpus_runs(tmp_path_factory: pytest.TempPathFactory):
+def corpus_env(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, dict[str, str]]:
     root = tmp_path_factory.mktemp("paper-corpus")
     config = root / "config.json"
     config.write_text(
@@ -197,6 +249,12 @@ def corpus_runs(tmp_path_factory: pytest.TempPathFactory):
         "DEEPPAPERNOTE_CONFIG_PATH": str(config),
         "DEEPPAPERNOTE_DISABLE_SHELL_CONFIG": "1",
     }
+    return root, env
+
+
+@pytest.fixture(scope="session")
+def corpus_runs(corpus_env: tuple[Path, dict[str, str]]):
+    root, env = corpus_env
     runs: dict[str, dict] = {}
 
     def run(paper: str) -> dict:
@@ -208,8 +266,23 @@ def corpus_runs(tmp_path_factory: pytest.TempPathFactory):
     return run
 
 
+@pytest.fixture(scope="session")
+def identity_runs(corpus_env: tuple[Path, dict[str, str]]):
+    root, env = corpus_env
+    runs: dict[str, dict] = {}
+
+    def run(paper: str) -> dict:
+        if paper not in runs:
+            pdf_path = PAPERS_DIR / EXPECTATIONS[paper]["pdf"]
+            cassette = CASSETTES_DIR / f"{paper}.json"
+            runs[paper] = run_identity(pdf_path, root / f"{paper}-identity", env, cassette)
+        return runs[paper]
+
+    return run
+
+
 @pytest.mark.parametrize(("paper", "check"), corpus_params())
-def test_paper_corpus(paper: str, check: str, corpus_runs) -> None:
+def test_paper_corpus(paper: str, check: str, corpus_runs, identity_runs) -> None:
     expectation = EXPECTATIONS[paper]
     pdf_path = PAPERS_DIR / expectation["pdf"]
     if not pdf_path.is_file():
@@ -218,6 +291,14 @@ def test_paper_corpus(paper: str, check: str, corpus_runs) -> None:
     if kind == "sha256":
         digest = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
         assert digest == expectation["sha256"], "The local PDF differs from the expected file."
+        return
+    if check == "title":
+        identity = identity_runs(paper)
+        assert identity["misses"] == [], (
+            "The cassette lacks these requests; re-record it with DEEPPAPERNOTE_CORPUS_RECORD=1."
+        )
+        assert identity["verdict"] == "accepted", identity
+        assert comparable_title(identity["title"]) == comparable_title(expectation["title"])
         return
     run = corpus_runs(paper)
     if check == "readable":
@@ -253,6 +334,8 @@ def test_expectations_are_well_formed() -> None:
         assert Path(expectation["pdf"]).name == expectation["pdf"], paper
         assert re.fullmatch(r"[0-9a-f]{64}", expectation["sha256"]), paper
         assert isinstance(expectation["readable"], bool), paper
+        assert isinstance(expectation["title"], str) and expectation["title"].strip(), paper
+        assert (CASSETTES_DIR / f"{paper}.json").is_file(), paper
         assert set(expectation["captions"]) <= set(expectation["labels"]), paper
         assert all(
             set(item) == {"starts", "ends"} and all(item.values())

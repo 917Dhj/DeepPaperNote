@@ -11,6 +11,7 @@
     "numbered-algorithms"
   ],
   "readable": true,
+  "title": "3D Gaussian Splatting for Real-Time Radiance Field Rendering",
   "labels": [
     "Fig 1",
     "Fig 2",

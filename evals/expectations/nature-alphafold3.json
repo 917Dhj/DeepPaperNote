@@ -10,6 +10,7 @@
     "caption-across-columns"
   ],
   "readable": true,
+  "title": "Accurate structure prediction of biomolecular interactions with AlphaFold 3",
   "labels": [
     "Fig 1",
     "Fig 2",

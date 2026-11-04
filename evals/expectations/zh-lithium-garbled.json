@@ -8,10 +8,13 @@
     "garbled-text-layer"
   ],
   "readable": false,
+  "title": "盐湖原卤提锂研究进展",
   "labels": [],
   "captions": {},
   "review": [],
   "crops": {},
   "same_visual": [],
-  "known_gaps": {}
+  "known_gaps": {
+    "title": "The text layer is garbled, so no line reads as a title and identity falls back to the PDF filename."
+  }
 }

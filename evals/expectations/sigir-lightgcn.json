@@ -9,6 +9,7 @@
     "figure-colon"
   ],
   "readable": true,
+  "title": "LightGCN: Simplifying and Powering Graph Convolution Network for Recommendation",
   "labels": [
     "Figure 1",
     "Figure 2",
