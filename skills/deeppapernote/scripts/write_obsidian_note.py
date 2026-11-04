@@ -328,15 +328,13 @@ def lint_failure_message(lint: dict, gate: str, lint_path: str) -> str:
         "reference_hygiene_issues",
     ):
         issues = lint.get(issue_key, []) or []
-        if not issues:
-            continue
-        first = issues[0]
-        if isinstance(first, dict):
-            reason = first.get("reason") or first.get("line") or first.get("snippet") or first
-            detail_parts.append(f"{issue_key}: {reason}")
-        else:
-            detail_parts.append(f"{issue_key}: {first}")
-    details = "; ".join(detail_parts[:4])
+        for issue in issues:
+            if isinstance(issue, dict):
+                reason = issue.get("reason") or issue.get("line") or issue.get("snippet") or issue
+                detail_parts.append(f"{issue_key}: {reason}")
+            else:
+                detail_parts.append(f"{issue_key}: {issue}")
+    details = "; ".join(detail_parts)
     suffix = f" Details: {details}." if details else ""
     return f"write_obsidian_note.py refused to write note because {gate} gate failed.{suffix} See lint JSON: {lint_path}"
 
