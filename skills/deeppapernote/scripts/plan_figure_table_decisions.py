@@ -103,6 +103,15 @@ def promote_parser() -> argparse.ArgumentParser:
     return p
 
 
+def summary_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="plan_figure_table_decisions.py summary",
+        description="Print one line per Figure/Table from the current decisions file.",
+    )
+    p.add_argument("--decisions", required=True, help="Decisions JSON file; read only.")
+    return p
+
+
 def load_record(value: str) -> dict[str, Any]:
     record = maybe_load_json_record(value)
     if record is None:
@@ -746,6 +755,40 @@ def run_promote(argv: list[str]) -> None:
     finish_item_command(args.decisions, wrapper, item)
 
 
+def summary_line(item: dict[str, Any]) -> dict[str, Any]:
+    decision = item.get("decision", "")
+    return {
+        "label": item_label(item),
+        "kind": item.get("kind", ""),
+        "pages": item.get("pages", []),
+        "decision": decision,
+        "target_section": item.get("target_section", ""),
+        # Only an insert belongs in the note; other items keep a placeholder or nothing.
+        "embed": item.get("relative_markdown_embed", "") if decision == "insert" else "",
+        "skip_reason": item.get("skip_reason", ""),
+        "caption": item.get("caption", ""),
+    }
+
+
+def run_summary(argv: list[str]) -> None:
+    args = summary_parser().parse_args(argv)
+    wrapper = load_decisions(args.decisions)
+    items = [item for item in wrapper["decisions"] if isinstance(item, dict)]
+    emit(
+        {
+            "status": "ok",
+            "script": "plan_figure_table_decisions.py",
+            "output_language": wrapper.get("output_language", ""),
+            "decisions_path": args.decisions,
+            "summary": decision_summary(items),
+            "review_pending_labels": [
+                item_label(item) for item in items if item.get("decision") == "review_pending"
+            ],
+            "items": [summary_line(item) for item in items],
+        }
+    )
+
+
 def main() -> None:
     argv = sys.argv[1:]
     if argv and argv[0] == "review":
@@ -753,6 +796,9 @@ def main() -> None:
         return
     if argv and argv[0] == "promote":
         run_promote(argv[1:])
+        return
+    if argv and argv[0] == "summary":
+        run_summary(argv[1:])
         return
     args = parser().parse_args(argv)
     language = normalize_output_language(

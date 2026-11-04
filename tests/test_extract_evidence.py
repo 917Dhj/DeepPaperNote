@@ -1179,7 +1179,7 @@ def test_bundle_exposes_all_paper_type_contracts_for_model_selection(
     assert contract["note_plan_contract"]["grounding_field"] == "section_plan[*].evidence_sources"
 
 
-def test_bundle_exposes_sanitized_figure_asset_quality_and_hard_gate_rules() -> None:
+def test_bundle_summarizes_figure_asset_quality_and_hard_gate_rules() -> None:
     synthesis = bundle(
         metadata={"title": "Figure Paper"},
         evidence_wrapper={"evidence_pack": {}},
@@ -1208,25 +1208,14 @@ def test_bundle_exposes_sanitized_figure_asset_quality_and_hard_gate_rules() -> 
         },
     )
 
-    figure_assets = synthesis["pdf_assets"]["figure_assets"]
-    assert figure_assets == [
-        {
-            "filename": "page_001_fig_figure_1.png",
-            "path": "/tmp/images/page_001_fig_figure_1.png",
-            "page_number": 1,
-            "label": "Figure 1",
-            "kind": "figure",
-            "caption_text": "Figure 1. Overview.",
-            "width": 640,
-            "height": 320,
-            "size_bytes": 1234,
-            "extraction_level": "figure",
-            "quality_signals": {
-                "visual_quality_status": "reject",
-                "quality_reason_codes": ["large_text_block_suspected"],
-            },
-        }
-    ]
+    assert "pdf_assets" not in synthesis
+    assert "do not expose" not in json.dumps(synthesis)
+    assert synthesis["coverage"]["figure_quality_summary"] == {
+        "usable": 0,
+        "review": 0,
+        "reject": 1,
+        "unknown": 0,
+    }
 
     figure_contract = synthesis["writing_contract"]["figure_table_contract"]
     assert figure_contract["placeholder_first"] is True

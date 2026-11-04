@@ -109,8 +109,19 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     assert bundle["source_manifest"]["raw_sections_path"] == str(raw_sections_path.resolve())
     assert bundle["identity_contract"]["identity_verdict"] == "accepted"
     assert bundle["identity_contract"]["repair_trace_path"] == str(identity_trace_path.resolve())
-    assert bundle["figure_table_manifest"]["decisions"]
-    removed_bundle_keys = ("evidence", "candidate_chunks", "section_texts", "summary")
+    manifest = bundle["figure_table_manifest"]
+    assert manifest["decisions_path"] == str(decisions_path.resolve())
+    assert manifest["figures_path"] == str(figures_path.resolve())
+    assert manifest["assets_path"] == str((workdir / "paper_assets.json").resolve())
+    assert "decisions" not in manifest
+    removed_bundle_keys = (
+        "evidence",
+        "candidate_chunks",
+        "section_texts",
+        "summary",
+        "figure_plan",
+        "pdf_assets",
+    )
     assert not any(key in bundle for key in removed_bundle_keys)
 
     note_text = "# 本地 PDF 语言完整性\n\n本笔记验证工件链可安全保存。\n"

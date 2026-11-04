@@ -402,3 +402,34 @@ def test_bundle_preserves_identity_warnings_without_body_writing_instruction() -
     assert "accepted_with_warnings" not in writing_contract_text
     assert "source_manifestation_year_differs_from_work_identity" not in writing_contract_text
     assert "identity warning" not in writing_contract_text.lower()
+
+
+def test_bundle_points_at_figure_artifacts_instead_of_copying_them() -> None:
+    synthesis = bundle(
+        metadata={"title": "Contract Paper"},
+        evidence_wrapper={"evidence_pack": {}},
+        figures_wrapper={
+            "output_language": "zh-CN",
+            "figure_plan": {"figures": [{"id": "Figure 1", "candidate_pages": ["page text"]}]},
+        },
+        assets_wrapper={"image_assets": [{"filename": "page_003_img_01.jpeg"}]},
+        source_manifest=accepted_source_manifest(),
+        figure_decisions_wrapper={
+            "output_language": "zh-CN",
+            "decisions_path": "/run/paper_figure_table_decisions.json",
+            "decisions": [{"source_id": "Figure 1", "decision": "review_pending"}],
+        },
+        output_language="zh-CN",
+        figures_path="/run/paper_figures.json",
+        assets_path="/run/paper_assets.json",
+    )
+
+    assert "figure_plan" not in synthesis
+    assert "pdf_assets" not in synthesis
+    manifest = synthesis["figure_table_manifest"]
+    assert "decisions" not in manifest
+    assert manifest["decisions_path"] == "/run/paper_figure_table_decisions.json"
+    assert manifest["figures_path"] == "/run/paper_figures.json"
+    assert manifest["assets_path"] == "/run/paper_assets.json"
+    assert manifest["planned_items"] == 1
+    assert manifest["requires_full_decision_table"] is True

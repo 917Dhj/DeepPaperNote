@@ -712,3 +712,40 @@ def test_a_recorded_visual_failure_cannot_be_rewritten_as_a_drop(run: dict[str, 
     item = entry(run, "Figure 1")
     assert item["decision"] == "visual_defect"
     assert item["visual_review"]["failure_reason"] == "identity_mismatch"
+
+
+def summary(run: dict[str, Path]) -> subprocess.CompletedProcess[str]:
+    return cli("summary", "--decisions", str(run["decisions"]))
+
+
+def test_summary_reports_the_decisions_as_reviewed(run: dict[str, Path]) -> None:
+    assert review(run, "Figure 1", "--verdict", "pass", "--preserved", "axes").returncode == 0
+    before = run["decisions"].read_bytes()
+
+    result = summary(run)
+
+    assert result.returncode == 0, result.stderr
+    assert run["decisions"].read_bytes() == before
+    report = json.loads(result.stdout)
+    assert report["decisions_path"] == str(run["decisions"])
+    assert report["summary"]["by_decision"]["insert"] == 1
+    items = {item["label"]: item for item in report["items"]}
+    assert list(items) == [item["source_id"] for item in load(run)["decisions"]]
+    figure_1 = entry(run, "Figure 1")
+    assert items["Figure 1"] == {
+        "label": "Figure 1",
+        "kind": figure_1["kind"],
+        "pages": figure_1["pages"],
+        "decision": "insert",
+        "target_section": figure_1["target_section"],
+        "embed": figure_1["relative_markdown_embed"],
+        "skip_reason": "",
+        "caption": "Architecture",
+    }
+    assert all(item["embed"] == "" for label, item in items.items() if label != "Figure 1")
+
+
+def test_summary_lists_the_items_still_in_review(run: dict[str, Path]) -> None:
+    report = json.loads(summary(run).stdout)
+
+    assert report["review_pending_labels"] == ["Figure 1"]
