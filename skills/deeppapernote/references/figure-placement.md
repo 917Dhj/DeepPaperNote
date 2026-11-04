@@ -123,6 +123,17 @@ A drop is an editorial choice, never a visual verdict:
 - An item the planner left out of review needs no drop: it is already not inserted.
 - Later verdicts replace a drop if your judgment changes. Grounding rejects a drop with no reason, no recorded review, or a stale asset hash.
 
+## Reading the Frozen Decisions
+
+The synthesis bundle carries only the paths of the figure plan, the PDF assets, and the decisions file, because decisions change during review. Before `note_plan`, read the current table:
+
+```bash
+python3 scripts/plan_figure_table_decisions.py summary \
+  --decisions <figure_table_decisions.json>
+```
+
+It prints one line per Figure/Table with its decision, target section, skip reason, and caption, plus `review_pending_labels`. Only `insert` items carry an `embed`; use that exact value. An empty `review_pending_labels` means the review is finished; Grounding still decides whether the freeze is valid. The command never writes the file.
+
 ## Visual-Body Crop Boundary
 
 Keep axes, tick labels, legends, color bars, scale bars, panel letters, table headers, method labels, and other text that belongs inside the scientific visual. Keep a small safety margin so edge labels are not clipped. Exclude the source caption and unrelated running prose from the image pixels while retaining the caption as metadata and later Markdown explanation.

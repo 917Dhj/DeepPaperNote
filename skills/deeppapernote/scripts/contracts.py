@@ -754,9 +754,7 @@ class SynthesisBundle(TypedDict, total=False):
     source_manifest: dict[str, Any]
     source_index: dict[str, Any]
     references: dict[str, Any]
-    figure_plan: dict[str, Any]
     figure_table_manifest: dict[str, Any]
-    pdf_assets: dict[str, Any]
     writing_contract: dict[str, Any]
 
 
@@ -819,8 +817,6 @@ def empty_synthesis_bundle() -> SynthesisBundle:
         source_manifest={},
         source_index={},
         references={},
-        figure_plan={},
         figure_table_manifest={},
-        pdf_assets={},
         writing_contract={},
     )

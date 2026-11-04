@@ -181,47 +181,6 @@ def appendix_evidence_counts(evidence_pack: dict) -> dict[str, int]:
     }
 
 
-def sanitize_page_assets(assets_wrapper: dict, *, limit: int = 24) -> list[dict]:
-    sanitized: list[dict] = []
-    for item in (assets_wrapper.get("page_assets", []) or [])[:limit]:
-        if not isinstance(item, dict):
-            continue
-        sanitized.append(
-            {
-                "page_number": item.get("page_number", 0),
-                "searchable_text_chars": item.get("searchable_text_chars", 0),
-                "text_extraction_method": item.get("text_extraction_method", ""),
-                "ocr_used": item.get("ocr_used", False),
-                "image_count": item.get("image_count", 0),
-                "text_preview": item.get("text_preview", ""),
-            }
-        )
-    return sanitized
-
-
-def sanitize_figure_assets(assets_wrapper: dict, *, limit: int = 48) -> list[dict]:
-    sanitized: list[dict] = []
-    for item in (assets_wrapper.get("figure_assets", []) or [])[:limit]:
-        if not isinstance(item, dict):
-            continue
-        record = {
-            "filename": item.get("filename", ""),
-            "path": item.get("path", ""),
-            "page_number": item.get("page_number", 0),
-            "label": item.get("label", ""),
-            "kind": item.get("kind", ""),
-            "caption_text": normalize_whitespace(str(item.get("caption_text", ""))),
-            "width": item.get("width", 0),
-            "height": item.get("height", 0),
-            "size_bytes": item.get("size_bytes", 0),
-            "extraction_level": item.get("extraction_level", ""),
-        }
-        if isinstance(item.get("quality_signals"), dict):
-            record["quality_signals"] = item.get("quality_signals")
-        sanitized.append(record)
-    return sanitized
-
-
 def source_index(source_manifest: dict) -> dict:
     if not isinstance(source_manifest, dict):
         return {}
@@ -286,14 +245,10 @@ def figure_table_manifest(
     figure_decisions_wrapper: dict,
     source_manifest: dict,
     figure_plan: dict,
+    figures_path: str,
+    assets_path: str,
 ) -> dict:
-    decisions = (
-        figure_decisions_wrapper.get("decisions", [])
-        if isinstance(figure_decisions_wrapper, dict)
-        else []
-    )
-    if not isinstance(decisions, list):
-        decisions = []
+    """Point at the figure artifacts; decisions change during Visual Review, so read them live."""
     captions = (
         source_manifest.get("captions", {})
         if isinstance(source_manifest.get("captions"), dict)
@@ -309,7 +264,8 @@ def figure_table_manifest(
     )
     return {
         "decisions_path": decisions_path,
-        "decisions": decisions,
+        "figures_path": figures_path,
+        "assets_path": assets_path,
         "caption_counts": {
             "figures": len(captions.get("figures", []) or []),
             "tables": len(captions.get("tables", []) or []),
@@ -444,6 +400,8 @@ def bundle(
     source_manifest: dict | None = None,
     figure_decisions_wrapper: dict | None = None,
     output_language: str | None = None,
+    figures_path: str = "",
+    assets_path: str = "",
 ) -> dict:
     evidence_pack = (
         evidence_wrapper.get("evidence_pack", {})
@@ -518,22 +476,20 @@ def bundle(
         },
         "source_index": source_index(source_manifest),
         "references": {"candidates": sanitize_reference_candidates(evidence_pack, config)},
-        "figure_plan": figure_plan,
         "figure_table_manifest": figure_table_manifest(
             figure_decisions_wrapper,
             source_manifest,
             figure_plan,
+            figures_path,
+            assets_path,
         ),
-        "pdf_assets": {
-            "asset_root": assets_wrapper.get("asset_root", ""),
-            "images_dir": assets_wrapper.get("images_dir", ""),
-            "page_assets": sanitize_page_assets(assets_wrapper),
-            "image_assets": assets_wrapper.get("image_assets", []),
-            "figure_assets": sanitize_figure_assets(assets_wrapper),
-            "ocr_available": assets_wrapper.get("ocr_available", False),
-        },
         "writing_contract": compact_writing_contract(resolved_output_language),
     }
+
+
+def resolved_file_path(value: str | None) -> str:
+    path = Path(value).expanduser() if value else None
+    return str(path.resolve()) if path is not None and path.is_file() else ""
 
 
 def main() -> None:
@@ -559,6 +515,8 @@ def main() -> None:
             source_manifest,
             figure_decisions,
             args.language,
+            figures_path=resolved_file_path(args.figures),
+            assets_path=resolved_file_path(args.assets),
         ),
         args.output,
     )
