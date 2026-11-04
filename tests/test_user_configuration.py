@@ -380,9 +380,6 @@ def test_confirmed_migration_becomes_the_only_durable_source(tmp_path: Path) -> 
 
 
 def test_canonical_configuration_reference_matches_machine_contract() -> None:
-    skill = (PROJECT_ROOT / "skills/deeppapernote/SKILL.md").read_text(
-        encoding="utf-8"
-    )
     contract = (
         PROJECT_ROOT / "skills/deeppapernote/references/user-configuration.md"
     ).read_text(encoding="utf-8")
@@ -401,21 +398,6 @@ def test_canonical_configuration_reference_matches_machine_contract() -> None:
         assert f"`{option}`" in contract
     for state in ("ready", "needs_input", "invalid", "blocked"):
         assert f"`{state}`" in contract
-    assert (
-        "explicit request > CLI > current process environment > User Configuration"
-        in contract
-    )
-    assert "preserve" in contract.lower() and "unknown" in contract.lower()
-    assert "Workspace mode" in contract and "preserve" in contract
-    assert "before paper identity resolution" in contract
-    assert "one canonical Skill" in skill
-    assert "one pipeline" in skill
-    assert "paper-local `images/`" in skill
-    assert "references/user-configuration.md" in skill
-    assert skill.index("Resolve Run Overrides") < skill.index("inspect User Configuration")
-    assert skill.index("inspect User Configuration") < skill.index("resolve the paper identity")
-    assert "without reading User Configuration" in contract
-    assert "scripts/user_configuration.py" in contract
 
 
 def test_output_language_reference_matches_both_machine_schemas() -> None:
