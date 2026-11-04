@@ -555,16 +555,6 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
             "reuse_takeaways",
             "followup_questions",
         ),
-        "final_quality_review_checks": (
-            "central_claims_are_supported_by_raw_sections_or_pages",
-            "key_experimental_settings_and_numbers_are_present",
-            "mechanisms_or_protocol_choices_are_mapped_to_results",
-            "comparisons_explain_positioning_against_alternatives",
-            "discussion_or_limitation_claims_are_explained_mechanistically",
-            "proven_claims_are_separated_from_unproven_or_unvalidated_claims",
-            "research_or_engineering_takeaways_are_specific_and_reusable",
-            "followup_questions_are_specific_to_replication_or_extension",
-        ),
     },
 }
 
