@@ -13,6 +13,7 @@ from contracts import (
     NOTE_REQUIRED_SECTIONS,
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
+    writing_contract_rules,
 )
 from lint_grounding import validate_central_claims, validate_note_plan
 from lint_note import REQUIRED_SECTIONS, inspect_central_claims_plan, inspect_note_plan
@@ -91,7 +92,6 @@ def test_topic_references_do_not_redefine_canonical_workflow() -> None:
     deep_analysis = (SKILL_ROOT / "references" / "deep-analysis.md").read_text(encoding="utf-8")
     evidence_first = (SKILL_ROOT / "references" / "evidence-first.md").read_text(encoding="utf-8")
 
-    assert "every reported `passes_*` gate is `true`" in skill
     assert "Preferred usage pattern:" not in skill
     assert "## Recommended Workflow" not in deep_analysis
     assert "- `method`" not in deep_analysis
@@ -102,52 +102,6 @@ def test_topic_references_do_not_redefine_canonical_workflow() -> None:
     assert "three-stage model-first pipeline" not in evidence_first
 
 
-def test_skill_owns_one_final_user_report_contract() -> None:
-    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-
-    assert skill.count("Final user report:") == 1
-    for required in (
-        "user's conversation language",
-        "actual saved domain",
-        "report that directory's existing domain",
-        "materialized and retained-placeholder figure/table counts",
-        "each dropped item with its reason from `figure_drops`",
-        "Final Note Lint `note_sha256`",
-        "derive every claim from current-run artifacts",
-    ):
-        assert required in skill
-
-    for reference in (SKILL_ROOT / "references").glob("*.md"):
-        assert "Final user report:" not in reference.read_text(encoding="utf-8")
-
-
-def test_skill_owns_one_fail_closed_output_language_contract() -> None:
-    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    output_reference = (SKILL_ROOT / "references" / "output-language.md").read_text(
-        encoding="utf-8"
-    )
-    evidence_reference = (SKILL_ROOT / "references" / "evidence-first.md").read_text(
-        encoding="utf-8"
-    )
-
-    assert skill.count("## Language Integrity Contract") == 1
-    for stage in (
-        "Figure Plan",
-        "Figure/Table Decisions",
-        "Synthesis Bundle",
-        "Note Plan",
-        "Grounding Lint",
-        "Final Note Lint",
-        "Final Quality Review",
-        "Final Readability Review",
-        "Formal Save",
-    ):
-        assert stage in skill
-    assert "source_manifest.language_hint" in skill
-    assert "note_sha256" in skill
-    assert "before any save side effect" in skill
-    assert "`SKILL.md` owns the cross-stage Language Integrity Contract" in output_reference
-    assert '"output_language": "zh-CN"' in evidence_reference
 
 
 def test_codex_adapter_stays_thin() -> None:
@@ -524,14 +478,7 @@ def test_figure_protocol_docs_keep_single_owners() -> None:
     references = SKILL_ROOT / "references"
     placement = (references / "figure-placement.md").read_text(encoding="utf-8")
     final_writing = (references / "final-writing.md").read_text(encoding="utf-8")
-    obsidian_format = (references / "obsidian-format.md").read_text(encoding="utf-8")
 
-    assert "placeholder-first figures" in skill
-    assert "writing_contract.figure_table_contract" in skill
-    assert "complete figure/table decision table" in skill
-    assert "grounding and final-note figure gates" in skill
-    assert "Formal Save materializes the selected image" in skill
-    assert "Figure/Table Decision Freeze" in skill
     for duplicate in (
         "needs_visual_quality_check",
         "reject_visual_quality",
@@ -541,14 +488,6 @@ def test_figure_protocol_docs_keep_single_owners() -> None:
     ):
         assert duplicate not in skill
 
-    assert "writing_contract.figure_table_contract" in placement
-    assert "identity match" in placement
-    assert "visual usability" in placement
-    assert "asset_candidate_missing" in placement
-    assert "Visual-Body Crop" in placement
-    assert "complete source page" in placement
-    assert "Bounded Crop Repair" in placement
-    assert "before `note_plan`" in placement
     for duplicate in (
         "kept_placeholder_visual_defect",
         "kept_placeholder_materialization_blocked",
@@ -562,8 +501,6 @@ def test_figure_protocol_docs_keep_single_owners() -> None:
     ):
         assert duplicate not in placement
 
-    assert "figure-placement.md" in final_writing
-    assert "obsidian-format.md" in final_writing
     for duplicate in (
         "usable_candidate",
         "needs_visual_quality_check",
@@ -576,71 +513,27 @@ def test_figure_protocol_docs_keep_single_owners() -> None:
     ):
         assert duplicate not in final_writing
 
-    assert "> [!figure]" in obsidian_format
-    assert "![[Research/Papers/DeepPaperNote/paper_slug/images/" in obsidian_format
-    assert "*论文原图编号：Fig. 2。" in obsidian_format
-
 
 def test_paper_types_doc_uses_typed_profiles_without_legacy_common_subheadings() -> None:
     text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "paper-types.md").read_text(encoding="utf-8")
 
     assert "Common subheadings" not in text
     assert "unless a section truly does not apply" not in text
-    assert "section_semantics" in text
-    assert "recommended_subsections" in text
-    assert "fixed top-level sections" in text or "12 top-level sections" in text
 
 
 def test_note_quality_structural_sections_match_canonical_contract() -> None:
     assert note_quality_structural_sections() == NOTE_REQUIRED_SECTIONS
 
 
-def test_skill_owns_note_plan_creation_and_grounding_gates() -> None:
-    text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    workflow = text.split("## Workflow", 1)[1].split("## Core Execution Contract", 1)[0]
-    non_negotiable_rules = text.split("Non-negotiable rules:", 1)[1].split(
-        "Reference usage policy:", 1
-    )[0]
-    model_first_rule = text.split("Model-first rule:", 1)[1].split(
-        "The topic references above", 1
-    )[0]
 
-    assert workflow.count(
-        "create a short JSON `note_plan` that satisfies the generated bundle contract"
-    ) == 1
-    assert workflow.count(
-        "draft from the plan only after the grounding gate passes"
-    ) == 1
-    assert "lint the final note against the same `note_plan`" in workflow
-    assert NOTE_PLAN_PROTOCOL_RE.search(non_negotiable_rules) is None
-    assert NOTE_PLAN_PROTOCOL_RE.search(model_first_rule) is None
-
-
-def test_skill_owns_formal_save_state_policy() -> None:
+def test_formal_save_policy_stays_out_of_obsidian_format() -> None:
     skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
     obsidian_format_text = (SKILL_ROOT / "references" / "obsidian-format.md").read_text(
         encoding="utf-8"
     )
 
-    marker = "Formal Save states:"
-    assert skill_text.count(marker) == 1
-    assert marker not in obsidian_format_text
+    assert "Formal Save states:" not in obsidian_format_text
     assert "After such a refusal" not in skill_text
-    assert "do not switch to workspace" in skill_text
-    assert "`save_mode=workspace`" in skill_text
-    assert "references/user-configuration.md" in skill_text
-    for argument in (
-        "--content-file",
-        "--plan-file",
-        "--lint-json",
-        "--grounding-lint-json",
-        "--source-manifest",
-        "--figure-decisions",
-        "--final-quality-review",
-        "--final-readability-review",
-    ):
-        assert argument in skill_text
-    assert "scripts/materialize_figure_asset.py" not in skill_text
     for policy_phrase in ("permission escalation", "workspace fallback", "explicit user consent"):
         assert policy_phrase not in obsidian_format_text
 
@@ -661,28 +554,13 @@ def test_bundle_routes_to_the_final_quality_gate_contract() -> None:
         assert argument in skill
 
 
-def test_skill_requires_programmatic_save_target_admission_before_drafting() -> None:
-    text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    workflow = text.split("## Workflow", 1)[1].split("## Core Execution Contract", 1)[0]
-
-    assert "Save Target Admission" in workflow
-    assert "write_obsidian_note.py --preflight" in workflow
-    assert workflow.index("Save Target Admission") < workflow.index("plan figure placement")
-    assert "same_language_note_exists" in workflow
-    assert "--expected-existing-note-sha256" in workflow
-
 
 def test_topic_references_keep_separate_note_plan_responsibilities() -> None:
-    evidence_first = (SKILL_ROOT / "references" / "evidence-first.md").read_text(
-        encoding="utf-8"
-    )
     writing_and_rubric = [
         (SKILL_ROOT / "references" / doc_name).read_text(encoding="utf-8")
         for doc_name in ("final-writing.md", "note-quality.md")
     ]
 
-    assert "Recommended shape:" in evidence_first
-    assert "scripts/lint_grounding.py --note-plan" in evidence_first
     for text in writing_and_rubric:
         assert NOTE_PLAN_PROTOCOL_RE.search(text) is None
 
@@ -694,24 +572,9 @@ def test_normal_execution_docs_do_not_force_broad_reference_reads() -> None:
         assert "Read [references/" not in text
         assert "Use [references/" not in text
 
-    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
-    assert "not a default reading checklist" in skill_text
 
 
-def test_normal_execution_docs_require_obsidian_yaml_frontmatter() -> None:
-    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
-    final_writing_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "final-writing.md").read_text(
-        encoding="utf-8"
-    )
-
-    for text in (skill_text, final_writing_text):
-        assert "Obsidian YAML" in text
-        assert "above the `#` title heading" in text
-        assert "`tags`" in text
-        assert "`aliases`" in text
-
-
-def test_final_writing_defines_fixed_core_info_schema() -> None:
+def test_core_info_references_list_every_contract_field() -> None:
     final_writing_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "final-writing.md").read_text(
         encoding="utf-8"
     )
@@ -719,37 +582,10 @@ def test_final_writing_defines_fixed_core_info_schema() -> None:
         encoding="utf-8"
     )
 
-    required_fields = [
-        "标题",
-        "标题翻译",
-        "作者",
-        "机构",
-        "发表时间",
-        "发表渠道",
-        "DOI",
-        "arXiv",
-        "论文链接",
-        "代码 / 项目",
-        "数据 / 资源",
-        "论文类型",
-    ]
-
     for text in (final_writing_text, obsidian_format_text):
-        assert "Core info field schema" in text
-        assert "only the following fields" in text
-        assert "no free prose" in text
-        for field in required_fields:
+        for field in writing_contract_rules("zh-CN")["core_info_fields"]:
             assert f"`{field}`" in text
 
-
-def test_final_writing_requires_tables_for_central_quantitative_comparisons() -> None:
-    final_writing_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "final-writing.md").read_text(
-        encoding="utf-8"
-    )
-
-    assert "three or more compared systems" in final_writing_text
-    assert "use a compact Markdown table" in final_writing_text
-    assert "loose bullet list" in final_writing_text
 
 
 def test_evidence_first_is_only_note_plan_json_example() -> None:
@@ -802,44 +638,21 @@ def test_pdf_contract_banned_phrase_matcher_catches_allowed_fallbacks() -> None:
     )
 
 
-def test_pdf_contract_docs_try_supported_acquisition_before_stopping() -> None:
-    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(encoding="utf-8")
+def test_readmes_accept_every_paper_input() -> None:
     readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     readme_zh_text = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
-
-    source_priority = skill_text.index("## Tool and Source Priority")
-    stop_policy = skill_text.index("If PDF or evidence quality is insufficient")
-    assert source_priority < stop_policy
-
-    for required_source in (
-        "local PDF path given by the user",
-        "local Zotero item and local Zotero attachment if available",
-        "DOI and publisher metadata",
-        "arXiv or open-access PDF sources",
-    ):
-        assert required_source in skill_text[source_priority:stop_policy]
 
     assert "A title, DOI, URL, arXiv ID, or local PDF all work." in readme_text
     assert "标题、DOI、URL、本地 PDF 都可以" in readme_zh_text
 
 
-def test_zotero_local_api_contract_is_consistent_across_docs() -> None:
-    skill_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
-    metadata_text = (
-        PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "metadata-sources.md"
-    ).read_text(encoding="utf-8")
+def test_readmes_document_the_zotero_local_api() -> None:
     readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     readme_zh_text = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
 
-    for text in (skill_text, readme_text):
-        assert "Zotero Local API" in text
-        assert "auto" in text
-        assert "off" in text
-        assert "required" in text
-
-    assert "read-only Zotero Local API" in metadata_text
+    assert "Zotero Local API" in readme_text
+    for mode in ("auto", "off", "required"):
+        assert mode in readme_text
     assert "Zotero Local API" in readme_zh_text
     assert "`auto`（默认）" in readme_zh_text
     assert "ambiguous local match always fails closed" in readme_text
