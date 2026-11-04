@@ -321,9 +321,6 @@ def compact_writing_contract(language: str | None = None) -> dict:
     analysis_coverage["required_plan_fields"] = list(
         analysis_coverage["required_plan_fields"]
     )
-    analysis_coverage["final_quality_review_checks"] = list(
-        analysis_coverage["final_quality_review_checks"]
-    )
     contract = {
         "language": rules["language"],
         "contract_role": "manifest_quality_contract",
