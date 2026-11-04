@@ -433,3 +433,31 @@ def test_bundle_points_at_figure_artifacts_instead_of_copying_them() -> None:
     assert manifest["assets_path"] == "/run/paper_assets.json"
     assert manifest["planned_items"] == 1
     assert manifest["requires_full_decision_table"] is True
+
+
+def quality_checklists(data: object, path: str = "") -> dict[str, object]:
+    """Return every bundle field that lists quality-review checks, keyed by dotted path."""
+    found: dict[str, object] = {}
+    if isinstance(data, dict):
+        for key, value in data.items():
+            child = f"{path}.{key}" if path else key
+            if key.endswith("checks") and "quality" in child:
+                found[child] = value
+            found.update(quality_checklists(value, child))
+    return found
+
+
+def test_bundle_carries_only_the_quality_checks_the_recorder_enforces() -> None:
+    from _final_quality import QUALITY_CHECKS
+
+    synthesis = bundle(
+        metadata={"title": "Contract Paper"},
+        evidence_wrapper={"evidence_pack": {}},
+        figures_wrapper={},
+        assets_wrapper={},
+        source_manifest=accepted_source_manifest(),
+    )
+
+    assert quality_checklists(synthesis) == {
+        "writing_contract.final_quality_gate.checks": list(QUALITY_CHECKS)
+    }
