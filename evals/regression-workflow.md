@@ -1,622 +1,333 @@
 # DeepPaperNote Regression Workflow
 
-Status: v1
-Audience: agents running or reviewing DeepPaperNote evaluation experiments
-Scope: real-paper regression testing for final note quality
+Status: v2
+Audience: agents that run or review DeepPaperNote evaluation experiments
+Scope: checking a change against real papers, from a smoke run to a full note-quality regression
 
-This document defines the experiment workflow. It explains how to choose papers,
-run baseline and candidate notes, collect artifacts, evaluate outputs, and decide
-whether a change produced a real improvement.
+This file is canonical. `evals/regression-workflow-zh.md` is its Chinese translation; when they disagree, this file wins and the translation is fixed.
 
-The quality scoring standard lives in `evals/note-quality-rubric.md`. The prompt
-template for the note evaluator lives in `evals/note-evaluator-prompt.md`.
+The scoring rubric lives in `evals/note-quality-rubric.md` (v2). The note evaluator's prompt template lives in `evals/note-evaluator-prompt.md`.
 
-## Core Principle
+## Choose A Tier
 
-A regression experiment compares raw generated outputs under controlled
-conditions. Do not let the same agent generate a note and judge its own quality.
-Do not manually repair generated notes before evaluation.
+| Tier | Use it when | What it shows |
+| --- | --- | --- |
+| Deterministic | every pull request | `python3 -m pytest -q`; add `python3 -m pytest -q -m corpus` when extraction or figure selection changes (`evals/paper-corpus.md`) |
+| Smoke | `SKILL.md`, a reference, or the stage order changes | the workflow still completes on real papers |
+| Full | you want to claim that final notes got better | whether the candidate's notes beat the baseline's beyond run-to-run noise |
 
-A useful experiment keeps these variables stable:
+A smoke pass never supports a quality claim. Only a full run can end in `real_improvement`.
 
-- paper set
-- runner tool and model settings
-- child Codex CLI prompt template
-- installed skill version for each run
-- vault layout
-- output artifact layout
-- evaluation rubric version
+## Core Principles
 
-## Handoff Documents
+- An experiment compares raw generated output under controlled conditions. Nobody edits, completes, or polishes a note before it is evaluated.
+- The agent that generates a note never evaluates it.
+- The evaluator is blind: it sees two notes as A and B and never learns which is the baseline.
+- One run per arm is not evidence. Generation is stochastic, so a full run measures the noise between two baseline runs and counts only differences larger than that.
 
-Each agent should read the previous stage's output document before starting, then
-write its own result document for the next agent. Use placeholders rather than
-hard-coded local paths in prompts.
+## Controlled Variables
 
-Recommended handoff chain:
+Hold these fixed across every run of one experiment, and record them in the manifests:
+
+- **Baseline and candidate commits.** The baseline is the parent of the change under test: the commit before the change, or, for a pull request, its merge base with `develop`. Never use `main` as the baseline unless `main` is that commit; it can lag `develop` by many merges and would mix their effects into the result.
+- **Host and model.** One host per experiment, Codex CLI by default, with the same model and reasoning settings. A change to `SKILL.md` runs the smoke tier on every host it targets.
+- **Paper set and PDF bytes.** Use the fixed set below and check each PDF's SHA-256 against `evals/expectations/<paper>.json` before running.
+- **Input mode and child prompt.** See Child Prompt.
+- **Run configuration.** Give every run its own configuration file, so no user configuration, shell profile, or earlier preference leaks in. Write `<RUN_DIR>/config.json`:
+
+  ```json
+  {
+    "output_language": "<OUTPUT_LANGUAGE>",
+    "save_mode": "obsidian",
+    "obsidian_vault": "<TEMP_VAULT_PATH>",
+    "papers_dir": "Papers"
+  }
+  ```
+
+  `<OUTPUT_LANGUAGE>` is `zh-CN` unless the experiment says otherwise, and `<TEMP_VAULT_PATH>` is an absolute path to an existing empty directory. Start the child session with `DEEPPAPERNOTE_CONFIG_PATH=<RUN_DIR>/config.json` and `DEEPPAPERNOTE_DISABLE_SHELL_CONFIG=1`, and with no other `DEEPPAPERNOTE_` variable set.
+
+- **Isolation.** Each run gets its own run directory and temporary vault. Runs that share an installed skill directory never run concurrently.
+- **Rubric version.** Every evaluation in one experiment uses the same rubric version.
+
+## Paper Set
+
+Use this fixed set from `evals/papers/`. The PDFs are local and ignored by Git; their hashes are committed in `evals/expectations/`.
+
+| Role | Paper | Stress points |
+| --- | --- | --- |
+| primary | `arxiv-sam` | method plus dataset, figure- and table-heavy, appendix, heavy Visual Review |
+| primary | `tacl-lost-middle` | evaluation paper, many figures, conclusions bounded by limitations |
+| primary | `osdi-distserve` | systems paper, algorithms, comparison tables |
+| primary | `ncomms-medsam` | journal layout, medical domain, full-width captions |
+| spare | `arxiv-transformer` | short mechanism paper |
+| spare | `zh-aptamer-review` | Chinese review article |
+
+The smoke tier uses `arxiv-transformer` and `arxiv-sam`. Replace a primary paper with a spare only when its run cannot start for a reason unrelated to the change, and record why.
+
+To extend the set, a Paper Finder agent picks papers with stable identity, a readable PDF, enough technical depth for a deep note, and a stress point the set lacks: benchmark or evaluation, method or system, appendix-heavy, figure- or table-heavy, or limitations-heavy. Each new paper gets an `evals/expectations/` entry as `evals/paper-corpus.md` describes before an experiment uses it.
+
+## Child Prompt
+
+Each run starts one independent child session with exactly one prompt and nothing else: no extra constraint, explanation, source path, agent instruction, model note, prefix, or suffix. Child sessions do not use `/goal`; the workflow agents below do. Never run two papers in one child session.
+
+| Input mode | Use it for | Prompt |
+| --- | --- | --- |
+| PDF (default) | every note-quality comparison | `给这篇论文生成一个深度笔记：<PDF_PATH>。笔记保存到<TEMP_VAULT_PATH>中。` |
+| Title | changes to resolve, metadata, fetch, or identity | `给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。` |
+
+PDF mode feeds both arms the same bytes and skips the Zotero lookup. Title mode exercises acquisition end to end, so its result also depends on the network and on whether Zotero is running; record both. Both arms of one experiment use the same mode. Record the exact prompt of every run.
+
+## Run Record
+
+After each child session ends, the runner saves, under that run directory:
+
+- the raw final note and every artifact the run wrote
+- the child prompt, logs, and exit status
+- `run_state.json`, the output of `python3 <SKILL_ROOT>/scripts/run_state.py status --workdir <RUN_WORKDIR> --prefix <RUN_PREFIX>`. It records which stages passed, stale artifacts, provenance gaps, and the `summary` the final report uses. When the child chose its own work directory, take `<RUN_WORKDIR>` from the `workdir=` line in its log.
+
+A run counts as **complete** when `run_state.json` shows every required stage passed, `summary.saved_verified` is true, and `summary.saved_sha256_match` is true.
+
+## Smoke Tier
+
+1. Run the candidate on the two smoke papers in PDF mode, once each, on every host the change targets.
+2. Keep each Run Record.
+3. One reviewer, human or agent, reads each note against hard gates H1 to H8 of the rubric. It scores nothing and compares nothing.
+4. Write `smoke-report.md`: per run, the host, completion per `run_state.json`, any `next_action` or provenance gap, and each hard gate with one line of evidence.
+
+The smoke tier passes when every run is complete and every hard gate passes. Report it as "the workflow still completes", never as a quality result.
+
+## Full Tier
+
+### Roles
+
+Each role can be its own session or a clearly isolated phase:
+
+- **Baseline Runner:** records the baseline identity, then runs the baseline. It does not judge quality.
+- **Candidate Runner:** runs the candidate on the same set, then builds the blinded pairs. It does not judge quality.
+- **Artifact Auditor:** checks each run against the workflow contract. It does not judge prose.
+- **Note Evaluator:** scores blinded pairs with the rubric. It never sees manifests, arms, or commits.
+- **Regression Judge:** unblinds the pairs and gives the verdict.
+
+Every agent reads the previous phase's document and writes its own for the next one. Prompts use placeholders, not local paths:
 
 ```text
-paper-set.md
-  -> baseline-run-manifest.md
-  -> candidate-run-manifest.md
+baseline-run-manifest.md
+  -> candidate-run-manifest.md + evaluation-pairs.md + blinding-map.json (sealed)
   -> artifact-audit-report.md
   -> note-evaluation-report.md
   -> regression-summary.md
 ```
 
-The runner manifests should also point to the machine-readable artifacts under
-the run root.
+### Runs
 
-## Goal Mode And Child Runner Prompts
+Run each primary paper twice per arm, in fresh child sessions: four papers times two arms times two runs makes 16 runs. Name run directories with neutral ids such as `run-07`, so a path never reveals its arm; the manifests map ids to arms.
 
-Every workflow-stage agent should be started in goal mode. Use `/goal` as the
-first line of each Agent Prompt Template in this document.
+Reuse earlier baseline runs only when the commit, host, model, paper set, input mode, child prompt, and run configuration all match.
 
-The independent per-paper Codex CLI sessions launched by the Baseline Runner and
-Candidate Runner are different: they must not use `/goal`.
+### Blinded Pairs
 
-For each paper, the runner must launch an independent Codex CLI session with
-exactly this prompt after replacing placeholders:
+After every run is recorded, the Candidate Runner builds three pairs per paper:
 
-```text
-给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
-```
+| Pair | Compares | Purpose |
+| --- | --- | --- |
+| noise | baseline run 1 and baseline run 2 | how much two runs of the same version differ |
+| comparison 1 | baseline run 1 and candidate run 1 | |
+| comparison 2 | baseline run 2 and candidate run 2 | |
 
-Do not add constraints, explanations, source paths, agent instructions, model
-notes, or extra surrounding text to that child prompt. Record the exact child
-prompt in the run manifest.
+For each pair it randomly assigns which run is A, gives the pair a neutral id, shuffles all pairs together, and writes:
 
-## Recommended Agent Roles
+- `evaluation-pairs.md`: per pair, its id, the paper, and the note, source evidence, and artifact root of A and of B
+- `blinding-map.json`: per pair, its kind and which run and arm is A and B. Only the Regression Judge reads it.
 
-Use these roles as separate sessions or clearly separated phases.
+### Artifact Audit
 
-### Paper Finder Agent
+The auditor starts from each run's `run_state.json` and records its stage results, stale artifacts, and provenance gaps. It then checks what the script cannot judge:
 
-Selects the test papers. It is read-only and must not run DeepPaperNote.
+- the accepted identity matches the paper in the PDF: title, authors, and identifier
+- Visual Review decisions are plausible: main method and main result figures are not left out or dropped, and each drop gives an editorial reason
+- the note's embeds match the frozen decisions, and inserted images exist in the paper-local `images/` directory
+- truncation or partial reading is stated in the note when the source manifest records it
+- Grounding Lint cites valid section IDs or page ranges for the central claims
 
-### Baseline Runner Agent
+Each run gets `pass`, `partial`, `fail`, or `unknown`:
 
-Records the frozen baseline identity, runs the baseline skill version, and writes
-baseline notes plus artifacts. It does not evaluate quality.
+- `pass`: every required stage passed and the checks above hold.
+- `partial`: the run completed, but a provenance, warning, or repair trace gap lowers confidence in the audit.
+- `fail`: a required stage failed, a check above fails, or identity evidence is contradictory or unsafe.
+- `unknown`: required artifacts are missing or unreadable, so the auditor cannot decide.
 
-### Candidate Runner Agent
+For title-mode experiments, the auditor also maps acquisition identity behavior to these results with explicit evidence:
 
-Runs the candidate skill version on the exact same paper set and writes candidate
-notes plus artifacts. It does not evaluate quality.
+- `pass`: the resolve, metadata, fetch, canonical identity, and repair trace artifacts are reused and consumed consistently; the identity verdict is accepted or accepted-with-warnings; warnings are limited to metadata or provenance; and Source Corpus evidence is bound to the selected source manifestation.
+- `partial`: the run can still be evaluated, but non-blocking provenance, warning, or repair trace evidence is incomplete.
+- `fail`: identity evidence is contradictory or unsafe; a repair-exhausted failure did not fail closed before downstream consumption; fetch used a stale or wrong identity; the selected PDF or source manifestation is inconsistent; or a repaired identity lacks its trace.
+- `unknown`: required acquisition artifacts are missing or unreadable.
 
-### Artifact Auditor Agent
+Cover the repaired identity, accepted-with-warnings identity, repair-exhausted failure, and equivalent manifestation scenarios whenever a run produces them.
 
-Checks whether the candidate run respected Source Corpus, bundle, grounding,
-lint, figure/table, and save contracts. It does not judge final note quality.
+An artifact improvement is not a final-note improvement. An acquisition identity improvement counts as note-visible only when the evidence shows it prevents or fixes a wrong identity, wrong PDF, metadata contradiction, missing source evidence, broken path, citation damage, or a comparable downstream failure. Otherwise it supports only `architectural_improvement_only`.
 
-### Note Evaluator Agent
+### Note Evaluation
 
-Uses `evals/note-quality-rubric.md` to compare baseline notes against candidate
-notes. It does not generate or repair notes.
+The Note Evaluator evaluates every pair in `evaluation-pairs.md` with `evals/note-evaluator-prompt.md` and `evals/note-quality-rubric.md`, one pair at a time and preferably in a fresh session per pair. It reads only those three files and the paths each pair names, never the manifests, `blinding-map.json`, Git history, or file timestamps. It writes one rubric JSON report per pair into `note-evaluation-report.md`.
 
-### Regression Judge Agent
+### Regression Judgment
 
-Synthesizes runner status, artifact audit, and note evaluation into one
-experiment verdict.
+The Regression Judge reads every document above, including `blinding-map.json`, and unblinds each pair.
 
-## Phase 1: Select Real Papers
+Per paper and per rubric dimension:
 
-Choose papers before running any baseline or candidate note.
+- The **noise margin** is the absolute score difference in the noise pair.
+- The candidate **improves** a dimension when it scores higher in both comparison pairs and each gain exceeds the noise margin.
+- The candidate **regresses** on a dimension when it scores lower in both comparison pairs and each loss exceeds the noise margin.
+- Anything else is noise.
 
-The paper set should include 4 primary papers and 2 backups. Start small enough
-to inspect outputs, then grow the fixed set once the workflow is stable.
+Per paper, assign one verdict:
 
-### Selection Criteria
+- `hard_fail`: a candidate note fails a hard gate that its baseline counterpart in the same pair passes.
+- `regression`: the candidate regresses on a core content dimension (D1 to D4) and improves on none.
+- `no_material_change`: every difference is noise.
+- `partial_improvement`: the candidate improves some dimensions, but not D1 or D2, or it also regresses on one.
+- `real_improvement`: the candidate improves D1 or D2, does not regress on D4, introduces no hard-gate failure, and the evaluator's reasons tie the gain to paper evidence rather than formatting.
 
-Prefer papers with:
+The experiment's verdict is one of `hard_fail`, `regression`, `no_material_change`, `partial_improvement`, `real_improvement`, or `architectural_improvement_only`:
 
-- stable identity evidence, such as DOI, arXiv ID, venue, year, or local PDF
-- available full text or reliable PDF attachment
-- enough technical content to require a deep note
-- existing baseline notes when available
-- varied stress patterns
+- `hard_fail` when any paper is `hard_fail`.
+- `real_improvement` only when at least three of the four papers are `real_improvement` and none is `regression`.
+- `architectural_improvement_only` when artifacts or contracts improved but no paper shows more than `no_material_change`.
+- Otherwise, the verdict that best describes the per-paper results, with the reason.
 
-Cover these paper types when possible:
+None of these is a real improvement: prettier formatting, a longer note with the same evidence coverage, more sections without better mechanism or result explanation, cleaner artifacts with unchanged notes, or a gain on one paper alongside a serious regression on another.
 
-- benchmark or evaluation paper
-- method, model, or system paper
-- appendix-heavy paper
-- figure/table-heavy paper
-- paper where limitations or discussion are important for interpretation
+For acquisition identity work, record two fields separately:
 
-Avoid papers that are too short, only abstract-level, missing a usable source, or
-too ambiguous to identify reliably.
+- `architectural_improvement_only`: the candidate improved artifact reuse, provenance, canonical identity, repair trace, or reporting clarity, but final notes show no visible quality gain.
+- `final_note_visible_improvement`: the candidate prevented or fixed a wrong identity, wrong PDF, metadata contradiction, missing source evidence, broken path, citation damage, or a comparable downstream failure that shows in the generated notes or source evidence.
 
-### Paper Selection Output
+### Experiment Summary
 
-The Paper Finder Agent should output a Markdown report with:
+`regression-summary.md` records the experiment id, baseline and candidate commits, host and model, input mode, paper set, run configuration, the completion and audit result of each run, the noise margins, each per-paper verdict with its deciding dimensions, the experiment verdict, whether an optimization success can be claimed, and the next recommended action. It keeps apart a mechanism gain without a note gain, a note gain with an artifact regression, architectural versus note-visible acquisition gains, and an inconclusive experiment.
 
-- 4 primary test papers
-- 2 backup papers
-- the expected stress point for each paper
-- a table with this shape:
+## Agent Prompt Templates
 
-```text
-Title | Type | Venue/Year | Note path | PDF or source evidence | Why it is a good test | What the change should help with | Risk
-```
+Every workflow agent starts in goal mode, so each template begins with `/goal`.
 
-### Paper Finder Agent Prompt Template
+### Baseline Runner
 
 ```text
 /goal
 
 Goal:
-Choose a reusable real-paper test set for a DeepPaperNote regression run.
+Run the frozen baseline of DeepPaperNote on the fixed paper set and write a complete baseline manifest.
 
 Read first:
 - <REPO_ROOT>/evals/regression-workflow.md
-- optional prior paper selection notes: <PRIOR_SELECTION_DOC_OR_NONE>
-- paper source root or index: <PAPER_SOURCE_ROOT>
+- baseline commit: <BASELINE_COMMIT>
+- experiment settings: <TIER>, <HOST_AND_MODEL>, <INPUT_MODE>, <OUTPUT_LANGUAGE>
 
-Task:
-- Find 6 candidate papers: 4 primary papers and 2 backups.
-- Prefer papers with stable identity evidence, usable PDF/source material, and enough technical depth.
-- Cover benchmark/evaluation, method/model/system, appendix-heavy, figure/table-heavy, and limitations-heavy stress patterns when possible.
-- Do not run DeepPaperNote.
-- Do not modify notes, PDFs, or the vault.
-
-Output:
-- Write a Markdown paper-set report to <PAPER_SET_DOC>.
-- Include the required selection table.
-- Mark the 4 primary papers and 2 backups.
-- For each primary paper, state the expected stress point and what a regression should reveal.
-```
-
-## Phase 2: Run Baseline Notes
-
-Run baseline before candidate. Without a frozen baseline, the experiment can only
-say that a candidate looks acceptable, not that it improved.
-
-The Baseline Runner owns the baseline manifest. Before generating notes, it must
-record:
-
-- baseline git ref or release tag
-- installed skill source
-- runner tool
-- model settings
-- prompt template
-- run timestamp
-- paper-set document path
-- run root and vault layout
-- artifact collection rules
-
-For each selected paper:
-
-1. Create an isolated run directory.
-2. Create or assign an isolated test vault.
-3. Install or sync the baseline skill version.
-4. Start one independent Codex CLI session per paper with the exact child prompt.
-5. Save the raw final note and all artifacts.
-6. Update the baseline manifest with present and missing artifacts.
-7. Do not edit the note after generation.
-
-The per-paper child Codex CLI prompt must be exactly:
-
-```text
-给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
-```
-
-The runner may control working directory, temp vault, installed skill version,
-logging, and manifest collection outside the child prompt. It must not add any
-extra text to the child prompt. Baseline and candidate must use the same child
-prompt template.
-
-Do not reuse old baseline artifacts unless they were produced with the same paper
-set, runner settings, child Codex CLI prompt template, and artifact collection
-rules.
-
-### Baseline Runner Agent Prompt Template
-
-```text
-/goal
-
-Goal:
-Run the frozen baseline DeepPaperNote version for the selected paper set and
-write a complete baseline manifest.
-
-Read first:
-- <REPO_ROOT>/evals/regression-workflow.md
-- paper set report: <PAPER_SET_DOC>
-- baseline ref or release note: <BASELINE_REF_DOC_OR_VALUE>
-
-Task:
-- Record the baseline identity before running any paper.
-- Use the exact per-paper child Codex CLI prompt template required by this workflow.
-- For each primary paper, create an isolated run directory and test vault.
-- Sync or install the baseline skill version.
-- For each primary paper, start a separate independent Codex CLI session.
-- In each child Codex CLI session, use exactly this prompt after replacing placeholders: `给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。`
-- Do not add any other text to the child Codex CLI prompt.
-- Preserve raw final notes, runner logs, and all available artifacts.
-- Record the exact child prompt, temp vault path, run directory, final note path, logs, exit status, available artifacts, and missing artifacts.
+Tasks:
+- Record the baseline identity, host, model, input mode, and run configuration before any run.
+- Check each PDF's SHA-256 against evals/expectations.
+- Install or sync the baseline skill.
+- Run each primary paper twice, each run in its own child session with its own neutral run id, run directory, temporary vault, and the process environment from Controlled Variables.
+- Give each child session only the child prompt for the input mode, with placeholders replaced.
+- Save the Run Record of every run, including run_state.json.
 
 Constraints:
-- This workflow-stage agent uses `/goal`; the per-paper child Codex CLI sessions must not use `/goal`.
-- Do not batch multiple papers into one Codex CLI session.
-- Do not evaluate note quality.
-- Do not repair or rewrite generated notes.
-- Do not run candidate code.
-- Do not change the paper set.
+- Do not evaluate, edit, or rewrite any note.
+- Do not run candidate code or change the paper set.
 
 Output:
-- Write <BASELINE_MANIFEST_DOC>.
-- The manifest must include baseline identity, runner settings, child Codex CLI prompt template, per-paper exact child prompt, per-paper status, final note paths, artifact paths, logs, exit status, and missing artifacts.
-- Also write or update machine-readable manifest data under <BASELINE_RUN_ROOT> when practical.
+- Write <BASELINE_MANIFEST_DOC>: baseline identity, settings, and per run its id, paper, exact prompt, run directory, vault, note path, exit status, completion per run_state.json, and missing artifacts.
 ```
 
-## Phase 3: Run Candidate Notes
-
-Run candidate after baseline on the same paper list.
-
-For each selected paper:
-
-1. Use the same paper identity input.
-2. Use the same runner tool and model settings.
-3. Use the same exact child Codex CLI prompt template.
-4. Use an isolated candidate run directory and test vault.
-5. Install or sync the candidate skill version.
-6. Save the raw final note and all artifacts.
-7. Update the candidate manifest with present and missing artifacts.
-8. Do not edit the note after generation.
-
-Baseline and candidate runners should not run concurrently when they share global
-state such as an installed skill directory.
-
-The per-paper child Codex CLI prompt must be exactly the same template used by
-the baseline:
-
-```text
-给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
-```
-
-### Candidate Runner Agent Prompt Template
+### Candidate Runner
 
 ```text
 /goal
 
 Goal:
-Run the candidate DeepPaperNote version on the exact same paper set and write a
-candidate manifest that lines up with the baseline manifest.
+Run the candidate on the same set and settings as the baseline, then build the blinded evaluation pairs.
 
 Read first:
 - <REPO_ROOT>/evals/regression-workflow.md
-- paper set report: <PAPER_SET_DOC>
-- baseline manifest: <BASELINE_MANIFEST_DOC>
-- candidate ref or change summary: <CANDIDATE_REF_DOC_OR_VALUE>
+- <BASELINE_MANIFEST_DOC>
+- candidate commit: <CANDIDATE_COMMIT>
 
-Task:
-- Confirm the paper set and child Codex CLI prompt template match the baseline manifest.
-- Sync or install the candidate skill version.
-- For each primary paper, create an isolated candidate run directory and test vault.
-- For each primary paper, start a separate independent Codex CLI session.
-- In each child Codex CLI session, use exactly this prompt after replacing placeholders: `给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。`
-- Do not add any other text to the child Codex CLI prompt.
-- Preserve raw final notes, runner logs, and all available artifacts.
-- Record the exact child prompt, temp vault path, run directory, final note path, logs, exit status, available artifacts, and missing artifacts.
-- Map every candidate output to the matching baseline output.
+Tasks:
+- Confirm that the paper set, host, model, input mode, child prompt, and run configuration match the baseline manifest.
+- Install or sync the candidate skill.
+- Run each primary paper twice, exactly as the baseline did, with new neutral run ids.
+- Save the Run Record of every run, including run_state.json.
+- Build the three pairs per paper, randomize A and B, shuffle the pairs, and write evaluation-pairs.md and blinding-map.json.
 
 Constraints:
-- This workflow-stage agent uses `/goal`; the per-paper child Codex CLI sessions must not use `/goal`.
-- Do not batch multiple papers into one Codex CLI session.
-- Do not evaluate note quality.
-- Do not repair or rewrite generated notes.
-- Do not rerun baseline.
-- Do not change the paper set unless the baseline manifest is invalid.
+- Do not evaluate, edit, or rewrite any note.
+- Do not rerun the baseline. Change the paper set only if the baseline manifest is invalid.
 
 Output:
-- Write <CANDIDATE_MANIFEST_DOC>.
-- The manifest must include candidate identity, runner settings, child Codex CLI prompt template, per-paper exact child prompt, per-paper status, final note paths, artifact paths, logs, exit status, missing artifacts, and baseline/candidate pairing.
-- Also write or update machine-readable manifest data under <CANDIDATE_RUN_ROOT> when practical.
+- Write <CANDIDATE_MANIFEST_DOC> in the baseline manifest's format, plus <EVALUATION_PAIRS_DOC> and <BLINDING_MAP_PATH>.
 ```
 
-## Phase 4: Artifact Audit
-
-The Artifact Auditor determines whether the run respected workflow contracts.
-It does not evaluate final prose quality.
-
-The auditor should check:
-
-- whether Source Corpus artifacts exist and are internally consistent
-- whether `source_manifest.json` and `raw_sections.jsonl` were the canonical
-  text-derived reading input
-- whether old diagnostic derived views became model-facing writing inputs
-- whether acquisition resolve, metadata, fetch, Canonical Identity Artifact, and
-  Identity Repair Trace artifacts are present or explicitly missing
-- whether the canonical identity provenance points back to the expected resolve
-  and metadata artifacts
-- whether fetch consumed the canonical identity/source manifestation contract
-  instead of reusing loose resolve or metadata identity fields
-- whether repaired identity, accepted-with-warnings identity,
-  repair-exhausted failure, and equivalent manifestation cases are explained by
-  explicit identity verdict, warning, failure class, equivalence, and repair
-  trace evidence
-- whether truncation or partial reading was explicit
-- whether grounding lint used valid section IDs or page ranges
-- whether figure/table decisions were fail-closed
-- whether final save behavior preserved required files and paths
-
-Artifact audit outcomes:
-
-- `pass`
-- `partial`
-- `fail`
-- `unknown`
-
-Map acquisition identity behavior to these same outcomes using explicit evidence:
-
-- `pass`: resolve, metadata, fetch, canonical identity, and repair trace artifacts
-  were consistently reused or consumed; the identity verdict is accepted or
-  accepted-with-warnings; any warning is scoped to metadata/provenance; and
-  Source Corpus evidence binds to the selected source manifestation.
-- `partial`: the run remains safe for note evaluation, but non-blocking
-  provenance, warning, or repair trace evidence is incomplete enough to limit
-  confidence in the acquisition audit.
-- `fail`: identity evidence is contradictory or unsafe, repair-exhausted failure
-  did not fail closed before downstream consumption, fetch used a stale or wrong
-  identity, the selected PDF/source manifestation is inconsistent, or the trace
-  is missing for a repaired identity.
-- `unknown`: required acquisition artifacts are absent from the manifest or
-  inaccessible, so the auditor cannot determine whether the identity contract
-  was respected.
-
-An artifact improvement alone is not the same as final note improvement. It can
-support an `architectural_improvement_only` conclusion when final note quality
-does not materially improve.
-
-Acquisition identity improvements count as final note-visible improvement only
-when the evidence shows they prevented or fixed wrong identity, wrong PDF,
-metadata contradiction, missing source evidence, broken path, citation damage,
-or a comparable downstream failure. Otherwise they remain
-`architectural_improvement_only` even when the acquisition architecture is
-cleaner.
-
-### Artifact Auditor Agent Prompt Template
+### Artifact Auditor
 
 ```text
 /goal
 
 Goal:
-Audit whether the baseline and candidate runs produced complete, contract-respecting artifacts.
+Check every baseline and candidate run against the workflow contract.
 
 Read first:
 - <REPO_ROOT>/evals/regression-workflow.md
-- paper set report: <PAPER_SET_DOC>
-- baseline manifest: <BASELINE_MANIFEST_DOC>
-- candidate manifest: <CANDIDATE_MANIFEST_DOC>
+- <BASELINE_MANIFEST_DOC>
+- <CANDIDATE_MANIFEST_DOC>
 
-Task:
-- Inspect the artifacts listed in both manifests.
-- Check Source Corpus, synthesis bundle, grounding, lint, figure/table, and save artifacts.
-- Check acquisition resolve, metadata, fetch, canonical identity, and repair trace artifacts.
-- Verify whether canonical identity and repair trace evidence were consistently reused or consumed.
-- Map identity behavior to pass/partial/fail/unknown with concrete evidence.
-- Cover repaired identity, accepted-with-warnings identity, repair-exhausted failure, and equivalent manifestation cases when they appear in the run.
-- Record whether candidate artifacts respect the expected contracts.
-- Record missing or inconsistent artifacts.
-- Distinguish artifact improvements from final note quality improvements.
+Tasks:
+- Start from each run's run_state.json: stage results, stale artifacts, provenance gaps.
+- Run the checks in the Artifact Audit section that the script cannot judge.
+- For title mode, map acquisition identity behavior to pass, partial, fail, or unknown with explicit evidence, covering every identity scenario the runs produced.
+- Separate artifact improvements from final-note improvements.
 
 Constraints:
-- Do not judge final prose quality.
-- Do not edit notes or artifacts.
-- Do not rerun DeepPaperNote.
-- Do not infer success from artifact presence alone.
+- Do not judge prose quality.
+- Do not edit notes or artifacts, and do not rerun DeepPaperNote.
+- Do not infer success from the mere presence of an artifact.
 
 Output:
-- Write <ARTIFACT_AUDIT_REPORT>.
-- Include one section per primary paper with pass/partial/fail/unknown, evidence paths, identity verdict evidence, source manifestation evidence, repair trace evidence, and risks.
-- End with an overall artifact verdict and any blocker for note evaluation.
+- Write <ARTIFACT_AUDIT_REPORT>: per run its result, evidence paths, and risks; then an overall verdict and whether any problem blocks note evaluation.
 ```
 
-## Phase 5: Note Evaluation
+### Note Evaluator
 
-The Note Evaluator uses `evals/note-evaluator-prompt.md` and
-`evals/note-quality-rubric.md`.
+Use the template in `evals/note-evaluator-prompt.md`, once per pair.
 
-For each paper, the evaluator receives:
-
-- paper identity evidence
-- baseline final note
-- candidate final note
-- available baseline artifacts
-- available candidate artifacts
-- optional source evidence
-
-The evaluator must:
-
-- compare raw notes only
-- run all hard gates
-- score all eight rubric dimensions
-- cite evidence for material score differences
-- decide whether the candidate beats the baseline
-- emit the rubric JSON report
-
-The evaluator must not:
-
-- rewrite notes
-- patch missing sections
-- rerun DeepPaperNote
-- use a different rubric
-- treat clean formatting as content improvement by itself
-
-### Note Evaluator Agent Prompt Template
+### Regression Judge
 
 ```text
 /goal
 
 Goal:
-Evaluate whether candidate final notes are materially better than baseline final notes.
+Decide whether this experiment supports claiming a real improvement.
 
 Read first:
 - <REPO_ROOT>/evals/regression-workflow.md
 - <REPO_ROOT>/evals/note-quality-rubric.md
-- <REPO_ROOT>/evals/note-evaluator-prompt.md
-- paper set report: <PAPER_SET_DOC>
-- baseline manifest: <BASELINE_MANIFEST_DOC>
-- candidate manifest: <CANDIDATE_MANIFEST_DOC>
-- artifact audit report: <ARTIFACT_AUDIT_REPORT>
+- <BASELINE_MANIFEST_DOC>, <CANDIDATE_MANIFEST_DOC>
+- <ARTIFACT_AUDIT_REPORT>
+- <NOTE_EVALUATION_REPORT>
+- <BLINDING_MAP_PATH>
 
-Task:
-- For each primary paper, compare the raw baseline note and raw candidate note.
-- Use the fixed rubric hard gates and scored dimensions.
-- Use source evidence and artifacts when available.
-- Mark evidence-grounded dimensions as lower-confidence when source evidence is missing.
-- Identify content improvements, regressions, and ties.
+Tasks:
+- Unblind every pair.
+- Compute each paper's noise margins, then apply the Regression Judgment rules per dimension and per paper.
+- Decide whether acquisition identity gains are architectural only or note-visible.
+- Give the experiment verdict and the next recommended action.
 
 Constraints:
-- Do not rewrite or repair notes.
-- Do not rerun DeepPaperNote.
-- Do not evaluate artifact contract quality except where it affects note quality.
-- Do not reward cleaner formatting unless content quality also improves.
+- Do not rerun tools or edit notes.
+- Do not let an average score override a hard-gate failure.
+- Do not claim a real improvement from formatting-only gains or a single paper.
 
 Output:
-- Write <NOTE_EVALUATION_REPORT>.
-- Include the required rubric JSON for each primary paper.
-- Add a short per-paper comparison summary and final per-paper verdict.
-```
-
-## Phase 6: Regression Judgment
-
-The Regression Judge combines:
-
-- paper set report
-- baseline manifest
-- candidate manifest
-- artifact audit report
-- note evaluation report
-- runner failures or missing artifacts
-
-It assigns one experiment-level verdict.
-
-### Verdict Values
-
-Use these values:
-
-- `hard_fail`
-- `regression`
-- `no_material_change`
-- `partial_improvement`
-- `real_improvement`
-- `architectural_improvement_only`
-
-### What Counts As Real Improvement
-
-`real_improvement` means the candidate is materially better than baseline on
-final note quality, not merely cleaner or more structured.
-
-To claim `real_improvement`, the candidate should:
-
-- pass all known hard gates in `evals/note-quality-rubric.md`
-- improve Evidence Chain Coverage or Mechanism/Protocol Depth
-- preserve or improve Claim Boundaries and Limitations
-- avoid factual, grounding, figure/table, citation, path, or readability
-  regressions
-- improve for reasons tied to paper evidence
-- show the improvement on most primary papers, not only one cherry-picked case
-
-### What Does Not Count As Real Improvement
-
-Do not claim real improvement for:
-
-- prettier formatting only
-- longer notes without stronger evidence coverage
-- more sections without better mechanism or result explanation
-- artifact contract cleanup that does not change final note quality
-- improvements on one paper paired with serious regressions on others
-- candidate notes that fail a severe hard gate
-
-Use `architectural_improvement_only` when artifacts or contracts improved but
-the final note quality is not materially better yet.
-
-For acquisition identity work, keep two fields separate in the regression
-summary:
-
-- `architectural_improvement_only`: the candidate improved artifact reuse,
-  provenance, canonical identity, repair trace, or reporting clarity, but the
-  final notes did not visibly improve.
-- `final_note_visible_improvement`: the candidate prevented or fixed wrong
-  identity, wrong PDF, metadata contradiction, missing source evidence, broken
-  path, citation damage, or a comparable downstream failure visible in the
-  generated note or its source evidence.
-
-Do not promote an acquisition architecture improvement into final note quality
-improvement merely because resolve, metadata, fetch, canonical identity, or
-repair trace artifacts are cleaner or more complete.
-
-## Minimum First Experiment
-
-For the first reusable regression run:
-
-1. Choose 4 primary papers and 2 backups.
-2. Run one baseline version.
-3. Run one candidate version.
-4. Audit artifacts for all primary papers.
-5. Evaluate notes for all primary papers.
-6. Produce one experiment summary.
-
-Do not add another runner tool until the baseline/candidate workflow is stable.
-
-## Final Experiment Summary
-
-The Regression Judge should produce:
-
-- experiment id
-- baseline version
-- candidate version
-- paper list
-- runner settings summary
-- artifact audit summary
-- note evaluation summary
-- per-paper verdicts
-- experiment-level verdict
-- whether optimization success can be claimed
-- next recommended action
-
-The summary should distinguish:
-
-- mechanism improved but note quality did not
-- note quality improved but artifacts regressed
-- architectural_improvement_only versus final note-visible acquisition improvement
-- one-paper improvement
-- broad real improvement
-- failed or inconclusive experiment
-
-### Regression Judge Agent Prompt Template
-
-```text
-/goal
-
-Goal:
-Decide whether the regression experiment supports claiming a real improvement.
-
-Read first:
-- <REPO_ROOT>/evals/regression-workflow.md
-- <REPO_ROOT>/evals/note-quality-rubric.md
-- paper set report: <PAPER_SET_DOC>
-- baseline manifest: <BASELINE_MANIFEST_DOC>
-- candidate manifest: <CANDIDATE_MANIFEST_DOC>
-- artifact audit report: <ARTIFACT_AUDIT_REPORT>
-- note evaluation report: <NOTE_EVALUATION_REPORT>
-
-Task:
-- Check runner success, artifact audit outcomes, and note evaluation verdicts.
-- Check whether acquisition identity improvements are architectural_improvement_only or final note-visible.
-- Assign a per-paper verdict.
-- Assign one experiment-level verdict.
-- Decide whether optimization success can be claimed.
-- Identify the next recommended action.
-
-Constraints:
-- Do not rerun tools.
-- Do not edit generated notes.
-- Do not override hard-gate failures with average scores.
-- Do not claim real improvement for formatting-only gains or one cherry-picked paper.
-
-Output:
-- Write <REGRESSION_SUMMARY_DOC>.
-- Include experiment id, baseline version, candidate version, paper list, runner settings summary, artifact audit summary, note evaluation summary, per-paper verdicts, experiment-level verdict, and next recommended action.
+- Write <REGRESSION_SUMMARY_DOC> as the Experiment Summary section describes.
 ```
