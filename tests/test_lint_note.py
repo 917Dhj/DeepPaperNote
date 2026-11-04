@@ -1793,6 +1793,50 @@ def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
     found, issues = inspect_note_plan(plan_path)
     assert found is True
     assert "planning_required_fields_invalid" in issues
+    assert "planning_must_cover_invalid: expected array" in issues
+    assert "planning_central_claims_invalid: expected array" in issues
+
+
+def test_inspect_note_plan_names_each_missing_field(tmp_path) -> None:
+    plan_path = tmp_path / "note.plan.json"
+    plan = {
+        "output_language": "zh-CN",
+        "paper_type": "AI_method",
+        "paper_type_rationale": "The paper proposes a model mechanism.",
+        "dominant_domain": "reasoning",
+        "must_cover": ["方法主线"],
+        "key_numbers": ["42"],
+        "real_comparisons": ["baseline"],
+        "central_claims": [
+            {
+                "claim": "The method improves a target behavior.",
+                "supporting_evidence": [{"section_id": "sec:method"}],
+                "what_it_actually_proves": "The source states the reported setting.",
+                "what_it_does_not_prove": "It does not prove all deployment cases.",
+            }
+        ],
+        "negative_or_limiting_results": ["No external failure case is reported."],
+        "mechanism_result_map": ["The mechanism explains the target behavior."],
+        "comparative_positioning": ["The plan names the baseline comparison."],
+        "reuse_takeaways": ["Track the mechanism separately from the result."],
+        "followup_questions": ["Check whether the mechanism transfers."],
+    }
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    found, issues = inspect_note_plan(plan_path)
+    assert found is True
+    assert "planning_required_fields_missing" in issues
+    assert "planning_claim_boundaries_missing" in issues
+    assert "planning_section_plan_missing" in issues
+
+
+def test_inspect_note_plan_names_a_plan_that_is_not_an_object(tmp_path) -> None:
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text("[]", encoding="utf-8")
+
+    found, issues = inspect_note_plan(plan_path)
+    assert found is True
+    assert issues == ["planning_artifact_not_object"]
 
 
 def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:

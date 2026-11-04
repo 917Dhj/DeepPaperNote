@@ -108,16 +108,6 @@ def emit(payload: dict[str, Any], output_path: str | None = None) -> None:
         print(text)
 
 
-def stub_payload(script: str, description: str, outputs: list[str]) -> dict[str, Any]:
-    return {
-        "status": "scaffold",
-        "script": script,
-        "description": description,
-        "next_step": "Implement this contract incrementally.",
-        "outputs": outputs,
-    }
-
-
 def load_json_file(path: str | Path) -> dict[str, Any]:
     # utf-8-sig transparently strips a UTF-8 BOM (e.g. files written by
     # PowerShell Out-File / Notepad on Windows) that would otherwise make
