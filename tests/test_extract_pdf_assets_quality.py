@@ -306,6 +306,72 @@ def test_extract_pdf_assets_excludes_table_captions_above_and_below(
     assert tables["Table 2"]["bbox_pt"][3] >= 150.0
 
 
+def write_embedded_bitmap_pdf(path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for PDF asset integration tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page()
+        page.insert_text((72, 72), "A page with three embedded bitmaps, two of them distinct.")
+        red = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 8, 8), False)
+        red.clear_with(200)
+        blue = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 16, 16), False)
+        blue.clear_with(60)
+        reused = page.insert_image(fitz.Rect(72, 100, 172, 200), pixmap=red)
+        page.insert_image(fitz.Rect(200, 100, 300, 200), pixmap=blue)
+        page.insert_image(fitz.Rect(72, 220, 172, 320), xref=reused)
+        doc.new_page().insert_text((72, 72), "A text-only page.")
+        doc.save(path)
+    finally:
+        doc.close()
+
+
+def payload_file_paths(value: object) -> list[str]:
+    paths: list[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if isinstance(item, str) and (key == "path" or key.endswith("_path")):
+                paths.append(item)
+            else:
+                paths.extend(payload_file_paths(item))
+    elif isinstance(value, list):
+        for item in value:
+            paths.extend(payload_file_paths(item))
+    return paths
+
+
+def test_extract_pdf_assets_counts_embedded_bitmaps_without_writing_them(
+    tmp_path: Path,
+) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    write_embedded_bitmap_pdf(pdf_path)
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "assets.json"
+    assets_dir = tmp_path / "assets"
+    write_fetch_input(input_path, pdf_path, title="Embedded Bitmap Paper")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_PDF_ASSETS_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--assets-dir",
+            str(assets_dir),
+        ],
+        check=True,
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert [page["image_count"] for page in payload["page_assets"]] == [2, 0]
+    assert "image_assets" not in payload
+    assert sorted(path.name for path in (assets_dir / "images").iterdir()) == []
+    for recorded in payload_file_paths(payload):
+        assert Path(recorded).exists(), recorded
+
+
 def test_extract_pdf_assets_default_scans_short_pdf_without_truncation(tmp_path: Path) -> None:
     pdf_path = tmp_path / "paper.pdf"
     write_test_pdf(pdf_path, ["Page 1", "Page 2", "Page 3"])
