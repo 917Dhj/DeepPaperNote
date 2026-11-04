@@ -81,14 +81,47 @@ Recommended shape:
   "followup_questions": ["Does the same state logging still help when external tools are slow, missing, or adversarially noisy?"],
   "section_plan": [
     {
+      "section": "研究问题",
+      "focus": "说明多步工具调用为什么会在中途失败后无法恢复，以及作者把它定义成什么问题",
+      "subsections": [],
+      "evidence_sources": [{"section_id": "sec:introduction"}]
+    },
+    {
+      "section": "数据与任务定义",
+      "focus": "交代评测任务、工具集合与错误标注方式，说明不可恢复错误率是怎样计算的",
+      "subsections": ["评测协议"],
+      "evidence_sources": [{"section_id": "sec:data"}, {"pages": [3]}]
+    },
+    {
       "section": "方法主线",
       "weight": "high",
+      "focus": "按调用顺序讲清失败状态如何被记录、保留并在后续步骤里被读取和修复",
       "subsections": ["机制流程", "训练目标"],
       "evidence_sources": [{"section_id": "sec:method"}, {"pages": [4, 6]}]
+    },
+    {
+      "section": "关键结果",
+      "focus": "对比最强基线的不可恢复错误率与成功率，并写清这些数字对应的评测设置",
+      "subsections": [],
+      "evidence_sources": [{"section_id": "sec:experiments"}, {"pages": [7, 8]}]
+    },
+    {
+      "section": "深度分析",
+      "focus": "用消融结果判断收益究竟来自状态保留本身，还是来自额外的重试次数",
+      "subsections": ["消融解读"],
+      "evidence_sources": [{"section_id": "sec:ablation"}]
+    },
+    {
+      "section": "局限",
+      "focus": "指出结论只覆盖论文的工具集合与基准分布，缺少慢速或缺失工具下的检验",
+      "subsections": [],
+      "evidence_sources": [{"section_id": "sec:limitations"}]
     }
   ]
 }
 ```
+
+`section_plan` must cover every required section. Each one needs evidence sources and a paper-specific `focus`. The bundle's `writing_contract.note_plan_contract.template` gives this shape with every value empty. Start from it and fill each value; Lint and Grounding reject the template while any value is still empty.
 
 Before drafting from this plan, run `scripts/lint_grounding.py --note-plan ... --source-manifest ... --bundle-json ... --figure-decisions ... --output ...` and retain the resulting Grounding Lint JSON for Formal Save.
 
