@@ -56,7 +56,20 @@
     "Table 1",
     "Table 2"
   ],
-  "crops": {},
+  "crops": {
+    "Table 5": {
+      "contains": [
+        "Model",
+        "minDALL-E",
+        "SD v1.5",
+        "w/DPO"
+      ],
+      "excludes": [
+        "Scaling Rectified Flow",
+        "RESULTS"
+      ]
+    }
+  },
   "same_visual": [],
   "known_gaps": {}
 }

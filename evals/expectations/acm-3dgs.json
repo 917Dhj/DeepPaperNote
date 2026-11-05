@@ -60,6 +60,15 @@
       "excludes": [
         "We use"
       ]
+    },
+    "Table 5": {
+      "contains": [
+        "Plenoxels",
+        "23.4947"
+      ],
+      "excludes": [
+        "0.6063"
+      ]
     }
   },
   "same_visual": [],

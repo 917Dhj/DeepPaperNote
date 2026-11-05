@@ -899,6 +899,36 @@ def test_table_crop_keeps_rows_around_a_wrapped_header_cell(
         doc.close()
 
 
+def test_table_crop_stops_at_a_running_header_repeated_on_the_next_page(
+    tmp_path: Path,
+) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    header = "Scaling Synthetic Tables for High-Resolution Crops"
+    doc = fitz.open()
+    try:
+        for _ in range(2):
+            doc.new_page(width=612.0, height=792.0).insert_text((180.0, 52.0), header, fontsize=9)
+        page = doc[0]
+        columns = (420.0, 470.0, 520.0)
+        page.insert_text((330.0, 76.0), "Model", fontsize=7)
+        for column, x in enumerate(columns):
+            page.insert_text((x, 76.0), f"Col{column}", fontsize=7)
+        for row in range(10):
+            y = 86.0 + row * 8.0
+            page.insert_text((330.0, y), f"Method{row}", fontsize=7)
+            for column, x in enumerate(columns):
+                page.insert_text((x, y), f"0.{row}{column}", fontsize=7)
+        page.insert_text((320.0, 180.0), "Table 5. Comparisons on a benchmark.", fontsize=8)
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "Model" in crops["Table 5"] and "Method9" in crops["Table 5"]
+        assert "Scaling Synthetic" not in crops["Table 5"]
+    finally:
+        doc.close()
+
+
 def paragraph_chars_in(page) -> int:
     return _count_paragraph_text_chars_in_bbox(page, tuple(page.rect), (0.0, 0.0, 0.0, 0.0))
 
