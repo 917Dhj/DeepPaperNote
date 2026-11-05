@@ -19,6 +19,11 @@ from _note_paths import (
     resolve_note_output_mode,
     resolve_obsidian_note_path,
 )
+from _evidence_heuristics import (
+    extract_mechanism_flow_sentences,
+    extract_negative_claims,
+    infer_paper_type,
+)
 from common import (
     clean_local_pdf_stem,
     extract_appendix_index,
@@ -28,9 +33,6 @@ from common import (
     env_config_value,
     extract_arxiv_id,
     extract_doi,
-    extract_mechanism_flow_sentences,
-    extract_negative_claims,
-    infer_paper_type,
     infer_source_type,
     fetch_arxiv_entries,
     enrich_metadata,

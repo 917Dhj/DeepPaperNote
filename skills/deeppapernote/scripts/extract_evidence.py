@@ -8,24 +8,26 @@ import re
 from pathlib import Path
 from typing import Any
 
+from _evidence_heuristics import (
+    extract_dataset_candidates,
+    extract_mechanism_flow_sentences,
+    extract_metric_claims,
+    extract_negative_claims,
+    infer_paper_type,
+    pick_sentences_by_keywords,
+)
 from common import (
     SECTION_ALIASES,
     emit,
     extract_appendix_index,
     extract_appendix_page_texts,
     extract_caption_lines,
-    extract_dataset_candidates,
-    extract_mechanism_flow_sentences,
-    extract_metric_claims,
-    extract_negative_claims,
     extract_pdf_sections,
     extract_pdf_text,
-    infer_paper_type,
     maybe_load_json_record,
     normalize_heading,
     normalize_whitespace,
     paper_id_for_record,
-    pick_sentences_by_keywords,
     pdf_coverage_summary,
     require_accepted_fetch_artifact,
     split_sentences,

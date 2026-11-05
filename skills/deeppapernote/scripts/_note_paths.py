@@ -6,7 +6,8 @@ import re
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
-from common import infer_paper_type, normalize_whitespace, slugify_filename
+from _evidence_heuristics import infer_paper_type
+from common import normalize_whitespace, slugify_filename
 
 
 def configured_obsidian_vault(config: dict[str, Any]) -> Path | None:
