@@ -853,6 +853,52 @@ def test_short_table_gets_its_own_crop(tmp_path: Path) -> None:
         doc.close()
 
 
+COMPLEXITY_TABLE_ROWS = (
+    ("Layer Type", "Complexity per Layer", "Sequential", "Maximum Path Length"),
+    ("", "", "Operations", ""),
+    ("Self-Attention", "O(n^2 · d)", "O(1)", "O(1)"),
+    ("Recurrent", "O(n · d^2)", "O(n)", "O(n)"),
+    ("Convolutional", "O(k · n · d^2)", "O(1)", "O(log_k(n))"),
+    ("Self-Attention (restricted)", "O(r · n · d)", "O(1)", "O(n/r)"),
+)
+
+
+@pytest.mark.parametrize("caption_below", [False, True], ids=["caption-above", "caption-below"])
+def test_table_crop_keeps_rows_around_a_wrapped_header_cell(
+    tmp_path: Path, caption_below: bool
+) -> None:
+    """A table set as one text block of short cells is not prose to stop at."""
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        writer = fitz.TextWriter(page.rect)
+        font = fitz.Font("helv")
+        caption = "Table 1: Per-layer complexity and path length for different layer types."
+        top = 100.0
+        if not caption_below:
+            writer.append((60.0, top), caption, font=font, fontsize=9)
+            top += 24.0
+        for row, cells in enumerate(COMPLEXITY_TABLE_ROWS):
+            for column, cell in enumerate(cells):
+                if cell:
+                    origin = (70.0 + column * 120.0, top + row * 11.0)
+                    writer.append(origin, cell, font=font, fontsize=8)
+        if caption_below:
+            origin = (60.0, top + len(COMPLEXITY_TABLE_ROWS) * 11.0 + 14.0)
+            writer.append(origin, caption, font=font, fontsize=9)
+        writer.write_text(page)
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert "Table 1" in crops
+        assert "Layer Type" in crops["Table 1"]
+        assert "O(n/r)" in crops["Table 1"]
+    finally:
+        doc.close()
+
+
 def paragraph_chars_in(page) -> int:
     return _count_paragraph_text_chars_in_bbox(page, tuple(page.rect), (0.0, 0.0, 0.0, 0.0))
 

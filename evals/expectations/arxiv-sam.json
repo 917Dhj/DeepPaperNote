@@ -68,7 +68,22 @@
     "Table 3",
     "Table 5"
   ],
-  "crops": {},
+  "crops": {
+    "Table 3": {
+      "contains": [
+        "method",
+        "HED",
+        "EDETR",
+        "zero-shot transfer methods:",
+        "Felz-Hutt",
+        ".768"
+      ],
+      "excludes": [
+        "Zero-shot transfer to edge detection",
+        "We compute the standard"
+      ]
+    }
+  },
   "same_visual": [],
   "known_gaps": {}
 }

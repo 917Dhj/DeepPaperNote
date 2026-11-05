@@ -35,7 +35,20 @@
     "Figure 2",
     "Table 2"
   ],
-  "crops": {},
+  "crops": {
+    "Table 1": {
+      "contains": [
+        "Layer Type",
+        "Operations",
+        "Self-Attention (restricted)",
+        "O(n/r)"
+      ],
+      "excludes": [
+        "Maximum path lengths",
+        "positional encodings"
+      ]
+    }
+  },
   "same_visual": [],
   "known_gaps": {}
 }
