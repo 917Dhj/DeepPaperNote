@@ -7,7 +7,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_legacy_script_side_chinese_rewrite_helpers_are_removed() -> None:
-    common_source = (PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "common.py").read_text(encoding="utf-8")
+    scripts_dir = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts"
+    scripts_source = "\n".join(path.read_text(encoding="utf-8") for path in sorted(scripts_dir.glob("*.py")))
 
     legacy_names = (
         "TERM_REPLACEMENTS",
@@ -18,4 +19,4 @@ def test_legacy_script_side_chinese_rewrite_helpers_are_removed() -> None:
         "finalize_cn_line",
     )
     for name in legacy_names:
-        assert name not in common_source
+        assert name not in scripts_source

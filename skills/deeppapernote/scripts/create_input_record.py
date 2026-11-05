@@ -6,7 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 
-from common import emit, normalize_whitespace, paper_id_for_record
+from _identity import paper_id_for_record
+from common import emit, normalize_whitespace
 
 
 def parser() -> argparse.ArgumentParser:

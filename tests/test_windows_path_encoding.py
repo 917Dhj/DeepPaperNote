@@ -19,13 +19,15 @@ from pathlib import Path
 
 from formal_save_helpers import formal_save_args, reviewed_insert_fields
 
+import _note_paths
 import citation_links
 import common
 import lint_grounding
 import lint_note
 import plan_figure_table_decisions
 import write_obsidian_note
-from common import load_json_file, resolve_obsidian_note_path
+from _note_paths import resolve_obsidian_note_path
+from common import load_json_file
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts"
@@ -105,8 +107,8 @@ def test_load_domain_rules_strips_bom(tmp_path: Path, monkeypatch) -> None:
     )
     path = tmp_path / "domain_rules.yaml"
     path.write_bytes(BOM.encode("utf-8") + rules_yaml.encode("utf-8"))
-    monkeypatch.setattr(common, "DOMAIN_RULES_PATH", path)
-    rules = common.load_domain_rules()
+    monkeypatch.setattr(_note_paths, "DOMAIN_RULES_PATH", path)
+    rules = _note_paths.load_domain_rules()
     labels = [d.get("label") for d in rules.get("domains", [])]
     # If the BOM were not stripped, the top-level `domains:` key would be
     # "﻿domains", the section would be skipped, and load_domain_rules would

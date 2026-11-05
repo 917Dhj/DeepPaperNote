@@ -18,13 +18,13 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from _identity import require_accepted_fetch_artifact
 from common import (
     default_assets_dir,
     emit,
     fitz,
     maybe_load_json_record,
     normalize_whitespace,
-    require_accepted_fetch_artifact,
 )
 from pdf_captions import CAPTION_RE, looks_like_data_row, select_caption_blocks
 

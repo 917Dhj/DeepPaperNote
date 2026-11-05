@@ -14,7 +14,7 @@ except ImportError:  # pragma: no cover
     fitz = None
 
 from build_synthesis_bundle import bundle as build_synthesis_bundle
-from common import extract_caption_lines
+from _pdf_text import extract_caption_lines
 from contracts import NOTE_REQUIRED_SECTIONS
 import extract_evidence
 from extract_evidence import build_appendix_evidence, evidence_quality, extract_equation_candidates

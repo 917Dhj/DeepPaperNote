@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from common import caption_label_key, extract_caption_lines, normalize_caption_label
+from _pdf_text import caption_label_key, extract_caption_lines, normalize_caption_label
 from pdf_captions import find_caption_blocks
 from plan_figure_table_decisions import matched_figure_asset
 from plan_figures import _match_figure_asset, classify_caption_kind

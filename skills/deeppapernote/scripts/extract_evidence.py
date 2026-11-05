@@ -8,27 +8,33 @@ import re
 from pathlib import Path
 from typing import Any
 
-from common import (
-    SECTION_ALIASES,
-    emit,
-    extract_appendix_index,
-    extract_appendix_page_texts,
-    extract_caption_lines,
+from _evidence_heuristics import (
     extract_dataset_candidates,
     extract_mechanism_flow_sentences,
     extract_metric_claims,
     extract_negative_claims,
+    infer_paper_type,
+    pick_sentences_by_keywords,
+)
+from _identity import (
+    paper_id_for_record,
+    require_accepted_fetch_artifact,
+)
+from _pdf_text import (
+    SECTION_ALIASES,
+    extract_appendix_index,
+    extract_appendix_page_texts,
+    extract_caption_lines,
     extract_pdf_sections,
     extract_pdf_text,
-    infer_paper_type,
-    maybe_load_json_record,
     normalize_heading,
-    normalize_whitespace,
-    paper_id_for_record,
-    pick_sentences_by_keywords,
     pdf_coverage_summary,
-    require_accepted_fetch_artifact,
     split_sentences,
+)
+from common import (
+    emit,
+    maybe_load_json_record,
+    normalize_whitespace,
 )
 from contracts import empty_evidence_pack
 from citation_links import extract_reference_candidates_from_pdf

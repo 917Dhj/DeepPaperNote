@@ -10,9 +10,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from common import (
+from _pdf_text import (
     caption_label_key,
     caption_preference_score,
+)
+from common import (
     emit,
     file_sha256,
     maybe_load_json_record,

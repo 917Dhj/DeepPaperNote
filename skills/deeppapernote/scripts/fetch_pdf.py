@@ -7,16 +7,18 @@ import argparse
 import re
 from pathlib import Path
 
-from common import (
+from _identity import (
     canonical_identity_summary,
-    default_pdf_path,
-    emit,
     fetch_record_from_canonical_identity,
-    file_sha256,
-    http_get_bytes,
-    maybe_load_json_record,
     paper_id_for_record,
     require_accepted_canonical_identity,
+)
+from _metadata_sources import http_get_bytes
+from common import (
+    default_pdf_path,
+    emit,
+    file_sha256,
+    maybe_load_json_record,
     require_ok_input_artifact,
     runtime_config,
 )

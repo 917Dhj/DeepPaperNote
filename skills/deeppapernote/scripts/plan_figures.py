@@ -6,10 +6,12 @@ from __future__ import annotations
 import argparse
 import re
 
-from common import (
+from _pdf_text import (
     caption_preference_score,
-    maybe_load_json_record,
     normalize_caption_label,
+)
+from common import (
+    maybe_load_json_record,
     normalize_whitespace,
     runtime_config,
 )

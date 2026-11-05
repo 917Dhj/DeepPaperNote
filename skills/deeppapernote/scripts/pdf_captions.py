@@ -6,11 +6,13 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-from common import (
+from _pdf_text import (
     caption_label_key,
     clean_pdf_line,
-    fitz,
     normalize_caption_label,
+)
+from common import (
+    fitz,
     normalize_whitespace,
 )
 

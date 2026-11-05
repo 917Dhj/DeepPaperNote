@@ -9,36 +9,49 @@ from pathlib import Path
 
 import pytest
 
+import _identity
+import _metadata_sources
+import _note_paths
 import common
-from common import (
-    clean_local_pdf_stem,
+from _note_paths import (
     domain_name_score,
-    extract_appendix_index,
-    extract_local_pdf_hints,
-    extract_caption_lines,
-    extract_pdf_sections,
-    env_config_value,
     existing_domain_dirs,
-    extract_arxiv_id,
-    extract_doi,
+    infer_domain_label,
+    resolve_domain_subdir,
+    resolve_note_output_mode,
+    resolve_obsidian_note_path,
+)
+from _evidence_heuristics import (
     extract_mechanism_flow_sentences,
     extract_negative_claims,
-    infer_domain_label,
     infer_paper_type,
-    infer_source_type,
+)
+from _metadata_sources import (
     fetch_arxiv_entries,
     enrich_metadata,
+    resolve_reference,
+    semantic_scholar_headers,
+)
+from _local_pdf_title import (
+    extract_local_pdf_hints,
+    choose_local_pdf_corrected_title,
+)
+from _identity import (
+    clean_local_pdf_stem,
+    extract_arxiv_id,
+    extract_doi,
+    infer_source_type,
+)
+from _pdf_text import (
+    extract_appendix_index,
+    extract_caption_lines,
+    extract_pdf_sections,
     match_section_heading,
     normalize_caption_label,
     normalize_pdf_text_artifacts,
     pdf_coverage_summary,
-    resolve_reference,
-    resolve_domain_subdir,
-    resolve_note_output_mode,
-    resolve_obsidian_note_path,
-    semantic_scholar_headers,
-    choose_local_pdf_corrected_title,
 )
+from common import env_config_value
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -252,7 +265,7 @@ def test_extract_pdf_sections_supports_chinese_headings(tmp_path: Path, monkeypa
             )
         ],
     )
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_pdf_text.fitz", FakeFitz(fake_doc))
 
     sections = extract_pdf_sections(pdf_path)
 
@@ -270,7 +283,7 @@ def test_pdf_coverage_reports_page_limit_and_late_appendix(tmp_path: Path, monke
     pages[9] = "References\n[1] Ignored reference."
     pages[19] = "Appendix\nAdditional experiments."
     fake_doc = FakePdfDoc(metadata={}, pages=pages)
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_pdf_text.fitz", FakeFitz(fake_doc))
 
     coverage = pdf_coverage_summary(pdf_path, max_pages=18)
 
@@ -302,7 +315,7 @@ def test_extract_appendix_index_reports_sections_and_captions(tmp_path: Path, mo
     )
     pages.extend(f"Appendix tail page {index}" for index in range(21, 26))
     fake_doc = FakePdfDoc(metadata={}, pages=pages)
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_pdf_text.fitz", FakeFitz(fake_doc))
 
     coverage = pdf_coverage_summary(pdf_path, max_pages=18)
     index = extract_appendix_index(pdf_path, coverage)
@@ -331,7 +344,7 @@ def test_extract_local_pdf_hints_prefers_pdf_metadata_title_and_doi(tmp_path: Pa
         },
         pages=["Ignored fallback title"],
     )
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_local_pdf_title.fitz", FakeFitz(fake_doc))
 
     hints = extract_local_pdf_hints(pdf_path)
 
@@ -355,7 +368,7 @@ def test_extract_local_pdf_hints_falls_back_to_first_page_title(tmp_path: Path, 
             )
         ],
     )
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_local_pdf_title.fitz", FakeFitz(fake_doc))
 
     hints = extract_local_pdf_hints(pdf_path)
 
@@ -392,7 +405,7 @@ def test_extract_local_pdf_hints_prefers_concise_first_page_title(
             )
         ],
     )
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_local_pdf_title.fitz", FakeFitz(fake_doc))
 
     hints = extract_local_pdf_hints(pdf_path)
 
@@ -403,7 +416,7 @@ def test_resolve_reference_local_pdf_uses_extracted_hints(tmp_path: Path, monkey
     pdf_path = tmp_path / "paper.pdf"
     pdf_path.write_bytes(b"%PDF-1.4")
     monkeypatch.setattr(
-        "common.extract_local_pdf_hints",
+        "_metadata_sources.extract_local_pdf_hints",
         lambda path: {
             "title": "LLaMA: Open and Efficient Foundation Language Models",
             "doi": "10.48550/arXiv.2302.13971",
@@ -461,7 +474,7 @@ def test_local_pdf_good_title_does_not_use_unrelated_external_title() -> None:
 
 def test_manifestation_equivalence_accepts_identical_cjk_identity() -> None:
     title = "双元联盟网络如何影响突破式创新——技术能力与网络惯例的调节作用"
-    decision = common.manifestation_equivalence_decision(
+    decision = _identity.manifestation_equivalence_decision(
         {"title": title, "authors": ["朱云鹃"]},
         {"title": title, "authors": ["朱云鹃"]},
     )
@@ -473,7 +486,7 @@ def test_manifestation_equivalence_accepts_identical_cjk_identity() -> None:
 
 
 def test_manifestation_equivalence_rejects_distinct_spaced_cjk_authors() -> None:
-    decision = common.manifestation_equivalence_decision(
+    decision = _identity.manifestation_equivalence_decision(
         {"title": "完全不同论文", "authors": ["李 云鹃"]},
         {"title": "深度学习研究一", "authors": ["朱 云鹃"]},
     )
@@ -484,7 +497,7 @@ def test_manifestation_equivalence_rejects_distinct_spaced_cjk_authors() -> None
 
 
 def test_manifestation_equivalence_preserves_unicode_combining_marks() -> None:
-    decision = common.manifestation_equivalence_decision(
+    decision = _identity.manifestation_equivalence_decision(
         {"title": "कतब", "authors": ["करण"]},
         {"title": "किताब", "authors": ["किरण"]},
     )
@@ -499,11 +512,11 @@ def test_ascii_identity_matching_remains_unchanged() -> None:
     assert common.normalize_title("Attention: Is All You Need!") == (
         "attention is all you need"
     )
-    equivalent = common.manifestation_equivalence_decision(
+    equivalent = _identity.manifestation_equivalence_decision(
         {"title": "attention is all you need", "authors": ["Alice Example"]},
         {"title": "Attention Is All You Need", "authors": ["Alice Example"]},
     )
-    ambiguous = common.manifestation_equivalence_decision(
+    ambiguous = _identity.manifestation_equivalence_decision(
         {"title": "Completely Different Paper", "authors": ["Bob Other"]},
         {"title": "Attention Is All You Need", "authors": ["Alice Example"]},
     )
@@ -514,7 +527,7 @@ def test_ascii_identity_matching_remains_unchanged() -> None:
 
 def test_identity_adjudication_accepts_identical_cjk_author() -> None:
     title = "双元联盟网络如何影响突破式创新——技术能力与网络惯例的调节作用"
-    decision = common.adjudicate_identity_observations(
+    decision = _identity.adjudicate_identity_observations(
         {"title": title, "authors": ["朱云鹃"], "year": "2026"},
         [
             {
@@ -1017,13 +1030,13 @@ fallback_domains:
         + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(common, "DOMAIN_RULES_PATH", rules_path)
+    monkeypatch.setattr(_note_paths, "DOMAIN_RULES_PATH", rules_path)
 
     assert infer_domain_label("Transformer analysis for galaxy survey data") == "天文学"
 
 
 def test_domain_rules_missing_or_invalid_falls_back(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(common, "DOMAIN_RULES_PATH", tmp_path / "missing.yaml")
+    monkeypatch.setattr(_note_paths, "DOMAIN_RULES_PATH", tmp_path / "missing.yaml")
     assert (
         infer_domain_label("Diffusion Policy for Robot Manipulation", "robotic control")
         == "机器人"
@@ -1031,7 +1044,7 @@ def test_domain_rules_missing_or_invalid_falls_back(tmp_path: Path, monkeypatch)
 
     invalid_path = tmp_path / "invalid.yaml"
     invalid_path.write_text("domains:\n  - aliases:\n      - no label\n", encoding="utf-8")
-    monkeypatch.setattr(common, "DOMAIN_RULES_PATH", invalid_path)
+    monkeypatch.setattr(_note_paths, "DOMAIN_RULES_PATH", invalid_path)
     assert (
         infer_domain_label("Diffusion Policy for Robot Manipulation", "robotic control")
         == "机器人"
@@ -1104,13 +1117,13 @@ def test_fetch_arxiv_entries_returns_empty_on_http_error(monkeypatch) -> None:
     def raising_http_get_text(*args: object, **kwargs: object) -> str:
         raise RuntimeError("network down")
 
-    monkeypatch.setattr("common.http_get_text", raising_http_get_text)
+    monkeypatch.setattr("_metadata_sources.http_get_text", raising_http_get_text)
 
     assert fetch_arxiv_entries(search_query='ti:"test"', max_results=1) == []
 
 
 def test_fetch_arxiv_entries_returns_empty_on_invalid_xml(monkeypatch) -> None:
-    monkeypatch.setattr("common.http_get_text", lambda *args, **kwargs: "<not-xml")
+    monkeypatch.setattr("_metadata_sources.http_get_text", lambda *args, **kwargs: "<not-xml")
 
     assert fetch_arxiv_entries(search_query='ti:"test"', max_results=1) == []
 
@@ -1124,10 +1137,13 @@ def test_resolve_reference_title_defers_provider_selection(monkeypatch) -> None:
         "year": "2025",
         "metadata_sources": ["semantic_scholar"],
     }
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
+    monkeypatch.setattr(
+        "_metadata_sources.search_semantic_scholar",
+        lambda *args, **kwargs: [semantic_match],
+    )
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
 
     resolved = resolve_reference("Example Paper")
 
@@ -1139,7 +1155,7 @@ def test_resolve_reference_title_defers_provider_selection(monkeypatch) -> None:
 
 
 def test_resolve_reference_doi_sets_high_identity_confidence(monkeypatch) -> None:
-    monkeypatch.setattr("common.fetch_crossref_by_doi", lambda *args, **kwargs: None)
+    monkeypatch.setattr("_metadata_sources.fetch_crossref_by_doi", lambda *args, **kwargs: None)
 
     resolved = resolve_reference("10.1000/example")
 
@@ -1149,7 +1165,7 @@ def test_resolve_reference_doi_sets_high_identity_confidence(monkeypatch) -> Non
 
 def test_resolve_reference_arxiv_id_sets_high_identity_confidence(monkeypatch) -> None:
     monkeypatch.setattr(
-        "common.safe_fetch_arxiv_entries",
+        "_metadata_sources.safe_fetch_arxiv_entries",
         lambda *args, **kwargs: [
             {
                 "title": "Arxiv Paper",
@@ -1182,7 +1198,7 @@ def test_resolve_reference_local_pdf_with_extracted_doi_sets_high_identity_confi
         metadata={},
         pages=["A Strong Enough Paper Title For Testing\nhttps://doi.org/10.1234/test"],
     )
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_local_pdf_title.fitz", FakeFitz(fake_doc))
 
     resolved = resolve_reference(str(pdf_path))
 
@@ -1198,7 +1214,7 @@ def test_resolve_reference_local_pdf_artifact_stem_sets_low_identity_confidence(
     pdf_path = tmp_path / "Touvron 等 - 2023 - LLaMA Open and Efficient Foundation Language Models-824666.pdf"
     pdf_path.write_bytes(b"%PDF-1.4")
     fake_doc = FakePdfDoc(metadata={}, pages=["Abstract\nshort"])
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_local_pdf_title.fitz", FakeFitz(fake_doc))
 
     resolved = resolve_reference(str(pdf_path))
 
@@ -1217,10 +1233,13 @@ def test_enrich_metadata_rejects_unlinked_doi_when_arxiv_provider_fails(monkeypa
         "doi": "10.1000/example",
         "metadata_sources": ["semantic_scholar"],
     }
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
+    monkeypatch.setattr(
+        "_metadata_sources.search_semantic_scholar",
+        lambda *args, **kwargs: [semantic_match],
+    )
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
 
     enriched = enrich_metadata({"title": "Example Paper", "arxiv_id": "2501.00001", "metadata_sources": ["seed_record"]})
 
@@ -1232,7 +1251,7 @@ def test_enrich_metadata_rejects_unlinked_doi_when_arxiv_provider_fails(monkeypa
 
 
 def test_normalize_openalex_keeps_landing_page_out_of_pdf_url() -> None:
-    normalized = common.normalize_openalex_work(
+    normalized = _metadata_sources.normalize_openalex_work(
         {
             "display_name": "The Effectiveness of Crisis Line Services: A Systematic Review",
             "ids": {"doi": "https://doi.org/10.3389/fpubh.2019.00399"},
@@ -1264,10 +1283,13 @@ def test_enrich_metadata_does_not_promote_filename_only_local_pdf(monkeypatch) -
         "source_type": "semantic_scholar",
         "source_url": "https://www.semanticscholar.org/paper/llama",
     }
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        "_metadata_sources.search_semantic_scholar",
+        lambda *args, **kwargs: [semantic_match],
+    )
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
 
     enriched = enrich_metadata(
         {
@@ -1297,10 +1319,13 @@ def test_enrich_metadata_keeps_low_confidence_without_independent_local_pdf_evid
         "source_type": "semantic_scholar",
         "source_url": "https://www.semanticscholar.org/paper/example",
     }
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        "_metadata_sources.search_semantic_scholar",
+        lambda *args, **kwargs: [semantic_match],
+    )
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
 
     enriched = enrich_metadata(
         {
@@ -1343,10 +1368,10 @@ def test_enrich_metadata_does_not_choose_published_doi_from_filename_only_match(
         "source_type": "crossref",
         "source_url": "https://doi.org/10.1101/2025.01.03.24318117",
     }
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [preprint, published])
+    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [preprint, published])
 
     enriched = enrich_metadata(
         {
@@ -1363,16 +1388,16 @@ def test_enrich_metadata_does_not_choose_published_doi_from_filename_only_match(
 
 
 def test_enrich_metadata_backfills_arxiv_doi_when_missing(monkeypatch) -> None:
-    monkeypatch.setattr("common.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
     enriched = enrich_metadata({"title": "Example Paper", "arxiv_id": "2302.13971", "metadata_sources": ["seed_record"]})
     assert enriched["doi"] == "10.48550/arXiv.2302.13971"
 
 
 def test_resolve_reference_arxiv_id_survives_arxiv_failure(monkeypatch) -> None:
-    monkeypatch.setattr("common.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
+    monkeypatch.setattr("_metadata_sources.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
 
     resolved = resolve_reference("2501.00001")
 
@@ -1385,7 +1410,7 @@ def test_resolve_reference_arxiv_id_survives_arxiv_failure(monkeypatch) -> None:
 
 
 def test_resolve_reference_arxiv_url_survives_arxiv_failure(monkeypatch) -> None:
-    monkeypatch.setattr("common.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
+    monkeypatch.setattr("_metadata_sources.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
 
     resolved = resolve_reference("https://arxiv.org/abs/2501.00001")
 
