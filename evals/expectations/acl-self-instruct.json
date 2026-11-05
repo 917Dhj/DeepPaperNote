@@ -49,7 +49,17 @@
     "Figure 7",
     "Table 3"
   ],
-  "crops": {},
+  "crops": {
+    "Table 7": {
+      "contains": [
+        "Come up with examples for the following tasks",
+        "Instruction for the target task"
+      ],
+      "excludes": []
+    }
+  },
   "same_visual": [],
-  "known_gaps": {}
+  "known_gaps": {
+    "crop:Table 7": "The crop starts partway down the boxed prompt and misses its first lines."
+  }
 }
