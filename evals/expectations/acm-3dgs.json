@@ -69,8 +69,20 @@
       "excludes": [
         "0.6063"
       ]
+    },
+    "Algorithm 1": {
+      "contains": [
+        "width and height of the training images",
+        "SfM Points",
+        "end while"
+      ],
+      "excludes": [
+        "DETAILS OF THE RASTERIZER"
+      ]
     }
   },
   "same_visual": [],
-  "known_gaps": {}
+  "known_gaps": {
+    "crop:Algorithm 1": "The crop misses the input line below the algorithm title and runs into the next section heading."
+  }
 }
