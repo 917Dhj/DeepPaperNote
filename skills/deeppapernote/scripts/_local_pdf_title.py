@@ -6,18 +6,20 @@ import re
 from pathlib import Path
 from typing import Any
 
-from common import (
+from _identity import (
     candidate_priority_score,
     choose_best_title_match,
     clean_local_pdf_stem,
-    clean_pdf_line,
     extract_arxiv_id,
     extract_doi,
-    fitz,
     is_probable_local_pdf_artifact_title,
-    normalize_whitespace,
     publication_quality_score,
     title_similarity,
+)
+from common import (
+    clean_pdf_line,
+    fitz,
+    normalize_whitespace,
 )
 
 

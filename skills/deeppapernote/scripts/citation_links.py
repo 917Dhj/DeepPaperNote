@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from _note_paths import configured_obsidian_vault
-from common import extract_arxiv_id, extract_doi, fitz, normalize_whitespace
+from _identity import extract_arxiv_id, extract_doi
+from common import fitz, normalize_whitespace
 
 
 NUMBERED_REF_RE = re.compile(r"^(?:\[(\d{1,4})\]|(\d{1,4})\.)\s+(.+)$")

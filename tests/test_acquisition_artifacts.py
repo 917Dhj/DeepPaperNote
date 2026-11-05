@@ -4,10 +4,10 @@ import json
 import sys
 from pathlib import Path
 
+import _identity
 import _metadata_sources
 import build_identity_contract
 import collect_metadata
-import common
 import extract_evidence
 import extract_pdf_assets
 import extract_source_text
@@ -283,7 +283,7 @@ def test_build_identity_contract_preserves_corrected_title_across_provider_obser
     title_source: str,
 ) -> None:
     pdf_path = tmp_path / "sam.pdf"
-    resolved = common.apply_identity_confidence(
+    resolved = _identity.apply_identity_confidence(
         {
             "status": "ok",
             "script": "resolve_paper.py",
@@ -523,7 +523,7 @@ def test_build_identity_contract_rejects_conflicting_same_title_provider_observa
     assert attempt["status"] == "rejected"
     assert attempt["rejected_candidate_identity"]["doi"] == "10.9999/conflicting"
     assert attempt["accepted_correction"]["doi"] == "10.1234/trusted"
-    downstream_summary = common.canonical_identity_summary(identity)
+    downstream_summary = _identity.canonical_identity_summary(identity)
     assert downstream_summary["schema_version"] == 2
     assert "accepted_observations" not in downstream_summary
     assert "rejected_observations" not in downstream_summary

@@ -7,11 +7,11 @@ from _metadata_sources import (
     collect_metadata_observations,
     resolve_reference,
 )
+from _identity import paper_id_for_record
 from common import (
     base_parser,
     emit,
     maybe_load_json_record,
-    paper_id_for_record,
     require_ok_input_artifact,
 )
 

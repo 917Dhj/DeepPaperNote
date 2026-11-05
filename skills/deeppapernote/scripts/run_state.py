@@ -21,7 +21,7 @@ from _final_quality import (
     validate_state,
 )
 from _note_paths import safe_relative_path_parts
-from common import canonical_identity_acceptance_error
+from _identity import canonical_identity_acceptance_error
 from lint_grounding import validate_bundle_contract, validate_figure_decisions, validate_note_plan
 from run_pipeline import has_review_work, pipeline_artifact_paths
 from source_corpus import SourceCorpusLoadError, load_source_corpus, validate_source_corpus

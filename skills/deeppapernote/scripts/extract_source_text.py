@@ -11,6 +11,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from _identity import (
+    paper_id_for_record,
+    require_accepted_fetch_artifact,
+)
 from common import (
     caption_label_key,
     clean_pdf_line,
@@ -24,9 +28,7 @@ from common import (
     maybe_load_json_record,
     normalize_heading,
     normalize_whitespace,
-    paper_id_for_record,
     pdf_coverage_summary,
-    require_accepted_fetch_artifact,
     stop_section_reason,
 )
 from pdf_captions import caption_item, select_caption_blocks

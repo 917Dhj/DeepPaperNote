@@ -16,6 +16,10 @@ from _evidence_heuristics import (
     infer_paper_type,
     pick_sentences_by_keywords,
 )
+from _identity import (
+    paper_id_for_record,
+    require_accepted_fetch_artifact,
+)
 from common import (
     SECTION_ALIASES,
     emit,
@@ -27,9 +31,7 @@ from common import (
     maybe_load_json_record,
     normalize_heading,
     normalize_whitespace,
-    paper_id_for_record,
     pdf_coverage_summary,
-    require_accepted_fetch_artifact,
     split_sentences,
 )
 from contracts import empty_evidence_pack

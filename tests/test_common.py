@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import _identity
 import _metadata_sources
 import _note_paths
 import common
@@ -35,15 +36,17 @@ from _local_pdf_title import (
     extract_local_pdf_hints,
     choose_local_pdf_corrected_title,
 )
-from common import (
+from _identity import (
     clean_local_pdf_stem,
+    extract_arxiv_id,
+    extract_doi,
+    infer_source_type,
+)
+from common import (
     extract_appendix_index,
     extract_caption_lines,
     extract_pdf_sections,
     env_config_value,
-    extract_arxiv_id,
-    extract_doi,
-    infer_source_type,
     match_section_heading,
     normalize_caption_label,
     normalize_pdf_text_artifacts,
@@ -471,7 +474,7 @@ def test_local_pdf_good_title_does_not_use_unrelated_external_title() -> None:
 
 def test_manifestation_equivalence_accepts_identical_cjk_identity() -> None:
     title = "双元联盟网络如何影响突破式创新——技术能力与网络惯例的调节作用"
-    decision = common.manifestation_equivalence_decision(
+    decision = _identity.manifestation_equivalence_decision(
         {"title": title, "authors": ["朱云鹃"]},
         {"title": title, "authors": ["朱云鹃"]},
     )
@@ -483,7 +486,7 @@ def test_manifestation_equivalence_accepts_identical_cjk_identity() -> None:
 
 
 def test_manifestation_equivalence_rejects_distinct_spaced_cjk_authors() -> None:
-    decision = common.manifestation_equivalence_decision(
+    decision = _identity.manifestation_equivalence_decision(
         {"title": "完全不同论文", "authors": ["李 云鹃"]},
         {"title": "深度学习研究一", "authors": ["朱 云鹃"]},
     )
@@ -494,7 +497,7 @@ def test_manifestation_equivalence_rejects_distinct_spaced_cjk_authors() -> None
 
 
 def test_manifestation_equivalence_preserves_unicode_combining_marks() -> None:
-    decision = common.manifestation_equivalence_decision(
+    decision = _identity.manifestation_equivalence_decision(
         {"title": "कतब", "authors": ["करण"]},
         {"title": "किताब", "authors": ["किरण"]},
     )
@@ -509,11 +512,11 @@ def test_ascii_identity_matching_remains_unchanged() -> None:
     assert common.normalize_title("Attention: Is All You Need!") == (
         "attention is all you need"
     )
-    equivalent = common.manifestation_equivalence_decision(
+    equivalent = _identity.manifestation_equivalence_decision(
         {"title": "attention is all you need", "authors": ["Alice Example"]},
         {"title": "Attention Is All You Need", "authors": ["Alice Example"]},
     )
-    ambiguous = common.manifestation_equivalence_decision(
+    ambiguous = _identity.manifestation_equivalence_decision(
         {"title": "Completely Different Paper", "authors": ["Bob Other"]},
         {"title": "Attention Is All You Need", "authors": ["Alice Example"]},
     )
@@ -524,7 +527,7 @@ def test_ascii_identity_matching_remains_unchanged() -> None:
 
 def test_identity_adjudication_accepts_identical_cjk_author() -> None:
     title = "双元联盟网络如何影响突破式创新——技术能力与网络惯例的调节作用"
-    decision = common.adjudicate_identity_observations(
+    decision = _identity.adjudicate_identity_observations(
         {"title": title, "authors": ["朱云鹃"], "year": "2026"},
         [
             {

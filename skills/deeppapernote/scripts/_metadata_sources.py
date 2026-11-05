@@ -13,21 +13,23 @@ from pathlib import Path
 from typing import Any
 
 from _local_pdf_title import extract_local_pdf_hints
-from common import (
+from _identity import (
     _record_arxiv_id,
     _string_field,
     adjudicate_identity_observations,
     apply_identity_confidence,
     choose_best_title_match,
     clean_local_pdf_stem,
-    env_config_value,
     extract_arxiv_id,
     extract_doi,
     infer_source_type,
     normalize_identity_title,
+    paper_id_for_record,
+)
+from common import (
+    env_config_value,
     normalize_title,
     normalize_whitespace,
-    paper_id_for_record,
     strip_tags,
 )
 

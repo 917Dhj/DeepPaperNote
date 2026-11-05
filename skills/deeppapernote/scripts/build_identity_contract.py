@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import argparse
 
-from common import (
+from _identity import (
     ACCEPTED_IDENTITY_VERDICTS,
     build_canonical_identity_artifact,
     build_identity_repair_trace,
+)
+from common import (
     emit,
     maybe_load_json_record,
     require_ok_input_artifact,
