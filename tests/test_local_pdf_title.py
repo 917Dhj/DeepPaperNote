@@ -5,7 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from common import extract_local_pdf_hints, fitz, normalize_crossref_work
+from _metadata_sources import normalize_crossref_work
+from common import extract_local_pdf_hints, fitz
 
 pytestmark = pytest.mark.skipif(fitz is None, reason="PyMuPDF is required")
 

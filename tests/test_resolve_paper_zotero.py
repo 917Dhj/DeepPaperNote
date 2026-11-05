@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import common
+import _metadata_sources
 import pytest
 import resolve_paper
 
@@ -32,10 +32,10 @@ def test_resolve_title_keeps_input_as_anchor_without_provider_selection(
     def fail_provider(*args: object, **kwargs: object) -> object:
         raise AssertionError("resolve stage must not query metadata providers")
 
-    monkeypatch.setattr(common, "search_semantic_scholar", fail_provider)
-    monkeypatch.setattr(common, "search_crossref_by_title", fail_provider)
-    monkeypatch.setattr(common, "search_openalex_by_title", fail_provider)
-    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", fail_provider)
+    monkeypatch.setattr(_metadata_sources, "search_semantic_scholar", fail_provider)
+    monkeypatch.setattr(_metadata_sources, "search_crossref_by_title", fail_provider)
+    monkeypatch.setattr(_metadata_sources, "search_openalex_by_title", fail_provider)
+    monkeypatch.setattr(_metadata_sources, "safe_fetch_arxiv_entries", fail_provider)
 
     resolved = resolve_paper.resolve_scalar_reference(
         "Reliable C++ Agents",
@@ -66,8 +66,8 @@ def test_resolve_strong_reference_keeps_input_as_anchor_without_provider_selecti
     def fail_provider(*args: object, **kwargs: object) -> object:
         raise AssertionError("resolve stage must not query metadata providers")
 
-    monkeypatch.setattr(common, "fetch_crossref_by_doi", fail_provider)
-    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", fail_provider)
+    monkeypatch.setattr(_metadata_sources, "fetch_crossref_by_doi", fail_provider)
+    monkeypatch.setattr(_metadata_sources, "safe_fetch_arxiv_entries", fail_provider)
 
     resolved = resolve_paper.resolve_scalar_reference(reference, zotero_mode="off")
 
@@ -429,7 +429,7 @@ def test_web_enrichment_does_not_override_zotero_identity(
 ) -> None:
     record = local_record()
     monkeypatch.setattr(
-        common,
+        _metadata_sources,
         "fetch_crossref_by_doi",
         lambda doi: {
             "title": "Conflicting Web Title",
@@ -440,13 +440,13 @@ def test_web_enrichment_does_not_override_zotero_identity(
             "metadata_sources": ["crossref"],
         },
     )
-    monkeypatch.setattr(common, "fetch_openalex_by_doi", lambda doi: None)
-    monkeypatch.setattr(common, "search_semantic_scholar", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "fetch_openalex_by_doi", lambda doi: None)
+    monkeypatch.setattr(_metadata_sources, "search_semantic_scholar", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
 
-    enriched = common.enrich_metadata(record)
+    enriched = _metadata_sources.enrich_metadata(record)
 
     assert enriched["title"] == "Local Canonical Title"
     assert enriched["authors"] == ["Local Author"]
@@ -471,12 +471,12 @@ def test_title_enrichment_rejects_an_unvalidated_doi_for_a_zotero_item(
         "abstract": "Abstract from the wrong same-title paper.",
         "metadata_sources": ["semantic_scholar"],
     }
-    monkeypatch.setattr(common, "search_semantic_scholar", lambda *args, **kwargs: [candidate])
-    monkeypatch.setattr(common, "search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_semantic_scholar", lambda *args, **kwargs: [candidate])
+    monkeypatch.setattr(_metadata_sources, "search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
 
-    enriched = common.enrich_metadata(record)
+    enriched = _metadata_sources.enrich_metadata(record)
 
     assert "doi" not in enriched
     assert enriched["paper_id"] == "zotero:PARENT01"
@@ -497,12 +497,12 @@ def test_title_enrichment_accepts_a_doi_after_zotero_author_and_year_validation(
         "abstract": "Validated enrichment.",
         "metadata_sources": ["semantic_scholar"],
     }
-    monkeypatch.setattr(common, "search_semantic_scholar", lambda *args, **kwargs: [candidate])
-    monkeypatch.setattr(common, "search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_semantic_scholar", lambda *args, **kwargs: [candidate])
+    monkeypatch.setattr(_metadata_sources, "search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
 
-    enriched = common.enrich_metadata(record)
+    enriched = _metadata_sources.enrich_metadata(record)
 
     assert enriched["doi"] == "10.5555/validated"
     assert enriched["paper_id"] == "doi:10.5555/validated"

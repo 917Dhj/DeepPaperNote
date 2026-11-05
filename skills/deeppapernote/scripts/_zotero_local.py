@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Mapping
 
+from _metadata_sources import DEFAULT_USER_AGENT
 from common import (
-    DEFAULT_USER_AGENT,
     apply_identity_confidence,
     extract_arxiv_id,
     extract_doi,

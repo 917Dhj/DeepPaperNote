@@ -4,6 +4,7 @@ import json
 import sys
 from pathlib import Path
 
+import _metadata_sources
 import build_identity_contract
 import collect_metadata
 import common
@@ -1583,7 +1584,7 @@ def test_collect_metadata_preserves_provider_result_as_identity_observation(
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        common,
+        _metadata_sources,
         "fetch_crossref_by_doi",
         lambda doi: {
             "source_type": "crossref",
@@ -1594,11 +1595,11 @@ def test_collect_metadata_preserves_provider_result_as_identity_observation(
             "metadata_sources": ["crossref"],
         },
     )
-    monkeypatch.setattr(common, "fetch_openalex_by_doi", lambda doi: None)
-    monkeypatch.setattr(common, "search_semantic_scholar", lambda query, limit=5: [])
-    monkeypatch.setattr(common, "search_crossref_by_title", lambda title, limit=5: [])
-    monkeypatch.setattr(common, "search_openalex_by_title", lambda title, limit=5: [])
-    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", lambda **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "fetch_openalex_by_doi", lambda doi: None)
+    monkeypatch.setattr(_metadata_sources, "search_semantic_scholar", lambda query, limit=5: [])
+    monkeypatch.setattr(_metadata_sources, "search_crossref_by_title", lambda title, limit=5: [])
+    monkeypatch.setattr(_metadata_sources, "search_openalex_by_title", lambda title, limit=5: [])
+    monkeypatch.setattr(_metadata_sources, "safe_fetch_arxiv_entries", lambda **kwargs: [])
     monkeypatch.setattr(
         sys,
         "argv",
@@ -1646,11 +1647,11 @@ def test_exact_swe_bench_title_admits_one_unique_arxiv_match(
         "title": title,
         "metadata_sources": ["title_query"],
     }
-    monkeypatch.setattr(common, "search_semantic_scholar", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_semantic_scholar", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_crossref_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr(
-        common,
+        _metadata_sources,
         "safe_fetch_arxiv_entries",
         lambda **kwargs: [
             {
@@ -1665,7 +1666,7 @@ def test_exact_swe_bench_title_admits_one_unique_arxiv_match(
         ],
     )
 
-    observations = common.collect_metadata_observations(resolve_payload)
+    observations = _metadata_sources.collect_metadata_observations(resolve_payload)
     identity, _ = build_identity_from_payloads(
         tmp_path,
         monkeypatch,

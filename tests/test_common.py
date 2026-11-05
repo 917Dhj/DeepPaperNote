@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import _metadata_sources
 import _note_paths
 import common
 from _note_paths import (
@@ -24,6 +25,12 @@ from _evidence_heuristics import (
     extract_negative_claims,
     infer_paper_type,
 )
+from _metadata_sources import (
+    fetch_arxiv_entries,
+    enrich_metadata,
+    resolve_reference,
+    semantic_scholar_headers,
+)
 from common import (
     clean_local_pdf_stem,
     extract_appendix_index,
@@ -34,14 +41,10 @@ from common import (
     extract_arxiv_id,
     extract_doi,
     infer_source_type,
-    fetch_arxiv_entries,
-    enrich_metadata,
     match_section_heading,
     normalize_caption_label,
     normalize_pdf_text_artifacts,
     pdf_coverage_summary,
-    resolve_reference,
-    semantic_scholar_headers,
     choose_local_pdf_corrected_title,
 )
 
@@ -408,7 +411,7 @@ def test_resolve_reference_local_pdf_uses_extracted_hints(tmp_path: Path, monkey
     pdf_path = tmp_path / "paper.pdf"
     pdf_path.write_bytes(b"%PDF-1.4")
     monkeypatch.setattr(
-        "common.extract_local_pdf_hints",
+        "_metadata_sources.extract_local_pdf_hints",
         lambda path: {
             "title": "LLaMA: Open and Efficient Foundation Language Models",
             "doi": "10.48550/arXiv.2302.13971",
@@ -1109,13 +1112,13 @@ def test_fetch_arxiv_entries_returns_empty_on_http_error(monkeypatch) -> None:
     def raising_http_get_text(*args: object, **kwargs: object) -> str:
         raise RuntimeError("network down")
 
-    monkeypatch.setattr("common.http_get_text", raising_http_get_text)
+    monkeypatch.setattr("_metadata_sources.http_get_text", raising_http_get_text)
 
     assert fetch_arxiv_entries(search_query='ti:"test"', max_results=1) == []
 
 
 def test_fetch_arxiv_entries_returns_empty_on_invalid_xml(monkeypatch) -> None:
-    monkeypatch.setattr("common.http_get_text", lambda *args, **kwargs: "<not-xml")
+    monkeypatch.setattr("_metadata_sources.http_get_text", lambda *args, **kwargs: "<not-xml")
 
     assert fetch_arxiv_entries(search_query='ti:"test"', max_results=1) == []
 
@@ -1129,10 +1132,10 @@ def test_resolve_reference_title_defers_provider_selection(monkeypatch) -> None:
         "year": "2025",
         "metadata_sources": ["semantic_scholar"],
     }
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
+    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
 
     resolved = resolve_reference("Example Paper")
 
@@ -1144,7 +1147,7 @@ def test_resolve_reference_title_defers_provider_selection(monkeypatch) -> None:
 
 
 def test_resolve_reference_doi_sets_high_identity_confidence(monkeypatch) -> None:
-    monkeypatch.setattr("common.fetch_crossref_by_doi", lambda *args, **kwargs: None)
+    monkeypatch.setattr("_metadata_sources.fetch_crossref_by_doi", lambda *args, **kwargs: None)
 
     resolved = resolve_reference("10.1000/example")
 
@@ -1154,7 +1157,7 @@ def test_resolve_reference_doi_sets_high_identity_confidence(monkeypatch) -> Non
 
 def test_resolve_reference_arxiv_id_sets_high_identity_confidence(monkeypatch) -> None:
     monkeypatch.setattr(
-        "common.safe_fetch_arxiv_entries",
+        "_metadata_sources.safe_fetch_arxiv_entries",
         lambda *args, **kwargs: [
             {
                 "title": "Arxiv Paper",
@@ -1222,10 +1225,10 @@ def test_enrich_metadata_rejects_unlinked_doi_when_arxiv_provider_fails(monkeypa
         "doi": "10.1000/example",
         "metadata_sources": ["semantic_scholar"],
     }
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
+    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
 
     enriched = enrich_metadata({"title": "Example Paper", "arxiv_id": "2501.00001", "metadata_sources": ["seed_record"]})
 
@@ -1237,7 +1240,7 @@ def test_enrich_metadata_rejects_unlinked_doi_when_arxiv_provider_fails(monkeypa
 
 
 def test_normalize_openalex_keeps_landing_page_out_of_pdf_url() -> None:
-    normalized = common.normalize_openalex_work(
+    normalized = _metadata_sources.normalize_openalex_work(
         {
             "display_name": "The Effectiveness of Crisis Line Services: A Systematic Review",
             "ids": {"doi": "https://doi.org/10.3389/fpubh.2019.00399"},
@@ -1269,10 +1272,10 @@ def test_enrich_metadata_does_not_promote_filename_only_local_pdf(monkeypatch) -
         "source_type": "semantic_scholar",
         "source_url": "https://www.semanticscholar.org/paper/llama",
     }
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
 
     enriched = enrich_metadata(
         {
@@ -1302,10 +1305,10 @@ def test_enrich_metadata_keeps_low_confidence_without_independent_local_pdf_evid
         "source_type": "semantic_scholar",
         "source_url": "https://www.semanticscholar.org/paper/example",
     }
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
 
     enriched = enrich_metadata(
         {
@@ -1348,10 +1351,10 @@ def test_enrich_metadata_does_not_choose_published_doi_from_filename_only_match(
         "source_type": "crossref",
         "source_url": "https://doi.org/10.1101/2025.01.03.24318117",
     }
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [preprint, published])
+    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [preprint, published])
 
     enriched = enrich_metadata(
         {
@@ -1368,16 +1371,16 @@ def test_enrich_metadata_does_not_choose_published_doi_from_filename_only_match(
 
 
 def test_enrich_metadata_backfills_arxiv_doi_when_missing(monkeypatch) -> None:
-    monkeypatch.setattr("common.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_semantic_scholar", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_crossref_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr("common.search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
     enriched = enrich_metadata({"title": "Example Paper", "arxiv_id": "2302.13971", "metadata_sources": ["seed_record"]})
     assert enriched["doi"] == "10.48550/arXiv.2302.13971"
 
 
 def test_resolve_reference_arxiv_id_survives_arxiv_failure(monkeypatch) -> None:
-    monkeypatch.setattr("common.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
+    monkeypatch.setattr("_metadata_sources.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
 
     resolved = resolve_reference("2501.00001")
 
@@ -1390,7 +1393,7 @@ def test_resolve_reference_arxiv_id_survives_arxiv_failure(monkeypatch) -> None:
 
 
 def test_resolve_reference_arxiv_url_survives_arxiv_failure(monkeypatch) -> None:
-    monkeypatch.setattr("common.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
+    monkeypatch.setattr("_metadata_sources.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
 
     resolved = resolve_reference("https://arxiv.org/abs/2501.00001")
 

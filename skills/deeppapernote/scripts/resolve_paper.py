@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from _zotero_local import lookup_zotero_local
+from _metadata_sources import resolve_reference
 from common import (
     base_parser,
     emit,
@@ -13,7 +14,6 @@ from common import (
     maybe_load_json_record,
     paper_id_for_record,
     require_ok_input_artifact,
-    resolve_reference,
 )
 
 ZOTERO_MODES = ("auto", "off", "required")
