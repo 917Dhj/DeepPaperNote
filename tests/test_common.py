@@ -9,21 +9,27 @@ from pathlib import Path
 
 import pytest
 
+import _note_paths
 import common
+from _note_paths import (
+    domain_name_score,
+    existing_domain_dirs,
+    infer_domain_label,
+    resolve_domain_subdir,
+    resolve_note_output_mode,
+    resolve_obsidian_note_path,
+)
 from common import (
     clean_local_pdf_stem,
-    domain_name_score,
     extract_appendix_index,
     extract_local_pdf_hints,
     extract_caption_lines,
     extract_pdf_sections,
     env_config_value,
-    existing_domain_dirs,
     extract_arxiv_id,
     extract_doi,
     extract_mechanism_flow_sentences,
     extract_negative_claims,
-    infer_domain_label,
     infer_paper_type,
     infer_source_type,
     fetch_arxiv_entries,
@@ -33,9 +39,6 @@ from common import (
     normalize_pdf_text_artifacts,
     pdf_coverage_summary,
     resolve_reference,
-    resolve_domain_subdir,
-    resolve_note_output_mode,
-    resolve_obsidian_note_path,
     semantic_scholar_headers,
     choose_local_pdf_corrected_title,
 )
@@ -1017,13 +1020,13 @@ fallback_domains:
         + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(common, "DOMAIN_RULES_PATH", rules_path)
+    monkeypatch.setattr(_note_paths, "DOMAIN_RULES_PATH", rules_path)
 
     assert infer_domain_label("Transformer analysis for galaxy survey data") == "天文学"
 
 
 def test_domain_rules_missing_or_invalid_falls_back(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(common, "DOMAIN_RULES_PATH", tmp_path / "missing.yaml")
+    monkeypatch.setattr(_note_paths, "DOMAIN_RULES_PATH", tmp_path / "missing.yaml")
     assert (
         infer_domain_label("Diffusion Policy for Robot Manipulation", "robotic control")
         == "机器人"
@@ -1031,7 +1034,7 @@ def test_domain_rules_missing_or_invalid_falls_back(tmp_path: Path, monkeypatch)
 
     invalid_path = tmp_path / "invalid.yaml"
     invalid_path.write_text("domains:\n  - aliases:\n      - no label\n", encoding="utf-8")
-    monkeypatch.setattr(common, "DOMAIN_RULES_PATH", invalid_path)
+    monkeypatch.setattr(_note_paths, "DOMAIN_RULES_PATH", invalid_path)
     assert (
         infer_domain_label("Diffusion Policy for Robot Manipulation", "robotic control")
         == "机器人"

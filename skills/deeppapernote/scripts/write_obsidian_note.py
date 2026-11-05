@@ -21,16 +21,18 @@ from _final_quality import (
     validate_quality,
     validate_readability,
 )
+from _note_paths import (
+    resolve_domain_subdir,
+    resolve_note_asset_dir,
+    resolve_note_output_mode,
+    resolve_obsidian_note_path,
+)
 from common import (
     emit,
     ensure_parent,
     file_sha256,
     json_input_sha256,
     maybe_load_json_record,
-    resolve_domain_subdir,
-    resolve_note_asset_dir,
-    resolve_note_output_mode,
-    resolve_obsidian_note_path,
     runtime_config,
 )
 from lint_grounding import validate_figure_decisions
