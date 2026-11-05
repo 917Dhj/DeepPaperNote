@@ -83,7 +83,8 @@ After each child session ends, the runner saves, under that run directory:
 
 - the raw final note and every artifact the run wrote
 - the child prompt, logs, and exit status
-- `run_state.json`, the output of `python3 <SKILL_ROOT>/scripts/run_state.py status --workdir <RUN_WORKDIR> --prefix <RUN_PREFIX>`. It records which stages passed, stale artifacts, provenance gaps, and the `summary` the final report uses. When the child chose its own work directory, take `<RUN_WORKDIR>` from the `workdir=` line in its log.
+- `status-bindings.json`, which names the run's admission, note plan, draft, lint, review, and save files and its run context, in the format of `<SKILL_ROOT>/references/run-state.md`. These files have no fixed names, so a status query without bindings reports those stages as `missing` and `summary.saved_verified` as false even for a finished run. Reuse the bindings file the child wrote when its paths match the files in `<RUN_WORKDIR>`; otherwise write one from those files and the run configuration.
+- `run_state.json`, the output of `python3 <SKILL_ROOT>/scripts/run_state.py status --workdir <RUN_WORKDIR> --prefix <RUN_PREFIX> --bindings <RUN_DIR>/status-bindings.json`. It records which stages passed, stale artifacts, provenance gaps, and the `summary` the final report uses. When the child chose its own work directory, take `<RUN_WORKDIR>` from the `workdir=` line in its log.
 
 A run counts as **complete** when `run_state.json` shows every required stage passed, `summary.saved_verified` is true, and `summary.saved_sha256_match` is true.
 
