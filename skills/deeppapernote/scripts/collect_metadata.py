@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
+from _identity import paper_id_for_record
 from _metadata_sources import (
     collect_metadata_observations,
     resolve_reference,
 )
-from _identity import paper_id_for_record
 from common import (
     base_parser,
     emit,

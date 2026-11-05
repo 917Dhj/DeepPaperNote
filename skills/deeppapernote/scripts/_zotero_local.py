@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Mapping
 
-from _metadata_sources import DEFAULT_USER_AGENT
 from _identity import (
     apply_identity_confidence,
     extract_arxiv_id,
@@ -23,6 +22,7 @@ from _identity import (
     normalize_identity_title,
     paper_id_for_record,
 )
+from _metadata_sources import DEFAULT_USER_AGENT
 from common import normalize_whitespace
 
 ZOTERO_LOCAL_BASE_URL = "http://127.0.0.1:23119/api"

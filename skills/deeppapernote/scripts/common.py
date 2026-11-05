@@ -17,7 +17,6 @@ from user_configuration import (
     resolve_run_overrides,
 )
 
-
 SHELL_CONFIG_FILES = [
     Path.home() / ".zshenv",
     Path.home() / ".zprofile",

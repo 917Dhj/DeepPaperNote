@@ -471,7 +471,11 @@ def test_title_enrichment_rejects_an_unvalidated_doi_for_a_zotero_item(
         "abstract": "Abstract from the wrong same-title paper.",
         "metadata_sources": ["semantic_scholar"],
     }
-    monkeypatch.setattr(_metadata_sources, "search_semantic_scholar", lambda *args, **kwargs: [candidate])
+    monkeypatch.setattr(
+        _metadata_sources,
+        "search_semantic_scholar",
+        lambda *args, **kwargs: [candidate],
+    )
     monkeypatch.setattr(_metadata_sources, "search_openalex_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr(_metadata_sources, "search_crossref_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr(_metadata_sources, "safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
@@ -497,7 +501,11 @@ def test_title_enrichment_accepts_a_doi_after_zotero_author_and_year_validation(
         "abstract": "Validated enrichment.",
         "metadata_sources": ["semantic_scholar"],
     }
-    monkeypatch.setattr(_metadata_sources, "search_semantic_scholar", lambda *args, **kwargs: [candidate])
+    monkeypatch.setattr(
+        _metadata_sources,
+        "search_semantic_scholar",
+        lambda *args, **kwargs: [candidate],
+    )
     monkeypatch.setattr(_metadata_sources, "search_openalex_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr(_metadata_sources, "search_crossref_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr(_metadata_sources, "safe_fetch_arxiv_entries", lambda *args, **kwargs: [])

@@ -9,7 +9,6 @@ from typing import Any
 
 from common import fitz, normalize_title, normalize_whitespace
 
-
 PDF_LIGATURE_MAP = {
     "\u00df": "ss",
     "\ufb00": "ff",

@@ -22,7 +22,6 @@ from common import (
     normalize_whitespace,
 )
 
-
 TITLE_MIN_LETTER_SHARE = 0.6
 TITLE_MAX_GARBLE_SHARE = 0.05
 TITLE_GARBLE_CHARS = set("!\"#$%*<=>@[\\]^_`{|}~")

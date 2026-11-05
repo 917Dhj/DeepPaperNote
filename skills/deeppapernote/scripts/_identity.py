@@ -11,7 +11,6 @@ from typing import Any
 
 from common import normalize_title, normalize_whitespace, require_ok_input_artifact
 
-
 PROVENANCE_FIELDS = (
     "title",
     "translated_title",

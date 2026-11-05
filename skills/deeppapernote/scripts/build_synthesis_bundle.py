@@ -8,8 +8,8 @@ from copy import deepcopy
 from pathlib import Path
 
 from _final_quality import QUALITY_CHECKS
-from citation_links import resolve_reference_links
 from _identity import canonical_identity_acceptance_error
+from citation_links import resolve_reference_links
 from common import (
     maybe_load_json_record,
     normalize_whitespace,

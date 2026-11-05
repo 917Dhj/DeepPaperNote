@@ -7,13 +7,13 @@ import argparse
 import re
 from pathlib import Path
 
-from _metadata_sources import http_get_bytes
 from _identity import (
     canonical_identity_summary,
     fetch_record_from_canonical_identity,
     paper_id_for_record,
     require_accepted_canonical_identity,
 )
+from _metadata_sources import http_get_bytes
 from common import (
     default_pdf_path,
     emit,

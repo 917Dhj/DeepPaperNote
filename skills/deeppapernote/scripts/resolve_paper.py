@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from _zotero_local import lookup_zotero_local
-from _metadata_sources import resolve_reference
 from _identity import (
     infer_source_type,
     paper_id_for_record,
 )
+from _metadata_sources import resolve_reference
+from _zotero_local import lookup_zotero_local
 from common import (
     base_parser,
     emit,

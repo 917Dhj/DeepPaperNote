@@ -1137,7 +1137,10 @@ def test_resolve_reference_title_defers_provider_selection(monkeypatch) -> None:
         "year": "2025",
         "metadata_sources": ["semantic_scholar"],
     }
-    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
+    monkeypatch.setattr(
+        "_metadata_sources.search_semantic_scholar",
+        lambda *args, **kwargs: [semantic_match],
+    )
     monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr("_metadata_sources.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
@@ -1230,7 +1233,10 @@ def test_enrich_metadata_rejects_unlinked_doi_when_arxiv_provider_fails(monkeypa
         "doi": "10.1000/example",
         "metadata_sources": ["semantic_scholar"],
     }
-    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
+    monkeypatch.setattr(
+        "_metadata_sources.search_semantic_scholar",
+        lambda *args, **kwargs: [semantic_match],
+    )
     monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr("_metadata_sources.fetch_arxiv_entries", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("arxiv down")))
@@ -1277,7 +1283,10 @@ def test_enrich_metadata_does_not_promote_filename_only_local_pdf(monkeypatch) -
         "source_type": "semantic_scholar",
         "source_url": "https://www.semanticscholar.org/paper/llama",
     }
-    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
+    monkeypatch.setattr(
+        "_metadata_sources.search_semantic_scholar",
+        lambda *args, **kwargs: [semantic_match],
+    )
     monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr("_metadata_sources.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
@@ -1310,7 +1319,10 @@ def test_enrich_metadata_keeps_low_confidence_without_independent_local_pdf_evid
         "source_type": "semantic_scholar",
         "source_url": "https://www.semanticscholar.org/paper/example",
     }
-    monkeypatch.setattr("_metadata_sources.search_semantic_scholar", lambda *args, **kwargs: [semantic_match])
+    monkeypatch.setattr(
+        "_metadata_sources.search_semantic_scholar",
+        lambda *args, **kwargs: [semantic_match],
+    )
     monkeypatch.setattr("_metadata_sources.search_crossref_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr("_metadata_sources.search_openalex_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr("_metadata_sources.safe_fetch_arxiv_entries", lambda *args, **kwargs: [])
