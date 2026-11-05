@@ -85,7 +85,8 @@ PDF 模式让两组拿到同样的字节，并跳过 Zotero 查找。标题模�
 
 - 原始最终笔记，以及该运行写出的全部产物
 - 子会话提示词、日志和退出状态
-- `run_state.json`，即 `python3 <SKILL_ROOT>/scripts/run_state.py status --workdir <RUN_WORKDIR> --prefix <RUN_PREFIX>` 的输出。它记录哪些阶段通过、过期产物、来源缺口，以及最终报告使用的 `summary`。子会话自行选择工作目录时，从其日志中的 `workdir=` 行取 `<RUN_WORKDIR>`。
+- `status-bindings.json`，按 `<SKILL_ROOT>/references/run-state.md` 的格式写明该运行的 admission、note plan、草稿、lint、审查和保存文件，以及运行上下文。这些文件没有固定文件名，不带 bindings 的状态查询会把这些阶段报为 `missing`，即使运行已经完成，`summary.saved_verified` 也是 false。子会话写了 bindings 文件、且其中的路径与 `<RUN_WORKDIR>` 中的文件一致时，直接沿用；否则根据这些文件和运行配置写一份。
+- `run_state.json`，即 `python3 <SKILL_ROOT>/scripts/run_state.py status --workdir <RUN_WORKDIR> --prefix <RUN_PREFIX> --bindings <RUN_DIR>/status-bindings.json` 的输出。它记录哪些阶段通过、过期产物、来源缺口，以及最终报告使用的 `summary`。子会话自行选择工作目录时，从其日志中的 `workdir=` 行取 `<RUN_WORKDIR>`。
 
 当 `run_state.json` 显示所有必需阶段都通过、`summary.saved_verified` 为真且 `summary.saved_sha256_match` 为真时，该运行算作**完成**。
 
