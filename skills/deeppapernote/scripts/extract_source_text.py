@@ -15,21 +15,23 @@ from _identity import (
     paper_id_for_record,
     require_accepted_fetch_artifact,
 )
-from common import (
+from _pdf_text import (
     caption_label_key,
     clean_pdf_line,
-    emit,
-    ensure_parent,
     extract_appendix_index,
     extract_caption_lines,
-    file_sha256,
-    fitz,
     match_section_heading,
-    maybe_load_json_record,
     normalize_heading,
-    normalize_whitespace,
     pdf_coverage_summary,
     stop_section_reason,
+)
+from common import (
+    emit,
+    ensure_parent,
+    file_sha256,
+    fitz,
+    maybe_load_json_record,
+    normalize_whitespace,
 )
 from pdf_captions import caption_item, select_caption_blocks
 

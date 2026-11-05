@@ -16,8 +16,8 @@ from _identity import (
     publication_quality_score,
     title_similarity,
 )
+from _pdf_text import clean_pdf_line
 from common import (
-    clean_pdf_line,
     fitz,
     normalize_whitespace,
 )

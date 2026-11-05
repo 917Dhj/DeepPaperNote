@@ -8,8 +8,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from _pdf_text import caption_label_key
 from common import (
-    caption_label_key,
     emit,
     file_sha256,
     json_input_sha256,

@@ -20,19 +20,21 @@ from _identity import (
     paper_id_for_record,
     require_accepted_fetch_artifact,
 )
-from common import (
+from _pdf_text import (
     SECTION_ALIASES,
-    emit,
     extract_appendix_index,
     extract_appendix_page_texts,
     extract_caption_lines,
     extract_pdf_sections,
     extract_pdf_text,
-    maybe_load_json_record,
     normalize_heading,
-    normalize_whitespace,
     pdf_coverage_summary,
     split_sentences,
+)
+from common import (
+    emit,
+    maybe_load_json_record,
+    normalize_whitespace,
 )
 from contracts import empty_evidence_pack
 from citation_links import extract_reference_candidates_from_pdf

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import re
 
-from common import normalize_title, normalize_whitespace, split_sentences
+from _pdf_text import split_sentences
+from common import normalize_title, normalize_whitespace
 
 
 def infer_paper_type(title: str, abstract: str) -> tuple[str, str]:

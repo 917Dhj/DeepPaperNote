@@ -11,7 +11,8 @@ import unicodedata
 from pathlib import Path
 
 import pytest
-from common import fitz, normalize_caption_label, normalize_whitespace
+from _pdf_text import normalize_caption_label
+from common import fitz, normalize_whitespace
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts"

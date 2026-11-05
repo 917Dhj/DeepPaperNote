@@ -42,16 +42,16 @@ from _identity import (
     extract_doi,
     infer_source_type,
 )
-from common import (
+from _pdf_text import (
     extract_appendix_index,
     extract_caption_lines,
     extract_pdf_sections,
-    env_config_value,
     match_section_heading,
     normalize_caption_label,
     normalize_pdf_text_artifacts,
     pdf_coverage_summary,
 )
+from common import env_config_value
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -265,7 +265,7 @@ def test_extract_pdf_sections_supports_chinese_headings(tmp_path: Path, monkeypa
             )
         ],
     )
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_pdf_text.fitz", FakeFitz(fake_doc))
 
     sections = extract_pdf_sections(pdf_path)
 
@@ -283,7 +283,7 @@ def test_pdf_coverage_reports_page_limit_and_late_appendix(tmp_path: Path, monke
     pages[9] = "References\n[1] Ignored reference."
     pages[19] = "Appendix\nAdditional experiments."
     fake_doc = FakePdfDoc(metadata={}, pages=pages)
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_pdf_text.fitz", FakeFitz(fake_doc))
 
     coverage = pdf_coverage_summary(pdf_path, max_pages=18)
 
@@ -315,7 +315,7 @@ def test_extract_appendix_index_reports_sections_and_captions(tmp_path: Path, mo
     )
     pages.extend(f"Appendix tail page {index}" for index in range(21, 26))
     fake_doc = FakePdfDoc(metadata={}, pages=pages)
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_pdf_text.fitz", FakeFitz(fake_doc))
 
     coverage = pdf_coverage_summary(pdf_path, max_pages=18)
     index = extract_appendix_index(pdf_path, coverage)
