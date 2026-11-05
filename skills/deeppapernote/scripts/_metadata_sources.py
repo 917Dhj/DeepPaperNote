@@ -12,6 +12,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from _local_pdf_title import extract_local_pdf_hints
 from common import (
     _record_arxiv_id,
     _string_field,
@@ -22,7 +23,6 @@ from common import (
     env_config_value,
     extract_arxiv_id,
     extract_doi,
-    extract_local_pdf_hints,
     infer_source_type,
     normalize_identity_title,
     normalize_title,

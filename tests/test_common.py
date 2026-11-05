@@ -31,10 +31,13 @@ from _metadata_sources import (
     resolve_reference,
     semantic_scholar_headers,
 )
+from _local_pdf_title import (
+    extract_local_pdf_hints,
+    choose_local_pdf_corrected_title,
+)
 from common import (
     clean_local_pdf_stem,
     extract_appendix_index,
-    extract_local_pdf_hints,
     extract_caption_lines,
     extract_pdf_sections,
     env_config_value,
@@ -45,7 +48,6 @@ from common import (
     normalize_caption_label,
     normalize_pdf_text_artifacts,
     pdf_coverage_summary,
-    choose_local_pdf_corrected_title,
 )
 
 
@@ -339,7 +341,7 @@ def test_extract_local_pdf_hints_prefers_pdf_metadata_title_and_doi(tmp_path: Pa
         },
         pages=["Ignored fallback title"],
     )
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_local_pdf_title.fitz", FakeFitz(fake_doc))
 
     hints = extract_local_pdf_hints(pdf_path)
 
@@ -363,7 +365,7 @@ def test_extract_local_pdf_hints_falls_back_to_first_page_title(tmp_path: Path, 
             )
         ],
     )
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_local_pdf_title.fitz", FakeFitz(fake_doc))
 
     hints = extract_local_pdf_hints(pdf_path)
 
@@ -400,7 +402,7 @@ def test_extract_local_pdf_hints_prefers_concise_first_page_title(
             )
         ],
     )
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_local_pdf_title.fitz", FakeFitz(fake_doc))
 
     hints = extract_local_pdf_hints(pdf_path)
 
@@ -1190,7 +1192,7 @@ def test_resolve_reference_local_pdf_with_extracted_doi_sets_high_identity_confi
         metadata={},
         pages=["A Strong Enough Paper Title For Testing\nhttps://doi.org/10.1234/test"],
     )
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_local_pdf_title.fitz", FakeFitz(fake_doc))
 
     resolved = resolve_reference(str(pdf_path))
 
@@ -1206,7 +1208,7 @@ def test_resolve_reference_local_pdf_artifact_stem_sets_low_identity_confidence(
     pdf_path = tmp_path / "Touvron 等 - 2023 - LLaMA Open and Efficient Foundation Language Models-824666.pdf"
     pdf_path.write_bytes(b"%PDF-1.4")
     fake_doc = FakePdfDoc(metadata={}, pages=["Abstract\nshort"])
-    monkeypatch.setattr("common.fitz", FakeFitz(fake_doc))
+    monkeypatch.setattr("_local_pdf_title.fitz", FakeFitz(fake_doc))
 
     resolved = resolve_reference(str(pdf_path))
 
