@@ -46,7 +46,18 @@
     "Table 1",
     "Table 2"
   ],
-  "crops": {},
+  "crops": {
+    "Table 1": {
+      "contains": [
+        "Methods",
+        "Prophet",
+        "ETTh"
+      ],
+      "excludes": [
+        "Univariate long sequence"
+      ]
+    }
+  },
   "same_visual": [],
   "known_gaps": {}
 }

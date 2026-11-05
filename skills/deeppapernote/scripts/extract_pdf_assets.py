@@ -48,6 +48,7 @@ MIN_FIGURE_WIDTH_PT = 100
 MIN_TABLE_HEIGHT_PT = 24
 FULL_PAGE_IMAGE_RATIO = 0.7
 RUNNING_HEADER_RATIO = 0.05
+RUNNING_HEADER_SEARCH_RATIO = 0.1
 SIDE_FIGURE_PANEL_GAP_PT = 24.0
 
 _TEXT_TABLE_SEPARATOR_RE = re.compile(r"(?:\t+|\s{2,}|[|;])")
@@ -335,7 +336,9 @@ def _find_body_text_blocks(page) -> list[tuple[float, float, float, float, str]]
     return results
 
 
-def _find_paragraph_blocks(page, *, min_chars: int = 200) -> list[tuple[float, float, float, float, str]]:
+def _find_paragraph_blocks(
+    page, *, min_chars: int = 200, exclude_cell_blocks: bool = False
+) -> list[tuple[float, float, float, float, str]]:
     """Return only large prose blocks that look like running paragraphs.
 
     PyMuPDF often groups an entire tabular column ("DS-Ulysses 629.9 418.3 ...")
@@ -343,6 +346,10 @@ def _find_paragraph_blocks(page, *, min_chars: int = 200) -> list[tuple[float, f
     catches table cells too aggressively.  For deciding whether we have walked
     out of a table region we want a stricter notion: only blocks whose total
     text mass and line count look like real prose count as paragraph blocks.
+
+    ``exclude_cell_blocks`` also drops blocks made mostly of short cells, as a
+    table set as one block is, whatever its cells hold ("O(n · d)", "HED").
+    Table row walks need this; figure bounds keep such blocks as barriers.
     """
     results: list[tuple[float, float, float, float, str]] = []
     blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
@@ -369,6 +376,14 @@ def _find_paragraph_blocks(page, *, min_chars: int = 200) -> list[tuple[float, f
                 numeric_line_share += 1
         if numeric_line_share > len(lines) * 0.4:
             continue
+        if exclude_cell_blocks:
+            # Prose lines run across the block; table cells do not.
+            block_width = max(1.0, block["bbox"][2] - block["bbox"][0])
+            wide_lines = sum(
+                1 for line in lines if line["bbox"][2] - line["bbox"][0] >= block_width * 0.5
+            )
+            if wide_lines * 2 < len(lines):
+                continue
         bb = block["bbox"]
         results.append((bb[0], bb[1], bb[2], bb[3], full_text))
     results.sort(key=lambda b: b[1])
@@ -513,6 +528,44 @@ def _clip_to_page(
 
 def _running_header_bottom(page) -> float:
     return page.rect.y0 + page.rect.height * RUNNING_HEADER_RATIO
+
+
+def _top_line_keys(page) -> dict[str, tuple[float, float]]:
+    """Map each long line in the page's top band, digits removed, to its y span."""
+    band_bottom = page.rect.y0 + page.rect.height * RUNNING_HEADER_SEARCH_RATIO
+    keys: dict[str, tuple[float, float]] = {}
+    for line in _collect_text_lines(page):
+        if line["bbox"][1] > band_bottom:
+            break
+        key = re.sub(r"[\d\s]+", " ", line["text"]).strip().casefold()
+        # Short keys match table header cells repeated on the next page.
+        if len(key) >= 20:
+            keys[key] = (line["bbox"][1], line["bbox"][3])
+    return keys
+
+
+def _repeated_running_header_bottom(page) -> float:
+    """Return the bottom of a top-of-page line repeated on a nearby page.
+
+    Running headers sit lower than ``_running_header_bottom`` in some
+    templates; a long line repeated at the same height near the top of a
+    nearby page is a header there too. Odd and even pages may carry different
+    headers, so pages two away count.
+    """
+    doc = page.parent
+    keys = _top_line_keys(page)
+    if doc is None or not keys:
+        return page.rect.y0
+    bottom = page.rect.y0
+    for offset in (-2, -1, 1, 2):
+        number = page.number + offset
+        if not 0 <= number < len(doc):
+            continue
+        other = _top_line_keys(doc[number])
+        for key, (y0, y1) in keys.items():
+            if key in other and abs(other[key][0] - y0) <= 3.0:
+                bottom = max(bottom, y1)
+    return bottom
 
 
 def _grow_bbox_over_figure_labels(
@@ -1172,6 +1225,16 @@ def _page_keeps_table_captions_below(
     if not later:
         return False
     last = later[-1]
+    # Only the rows between the last caption and the caption before it can
+    # be its body; earlier tables' rows would outvote the side below it.
+    ceiling = max(
+        [caption_anchor["bbox"][3]]
+        + [
+            anchor["bbox"][3]
+            for anchor in page_anchors
+            if anchor["bbox"][3] < last["bbox"][1] and _captions_share_column(anchor, last)
+        ]
+    )
     _, rows_below = _grow_table_region(
         page,
         last,
@@ -1187,7 +1250,7 @@ def _page_keeps_table_captions_below(
         rows,
         paragraph_blocks,
         direction="up",
-        upper_bound=caption_anchor["bbox"][3],
+        upper_bound=ceiling,
         lower_bound=last["bbox"][1],
     )
     return rows_below == 0 or rows_below < rows_above
@@ -1253,9 +1316,9 @@ def _estimate_table_bbox_with_rows(
     """
     caption_y1 = caption_anchor["bbox"][3]
 
-    upper_bound = page_rect.y0
+    upper_bound = max(page_rect.y0, _repeated_running_header_bottom(page) + 1.0)
     if prev_anchor is not None:
-        upper_bound = max(page_rect.y0, prev_anchor["bbox"][3] + 2.0)
+        upper_bound = max(upper_bound, prev_anchor["bbox"][3] + 2.0)
 
     lower_bound = page_rect.y1
     if next_anchor is not None:
@@ -1268,7 +1331,7 @@ def _estimate_table_bbox_with_rows(
 
     text_lines = _collect_text_lines(page)
     rows = _cluster_lines_into_rows(text_lines)
-    paragraph_blocks = _find_paragraph_blocks(page)
+    paragraph_blocks = _find_paragraph_blocks(page, exclude_cell_blocks=True)
 
     down_lines, down_data = _grow_table_region(
         page,
