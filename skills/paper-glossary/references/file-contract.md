@@ -163,7 +163,7 @@ The linker revalidates the successful writer provenance against the current sour
 }
 ```
 
-Link statuses are `linked`, `already_linked`, or `not_found`. A stale article hash stops linking before article modification.
+The linker links each term at its first safe occurrence. Inline code is protected, except a span whose whole content (after CommonMark's one-space padding) is exactly a selected form: that span is replaced by the link without its backticks (`` `DPO` `` → `[[DPO]]`). Link statuses are `linked`, `already_linked`, or `not_found`. A stale article hash stops linking before article modification.
 
 ## Lint And Timing Boundaries
 

@@ -55,7 +55,7 @@ def test_linker_links_first_safe_alias_and_skips_all_protected_regions(
     article.write_text(
         "---\ntitle: ReAct\n---\n"
         "# ReAct heading\n\n"
-        "`ReAct` and [ReAct](https://example.test/ReAct) are protected.\n"
+        "`ReAct agent` and [ReAct](https://example.test/ReAct) are protected.\n"
         "<span>ReAct</span> https://example.test/ReAct [[Other|ReAct]]\n\n"
         "REACT combines reasoning and acting. ReAct appears again.\n\n"
         "```python\nReAct = 'code'\n```\n\n"
@@ -72,7 +72,7 @@ def test_linker_links_first_safe_alias_and_skips_all_protected_regions(
     text = article.read_text(encoding="utf-8")
     assert "[[ReAct|REACT]] combines reasoning" in text
     assert "# ReAct heading" in text
-    assert "`ReAct`" in text
+    assert "`ReAct agent`" in text
     assert "[ReAct](https://example.test/ReAct)" in text
     assert "<span>ReAct</span>" in text
     assert "https://example.test/ReAct" in text
@@ -81,6 +81,91 @@ def test_linker_links_first_safe_alias_and_skips_all_protected_regions(
     assert "## References\nReAct paper" in text
     assert text.count("[[ReAct|REACT]]") == 1
     assert result["summary"] == {"linked": 1, "already_linked": 0, "not_found": 0}
+
+
+def _link(tmp_path: Path, body: str, mappings: list[dict]) -> tuple[str, dict]:
+    article = tmp_path / "Paper.md"
+    article.write_text(body, encoding="utf-8")
+    result = link_article_terms(article, mappings, digest(article))
+    return article.read_text(encoding="utf-8"), result
+
+
+def test_whole_inline_code_term_becomes_a_link_without_backticks(tmp_path: Path) -> None:
+    text, result = _link(tmp_path, "本文提出 `DPO`，直接优化偏好。\n", [{"link_stem": "DPO", "forms": ["DPO"]}])
+    assert text == "本文提出 [[DPO]]，直接优化偏好。\n"
+    assert result["summary"] == {"linked": 1, "already_linked": 0, "not_found": 0}
+
+
+def test_inline_code_with_different_case_keeps_its_surface(tmp_path: Path) -> None:
+    text, _ = _link(tmp_path, "we compare against `dpo` here.\n", [{"link_stem": "DPO", "forms": ["DPO"]}])
+    assert text == "we compare against [[DPO|dpo]] here.\n"
+
+
+@pytest.mark.parametrize("span", ["`` DPO ``", "``DPO``", "` DPO `"])
+def test_padded_and_multi_backtick_spans_follow_commonmark(tmp_path: Path, span: str) -> None:
+    text, _ = _link(tmp_path, f"方法 {span} 很简单。\n", [{"link_stem": "DPO", "forms": ["DPO"]}])
+    assert text == "方法 [[DPO]] 很简单。\n"
+
+
+@pytest.mark.parametrize("span", ["`Ego-R1 Bench`", "`  DPO`", "`DPO `", "`DPO()`"])
+def test_partial_inline_code_matches_stay_protected(tmp_path: Path, span: str) -> None:
+    body = f"见 {span}。\n"
+    text, result = _link(
+        tmp_path, body,
+        [{"link_stem": "Ego-R1", "forms": ["Ego-R1"]}, {"link_stem": "DPO", "forms": ["DPO"]}],
+    )
+    assert text == body
+    assert result["summary"]["linked"] == 0
+
+
+def test_bare_text_before_inline_code_is_linked_first(tmp_path: Path) -> None:
+    text, _ = _link(tmp_path, "DPO is simple. Later `DPO` again.\n", [{"link_stem": "DPO", "forms": ["DPO"]}])
+    assert text == "[[DPO]] is simple. Later `DPO` again.\n"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "```text\n`DPO`\n```\n",
+        "    `DPO` in indented code\n",
+        "## 使用 `DPO`\n",
+        "[`DPO`](https://example.test/dpo)\n",
+        "[[Other|`DPO`]]\n",
+        "<span>`DPO`</span>\n",
+        "## 参考文献\n\n`DPO` paper\n",
+        "## 关联\n\n- `DPO`\n",
+    ],
+)
+def test_inline_code_inside_other_protected_regions_is_not_linked(tmp_path: Path, body: str) -> None:
+    text, result = _link(tmp_path, body, [{"link_stem": "DPO", "forms": ["DPO"]}])
+    assert text == body
+    assert result["summary"]["not_found"] == 1
+
+
+def test_realistic_chinese_note_links_each_backticked_term_once(tmp_path: Path) -> None:
+    body = (
+        "---\ntags: [papers/AI]\nmethods: [\"[[WorldMM]]\"]\n---\n\n"
+        "# WorldMM\n\n"
+        "## 核心结论\n\n"
+        "- 作者在 `EgoLifeQA` 与 `LVBench` 上评测，`WorldMM` 比 `GPT-4o` 高 `8.4` 个点。\n"
+        "- 在 `EgoLifeQA` 的长时问题上提升最明显。\n\n"
+        "## 方法\n\n"
+        "调用 `find_acoustic_hotspots` 工具定位声音片段，`Ego-R1 Bench` 用作补充。\n\n"
+        "## 关联\n\n"
+        "- [[Ego-R1.zh-CN|Ego-R1]]：同一基准。\n"
+    )
+    mappings = [
+        {"link_stem": "EgoLifeQA", "forms": ["EgoLifeQA"]},
+        {"link_stem": "LVBench", "forms": ["LVBench"]},
+        {"link_stem": "GPT-4o", "forms": ["GPT-4o"]},
+        {"link_stem": "Ego-R1", "forms": ["Ego-R1"]},
+    ]
+    text, result = _link(tmp_path, body, mappings)
+    assert "作者在 [[EgoLifeQA]] 与 [[LVBench]] 上评测，`WorldMM` 比 [[GPT-4o]] 高 `8.4` 个点。" in text
+    assert "在 `EgoLifeQA` 的长时问题上" in text
+    assert "`find_acoustic_hotspots`" in text and "`Ego-R1 Bench`" in text
+    assert text.count("[[EgoLifeQA]]") == 1
+    assert [item["status"] for item in result["results"]] == ["linked", "linked", "linked", "not_found"]
 
 
 def test_linker_uses_safe_stem_and_does_not_duplicate_link(tmp_path: Path) -> None:
