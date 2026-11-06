@@ -43,6 +43,11 @@ aliases:
   - "Auditable Tool Use"
 date: 2024
 doi: 10.1234/example
+paper_type: AI_method
+methods: [auditable tool-state tracking]
+datasets: []
+tasks: [multi-hop question answering]
+read_date: 2026-11-06
 ---
 
 # Auditable Tool Use

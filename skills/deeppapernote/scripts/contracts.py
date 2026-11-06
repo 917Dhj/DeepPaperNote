@@ -546,6 +546,14 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
             "summarize this section",
         ),
     },
+    "frontmatter_contract": {
+        "required_fields": ("paper_type", "methods", "datasets", "tasks", "read_date"),
+        "list_fields": ("methods", "datasets", "tasks"),
+        "max_list_items": 5,
+        "domain_tag_prefix": "papers/",
+        "read_date_format": "YYYY-MM-DD",
+        "paper_type_source": "note_plan.paper_type",
+    },
     "takeaways_contract": {
         "plan_fields": TAKEAWAY_PLAN_FIELDS,
         "min_items": 1,

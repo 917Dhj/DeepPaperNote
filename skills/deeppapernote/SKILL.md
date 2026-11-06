@@ -37,7 +37,7 @@ Run the steps in order. A step is complete at its **done when**, never because a
    | Result | Action |
    |---|---|
    | reuse of an existing directory | Use that directory and its domain. A verified PDF-only directory needs no confirmation. |
-   | `same_language_note_exists` | Ask whether to overwrite the reported note, and say what its `user_notes` result means: `present` keeps the user's My Notes block (about `chars` characters) and regenerates everything else; `none` found no notes of the user's; `heading_missing` found no My Notes heading, so nothing can be kept. When `legacy_format` is true, add that the kept block predates the current note format and may be old model-written text. Edits elsewhere in the note are replaced. On yes, rerun with `--overwrite-existing-note --expected-existing-note-sha256 <reported_sha256>` and carry it to Formal Save. On no, stop without writing. |
+   | `same_language_note_exists` | Ask whether to overwrite the reported note, and say what its `user_notes` result means: `present` keeps the user's My Notes block (about `chars` characters) and regenerates everything else; `none` found no notes of the user's; `heading_missing` found no My Notes heading, so nothing can be kept. When `legacy_format` is true, add that the kept block predates the current note format and may be old model-written text. Edits elsewhere in the note are replaced. Carry its `existing_read_date`, when non-empty, into the new note's `read_date`. On yes, rerun with `--overwrite-existing-note --expected-existing-note-sha256 <reported_sha256>` and carry it to Formal Save. On no, stop without writing. |
    | several matching directories or sources | Ask for the selection as `references/paper-archive.md` describes, and carry it through Formal Save. |
    | any other conflict | Report it and stop. |
 
@@ -89,7 +89,7 @@ When any other step fails, retry it or take a fallback this skill names. Otherwi
 
 ## Note Shape
 
-- Start with an Obsidian YAML properties block above the `#` title heading. Include `tags` with a `papers/<domain>` value and useful `aliases`; add `date`, `doi`, or `arxiv_id` when known, and omit unknown fields.
+- Start with an Obsidian YAML properties block above the `#` title heading. Include `tags` with a `papers/<domain>` value and useful `aliases`; add `date`, `doi`, or `arxiv_id` when known, and omit unknown fields. Always include the fields of `writing_contract.frontmatter_contract`: `paper_type` matching the plan, `methods`, `datasets`, and `tasks` as lists of at most 5 central items in plain text, and `read_date` as `YYYY-MM-DD`.
 - Use real `#`, `##`, and `###` headings. The top-level sections are exactly `writing_contract.must_include_sections`, in that order. A non-trivial paper gets several meaningful `###` subsections in its technical sections.
 - Core Information is a fixed metadata block holding only `writing_contract.core_info_fields`, in order. Analysis belongs in later sections.
 - Abstract renders the original abstract faithfully in the configured language, translated in `zh-CN` mode, with no later evidence or judgment added.

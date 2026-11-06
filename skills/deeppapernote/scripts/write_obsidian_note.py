@@ -21,6 +21,7 @@ from _final_quality import (
     validate_quality,
     validate_readability,
 )
+from _frontmatter import FrontmatterError, parse_frontmatter
 from _user_notes import inspect_existing_user_notes, merge_user_notes, restore_generated_text
 from _note_paths import (
     resolve_domain_subdir,
@@ -459,12 +460,23 @@ def block_note_conflict(
             "existing_note_path": str(target_path),
             "existing_note_sha256": file_sha256(target_path),
             "user_notes": existing_user_notes(target_path, output_language),
+            "existing_read_date": existing_read_date(target_path),
             "source_sha256": source_sha256,
             "output_language": output_language,
         },
         args.output,
     )
     raise SystemExit(2)
+
+
+def existing_read_date(target_path: Path) -> str:
+    """The first-read date recorded in a note that would be replaced, or an empty string."""
+    try:
+        fields = parse_frontmatter(target_path.read_bytes().decode("utf-8", errors="replace"))
+    except FrontmatterError:
+        return ""
+    value = (fields or {}).get("read_date", "")
+    return value if isinstance(value, str) else ""
 
 
 def existing_user_notes(target_path: Path, output_language: str) -> dict:
@@ -854,7 +866,10 @@ def main() -> None:
                 "source_sha256": str(source_manifest["source_sha256"]),
                 "output_language": output_language,
                 **(
-                    {"user_notes": existing_user_notes(target_path, output_language)}
+                    {
+                        "user_notes": existing_user_notes(target_path, output_language),
+                        "existing_read_date": existing_read_date(target_path),
+                    }
                     if target_path.is_file()
                     else {}
                 ),

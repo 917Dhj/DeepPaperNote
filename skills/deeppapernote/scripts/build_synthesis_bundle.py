@@ -400,6 +400,10 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "subsections": list(rules["takeaways_contract"]["subsections"]),
         },
         "my_notes_contract": dict(rules["my_notes_contract"]),
+        "frontmatter_contract": {
+            key: list(value) if isinstance(value, tuple) else value
+            for key, value in rules["frontmatter_contract"].items()
+        },
         "final_quality_gate": {
             "schema_version": QUALITY_REVIEW_SCHEMA_VERSION,
             "checks": list(QUALITY_CHECKS),

@@ -21,8 +21,9 @@ Include at least:
 - `aliases`: a short English name, acronym, or stable title alias useful for wikilinks
 - `date`: when publication date or year is known
 - `doi` or `arxiv_id`: when available
+- `paper_type`, `methods`, `datasets`, `tasks`, and `read_date`, always, as `obsidian-format.md` describes
 
-Do not invent placeholder metadata values. Omit unavailable fields instead.
+Do not invent placeholder metadata values. Omit unavailable optional fields instead; the five fields above are always present, with an empty list `[]` when a list has nothing central to name.
 
 Near the beginning of the note, include:
 - `## 核心信息`

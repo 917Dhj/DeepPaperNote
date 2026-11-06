@@ -71,6 +71,11 @@ Required fields:
 - `aliases`: English short name or common abbreviation for wikilink resolution
 - `date`: ISO publication date; use `YYYY` if only the year is known
 - `doi`: DOI string without the `https://doi.org/` prefix; omit the field entirely if unavailable
+- `paper_type`: the note plan's `paper_type`, e.g. `AI_method`
+- `methods`, `datasets`, `tasks`: lists of 0 to 5 core items each; an empty list is written `[]`
+- `read_date`: the day the paper was first read, as `YYYY-MM-DD`; distinct from the publication `date`
+
+These keys stay in English in both `zh-CN` and `en` notes, so one Bases view can query every note. `writing_contract.frontmatter_contract` carries the exact rules, and Final Note Lint checks them.
 
 Example:
 
@@ -82,6 +87,11 @@ aliases:
   - "Paper Short Name"
 date: 2024-05-01
 doi: 10.18653/v1/2024.acl-long.1
+paper_type: AI_method
+methods: [direct preference optimization]
+datasets: [Anthropic HH]
+tasks: []
+read_date: 2026-11-06
 ---
 ```
 
@@ -89,6 +99,8 @@ Rules:
 - Do not invent placeholder values for missing fields; omit them instead.
 - The `tags` field must always be present with at least one `papers/<domain>` tag.
 - `aliases` should be the paper's short name or acronym (e.g. "GPT-4", "LoRA"), not a paraphrase.
+- `methods`, `datasets`, and `tasks` name only what is central to the paper, never every term it mentions. Write the values as plain text.
+- When an existing note is replaced, copy `existing_read_date` from the admission result into `read_date`; otherwise use today's date.
 
 ## Figure Placeholder Style
 

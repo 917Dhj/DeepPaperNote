@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+from datetime import date
 from pathlib import Path
 
 from contracts import (
@@ -18,6 +19,7 @@ from contracts import (
     required_field_value_error,
     takeaway_plan_issues,
 )
+from _frontmatter import FrontmatterError, parse_frontmatter
 from localization import (
     normalize_output_language,
     note_schema,
@@ -1700,6 +1702,64 @@ def inspect_takeaway_judgment(text: str, reader_research_direction: str) -> list
     return [issue(heading, "takeaways_judgment_marker_missing", "error", transferable)]
 
 
+ISO_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def frontmatter_issues(text: str, plan_paper_type: str) -> list[str]:
+    """Check the Obsidian properties that research memory and connections rely on."""
+    contract = WRITING_CONTRACT_RULES["frontmatter_contract"]
+    try:
+        fields = parse_frontmatter(text)
+    except FrontmatterError:
+        return ["frontmatter_unparseable"]
+    if fields is None:
+        return ["frontmatter_missing"]
+    issues: list[str] = []
+    if any(field not in fields for field in contract["required_fields"]):
+        issues.append("frontmatter_field_missing")
+    tags = fields.get("tags")
+    tag_values = tags if isinstance(tags, list) else [tags] if isinstance(tags, str) else []
+    prefix = contract["domain_tag_prefix"]
+    if not any(isinstance(tag, str) and tag.startswith(prefix) and len(tag) > len(prefix) for tag in tag_values):
+        issues.append("frontmatter_domain_tag_missing")
+    paper_type = fields.get("paper_type")
+    if "paper_type" in fields and plan_paper_type and paper_type != plan_paper_type:
+        issues.append("frontmatter_paper_type_mismatch")
+    for field in contract["list_fields"]:
+        if field not in fields:
+            continue
+        value = fields[field]
+        if (
+            not isinstance(value, list)
+            or len(value) > contract["max_list_items"]
+            or any(not item.strip() for item in value)
+        ):
+            issues.append("frontmatter_list_field_invalid")
+            break
+    if "read_date" in fields and not valid_iso_day(fields["read_date"]):
+        issues.append("frontmatter_read_date_invalid")
+    return issues
+
+
+def valid_iso_day(value: object) -> bool:
+    if not isinstance(value, str) or not ISO_DAY_RE.match(value):
+        return False
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
+def plan_paper_type(plan_path: Path | None) -> str:
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path else {}
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return ""
+    value = plan.get("paper_type", "") if isinstance(plan, dict) else ""
+    return value.strip() if isinstance(value, str) else ""
+
+
 def plan_reader_research_direction(plan_path: Path | None) -> str:
     try:
         plan = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path else {}
@@ -1807,6 +1867,8 @@ def main() -> None:
     substantive_issues.extend(
         inspect_takeaway_judgment(text, plan_reader_research_direction(plan_path))
     )
+    frontmatter_problems = frontmatter_issues(text, plan_paper_type(plan_path))
+    warnings.extend(frontmatter_problems)
     warnings.extend(inspect_figure_callouts(text))
     for issue in figure_issues:
         reason = str(issue.get("reason", ""))
@@ -1869,6 +1931,7 @@ def main() -> None:
         "math_render_issues": math_issues,
         "figure_structure_issues": figure_issues,
         "core_info_structure_issues": core_info_issues,
+        "frontmatter_issues": frontmatter_problems,
         "reference_hygiene_issues": reference_hygiene_issues,
         "substantive_content_issues": substantive_issues,
         "planning_artifact_found": planning_artifact_found,
@@ -1876,6 +1939,7 @@ def main() -> None:
         "passes_basic_structure": (
             not missing_sections
             and not core_info_issues
+            and not frontmatter_problems
             and not {
                 "title_heading_missing",
                 "no_level2_sections",
