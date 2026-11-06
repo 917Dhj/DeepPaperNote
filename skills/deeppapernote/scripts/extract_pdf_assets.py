@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import io
 import re
+import unicodedata
 from functools import lru_cache
 from pathlib import Path
 
@@ -1432,6 +1433,59 @@ def _unique_figure_asset_filename(page_number: int, label: str, used_filenames: 
         suffix += 1
 
 
+def _table_number(label: str) -> str:
+    match = re.search(r"(\d+[a-z]?)$", unicodedata.normalize("NFKC", label), re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
+def _bilingual_table_twin(anchor: dict, neighbor: dict | None) -> bool:
+    """Tell whether ``neighbor`` is the same table's caption in the other language.
+
+    Chinese papers often stack a 表 caption and its English translation.
+    """
+    if neighbor is None or anchor.get("kind") != "table" or neighbor.get("kind") != "table":
+        return False
+    labels = (anchor["label"].lstrip(), neighbor["label"].lstrip())
+    if labels[0].startswith("表") == labels[1].startswith("表"):
+        return False
+    number = _table_number(labels[0])
+    if not number or number != _table_number(labels[1]):
+        return False
+    upper, lower = sorted((anchor["bbox"], neighbor["bbox"]), key=lambda bbox: bbox[1])
+    line_height = max(upper[3] - upper[1], lower[3] - lower[1], 6.0)
+    return lower[1] - upper[3] <= min(line_height, 12.0)
+
+
+def _table_caption_block(
+    anchor: dict, column_anchors: list[dict], idx: int
+) -> tuple[dict, dict | None, dict | None]:
+    """Return the caption block and its neighbors, joining a bilingual twin caption.
+
+    Without the join, each twin is the other's neighbor, which hides the table
+    from the caption on its side.
+    """
+    prev_anchor = column_anchors[idx - 1] if idx > 0 else None
+    next_anchor = column_anchors[idx + 1] if idx + 1 < len(column_anchors) else None
+    for twin, other in ((prev_anchor, idx - 2), (next_anchor, idx + 2)):
+        if not _bilingual_table_twin(anchor, twin):
+            continue
+        boxes = (anchor["bbox"], twin["bbox"])
+        block = {
+            **anchor,
+            "bbox": (
+                min(box[0] for box in boxes),
+                min(box[1] for box in boxes),
+                max(box[2] for box in boxes),
+                max(box[3] for box in boxes),
+            ),
+        }
+        beyond = column_anchors[other] if 0 <= other < len(column_anchors) else None
+        if twin is prev_anchor:
+            return block, beyond, next_anchor
+        return block, prev_anchor, beyond
+    return anchor, prev_anchor, next_anchor
+
+
 def extract_figure_regions(
     page, page_number: int, images_dir: Path, anchors: list[dict], *, dpi: int = FIGURE_RENDER_DPI
 ) -> list[dict]:
@@ -1460,8 +1514,18 @@ def extract_figure_regions(
         bbox: tuple[float, float, float, float] | None
         table_body_rows = 0
         if kind == "table":
+            column_anchors = [
+                other
+                for other in anchors
+                if other is anchor or _captions_share_column(other, anchor)
+            ]
+            caption_block, table_prev, table_next = _table_caption_block(
+                anchor,
+                column_anchors,
+                next(index for index, other in enumerate(column_anchors) if other is anchor),
+            )
             table_result = _estimate_table_bbox_with_rows(
-                page, anchor, prev_anchor, next_anchor, page_rect, anchors
+                page, caption_block, table_prev, table_next, page_rect, anchors
             )
             if table_result is not None:
                 bbox, table_body_rows = table_result
@@ -1471,7 +1535,7 @@ def extract_figure_regions(
                 # Fall back to the figure-shape estimator in case the table is
                 # actually rendered as an embedded image.
                 bbox = _estimate_figure_bbox_above_caption(
-                    page, anchor, prev_anchor, page_rect, anchors
+                    page, caption_block, table_prev, page_rect, anchors
                 )
         else:
             bbox = _estimate_figure_bbox_beside_caption(page, anchor, anchors, page_rect)
