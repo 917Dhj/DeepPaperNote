@@ -44,7 +44,7 @@ The plan should state:
 - what each central claim actually proves and does not prove
 - which weak, negative, limiting, or explicitly unreported results constrain the conclusion
 - one or two reusable takeaways and one or two follow-up questions or experiments, each specific to this paper and at least 20 characters long
-- the research direction the user stated in the request, verbatim in `reader_research_direction`, or an empty string when none was stated
+- the user's research direction in `reader_research_direction`: the one stated in the request, verbatim; else the bundle's `research_memory.suggested_reader_research_direction` when its status is `ok`; else an empty string
 - three to five `key_prior_work` items `{work, role}`: the prior works this paper builds on, with how it uses each (baseline, backbone model, data source, theoretical basis, method source)
 - zero to eight `connections` `{target, relation, reason}` chosen from the bundle's `connection_candidates`; `target` copies a candidate's `target`, `relation` is a key of `writing_contract.connections_contract.relations`, and Grounding Lint rejects any target the bundle did not recall
 - whether this is mostly a method note, system note, dataset note, benchmark note, or empirical/clinical note
