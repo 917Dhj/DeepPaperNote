@@ -23,10 +23,17 @@ Use these top-level sections in this order:
 8. `关键结果`
 9. `深度分析`
 10. `局限`
-11. `我的笔记`
+11. `阅读收获`
 12. `引用`
+13. `我的笔记`
 
-Use `### 机制流程` for the mechanism-flow subsection. Chinese figure placeholders use the labels `建议位置：`, `放置原因：`, and `当前状态：`; a materialized image caption begins with `论文原图编号：`.
+Use `### 机制流程` for the mechanism-flow subsection. `阅读收获` holds exactly two subsections, `### 可迁移` and `### 下一步`. `我的笔记` is the last section and, in a generated draft, holds only this guidance line:
+
+```md
+> [!note] 这一节留给你自己：写下你的判断、它和你研究的联系、想验证的点。重新生成这篇笔记时，这一节会原样保留。
+```
+
+Chinese figure placeholders use the labels `建议位置：`, `放置原因：`, and `当前状态：`; a materialized image caption begins with `论文原图编号：`.
 
 `原文摘要翻译` is a faithful Chinese translation of the source abstract. Preserve its meaning and scope; contribution claims, result interpretation, and hindsight judgment belong later unless the source abstract itself contains them.
 
@@ -44,8 +51,15 @@ Use these top-level sections in this order:
 8. `Key Results`
 9. `Deep Analysis`
 10. `Limitations`
-11. `Research Notes`
+11. `Takeaways`
 12. `References`
+13. `My Notes`
+
+`Takeaways` holds exactly two subsections, `### Transferable Ideas` and `### Next Steps`. `My Notes` is the last section and, in a generated draft, holds only this guidance line:
+
+```md
+> [!note] This section is yours: write down your own judgments, how the paper connects to your research, and what you want to verify. When this note is regenerated, this section is kept exactly as it is.
+```
 
 The allowed Core Information fields, in order, are:
 

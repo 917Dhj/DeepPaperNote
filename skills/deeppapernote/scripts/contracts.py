@@ -19,8 +19,9 @@ NOTE_REQUIRED_SECTIONS: tuple[str, ...] = (
     "关键结果",
     "深度分析",
     "局限",
-    "我的笔记",
+    "阅读收获",
     "引用",
+    "我的笔记",
 )
 
 def note_required_sections(language: str | None = None) -> tuple[str, ...]:
@@ -55,6 +56,9 @@ NOTE_PLAN_LIST_FIELDS: tuple[str, ...] = (
 )
 
 NOTE_PLAN_REQUIRED_FIELDS: tuple[str, ...] = NOTE_PLAN_STRING_FIELDS + NOTE_PLAN_LIST_FIELDS
+# Optional fields stay in the template so the planner sees them, but an empty value is valid.
+NOTE_PLAN_OPTIONAL_STRING_FIELDS: tuple[str, ...] = ("reader_research_direction",)
+TAKEAWAY_PLAN_FIELDS: tuple[str, ...] = ("reuse_takeaways", "followup_questions")
 NOTE_PLAN_FIELD_TYPES: dict[str, str] = {
     **dict.fromkeys(NOTE_PLAN_STRING_FIELDS, "string"),
     **dict.fromkeys(NOTE_PLAN_LIST_FIELDS, "array"),
@@ -542,6 +546,13 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
             "summarize this section",
         ),
     },
+    "takeaways_contract": {
+        "plan_fields": TAKEAWAY_PLAN_FIELDS,
+        "min_items": 1,
+        "max_items": 2,
+        "min_item_chars": 20,
+        "reader_context_field": "reader_research_direction",
+    },
     "analysis_coverage_contract": {
         "central_claim_fields": tuple(CENTRAL_CLAIM_FIELD_TYPES),
         "central_claim_field_types": CENTRAL_CLAIM_FIELD_TYPES,
@@ -568,9 +579,47 @@ def writing_contract_rules(language: str | None = None) -> dict[str, Any]:
     rules["core_info_fields"] = tuple(schema["core_info_fields"])
     rules["figure_labels"] = dict(schema["figure_labels"])
     rules["mechanism_flow_heading"] = schema["mechanism_flow"]
+    rules["takeaways_contract"]["section"] = schema["sections"]["takeaways"]
+    rules["takeaways_contract"]["subsections"] = tuple(schema["takeaways_subsections"].values())
+    rules["my_notes_contract"] = {
+        "section": schema["sections"]["my_notes"],
+        "guidance": schema["my_notes_guidance"],
+        "position": "last",
+        "user_owned": True,
+    }
     if schema.get("abstract_contract"):
         rules["abstract_contract"] = deepcopy(schema["abstract_contract"])
     return rules
+
+
+def compact_text_length(value: str) -> int:
+    return sum(1 for ch in value if not ch.isspace())
+
+
+def takeaway_plan_issues(note_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Check the plan fields that feed the Takeaways section and the optional reader context."""
+    contract = WRITING_CONTRACT_RULES["takeaways_contract"]
+    generic = WRITING_CONTRACT_RULES["note_plan_depth_requirements"]["generic_focus_phrases"]
+    issues: list[dict[str, Any]] = []
+    for field in contract["plan_fields"]:
+        items = note_plan.get(field)
+        if not isinstance(items, list) or not items:
+            continue  # missing or empty lists are reported by the required-field checks
+        if not contract["min_items"] <= len(items) <= contract["max_items"]:
+            issues.append({"code": "note_plan_takeaway_item_count_invalid", "field": field, "count": len(items)})
+        for index, item in enumerate(items):
+            if not isinstance(item, str):
+                issues.append({"code": "note_plan_takeaway_item_invalid", "field": field, "index": index})
+                continue
+            lowered = " ".join(item.split()).lower()
+            if compact_text_length(item) < contract["min_item_chars"] or any(
+                phrase in lowered for phrase in generic
+            ):
+                issues.append({"code": "note_plan_takeaway_item_too_thin", "field": field, "index": index})
+    reader_field = contract["reader_context_field"]
+    if reader_field in note_plan and not isinstance(note_plan[reader_field], str):
+        issues.append({"code": "note_plan_reader_research_direction_invalid", "field": reader_field})
+    return issues
 
 
 class MetadataRecord(TypedDict, total=False):

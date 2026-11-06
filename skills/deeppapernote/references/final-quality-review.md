@@ -16,11 +16,12 @@ Give the reviewer this prompt with the explicit paths and resolved language fill
 >
 > Review from scratch on every attempt. Do not rely on an earlier verdict, author assurances, a passing lint, or an earlier drafting rationale. Write only the quality-review JSON artifact. Do not edit the note, plan, readability receipt, or revision journal.
 >
-> Check every planned item in these three groups:
+> Check every planned item in these four groups:
 >
 > - `central_claims`: the note explains each claim and the evidence-to-claim relationship, including what the evidence actually proves. A keyword mention is insufficient.
 > - `mechanism_result_map`: the note explains each planned mechanism-to-result relationship. Listing a mechanism and a result separately is insufficient.
 > - `claim_boundaries`: the note faithfully carries every boundary and each central claim's `what_it_does_not_prove`. Unsupported generalization fails this check.
+> - `takeaways`: the Takeaways section carries every `reuse_takeaways` and `followup_questions` item, and each is specific to this paper rather than a sentence that would fit any paper. A transferable idea names the paper's mechanism, where it would transfer, and its precondition. When `reader_research_direction` is non-empty, at least one transferable idea connects to that direction whenever a credible transfer exists, the connection is marked as judgment rather than paper fact, and an absent transfer is stated plainly instead of forced. The My Notes section holds only the standard guidance.
 >
 > Mark a group true only when all its relevant plan items are faithfully reflected. For each missing or incorrect relationship, identify the exact plan item and a concrete required revision. Do not invent facts, weaken the plan to fit the draft, or turn broad stylistic preferences into V1 blocking findings. The wider writing requirements still apply to the author.
 >
@@ -30,7 +31,7 @@ Quality artifact shape:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "output_language": "en",
   "verdict": "pass",
   "reviewed_note_sha256": "<actual raw draft SHA-256>",
@@ -38,13 +39,16 @@ Quality artifact shape:
   "checks": {
     "central_claims": true,
     "mechanism_result_map": true,
-    "claim_boundaries": true
+    "claim_boundaries": true,
+    "takeaways": true
   },
   "blocking_findings": []
 }
 ```
 
-Use lowercase 64-character SHA-256 values. A passing artifact has all three literal booleans true and no findings. A failing artifact uses `verdict: "fail"`, at least one false check, and a finding for every false check. Every finding names a false check and contains exactly:
+The quality artifact is `schema_version` 2; a version 1 review predates the `takeaways` check and must be redone in full. The readability receipt and revision journal stay at version 1.
+
+Use lowercase 64-character SHA-256 values. A passing artifact has all four literal booleans true and no findings. A failing artifact uses `verdict: "fail"`, at least one false check, and a finding for every false check. Every finding names a false check and contains exactly:
 
 ```json
 {
@@ -55,7 +59,7 @@ Use lowercase 64-character SHA-256 values. A passing artifact has all three lite
 }
 ```
 
-Allowed references name an existing item at `/central_claims/N`, `/mechanism_result_map/N`, or `/claim_boundaries/N`, matching the failed check. Boundary findings may also use `/central_claims/N/what_it_does_not_prove`. Indices are zero-based canonical decimals. Empty strings, arbitrary pointers, unknown fields, duplicate keys, and inconsistent verdicts are invalid executions.
+Allowed references name an existing item at `/central_claims/N`, `/mechanism_result_map/N`, or `/claim_boundaries/N`, matching the failed check; a `takeaways` finding names `/reuse_takeaways/N` or `/followup_questions/N`. Boundary findings may also use `/central_claims/N/what_it_does_not_prove`. Indices are zero-based canonical decimals. Empty strings, arbitrary pointers, unknown fields, duplicate keys, and inconsistent verdicts are invalid executions.
 
 ## Record every result
 

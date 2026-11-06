@@ -28,7 +28,7 @@ def final_review_args(
     note_hash = hashlib.sha256(content_path.read_bytes()).hexdigest()
     quality_path = tmp_path / f"quality-review.{output_language}.json"
     quality_path.write_text(json.dumps({
-        "schema_version": 1,
+        "schema_version": 2,
         "output_language": output_language,
         "verdict": "pass",
         "reviewed_note_sha256": note_hash,
@@ -37,6 +37,7 @@ def final_review_args(
             "central_claims": True,
             "mechanism_result_map": True,
             "claim_boundaries": True,
+            "takeaways": True,
         },
         "blocking_findings": [],
     }), encoding="utf-8")
@@ -86,6 +87,8 @@ def formal_save_args(
             }],
             "mechanism_result_map": ["The described mechanism explains the reported result."],
             "claim_boundaries": ["The conclusion is limited to the reported evidence."],
+            "reuse_takeaways": ["Reuse the reported mechanism where its stated preconditions hold."],
+            "followup_questions": ["Test whether the result survives outside the reported setting."],
         }), encoding="utf-8")
     source_manifest_path = source_manifest_path or tmp_path / "source-manifest.json"
     if not source_manifest_path.exists():

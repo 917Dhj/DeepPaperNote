@@ -193,6 +193,12 @@ Weight: 10
 - 5: A future reader could use the takeaways to guide implementation,
   reproduction, comparison, or research planning.
 
+Score mainly from the Takeaways section (`阅读收获` / `Takeaways`): a transferable
+idea that names the paper's mechanism, its transfer target, and the precondition,
+plus a follow-up question or experiment specific to the paper, supports a 4 or 5.
+Do not score the user-owned My Notes section (`我的笔记` / `My Notes`); in a
+generated note it holds only the standard guidance.
+
 ### D7. Obsidian Note Usability
 
 Weight: 5

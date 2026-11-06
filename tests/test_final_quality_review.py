@@ -21,11 +21,13 @@ def plan_payload() -> dict:
         ],
         "mechanism_result_map": ["State logs explain fewer untraceable failures."],
         "claim_boundaries": ["Evidence covers only the reported benchmark."],
+        "reuse_takeaways": ["Log tool failures as explicit state wherever later steps consume tool output."],
+        "followup_questions": ["Does the state log still help when tools time out under injected latency?"],
     }
 
 
 def review_payload(note_sha: str = "a" * 64, plan_sha: str = "b" * 64, *, failed: str = "") -> dict:
-    checks = dict.fromkeys(("central_claims", "mechanism_result_map", "claim_boundaries"), True)
+    checks = dict.fromkeys(quality_module().QUALITY_CHECKS, True)
     findings = []
     if failed:
         checks[failed] = False
@@ -38,7 +40,7 @@ def review_payload(note_sha: str = "a" * 64, plan_sha: str = "b" * 64, *, failed
             }
         ]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "output_language": "en",
         "verdict": "fail" if failed else "pass",
         "reviewed_note_sha256": note_sha,
@@ -69,7 +71,8 @@ def test_quality_schema_accepts_complete_consistent_review(failed: str) -> None:
     "field,value",
     [
         ("schema_version", True),
-        ("schema_version", 2),
+        ("schema_version", 1),
+        ("schema_version", 3),
         ("output_language", "English"),
         ("verdict", "approved"),
         ("verdict", []),

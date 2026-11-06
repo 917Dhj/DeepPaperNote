@@ -28,8 +28,9 @@ The note should usually include:
 - `关键结果`
 - `深度分析`
 - `局限`
-- `我的笔记`
+- `阅读收获`
 - `引用`
+- `我的笔记`
 
 For non-trivial papers, it should usually also include multiple `###` subheadings inside:
 - `数据与任务定义`
@@ -52,6 +53,7 @@ Bad sign:
 - The note identifies where labels, supervision, or evaluation may be weak.
 - The note explains why the paper matters to later reading or research reuse.
 - The note surfaces one paper-specific insight, not just generic praise.
+- `阅读收获` names a concrete mechanism to reuse, where it applies, and under which precondition, plus a follow-up question or experiment specific to this paper.
 
 ### Bad signs
 
@@ -61,6 +63,8 @@ Bad sign:
 - It says the paper is innovative without locating the innovation.
 - It has no dedicated `创新点` section and leaves the paper's novelty scattered across the note.
 - It uses generic limitations such as "future work can use more data" and nothing more specific.
+- `阅读收获` repeats the limitations, or offers takeaways that would fit any paper.
+- The model writes its own content into `我的笔记`; that section belongs to the user and holds only the standard guidance in a generated draft.
 - It flattens a technically rich paper into only `##` headings with no internal structure.
 
 ## Quality Gate

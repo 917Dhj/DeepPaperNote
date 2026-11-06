@@ -14,7 +14,10 @@ import plan_figure_table_decisions
 import pytest
 import run_pipeline
 import run_state
+from localization import note_schema
 from test_lint_grounding import grounded_note_plan, slim_bundle, source_manifest
+
+MY_NOTES_GUIDANCE = note_schema("zh-CN")["my_notes_guidance"]
 
 SCRIPT = Path(run_state.__file__).resolve()
 
@@ -127,7 +130,9 @@ def completed_run(tmp_path: Path) -> tuple[Path, dict, dict[str, Path]]:
             "figure_decisions_sha256": sha(paths["figure_table_decisions"]),
         },
     )
-    paths["draft"].write_bytes("# A paper\n\nA grounded final note.\n".encode())
+    paths["draft"].write_bytes(
+        f"# A paper\n\nA grounded final note.\n\n## 我的笔记\n\n{MY_NOTES_GUIDANCE}\n".encode()
+    )
     dump(
         paths["note_lint"],
         {
@@ -141,7 +146,7 @@ def completed_run(tmp_path: Path) -> tuple[Path, dict, dict[str, Path]]:
         },
     )
     review = {
-        "schema_version": 1,
+        "schema_version": 2,
         "output_language": "zh-CN",
         "verdict": "pass",
         "reviewed_note_sha256": sha(paths["draft"]),
@@ -368,6 +373,29 @@ def test_artifact_failure_does_not_hide_later_results(
     report = run_state.inspect_run(workdir, bindings=bindings)
     assert stages(report)[artifact]["status"] == expected
     assert len(report["stages"]) == len(run_state.STAGES)
+    assert report["summary"]["saved_verified"] is False
+
+
+def saved_note(workdir: Path) -> Path:
+    return workdir.parent / "Vault" / "Papers" / "AI" / "A paper" / "note.zh-CN.md"
+
+
+def test_user_edits_in_my_notes_keep_the_save_verified(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    note = saved_note(workdir)
+    text = note.read_text(encoding="utf-8")
+    note.write_bytes(text.replace(MY_NOTES_GUIDANCE, "我自己补的想法：超时场景值得复现。").encode())
+    report = run_state.inspect_run(workdir, bindings=bindings)
+    assert stages(report)["save_receipt"]["status"] == "passed"
+    assert report["summary"]["saved_verified"] is True
+
+
+def test_edits_outside_my_notes_make_the_save_stale(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    note = saved_note(workdir)
+    note.write_bytes(note.read_bytes().replace("A grounded final note.".encode(), b"Edited."))
+    report = run_state.inspect_run(workdir, bindings=bindings)
+    assert stages(report)["save_receipt"]["status"] == "stale"
     assert report["summary"]["saved_verified"] is False
 
 
@@ -650,7 +678,8 @@ def test_optional_workspace_admission_does_not_gate_save_but_remains_visible(
 def test_saved_note_absence_and_changed_bytes_are_distinct(completed_run: tuple) -> None:
     workdir, bindings, paths = completed_run
     saved = Path(json.loads(paths["save_receipt"].read_text())["note_path"])
-    saved.write_bytes(saved.read_bytes() + b"external change")
+    # The end of the file is the user-owned My Notes block; change the generated part.
+    saved.write_bytes(b"external change\n" + saved.read_bytes())
     report = run_state.inspect_run(workdir, bindings=bindings)
     assert stages(report)["save_receipt"]["status"] == "stale"
     assert report["summary"]["saved_sha256_match"] is False

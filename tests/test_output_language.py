@@ -12,6 +12,7 @@ from build_synthesis_bundle import compact_writing_contract
 from lint_grounding import validate_note_plan
 from localization import (
     normalize_output_language,
+    note_schema,
     require_artifact_output_language,
     required_sections,
 )
@@ -28,8 +29,9 @@ ENGLISH_SECTIONS = (
     "Key Results",
     "Deep Analysis",
     "Limitations",
-    "Research Notes",
+    "Takeaways",
     "References",
+    "My Notes",
 )
 
 
@@ -101,14 +103,23 @@ The important contribution is not only the score increase. Failed calls become i
 
 The evaluation covers English question-answering data and a narrow tool set, so it does not establish robustness for multimodal tools or high-latency services.
 
-## Research Notes
+## Takeaways
 
-The state-record design is reusable in evidence-first paper workflows because it separates missing source material from model interpretation failure.
+### Transferable Ideas
+
+- The state-record design is reusable in evidence-first paper workflows: it separates missing source material from model interpretation failure, provided each step reports a checkable outcome.
+
+### Next Steps
+
+- I suspect the state machine degrades with high-latency services; rerunning the main benchmark with injected timeouts would test this.
 
 ## References
 
 - Smith et al. (2024). Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example
-"""
+
+## My Notes
+
+""" + note_schema("en")["my_notes_guidance"] + "\n"
 
 
 def plan_payload() -> dict:
@@ -130,8 +141,8 @@ def plan_payload() -> dict:
         "negative_or_limiting_results": ["Multimodal tools were not tested."],
         "mechanism_result_map": ["Rollback states explain fewer untraceable errors."],
         "comparative_positioning": ["Compared with answer-only baselines."],
-        "reuse_takeaways": ["Track failure state explicitly."],
-        "followup_questions": ["Test missing and delayed tool outputs."],
+        "reuse_takeaways": ["Track tool failure state explicitly so later steps can tell missing evidence apart."],
+        "followup_questions": ["Test whether the state log survives missing and delayed tool outputs."],
         "section_plan": [{"section": "Method", "evidence_sources": [{"section_id": "sec:method"}]}],
     }
 

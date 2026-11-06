@@ -7,7 +7,7 @@ import argparse
 from copy import deepcopy
 from pathlib import Path
 
-from _final_quality import QUALITY_CHECKS
+from _final_quality import QUALITY_CHECKS, QUALITY_REVIEW_SCHEMA_VERSION
 from _identity import canonical_identity_acceptance_error
 from citation_links import resolve_reference_links
 from common import (
@@ -16,6 +16,7 @@ from common import (
     runtime_config,
 )
 from contracts import (
+    NOTE_PLAN_OPTIONAL_STRING_FIELDS,
     NOTE_PLAN_REQUIRED_FIELDS,
     PAPER_TYPE_VALUES,
     paper_type_contracts,
@@ -286,6 +287,8 @@ def note_plan_template(rules: dict) -> dict:
     template["central_claims"] = [
         {field: deepcopy(empty[claim_types[field]]) for field in claim_fields}
     ]
+    for field in NOTE_PLAN_OPTIONAL_STRING_FIELDS:
+        template[field] = ""
     focus_field = rules["note_plan_depth_requirements"]["required_section_focus_fields"][0]
     template["section_plan"] = [
         {"section": section, focus_field: "", "subsections": [], "evidence_sources": []}
@@ -334,6 +337,7 @@ def compact_writing_contract(language: str | None = None) -> dict:
         "mechanism_flow_heading": rules["mechanism_flow_heading"],
         "note_plan_contract": {
             "required_fields": ["output_language", *NOTE_PLAN_REQUIRED_FIELDS],
+            "optional_fields": list(NOTE_PLAN_OPTIONAL_STRING_FIELDS),
             "field_types": {
                 "output_language": "string",
                 **dict(rules["note_plan_field_types"]),
@@ -390,8 +394,14 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "visual_review": visual_review_contract,
         },
         "analysis_coverage_contract": analysis_coverage,
+        "takeaways_contract": {
+            **rules["takeaways_contract"],
+            "plan_fields": list(rules["takeaways_contract"]["plan_fields"]),
+            "subsections": list(rules["takeaways_contract"]["subsections"]),
+        },
+        "my_notes_contract": dict(rules["my_notes_contract"]),
         "final_quality_gate": {
-            "schema_version": 1,
+            "schema_version": QUALITY_REVIEW_SCHEMA_VERSION,
             "checks": list(QUALITY_CHECKS),
             "reference": "references/final-quality-review.md",
             "reviewed_bytes": "raw_sha256",
