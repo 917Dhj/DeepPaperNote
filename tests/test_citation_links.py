@@ -155,6 +155,50 @@ def test_lines_starting_with_a_year_are_not_numbered_references(tmp_path: Path, 
     assert [item["display_text"][:12] for item in candidates] == ["Ana Smith, B", "Dan Brown an", "Fay Green, G"]
 
 
+def extract_pages(tmp_path: Path, monkeypatch, pages: list[list[str]]) -> list[str]:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(citation_links, "fitz", FakeFitz(FakePdfDoc(["\n".join(page) for page in pages])))
+    return [
+        item["display_text"]
+        for item in extract_reference_candidates_from_pdf(pdf_path, 1, max_pages=30, max_items=400)
+    ]
+
+
+def test_lettered_appendix_heading_ends_a_numbered_bibliography(tmp_path: Path, monkeypatch) -> None:
+    texts = extract_pages(tmp_path, monkeypatch, [
+        ["References", "[1] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning. In CVPR, 2016.",
+         "[2] A. Vaswani and N. Shazeer. Attention is all you need. In NeurIPS, 2017."],
+        ["A. Object Detection Baselines", "In this section we use Faster R-CNN [32] as the detector.",
+         "[32] and a Fast R-CNN detection network [7] share features."],
+    ])
+    assert texts == [
+        "K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning. In CVPR, 2016.",
+        "A. Vaswani and N. Shazeer. Attention is all you need. In NeurIPS, 2017.",
+    ]
+
+
+def test_oversized_numbered_entry_is_dropped(tmp_path: Path, monkeypatch) -> None:
+    table_debris = [f"Hyperparameter row {i} value {i}e-4 with more table text here" for i in range(40)]
+    texts = extract_pages(tmp_path, monkeypatch, [
+        ["References", "[1] A. Chang, T. Funkhouser, L. Guibas, P. Hanrahan, Q. Huang, Z. Li,", *table_debris,
+         "[2] M. Fischler and R. Bolles. Random sample consensus. Commun. ACM, 1981."],
+    ])
+    assert texts == ["M. Fischler and R. Bolles. Random sample consensus. Commun. ACM, 1981."]
+
+
+def test_author_year_entry_ending_in_a_url_is_split(tmp_path: Path, monkeypatch) -> None:
+    texts = extract_pages(tmp_path, monkeypatch, [[
+        "References",
+        "Sebastien Bonopera, Jerome Esnault, and George Drettakis. 2020. sibr: A System for",
+        "Image Based Rendering. https://gitlab.inria.fr/sibr/sibr_core",
+        "Mario Botsch, Alexander Hornung, and Leif Kobbelt. 2005. High-quality surface",
+        "splatting on today's GPUs. In Point-Based Graphics.",
+        "Gaurav Chaurasia and George Drettakis. 2013. Depth synthesis. ACM TOG 32, 3 (2013).",
+    ]])
+    assert [text[:14] for text in texts] == ["Sebastien Bono", "Mario Botsch, ", "Gaurav Chauras"]
+
+
 def recall(vault: Path, references: list[dict], full_text: str = "") -> dict:
     return vault_connections.connection_candidates(
         {"obsidian_vault": str(vault), "papers_dir": "Research/Papers"},

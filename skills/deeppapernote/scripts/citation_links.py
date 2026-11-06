@@ -18,6 +18,9 @@ REFERENCE_HEADINGS = {"references", "bibliography", "参考文献"}
 APPENDIX_HEADING_RE = re.compile(
     r"^(?:appendix|appendices|supplementary|supplemental|附录)\b|^A\.?$", flags=re.IGNORECASE
 )
+# "A. Object Detection Baselines": no commas or digits, so "K. He, X. Zhang" never matches.
+LETTERED_APPENDIX_RE = re.compile(r"^A\.\s+[A-Z][a-z]+(?:\s+[A-Za-z][a-z\-]*){1,6}$")
+URL_END_RE = re.compile(r"https?://\S+$")
 # "Surname, ...", "A B and C", or a single author "First Last. 2020".
 AUTHOR_START_RE = re.compile(
     r"^[A-Z\u00C0-\u024F][\w'’.\-]*(?:\s+[A-Z\u00C0-\u024F][\w'’.\-]*){0,3}"
@@ -71,7 +74,7 @@ def _reference_lines_from_pdf(pdf_path: Path, references_start_page: int, max_pa
                 if headings:
                     page_lines = page_lines[headings[0] + 1:]
             for line in page_lines:
-                if APPENDIX_HEADING_RE.match(line):
+                if APPENDIX_HEADING_RE.match(line) or LETTERED_APPENDIX_RE.match(line):
                     return lines
                 if line.lower() in REFERENCE_HEADINGS:
                     continue
@@ -113,7 +116,8 @@ def _group_author_year_references(lines: list[tuple[str, int]]) -> list[tuple[st
     grouped: list[tuple[list[str], int]] = []
     for line, page_number in lines:
         current = grouped[-1][0] if grouped else []
-        finished = bool(current) and current[-1].rstrip().endswith((".", ")")) and bool(
+        last = current[-1].rstrip() if current else ""
+        finished = bool(current) and (last.endswith((".", ")")) or bool(URL_END_RE.search(last))) and bool(
             YEAR_RE.search(" ".join(current))
         )
         if not current or (finished and AUTHOR_START_RE.match(line)):
@@ -147,7 +151,11 @@ def extract_reference_candidates_from_pdf(
         return []
 
     if lines and NUMBERED_REF_RE.match(lines[0][0]):
-        references = _group_numbered_references(lines)
+        # An oversized entry swallowed page debris such as an appendix table.
+        references = [
+            (text, page) for text, page in _group_numbered_references(lines)
+            if len(text) <= MAX_ENTRY_CHARS
+        ]
     else:
         references = _group_author_year_references(lines)
         if any(len(text) > MAX_ENTRY_CHARS for text, _ in references):
