@@ -146,7 +146,7 @@ def completed_run(tmp_path: Path) -> tuple[Path, dict, dict[str, Path]]:
         },
     )
     review = {
-        "schema_version": 1,
+        "schema_version": 2,
         "output_language": "zh-CN",
         "verdict": "pass",
         "reviewed_note_sha256": sha(paths["draft"]),

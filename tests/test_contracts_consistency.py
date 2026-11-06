@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from _final_quality import QUALITY_CHECKS
+from _final_quality import QUALITY_CHECKS, QUALITY_REVIEW_SCHEMA_VERSION
 from build_synthesis_bundle import bundle as build_synthesis_bundle
 from contracts import (
     NOTE_PLAN_LIST_FIELDS,
@@ -543,7 +543,7 @@ def test_bundle_routes_to_the_final_quality_gate_contract() -> None:
     contract = bundle(metadata={}, evidence_wrapper={}, assets_wrapper={})["writing_contract"]
     gate = contract["final_quality_gate"]
     assert gate["checks"] == list(QUALITY_CHECKS)
-    assert gate["schema_version"] == 1
+    assert gate["schema_version"] == QUALITY_REVIEW_SCHEMA_VERSION == 2
     assert gate["max_revisions"] == 2
     assert gate["reviewed_bytes"] == "raw_sha256"
     reference = (SKILL_ROOT / gate["reference"]).read_text(encoding="utf-8")

@@ -31,7 +31,7 @@ Quality artifact shape:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "output_language": "en",
   "verdict": "pass",
   "reviewed_note_sha256": "<actual raw draft SHA-256>",
@@ -45,6 +45,8 @@ Quality artifact shape:
   "blocking_findings": []
 }
 ```
+
+The quality artifact is `schema_version` 2; a version 1 review predates the `takeaways` check and must be redone in full. The readability receipt and revision journal stay at version 1.
 
 Use lowercase 64-character SHA-256 values. A passing artifact has all four literal booleans true and no findings. A failing artifact uses `verdict: "fail"`, at least one false check, and a finding for every false check. Every finding names a false check and contains exactly:
 

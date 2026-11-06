@@ -28,7 +28,7 @@ def final_review_args(
     note_hash = hashlib.sha256(content_path.read_bytes()).hexdigest()
     quality_path = tmp_path / f"quality-review.{output_language}.json"
     quality_path.write_text(json.dumps({
-        "schema_version": 1,
+        "schema_version": 2,
         "output_language": output_language,
         "verdict": "pass",
         "reviewed_note_sha256": note_hash,

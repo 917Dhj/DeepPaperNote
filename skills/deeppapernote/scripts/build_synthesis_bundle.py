@@ -7,7 +7,7 @@ import argparse
 from copy import deepcopy
 from pathlib import Path
 
-from _final_quality import QUALITY_CHECKS
+from _final_quality import QUALITY_CHECKS, QUALITY_REVIEW_SCHEMA_VERSION
 from _identity import canonical_identity_acceptance_error
 from citation_links import resolve_reference_links
 from common import (
@@ -401,7 +401,7 @@ def compact_writing_contract(language: str | None = None) -> dict:
         },
         "my_notes_contract": dict(rules["my_notes_contract"]),
         "final_quality_gate": {
-            "schema_version": 1,
+            "schema_version": QUALITY_REVIEW_SCHEMA_VERSION,
             "checks": list(QUALITY_CHECKS),
             "reference": "references/final-quality-review.md",
             "reviewed_bytes": "raw_sha256",

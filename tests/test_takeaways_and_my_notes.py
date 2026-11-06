@@ -277,7 +277,7 @@ def quality_review(*, finding_ref: str = "") -> dict:
             "required_revision": "Name the paper mechanism and the target problem.",
         }]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "output_language": "en",
         "verdict": "fail" if finding_ref else "pass",
         "reviewed_note_sha256": "a" * 64,
@@ -308,6 +308,28 @@ def test_takeaways_finding_may_reference_either_plan_field(ref: str) -> None:
 def test_takeaways_finding_rejects_other_or_missing_refs(ref: str) -> None:
     with pytest.raises(ValueError):
         validate_review(quality_review(finding_ref=ref))
+
+
+def test_quality_review_schema_is_version_two() -> None:
+    assert _final_quality.QUALITY_REVIEW_SCHEMA_VERSION == 2
+    assert quality_review()["schema_version"] == 2
+    contract = build_synthesis_bundle.compact_writing_contract("en")
+    assert contract["final_quality_gate"]["schema_version"] == 2
+
+
+def test_version_one_review_is_rejected_with_a_rerun_hint() -> None:
+    review = quality_review()
+    review["schema_version"] = 1
+    with pytest.raises(ValueError, match="schema_version 2.*rerun"):
+        validate_review(review)
+
+
+def test_readability_receipt_and_state_stay_version_one() -> None:
+    receipt = {"schema_version": 1, "output_language": "en", "verdict": "pass", "reviewed_note_sha256": "a" * 64}
+    _final_quality.validate_readability(receipt, note_sha256="a" * 64, language="en")
+    review = quality_review()
+    state = _final_quality.advance_state(None, review, validate_review(review), language="en")
+    assert state["schema_version"] == 1
 
 
 def test_quality_review_requires_nonempty_takeaway_plan_fields() -> None:
