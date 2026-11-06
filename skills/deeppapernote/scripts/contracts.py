@@ -581,6 +581,8 @@ def writing_contract_rules(language: str | None = None) -> dict[str, Any]:
     rules["mechanism_flow_heading"] = schema["mechanism_flow"]
     rules["takeaways_contract"]["section"] = schema["sections"]["takeaways"]
     rules["takeaways_contract"]["subsections"] = tuple(schema["takeaways_subsections"].values())
+    rules["takeaways_contract"]["judgment_marker"] = schema["takeaways_judgment_marker"]
+    rules["takeaways_contract"]["max_item_chars"] = schema["takeaways_max_item_chars"]
     rules["my_notes_contract"] = {
         "section": schema["sections"]["my_notes"],
         "guidance": schema["my_notes_guidance"],

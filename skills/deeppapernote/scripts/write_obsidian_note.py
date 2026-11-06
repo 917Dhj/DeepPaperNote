@@ -1113,6 +1113,7 @@ def main() -> None:
                 "status": user_notes["status"],
                 "chars": user_notes["chars"],
                 "sha256": user_notes["user_notes_sha256"],
+                "legacy_format": user_notes["legacy_format"],
             },
         }
         if sidecar_path is not None:

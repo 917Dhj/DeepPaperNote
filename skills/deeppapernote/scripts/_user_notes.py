@@ -27,6 +27,12 @@ def split_user_notes(text: str, language: str) -> tuple[str, str] | None:
     return text[: match.start()], text[match.start():]
 
 
+def _is_legacy_format(generated: str, language: str) -> bool:
+    """A note saved before the Takeaways section existed; its My Notes may be model text."""
+    heading = note_schema(language)["sections"]["takeaways"]
+    return re.search(rf"^##[ \t]+{re.escape(heading)}[ \t]*$", generated, flags=re.MULTILINE) is None
+
+
 def _block_body(block: str) -> str:
     _, _, body = block.partition("\n")
     return body
@@ -48,11 +54,15 @@ def inspect_existing_user_notes(text: str, language: str) -> dict:
     """Describe the user content of a note about to be replaced, for the overwrite prompt."""
     parts = split_user_notes(_normalize(text), language)
     if parts is None:
-        return {"status": "heading_missing", "chars": 0}
-    block = parts[1]
+        return {"status": "heading_missing", "chars": 0, "legacy_format": False}
+    generated, block = parts
     if is_default_block(block, language):
-        return {"status": "none", "chars": 0}
-    return {"status": "present", "chars": _content_chars(block)}
+        return {"status": "none", "chars": 0, "legacy_format": False}
+    return {
+        "status": "present",
+        "chars": _content_chars(block),
+        "legacy_format": _is_legacy_format(generated, language),
+    }
 
 
 def merge_user_notes(
@@ -69,17 +79,17 @@ def merge_user_notes(
     block is exactly the standard guidance. Any other block is kept as it is.
     """
     if existing_text is None:
-        return draft_text, {"status": "no_existing_note", "chars": 0, "user_notes_sha256": ""}
+        return draft_text, {"status": "no_existing_note", "chars": 0, "user_notes_sha256": "", "legacy_format": False}
     if recorded_saved_sha256 and (
         hashlib.sha256(existing_text.encode("utf-8")).hexdigest() == recorded_saved_sha256
     ):
-        return draft_text, {"status": "untouched", "chars": 0, "user_notes_sha256": ""}
+        return draft_text, {"status": "untouched", "chars": 0, "user_notes_sha256": "", "legacy_format": False}
     existing_parts = split_user_notes(_normalize(existing_text), language)
     if existing_parts is None:
-        return draft_text, {"status": "heading_missing", "chars": 0, "user_notes_sha256": ""}
-    block = existing_parts[1]
+        return draft_text, {"status": "heading_missing", "chars": 0, "user_notes_sha256": "", "legacy_format": False}
+    existing_generated, block = existing_parts
     if is_default_block(block, language):
-        return draft_text, {"status": "untouched", "chars": 0, "user_notes_sha256": ""}
+        return draft_text, {"status": "untouched", "chars": 0, "user_notes_sha256": "", "legacy_format": False}
     draft_parts = split_user_notes(draft_text, language)
     if draft_parts is None:
         raise ValueError(
@@ -92,6 +102,7 @@ def merge_user_notes(
         "status": "preserved",
         "chars": _content_chars(block),
         "user_notes_sha256": hashlib.sha256(block.encode("utf-8")).hexdigest(),
+        "legacy_format": _is_legacy_format(existing_generated, language),
     }
 
 

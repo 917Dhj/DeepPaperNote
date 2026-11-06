@@ -37,7 +37,7 @@ Run the steps in order. A step is complete at its **done when**, never because a
    | Result | Action |
    |---|---|
    | reuse of an existing directory | Use that directory and its domain. A verified PDF-only directory needs no confirmation. |
-   | `same_language_note_exists` | Ask whether to overwrite the reported note, and say what its `user_notes` result means: `present` keeps the user's My Notes block (about `chars` characters) and regenerates everything else; `none` found no notes of the user's; `heading_missing` found no My Notes heading, so nothing can be kept. Edits elsewhere in the note are replaced. On yes, rerun with `--overwrite-existing-note --expected-existing-note-sha256 <reported_sha256>` and carry it to Formal Save. On no, stop without writing. |
+   | `same_language_note_exists` | Ask whether to overwrite the reported note, and say what its `user_notes` result means: `present` keeps the user's My Notes block (about `chars` characters) and regenerates everything else; `none` found no notes of the user's; `heading_missing` found no My Notes heading, so nothing can be kept. When `legacy_format` is true, add that the kept block predates the current note format and may be old model-written text. Edits elsewhere in the note are replaced. On yes, rerun with `--overwrite-existing-note --expected-existing-note-sha256 <reported_sha256>` and carry it to Formal Save. On no, stop without writing. |
    | several matching directories or sources | Ask for the selection as `references/paper-archive.md` describes, and carry it through Formal Save. |
    | any other conflict | Report it and stop. |
 
@@ -96,7 +96,7 @@ When any other step fails, retry it or take a fallback this skill names. Otherwi
 - Contributions lists the paper's actual innovations and why each matters.
 - A method, framework, or system paper gets the localized mechanism-flow subsection under its method section, usually 3 to 4 numbered steps that each name the input, the operation, and where the output goes.
 - Give replication-grade detail: key settings and numbers, plus the central formulas, objectives, or complexity expressions as `$...$` or `$$...$$`. Write a central comparison of three or more systems, settings, tasks, datasets, metrics, or ablation rows as a compact Markdown table followed by its interpretation.
-- Takeaways holds exactly the two subsections of `writing_contract.takeaways_contract`, one or two items each: reusable ideas that name the paper's mechanism, where it transfers, and its precondition, then follow-up questions or experiments specific to this paper. With a non-empty `reader_research_direction`, connect at least one transferable idea to that direction whenever a credible transfer exists, mark the connection as judgment, and say plainly when none exists.
+- Takeaways holds exactly the two subsections of `writing_contract.takeaways_contract`, one or two items each, and each item is one or two sentences: reusable ideas that name the paper's mechanism, where it transfers, and its precondition, then follow-up questions or experiments specific to this paper, at least one of which tests the paper's own claims or evidence. With a non-empty `reader_research_direction`, connect at least one transferable idea to that direction whenever a credible transfer exists, start every item that connects to it with `takeaways_contract.judgment_marker`, and say plainly when no credible transfer exists.
 - My Notes is the last section and belongs to the user. The draft holds exactly `writing_contract.my_notes_contract.guidance` there. Formal Save keeps the user's own block from the note it replaces.
 - A short paper still gets a complete deep note: spend the space on protocol details, ablations, limitations, and replication implications.
 - The readability pass rewrites leftover language into natural prose in the configured language and keeps stable proper nouns. It adds no new facts or filler.
@@ -125,7 +125,7 @@ Final user report:
   2. the Grounding Lint, Final Note Lint, Final Quality Review, and Final Readability Review results, plus the warning count
   3. the materialized and retained-placeholder figure/table counts, plus each dropped item with its reason from `figure_drops`
   4. whether the generated part of the saved note matches the Final Note Lint `note_sha256`
-- When the save replaced an existing note, report the save receipt's `user_notes.status`: `preserved` kept the user's My Notes; `untouched` found none to keep; `heading_missing` found no My Notes heading. A preserved block that predates this format may be model-written text; say the user can delete it.
+- When the save replaced an existing note, report the save receipt's `user_notes.status`: `preserved` kept the user's My Notes; `untouched` found none to keep; `heading_missing` found no My Notes heading. Only when `user_notes.legacy_format` is true, add that the kept block predates the current note format and may be old model-written text the user can delete.
 - Add overwrite actions, preference changes, or user-relevant warnings only when they occurred.
 
 ## References
