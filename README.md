@@ -71,7 +71,7 @@ claude plugin install deeppapernote@deeppapernote
 npx skills add 917Dhj/DeepPaperNote
 ```
 
-Both routes install the same skills. The plugin route brings both `deeppapernote` and `paper-glossary`; the skills CLI installer lets you choose which skills to install and which agents should receive them. For most users, start with `deeppapernote`; add `paper-glossary` only if you want reusable terminology notes.
+Both routes install the same skills. The plugin route brings `deeppapernote`, `paper-glossary`, and `research-memory`; the skills CLI installer lets you choose which skills to install and which agents should receive them. For most users, start with `deeppapernote`; add `paper-glossary` if you want reusable terminology notes, and `research-memory` if you want takeaways tailored to your own research.
 
 ### 2. Install the core PDF dependency
 
@@ -117,12 +117,13 @@ Connector is an optional browser extension, currently supporting **Chrome on mac
 
 ## 🧩 Skills
 
-DeepPaperNote remains the main product. The repository also includes an optional companion skill that works from DeepPaperNote's saved paper artifacts without taking over or rerunning the paper-reading workflow.
+DeepPaperNote remains the main product. The repository also includes optional companion skills that work from DeepPaperNote's saved notes and artifacts without taking over or rerunning the paper-reading workflow.
 
 | Skill | Role | When to use it |
 | --- | --- | --- |
 | [`deeppapernote`](./skills/deeppapernote/SKILL.md) | **Core product · recommended** | Read one paper deeply and produce a structured, evidence-based Obsidian note with figures, results, and limitations |
 | [`paper-glossary`](./skills/paper-glossary/SKILL.md) | Optional companion | Select terms from existing paper artifacts, create reusable Obsidian glossary notes, and optionally link them back to the paper note |
+| [`research-memory`](./skills/research-memory/SKILL.md) | Optional companion | Let the agent interview you, with evidence from the papers you have read, to record your research directions in Obsidian; DeepPaperNote then tailors each note's transferable ideas to them |
 
 You do not need to install every skill. Choose the ones that match your workflow during installation.
 
