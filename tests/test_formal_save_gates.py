@@ -49,6 +49,8 @@ def save_inputs(tmp_path: Path) -> dict[str, Path]:
         "claim_boundaries": ["The conclusion is limited to the reported evidence."],
         "reuse_takeaways": ["Reuse the reported mechanism where its stated preconditions hold."],
         "followup_questions": ["Test whether the result survives outside the reported setting."],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
     })
     write_json(paths["source"], {
         "status": "ok", "paper_id": "paper:formal-save", "source_sha256": "a" * 64,

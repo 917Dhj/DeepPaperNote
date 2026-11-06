@@ -149,7 +149,7 @@ The embed must be followed immediately by exactly one italic caption line:
 9. `深度分析`
 10. `局限`
 11. `阅读收获`
-12. `引用`
+12. `关联`
 13. `我的笔记`
 
 When abstract metadata exists, `原文摘要翻译` should be a single Chinese translation block for the original abstract rather than a bilingual subsection pair.
@@ -173,7 +173,7 @@ When the paper is complex, add `###` subsections such as:
 
 ### 下一步
 
-- 一到两条，每条一两句话：针对这篇论文的追问或实验，至少一条检验论文自身的论断或证据；推荐的论文必须已出现在 `引用` 中。
+- 一到两条，每条一两句话：针对这篇论文的追问或实验，至少一条检验论文自身的论断或证据；推荐的论文必须已出现在 `关联` 中。
 ```
 
 ## 我的笔记 Section Format
@@ -188,27 +188,48 @@ When the paper is complex, add `###` subsections such as:
 
 Everything from the `## 我的笔记` heading line to the end of the file belongs to the user, including any `##` headings the user adds. Formal Save keeps that block from the note it replaces, unless the old note is byte-identical to its last recorded save or the block is exactly the standard guidance. When the old note has no `## 我的笔记` heading, nothing can be kept and the overwrite prompt says so.
 
-## 引用 Section Format
+## 关联 Section Format
 
-Entries in `## 引用` should link to existing notes in the vault where possible.
-If the synthesis bundle includes `references.candidates`, use confirmed candidate `wikilink` values when present. When `wikilink` is empty, treat `display_text` as the plain-text fallback.
-Follow this priority order for each reference:
+`关联` replaces the old bibliography list. It turns the note into a node of the user's vault: it links to papers the user has already read and names the few prior works this paper builds on. `writing_contract.connections_contract` carries the exact headings, relation labels, limits, and empty statements.
 
-1. **Vault lookup first**: check whether the cited paper already has a note in the vault.
-   - Match by note basename (the `<paper_slug>` part of the folder name).
-   - Match by the `aliases` field in the note's YAML frontmatter.
-2. **If a match is found**: write a wikilink that separates the target from the display text:
-   ```
-   - [[paper_slug_or_alias|Human Readable Title]]
-   ```
-3. **If no match is found**: do not invent a wikilink target. Write the reference as plain text instead:
-   ```
-   - Vaswani et al. (2017). Attention Is All You Need.
-   ```
-   Use the candidate `display_text` as the plain fallback when available.
+```md
+## 关联
 
-Rules:
-- Never use a raw English paper title as the wikilink target; it will not match vault filenames.
-- To derive a likely slug from a title: lowercase the title and replace spaces and special characters with underscores — but only use the result as the target if you have confirmed the file exists.
-- List only papers cited or directly relevant to this note.
-- Do not add extra DOIs or author metadata when using wikilink format; the display text is enough.
+### 库内笔记
+
+- [[InstructGPT.en|InstructGPT]]（基线/对比）：本文直接拿它作为主要对照模型。
+- [[Super_NaturalInstructions.zh-CN|Super-NaturalInstructions]]（同一数据集/基准）：两篇都在 SuperNI 上报告泛化结果。
+
+### 关键前置文献
+
+- Ouyang et al. 2022. Training Language Models to Follow Instructions with Human Feedback（基线）
+- Wang et al. 2022. Super-NaturalInstructions（数据来源）
+- Brown et al. 2020. Language Models are Few-Shot Learners（骨干模型）
+```
+
+### 库内笔记
+
+- Choose only from `connection_candidates` in the synthesis bundle. `cited` holds vault papers this paper cites (matched by DOI, arXiv ID, or title/alias); `related` holds vault papers that share methods, datasets, tasks, or aliases with this paper's full text. Scripts recall; you judge. Drop a candidate unless one relation below is true and you can state why in one sentence.
+- Record each kept link in `note_plan.connections` as `{target, relation, reason}`. `target` is the candidate's `target` exactly; `relation` is one key of `connections_contract.relations`; `reason` is the one-sentence justification. The section lists exactly the planned links, in plan order.
+- Entry format: `- [[target|标题]]（关系）：理由`. The display title is the paper's short name or title, not the file name. The relation label comes from `connections_contract.relation_labels`:
+
+  | key | 中文标签 | English label |
+  |---|---|---|
+  | `baseline` | 基线/对比 | baseline |
+  | `extends` | 扩展了它 | extends |
+  | `extended_by` | 被本文扩展 | extended by |
+  | `conflicting_findings` | 结论冲突 | conflicting findings |
+  | `same_task` | 同一任务 | same task |
+  | `same_benchmark` | 同一数据集/基准 | same benchmark |
+  | `shared_method` | 方法同源 | shared method |
+
+  A relation outside this table is not written.
+- At most `max_in_vault` (8) entries. Order by importance: baseline, extension, and conflicting findings first; same task, same benchmark, and shared method after.
+- With no kept link, write exactly one fixed sentence instead of a list: `库里暂无相关笔记`; in workspace mode, `当前为 workspace 模式，未连接知识库`.
+- Workspace mode has no vault, so the whole note carries no `[[link]]`. In Obsidian mode, Formal Save refuses a generated `[[link]]` (frontmatter included, `我的笔记` excluded) that matches no vault file.
+
+### 关键前置文献
+
+- Three to five works, chosen by how this paper uses them: baseline, backbone model, data source, theoretical basis, or method source. Do not copy the bibliography.
+- Record them in `note_plan.key_prior_work` as `{work, role}`; the section lists the same works in the same order.
+- Entry format: `- 作者 年份. 标题（角色）`. Write plain text; never invent a link target. A prior work that already has a vault note belongs in `库内笔记` as well.

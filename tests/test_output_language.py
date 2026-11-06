@@ -30,7 +30,7 @@ ENGLISH_SECTIONS = (
     "Deep Analysis",
     "Limitations",
     "Takeaways",
-    "References",
+    "Connections",
     "My Notes",
 )
 
@@ -118,9 +118,17 @@ The evaluation covers English question-answering data and a narrow tool set, so 
 
 - I suspect the state machine degrades with high-latency services; rerunning the main benchmark with injected timeouts would test this.
 
-## References
+## Connections
 
-- Smith et al. (2024). Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example
+### In Your Vault
+
+No related notes in your vault yet.
+
+### Key Prior Work
+
+- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering (baseline)
+- Yao et al. 2023. ReAct: Synergizing Reasoning and Acting in Language Models (method source)
+- Schick et al. 2023. Toolformer: Language Models Can Teach Themselves to Use Tools (method source)
 
 ## My Notes
 
@@ -148,6 +156,8 @@ def plan_payload() -> dict:
         "comparative_positioning": ["Compared with answer-only baselines."],
         "reuse_takeaways": ["Track tool failure state explicitly so later steps can tell missing evidence apart."],
         "followup_questions": ["Test whether the state log survives missing and delayed tool outputs."],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
         "section_plan": [{"section": "Method", "evidence_sources": [{"section_id": "sec:method"}]}],
     }
 

@@ -61,11 +61,11 @@ It should usually:
 
 ## Takeaways and My Notes
 
-The note ends with `阅读收获`, then `引用`, then `我的笔记`. `writing_contract.takeaways_contract` and `writing_contract.my_notes_contract` carry the exact headings, limits, and guidance text.
+The note ends with `阅读收获`, then `关联`, then `我的笔记`. `writing_contract.takeaways_contract`, `writing_contract.connections_contract`, and `writing_contract.my_notes_contract` carry the exact headings, limits, and guidance text. Write `关联` from `note_plan.connections` and `note_plan.key_prior_work` as described in `references/obsidian-format.md`.
 
 `阅读收获` answers "what do I do with this paper". It holds exactly two `###` subsections, each with one or two list items. Keep each item to one or two sentences; Final Note Lint warns when an item exceeds `takeaways_contract.max_item_chars` non-space characters.
 - `### 可迁移` comes from `note_plan.reuse_takeaways`. Each item names the paper's concrete mechanism or practice, where it would transfer, and the precondition for the transfer to hold.
-- `### 下一步` comes from `note_plan.followup_questions`. Each item is a follow-up question or experiment specific to this paper. At least one item tests the paper's own claims or evidence rather than only a transfer setting. A doubt belongs here only together with the experiment that would test it; plain criticism stays in `深度分析` and `局限`. A recommended next paper must already appear in `引用`; never invent a title.
+- `### 下一步` comes from `note_plan.followup_questions`. Each item is a follow-up question or experiment specific to this paper. At least one item tests the paper's own claims or evidence rather than only a transfer setting. A doubt belongs here only together with the experiment that would test it; plain criticism stays in `深度分析` and `局限`. A recommended next paper must already appear in `关联`; never invent a title.
 
 When the user's request states their own research direction, record it verbatim in `note_plan.reader_research_direction` and write `### 可迁移` against it:
 1. Whenever a credible transfer exists, at least one item connects to the user's direction.

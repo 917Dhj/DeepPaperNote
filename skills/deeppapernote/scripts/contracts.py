@@ -20,7 +20,7 @@ NOTE_REQUIRED_SECTIONS: tuple[str, ...] = (
     "深度分析",
     "局限",
     "阅读收获",
-    "引用",
+    "关联",
     "我的笔记",
 )
 
@@ -52,12 +52,14 @@ NOTE_PLAN_LIST_FIELDS: tuple[str, ...] = (
     "comparative_positioning",
     "reuse_takeaways",
     "followup_questions",
+    "key_prior_work",
     "section_plan",
 )
 
 NOTE_PLAN_REQUIRED_FIELDS: tuple[str, ...] = NOTE_PLAN_STRING_FIELDS + NOTE_PLAN_LIST_FIELDS
 # Optional fields stay in the template so the planner sees them, but an empty value is valid.
 NOTE_PLAN_OPTIONAL_STRING_FIELDS: tuple[str, ...] = ("reader_research_direction",)
+NOTE_PLAN_OPTIONAL_LIST_FIELDS: tuple[str, ...] = ("connections",)
 TAKEAWAY_PLAN_FIELDS: tuple[str, ...] = ("reuse_takeaways", "followup_questions")
 NOTE_PLAN_FIELD_TYPES: dict[str, str] = {
     **dict.fromkeys(NOTE_PLAN_STRING_FIELDS, "string"),
@@ -554,6 +556,19 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
         "read_date_format": "YYYY-MM-DD",
         "paper_type_source": "note_plan.paper_type",
     },
+    "connections_contract": {
+        "plan_fields": ("connections", "key_prior_work"),
+        "connection_fields": ("target", "relation", "reason"),
+        "key_prior_work_fields": ("work", "role"),
+        "relations": (
+            "baseline", "extends", "extended_by", "conflicting_findings",
+            "same_task", "same_benchmark", "shared_method",
+        ),
+        "max_in_vault": 8,
+        "key_prior_work_items": {"min": 3, "max": 5},
+        "candidate_source": "connection_candidates",
+        "followup_papers_must_appear_in_connections": True,
+    },
     "takeaways_contract": {
         "plan_fields": TAKEAWAY_PLAN_FIELDS,
         "min_items": 1,
@@ -591,6 +606,19 @@ def writing_contract_rules(language: str | None = None) -> dict[str, Any]:
     rules["takeaways_contract"]["subsections"] = tuple(schema["takeaways_subsections"].values())
     rules["takeaways_contract"]["judgment_marker"] = schema["takeaways_judgment_marker"]
     rules["takeaways_contract"]["max_item_chars"] = schema["takeaways_max_item_chars"]
+    connections = rules["connections_contract"]
+    connections["section"] = schema["sections"]["connections"]
+    connections["subsections"] = tuple(schema["connections_subsections"].values())
+    connections["relation_labels"] = {
+        key: schema["connections_relation_labels"][key] for key in connections["relations"]
+    }
+    connections["empty_statements"] = dict(schema["connections_empty_statements"])
+    connections["in_vault_entry_format"] = (
+        "- [[target|标题]]（关系）：理由" if resolved == "zh-CN" else "- [[target|Title]] (relation): reason"
+    )
+    connections["key_prior_work_entry_format"] = (
+        "- 作者 年份. 标题（角色）" if resolved == "zh-CN" else "- Author Year. Title (role)"
+    )
     rules["my_notes_contract"] = {
         "section": schema["sections"]["my_notes"],
         "guidance": schema["my_notes_guidance"],
@@ -630,6 +658,63 @@ def takeaway_plan_issues(note_plan: dict[str, Any]) -> list[dict[str, Any]]:
     if reader_field in note_plan and not isinstance(note_plan[reader_field], str):
         issues.append({"code": "note_plan_reader_research_direction_invalid", "field": reader_field})
     return issues
+
+
+def connection_plan_issues(note_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Check the plan fields that feed the Connections section (shape only, not targets)."""
+    contract = WRITING_CONTRACT_RULES["connections_contract"]
+    issues: list[dict[str, Any]] = []
+    prior = note_plan.get("key_prior_work")
+    if isinstance(prior, list) and prior:
+        limits = contract["key_prior_work_items"]
+        if not limits["min"] <= len(prior) <= limits["max"]:
+            issues.append({"code": "note_plan_key_prior_work_count_invalid", "field": "key_prior_work", "count": len(prior)})
+        for index, item in enumerate(prior):
+            if not _filled_object(item, contract["key_prior_work_fields"]):
+                issues.append({"code": "note_plan_key_prior_work_item_invalid", "field": "key_prior_work", "index": index})
+    if "connections" not in note_plan:
+        return issues
+    connections = note_plan["connections"]
+    if not isinstance(connections, list):
+        return issues + [{"code": "note_plan_connections_invalid", "field": "connections"}]
+    if len(connections) > contract["max_in_vault"]:
+        issues.append({"code": "note_plan_connections_count_invalid", "field": "connections", "count": len(connections)})
+    seen: set[str] = set()
+    for index, item in enumerate(connections):
+        if not _filled_object(item, contract["connection_fields"]):
+            issues.append({"code": "note_plan_connection_item_invalid", "field": "connections", "index": index})
+            continue
+        if item["relation"] not in contract["relations"]:
+            issues.append({"code": "note_plan_connection_relation_invalid", "field": "connections", "index": index})
+        if item["target"] in seen:
+            issues.append({"code": "note_plan_connection_duplicate", "field": "connections", "index": index})
+        seen.add(item["target"])
+    return issues
+
+
+def connection_target_issues(note_plan: dict[str, Any], bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every planned connection must link to a note the bundle recalled."""
+    connections = note_plan.get("connections")
+    if not isinstance(connections, list) or not connections:
+        return []
+    recalled = bundle.get("connection_candidates")
+    known: set[str] = set()
+    if isinstance(recalled, dict):
+        for group in ("cited", "related"):
+            for candidate in recalled.get(group) or []:
+                if isinstance(candidate, dict) and isinstance(candidate.get("target"), str):
+                    known.add(candidate["target"])
+    return [
+        {"code": "note_plan_connection_target_unknown", "field": "connections", "index": index, "target": item["target"]}
+        for index, item in enumerate(connections)
+        if isinstance(item, dict) and isinstance(item.get("target"), str) and item["target"] not in known
+    ]
+
+
+def _filled_object(item: object, fields: tuple[str, ...]) -> bool:
+    return isinstance(item, dict) and set(item) == set(fields) and all(
+        isinstance(item[field], str) and item[field].strip() for field in fields
+    )
 
 
 class MetadataRecord(TypedDict, total=False):

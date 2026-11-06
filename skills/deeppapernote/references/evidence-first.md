@@ -45,6 +45,8 @@ The plan should state:
 - which weak, negative, limiting, or explicitly unreported results constrain the conclusion
 - one or two reusable takeaways and one or two follow-up questions or experiments, each specific to this paper and at least 20 characters long
 - the research direction the user stated in the request, verbatim in `reader_research_direction`, or an empty string when none was stated
+- three to five `key_prior_work` items `{work, role}`: the prior works this paper builds on, with how it uses each (baseline, backbone model, data source, theoretical basis, method source)
+- zero to eight `connections` `{target, relation, reason}` chosen from the bundle's `connection_candidates`; `target` copies a candidate's `target`, `relation` is a key of `writing_contract.connections_contract.relations`, and Grounding Lint rejects any target the bundle did not recall
 - whether this is mostly a method note, system note, dataset note, benchmark note, or empirical/clinical note
 - whether key formulas or complexity expressions need to appear in the final note
 
@@ -80,6 +82,11 @@ Recommended shape:
   "comparative_positioning": ["Compared with answer-only baselines, the paper evaluates a mechanism that keeps intermediate failure states inspectable."],
   "reuse_takeaways": ["Track tool failures as first-class state rather than hiding them in the final answer."],
   "followup_questions": ["Does the same state logging still help when external tools are slow, missing, or adversarially noisy?"],
+  "key_prior_work": [
+    {"work": "Yao et al. 2023. ReAct: Synergizing Reasoning and Acting in Language Models", "role": "基线"},
+    {"work": "Schick et al. 2023. Toolformer: Language Models Can Teach Themselves to Use Tools", "role": "方法来源"},
+    {"work": "Yang et al. 2018. HotpotQA: A Dataset for Diverse, Explainable Multi-hop Question Answering", "role": "数据来源"}
+  ],
   "section_plan": [
     {
       "section": "研究问题",
@@ -119,7 +126,10 @@ Recommended shape:
       "evidence_sources": [{"section_id": "sec:limitations"}]
     }
   ],
-  "reader_research_direction": ""
+  "reader_research_direction": "",
+  "connections": [
+    {"target": "ReAct.zh-CN", "relation": "baseline", "reason": "本文把 ReAct 作为主要对照，并在同一批多跳问答任务上比较可追溯错误率。"}
+  ]
 }
 ```
 

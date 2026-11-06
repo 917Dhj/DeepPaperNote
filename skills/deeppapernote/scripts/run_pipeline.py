@@ -318,6 +318,11 @@ def prepare_steps(
             str(paths["figure_table_decisions"]),
             "--language",
             args.language,
+            *(
+                ["--admission", str(Path(args.admission).expanduser().resolve())]
+                if getattr(args, "admission", "")
+                else []
+            ),
             "--output",
             str(paths["bundle"]),
         ],

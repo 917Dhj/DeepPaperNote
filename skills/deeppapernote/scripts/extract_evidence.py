@@ -38,6 +38,10 @@ from common import (
 )
 from contracts import empty_evidence_pack
 from citation_links import extract_reference_candidates_from_pdf
+
+# Connections match the whole bibliography against the vault, not just its first page.
+FULL_BIBLIOGRAPHY_MAX_PAGES = 30
+FULL_BIBLIOGRAPHY_MAX_ITEMS = 400
 from source_corpus import SourceCorpus, SourceCorpusLoadError, load_source_corpus, validate_source_corpus
 
 
@@ -858,6 +862,8 @@ def main() -> None:
         pack["reference_candidates"] = extract_reference_candidates_from_pdf(
             pdf_path.resolve(),
             pdf_coverage.get("references_start_page"),
+            max_pages=FULL_BIBLIOGRAPHY_MAX_PAGES,
+            max_items=FULL_BIBLIOGRAPHY_MAX_ITEMS,
         )
     pack["candidate_chunks"] = candidates
     pack["language_hint"] = language_hint or language_hint_for_text(

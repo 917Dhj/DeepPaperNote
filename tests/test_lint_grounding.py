@@ -138,6 +138,8 @@ def note_plan_with_sources(sources_by_section: dict[str, list[dict] | list[str]]
         "comparative_positioning": ["The plan distinguishes the method from answer-only baselines."],
         "reuse_takeaways": ["Track evidence and repair steps separately."],
         "followup_questions": ["Check whether the mechanism still works with missing tool outputs."],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
         "section_plan": section_plan,
     }
 

@@ -22,6 +22,8 @@ from contracts import (
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
     required_field_value_error,
+    connection_plan_issues,
+    connection_target_issues,
     takeaway_plan_issues,
     writing_contract_rules,
 )
@@ -454,7 +456,7 @@ def validate_note_plan(
         issues.append(issue("section_plan_required_section_missing", section=section_name))
 
     issues.extend(validate_central_claims(note_plan, valid_ids, max_page))
-    for item in takeaway_plan_issues(note_plan):
+    for item in [*takeaway_plan_issues(note_plan), *connection_plan_issues(note_plan)]:
         code = item.pop("code")
         issues.append(issue(code, **item))
 
@@ -513,6 +515,9 @@ def validate_bundle_contract(
     if not bundle:
         return []
     issues: list[dict[str, Any]] = []
+    for item in connection_target_issues(note_plan, bundle):
+        code = item.pop("code")
+        issues.append(issue(code, **item))
     for old_key in WRITING_CONTRACT_RULES["excluded_model_input_fields"]:
         if old_key in bundle:
             issues.append(issue("bundle_old_model_input_field_present", field=old_key))

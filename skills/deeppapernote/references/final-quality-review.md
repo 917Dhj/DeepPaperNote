@@ -16,12 +16,13 @@ Give the reviewer this prompt with the explicit paths and resolved language fill
 >
 > Review from scratch on every attempt. Do not rely on an earlier verdict, author assurances, a passing lint, or an earlier drafting rationale. Write only the quality-review JSON artifact. Do not edit the note, plan, readability receipt, or revision journal.
 >
-> Check every planned item in these four groups:
+> Check every planned item in these five groups:
 >
 > - `central_claims`: the note explains each claim and the evidence-to-claim relationship, including what the evidence actually proves. A keyword mention is insufficient.
 > - `mechanism_result_map`: the note explains each planned mechanism-to-result relationship. Listing a mechanism and a result separately is insufficient.
 > - `claim_boundaries`: the note faithfully carries every boundary and each central claim's `what_it_does_not_prove`. Unsupported generalization fails this check.
 > - `takeaways`: the Takeaways section carries every `reuse_takeaways` and `followup_questions` item, and each is specific to this paper rather than a sentence that would fit any paper. A transferable idea names the paper's mechanism, where it would transfer, and its precondition. At least one next step tests the paper's own claims or evidence. When `reader_research_direction` is non-empty, at least one transferable idea connects to that direction whenever a credible transfer exists, every item that connects to it starts with the judgment marker from `writing_contract.takeaways_contract`, and an absent transfer is stated plainly instead of forced. The My Notes section holds only the standard guidance.
+> - `connections`: every `connections` entry links its planned target with the planned relation label, and the relation and reason are true of the two papers as the note and plan describe them; a link kept only to fill the list fails. Every `key_prior_work` item is a real work this paper uses, its role matches how the paper uses it, and the list is not a copy of the bibliography. With no planned connection, the In Your Vault subsection holds only the fixed empty statement.
 >
 > Mark a group true only when all its relevant plan items are faithfully reflected. For each missing or incorrect relationship, identify the exact plan item and a concrete required revision. Do not invent facts, weaken the plan to fit the draft, or turn broad stylistic preferences into V1 blocking findings. The wider writing requirements still apply to the author.
 >
@@ -31,7 +32,7 @@ Quality artifact shape:
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "output_language": "en",
   "verdict": "pass",
   "reviewed_note_sha256": "<actual raw draft SHA-256>",
@@ -40,15 +41,16 @@ Quality artifact shape:
     "central_claims": true,
     "mechanism_result_map": true,
     "claim_boundaries": true,
-    "takeaways": true
+    "takeaways": true,
+    "connections": true
   },
   "blocking_findings": []
 }
 ```
 
-The quality artifact is `schema_version` 2; a version 1 review predates the `takeaways` check and must be redone in full. The readability receipt and revision journal stay at version 1.
+The quality artifact is `schema_version` 3; an older review predates the `connections` check and must be redone in full. The readability receipt and revision journal stay at version 1.
 
-Use lowercase 64-character SHA-256 values. A passing artifact has all four literal booleans true and no findings. A failing artifact uses `verdict: "fail"`, at least one false check, and a finding for every false check. Every finding names a false check and contains exactly:
+Use lowercase 64-character SHA-256 values. A passing artifact has all five literal booleans true and no findings. A failing artifact uses `verdict: "fail"`, at least one false check, and a finding for every false check. Every finding names a false check and contains exactly:
 
 ```json
 {
@@ -59,7 +61,7 @@ Use lowercase 64-character SHA-256 values. A passing artifact has all four liter
 }
 ```
 
-Allowed references name an existing item at `/central_claims/N`, `/mechanism_result_map/N`, or `/claim_boundaries/N`, matching the failed check; a `takeaways` finding names `/reuse_takeaways/N` or `/followup_questions/N`. Boundary findings may also use `/central_claims/N/what_it_does_not_prove`. Indices are zero-based canonical decimals. Empty strings, arbitrary pointers, unknown fields, duplicate keys, and inconsistent verdicts are invalid executions.
+Allowed references name an existing item at `/central_claims/N`, `/mechanism_result_map/N`, or `/claim_boundaries/N`, matching the failed check; a `takeaways` finding names `/reuse_takeaways/N` or `/followup_questions/N`; a `connections` finding names `/connections/N` or `/key_prior_work/N`. Boundary findings may also use `/central_claims/N/what_it_does_not_prove`. Indices are zero-based canonical decimals. Empty strings, arbitrary pointers, unknown fields, duplicate keys, and inconsistent verdicts are invalid executions.
 
 ## Record every result
 
