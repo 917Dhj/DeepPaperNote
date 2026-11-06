@@ -85,16 +85,16 @@ Answer:
 - what the paper's real contribution is
 - what the title may overstate
 
-### 研究问题
+### Opening sections
 
-Answer:
+The first middle sections of each type (for example `背景与问题`, `评测缺口`, `核心立场`, `研究问题与假设`) set up the problem. Answer:
 - the concrete pain point
 - why existing methods are not enough
 - whether this is a new problem, a new angle on an old problem, or a more realistic reformulation
 
-### 数据与任务定义
+### Data and task
 
-Must separate:
+Wherever the type describes data or the task (for example `任务与设计目标`, `构造流程与质量控制`, `研究设计与对象`, `材料与参与者`), separate:
 - where the data comes from
 - what labels or supervision exist
 - what the actual task is
@@ -106,9 +106,9 @@ For clinical or social-science papers, spell out:
 - annotation or rating assumptions
 - whether the task is realistic or simplified
 
-### 方法主线
+### Method or design sections
 
-This is usually where a shallow note fails.
+The section that explains how the work operates (for example `方法`, `设计与权衡`, `实验设计`) is usually where a shallow note fails.
 
 Explain:
 - the information flow
@@ -121,22 +121,17 @@ Explain:
 - even if an extracted Algorithm block is broken, reconstruct the mechanism in plain engineering language rather than giving up
 - make the reader feel the Input -> key transformation -> Output flow, not just the paper's terminology
 
-For method, framework, or system papers:
-- default to an explicit `### 机制流程` subsection inside `方法主线`
-- write it as a 3 to 4 step numbered list rather than a long paragraph
-- each step should say what goes in, what operation happens, and where the output goes next
-- if the paper has both training and inference details, use `### 机制流程` for the dominant execution chain and leave training recipe details to neighboring subsections
+When the type has a workflow, its subsection carries the execution chain as `paper-types.md` shows; mark the steps that are new in this paper. A paper with both training and inference chains gets one flow for each.
 
 For complex papers, use `###` subheadings such as:
-- `### 机制流程`
 - `### 数据构建`
 - `### 中间表征抽取`
 - `### 模型结构`
 - `### 训练与推理`
 
-### 关键结果
+### Results sections
 
-Do not dump all metrics.
+In the section that carries results (for example `实验证据`, `实验发现`, `评测`, `主要发现`), do not dump all metrics.
 
 Include:
 - the most important comparison
@@ -150,9 +145,9 @@ For method papers, also ask:
 - if the paper reports ablations or removed-module comparisons, include at least one setting that hurt performance, made training unstable, or revealed a trade-off
 - if the evidence bundle contains no such negative ablation signal, say explicitly that the paper did not clearly report failed or unstable settings
 
-### 深度分析
+### Analysis sections
 
-This is the most important part.
+The analytical sections (for example `深度分析`, `它到底测到了什么`, `能否排除其他解释`, `结论强度`, `偏倚与外推`) are the most important part.
 
 Include:
 - research value
@@ -192,7 +187,7 @@ Prefer:
 
 ### 阅读收获
 
-This section answers "what do I do with this paper", not "what did it prove". Doubts about the evidence stay in `深度分析` and `局限`.
+This section answers "what do I do with this paper", not "what did it prove". Doubts about the evidence stay in the analysis sections and `局限`.
 
 - `### 可迁移`: one or two reusable ideas, each naming the paper's concrete mechanism or practice, where it would transfer, and the precondition for the transfer to hold. An item tied to the user's research direction starts with `判断：`.
 - `### 下一步`: one or two follow-up questions or experiments specific to this paper, at least one of them testing the paper's own claims or evidence. A doubt is welcome here when it comes with the experiment that would test it. A recommended next paper must already appear in `关联`.
@@ -208,7 +203,7 @@ This section belongs to the user. Write only the standard guidance from `writing
 When the paper has useful visuals:
 - preserve placeholders for the important ones
 - prioritize one method figure, one data/task figure, and one result figure or table
-- if a high-confidence pipeline or architecture figure clearly matches the core execution chain, place it in `### 机制流程` first
+- if a high-confidence pipeline or architecture figure clearly matches the core execution chain, place it right after the workflow table
 - explain why each figure matters
 - keep original paper numbering such as `Fig. 1` or `Table 2`
 

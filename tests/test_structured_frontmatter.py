@@ -24,7 +24,7 @@ aliases:
   - "Self-Instruct"
 date: 2023-07-09
 doi: 10.18653/v1/2023.acl-long.754
-paper_type: AI_method
+paper_type: method
 methods: [instruction tuning, "self-generated data"]
 datasets:
   - SuperNI
@@ -44,7 +44,7 @@ def test_parser_reads_scalars_block_lists_and_flow_lists() -> None:
     assert fields["tags"] == ["papers/机器学习"]
     assert fields["aliases"] == ["Self-Instruct"]
     assert fields["date"] == "2023-07-09"
-    assert fields["paper_type"] == "AI_method"
+    assert fields["paper_type"] == "method"
     assert fields["methods"] == ["instruction tuning", "self-generated data"]
     assert fields["datasets"] == ["SuperNI"]
     assert fields["tasks"] == []
@@ -85,7 +85,7 @@ def test_parser_rejects_unclosed_frontmatter() -> None:
 # --- lint checks -----------------------------------------------------------
 
 
-def codes(text: str, paper_type: str = "AI_method") -> set[str]:
+def codes(text: str, paper_type: str = "method") -> set[str]:
     return set(lint_note.frontmatter_issues(text, paper_type))
 
 
@@ -154,7 +154,7 @@ def test_frontmatter_issues_fail_basic_structure_in_cli(tmp_path: Path) -> None:
 def test_valid_fixture_note_passes_frontmatter_checks() -> None:
     from test_lint_note import _valid_note_text
 
-    assert lint_note.frontmatter_issues(_valid_note_text(), "AI_method") == []
+    assert lint_note.frontmatter_issues(_valid_note_text(), "method") == []
 
 
 def test_writing_contract_describes_the_frontmatter() -> None:

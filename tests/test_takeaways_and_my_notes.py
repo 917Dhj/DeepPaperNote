@@ -79,21 +79,23 @@ def zh_note(tail: str | None = None) -> str:
 
 这篇论文用可审计的工具调用状态机降低长链路问答中的错误累积。
 
-## 研究问题
+## 背景与问题
 
 论文关注多步问答系统在检索证据不完整、工具调用失败时，如何保持最终答案的可追溯性与可靠性。
 
-## 数据与任务定义
+## 现有方法的局限
 
-任务输入包括用户问题、候选检索证据和可调用工具列表；输出包括最终答案和每一步工具调用记录。
+只看答案的方法无法区分证据不足和推理错误，失败的工具调用也不会留下可检查的记录。
 
-## 方法主线
+## 核心思路与挑战
 
-### 机制流程
+核心思路是把每一步工具调用写进可审计的状态机，难点是失败状态要被后续步骤显式读取。
+
+## 方法
 
 输入问题先进入证据筛选模块，随后工具规划器选择下一步调用，最后由答案生成器结合状态日志输出结论。
 
-## 关键结果
+## 实验证据
 
 在三个多步问答数据集上，方法把答案准确率从 71.2% 提升到 78.5%，并将不可追溯错误比例从 18% 降到 9%。
 
@@ -115,6 +117,7 @@ def reasons(text: str) -> set[str]:
 @pytest.fixture(autouse=True)
 def zh_lint_profile():
     lint_note.configure_output_language("zh-CN")
+    lint_note.configure_paper_type("method")
     yield
     lint_note.configure_output_language("zh-CN")
 
@@ -139,7 +142,7 @@ def test_writing_contract_carries_takeaways_and_my_notes_contracts() -> None:
         my_notes = contract["my_notes_contract"]
         assert my_notes["guidance"] == guidance
         assert my_notes["position"] == "last"
-        assert my_notes["section"] == contract["must_include_sections"][-1]
+        assert my_notes["section"] == contract["section_order"]["tail"][-1]
         assert "reader_research_direction" in contract["note_plan_contract"]["template"]
         assert "reader_research_direction" not in contract["note_plan_contract"]["required_fields"]
 
@@ -185,6 +188,7 @@ def test_my_notes_must_be_the_last_section() -> None:
 
 def test_english_note_requires_new_top_level_profile() -> None:
     lint_note.configure_output_language("en")
+    lint_note.configure_paper_type("")  # fixed sections only
     headings = "\n\n".join(f"## {name}\n\nBody." for name in note_schema("en")["sections"].values())
     assert lint_note.english_top_level_section_warnings(f"# T\n\n{headings}\n") == []
     old = headings.replace("## My Notes", "## Research Notes")

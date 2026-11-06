@@ -24,8 +24,10 @@ from contracts import (
     required_field_value_error,
     connection_plan_issues,
     connection_target_issues,
+    core_answer_form,
+    grounding_required_sections,
     takeaway_plan_issues,
-    writing_contract_rules,
+    type_plan_issues,
 )
 from localization import normalize_output_language, require_artifact_output_language
 from source_corpus import SourceCorpusLoadError, load_source_corpus
@@ -424,7 +426,7 @@ def validate_note_plan(
 
     valid_ids = source_section_ids(source_manifest)
     max_page = total_pages(source_manifest)
-    required_sections = set(writing_contract_rules(language)["grounding_required_sections"])
+    required_sections = set(grounding_required_sections(language, paper_type))
     grounded_sections: set[str] = set()
     section_plan = note_plan.get("section_plan", [])
     if not isinstance(section_plan, list):
@@ -456,13 +458,35 @@ def validate_note_plan(
         issues.append(issue("section_plan_required_section_missing", section=section_name))
 
     issues.extend(validate_central_claims(note_plan, valid_ids, max_page))
-    for item in [*takeaway_plan_issues(note_plan), *connection_plan_issues(note_plan)]:
+    issues.extend(validate_core_answer_sources(note_plan, valid_ids, max_page))
+    for item in [
+        *takeaway_plan_issues(note_plan),
+        *connection_plan_issues(note_plan),
+        *type_plan_issues(note_plan, language),
+    ]:
         code = item.pop("code")
         issues.append(issue(code, **item))
 
     if contains_old_reference(note_plan):
         issues.append(issue("note_plan_old_bundle_reference_present"))
 
+    return issues
+
+
+def validate_core_answer_sources(
+    note_plan: dict[str, Any], valid_ids: set[str], max_page: int
+) -> list[dict[str, Any]]:
+    """An answered core question cites the source like a section_plan entry does."""
+    answers = note_plan.get("core_answers")
+    if not isinstance(answers, dict):
+        return []
+    issues: list[dict[str, Any]] = []
+    for qid, value in answers.items():
+        if core_answer_form(value) != "answer":
+            continue
+        for source in value["evidence_refs"]:
+            for code in source_grounding_errors(source, valid_ids, max_page):
+                issues.append(issue(code, question=qid, source=source))
     return issues
 
 

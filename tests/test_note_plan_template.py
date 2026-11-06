@@ -52,14 +52,14 @@ def test_template_has_the_shape_the_gates_check(language: str) -> None:
     plan = template(language)
 
     contract = compact_writing_contract(language)["note_plan_contract"]
-    assert list(plan) == contract["required_fields"] + contract["optional_fields"]
+    assert list(plan) == contract["required_fields"] + contract["optional_fields"] + list(contract["type_fields"])
+    assert plan["core_answers"] == {} and plan["workflow"] == []
     assert plan["reader_research_direction"] == ""
     assert plan["output_language"] == language
     claim_fields = WRITING_CONTRACT_RULES["analysis_coverage_contract"]["central_claim_fields"]
     assert [list(claim) for claim in plan["central_claims"]] == [list(claim_fields)]
-    assert [item["section"] for item in plan["section_plan"]] == list(
-        rules["grounding_required_sections"]
-    )
+    # The middle sections depend on the paper type, so the template leaves one blank entry before limitations.
+    assert [item["section"] for item in plan["section_plan"]] == ["", rules["limitations_section"]]
     for item in plan["section_plan"]:
         assert item == {
             "section": item["section"],
@@ -84,8 +84,8 @@ def test_unfilled_template_fails_lint_and_grounding(tmp_path: Path, language: st
         (issue["code"], issue.get("section", ""))
         for issue in validate_note_plan(plan, SOURCE_MANIFEST, language)
     }
-    for section in rules["grounding_required_sections"]:
-        assert ("section_plan_grounding_missing", section) in codes
+    assert ("section_plan_grounding_missing", rules["limitations_section"]) in codes
+    assert ("note_plan_paper_type_invalid", "") in codes
     assert ("central_claim_supporting_evidence_missing", "") in codes
 
 

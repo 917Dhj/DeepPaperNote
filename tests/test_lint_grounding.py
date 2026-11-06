@@ -8,7 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from contracts import PAPER_TYPE_CONTRACTS, WRITING_CONTRACT_RULES
+from contracts import WRITING_CONTRACT_RULES, paper_type_contracts
+
+PAPER_TYPE_CONTRACTS = paper_type_contracts("zh-CN")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LINT_GROUNDING_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "lint_grounding.py"
@@ -118,8 +120,23 @@ def note_plan_with_sources(sources_by_section: dict[str, list[dict] | list[str]]
     ]
     return {
         "output_language": "zh-CN",
-        "paper_type": "AI_method",
+        "paper_type": "method",
         "paper_type_rationale": "method paper",
+        "positioning": "technique",
+        "survey_mode": "",
+        "secondary_type": "",
+        "secondary_host_section": "",
+        "core_answers": {
+            qid: {"answer": f"Answer for {qid}.", "evidence_refs": [{"section_id": "sec:method"}]}
+            for qid in (
+                "method.problem", "method.prior_gaps", "method.key_idea",
+                "method.claim_evidence", "method.comparison", "method.boundary_cost",
+            )
+        },
+        "workflow": [{"name": "repair", "steps": [
+            {"step": name, "input": "issue", "operation": f"{name} the repository", "output": "patch", "novel": index == 1}
+            for index, name in enumerate(("locate", "edit", "verify"))
+        ]}],
         "dominant_domain": "AI",
         "must_cover": ["method"],
         "key_numbers": ["91.2"],
@@ -147,10 +164,11 @@ def note_plan_with_sources(sources_by_section: dict[str, list[dict] | list[str]]
 def grounded_note_plan() -> dict:
     return note_plan_with_sources(
         {
-            "研究问题": [{"section_id": "sec:introduction"}],
-            "数据与任务定义": [{"pages": [2, 3]}],
-            "方法主线": [{"section_id": "sec:method"}],
-            "关键结果": [{"pages": [7, 9]}],
+            "背景与问题": [{"section_id": "sec:introduction"}],
+            "现有方法的局限": [{"pages": [2, 3]}],
+            "核心思路与挑战": [{"section_id": "sec:introduction"}],
+            "方法": [{"section_id": "sec:method"}],
+            "实验证据": [{"pages": [7, 9]}],
             "深度分析": [{"section_id": "sec:experiment"}],
             "局限": [{"pages": {"start": 10, "end": 12}}],
         }

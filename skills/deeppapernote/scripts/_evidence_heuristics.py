@@ -22,13 +22,19 @@ def infer_paper_type(title: str, abstract: str) -> tuple[str, str]:
     ]
     if any(re.search(rf"(?<![a-z0-9]){re.escape(token)}(?![a-z0-9])", lower) for token in survey_terms):
         return "survey_or_review", "The paper is an explicit survey, review, tutorial, overview, or meta-analysis."
+    if title.strip().lower().startswith("position:"):
+        return "position", "The title declares a position paper."
     if any(token in lower for token in ["depression", "anxiety", "mental health", "clinical", "patient", "psychiatric", "psychological", "hospital"]):
-        return "clinical_or_psychology_empirical", "The paper is closer to an empirical clinical or psychology study."
-    if any(token in lower for token in ["humanities", "social science", "theoretical framing", "ethnographic", "interpretive", "conceptual", "argument structure"]):
-        return "humanities_or_social_science", "The paper emphasizes theoretical framing, interpretation, or social-science argument structure."
+        return "human_subjects_empirical", "The paper is closer to an empirical study of human participants."
+    if any(token in lower for token in ["semi-structured interview", "focus group", "thematic analysis", "ethnograph", "grounded theory", "qualitative study"]):
+        return "qualitative_empirical", "The paper reports qualitative fieldwork or thematic analysis."
+    if any(token in lower for token in ["humanities", "theoretical framing", "interpretive", "conceptual analysis", "argument structure", "philosoph"]):
+        return "humanities_argument", "The paper emphasizes interpretation or conceptual argument."
     if any(token in lower for token in ["benchmark", "leaderboard", "evaluation suite", "dataset", "corpus"]):
         return "benchmark_or_dataset", "The paper emphasizes benchmark, dataset, or evaluation design."
-    return "AI_method", "The paper is best treated as a method-focused technical paper."
+    if any(token in lower for token in ["we prove", "theorem", "lower bound", "upper bound", "sample complexity"]):
+        return "theory", "The paper centers on proved results."
+    return "method", "The paper is best treated as a method-focused technical paper."
 
 
 def extract_dataset_candidates(text: str) -> list[str]:

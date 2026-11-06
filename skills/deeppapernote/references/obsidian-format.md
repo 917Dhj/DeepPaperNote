@@ -1,6 +1,6 @@
 # Obsidian Format
 
-Language note: section names, metadata labels, figure callouts, and the mechanism-flow heading must follow `synthesis_bundle.writing_contract`. For `en`, use the exact schema in `output-language.md`; Chinese-specific examples below apply only to `zh-CN`.
+Language note: section names, metadata labels, figure callouts, and the workflow heading must follow `synthesis_bundle.writing_contract`. For `en`, use the exact schema in `output-language.md`; Chinese-specific examples below apply only to `zh-CN`.
 
 ## Heading Rules
 
@@ -8,8 +8,8 @@ Language note: section names, metadata labels, figure callouts, and the mechanis
 - Use `##` for major sections.
 - Use `###` only when a section genuinely needs internal structure.
 - Do not flatten everything into bullet points.
-- For method, system, benchmark, or clinical empirical papers, prefer meaningful `###` subheadings in technical sections instead of one long undifferentiated block.
-- For method, framework, or system papers, default to `### 机制流程` inside `方法主线` and write it as a numbered 3 to 4 step flow.
+- Prefer meaningful `###` subheadings in the middle sections instead of one long undifferentiated block.
+- When the paper type has a workflow, its `###` subsection (for example `### 方法流程`) is an overview chain plus a step table, as `paper-types.md` shows.
 
 ## File Naming
 
@@ -60,7 +60,7 @@ Formatting and scope rules:
 - omit fields that are unavailable or not applicable; do not add placeholder rows just to fill the schema
 - do not add interpretation, commentary, judgment, or takeaway lines inside `核心信息`
 - do not use the last metadata bullet as a place to append extra analysis
-- move explanatory content to `一句话总结`、`深度分析`、`阅读收获` or another true analysis section
+- move explanatory content to `一句话总结`、`阅读收获` or a middle section that carries analysis
 
 ## YAML Frontmatter
 
@@ -71,7 +71,7 @@ Required fields:
 - `aliases`: English short name or common abbreviation for wikilink resolution
 - `date`: ISO publication date; use `YYYY` if only the year is known
 - `doi`: DOI string without the `https://doi.org/` prefix; omit the field entirely if unavailable
-- `paper_type`: the note plan's `paper_type`, e.g. `AI_method`
+- `paper_type`: the note plan's `paper_type`, e.g. `method`
 - `methods`, `datasets`, `tasks`: lists of 0 to 5 core items each; an empty list is written `[]`
 - `read_date`: the day the paper was first read, as `YYYY-MM-DD`; distinct from the publication `date`
 
@@ -87,7 +87,7 @@ aliases:
   - "Paper Short Name"
 date: 2024-05-01
 doi: 10.18653/v1/2024.acl-long.1
-paper_type: AI_method
+paper_type: method
 methods: [direct preference optimization]
 datasets: [Anthropic HH]
 tasks: []
@@ -110,7 +110,7 @@ Use this callout format only for placeholders that remain unresolved in the fina
 
 ```md
 > [!figure] Fig. 3 数据分布与质量评估
-> 建议位置：数据与任务定义
+> 建议位置：构造流程与质量控制
 > 放置原因：这张图同时展示样本构成、对话长度统计和专家质检结果，是理解 `PsyInterview` 数据边界最重要的图之一。
 > 当前状态：保留占位；当前提取结果只拿到局部子图，无法稳定恢复成可独立解释的完整原图。
 ```
@@ -135,7 +135,7 @@ The embed must be followed immediately by exactly one italic caption line:
 
 ```md
 ![[Research/Papers/DeepPaperNote/paper_slug/images/figure_2.png]]
-*论文原图编号：Fig. 2。数据生成流程图。这里插入是因为它最能帮助理解方法主线。*
+*论文原图编号：Fig. 2。数据生成流程图。这里插入是因为它最能帮助理解构造流程。*
 ```
 
 ## Default Section Order
@@ -144,23 +144,17 @@ The embed must be followed immediately by exactly one italic caption line:
 2. `原文摘要翻译`
 3. `创新点`
 4. `一句话总结`
-5. `研究问题`
-6. `数据与任务定义`
-7. `方法主线`
-8. `关键结果`
-9. `深度分析`
-10. `局限`
-11. `阅读收获`
-12. `关联`
-13. `我的笔记`
+5. the middle sections of the paper type (`paper-types.md`)
+6. `局限`
+7. `阅读收获`
+8. `关联`
+9. `我的笔记`
 
 When abstract metadata exists, `原文摘要翻译` should be a single Chinese translation block for the original abstract rather than a bilingual subsection pair.
 
 This order is the stable backbone, not a full outline.
 When the paper is complex, add `###` subsections such as:
-- `### 数据来源`
-- `### 任务定义`
-- `### 机制流程`
+- the type's workflow subsection, for example `### 方法流程` or `### 构造流程`
 - `### 为什么结果成立`
 - `### 哪些地方容易被误读`
 

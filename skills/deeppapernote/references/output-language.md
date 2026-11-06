@@ -17,17 +17,13 @@ Use these top-level sections in this order:
 2. `原文摘要翻译`
 3. `创新点`
 4. `一句话总结`
-5. `研究问题`
-6. `数据与任务定义`
-7. `方法主线`
-8. `关键结果`
-9. `深度分析`
-10. `局限`
-11. `阅读收获`
-12. `关联`
-13. `我的笔记`
+5. the middle sections of the paper type, in order (`contracts_by_paper_type[paper_type].middle_sections`, see `paper-types.md`)
+6. `局限`
+7. `阅读收获`
+8. `关联`
+9. `我的笔记`
 
-Use `### 机制流程` for the mechanism-flow subsection. `阅读收获` holds exactly two subsections, `### 可迁移` and `### 下一步`; an item tied to the user's stated research direction starts with `判断：`. `关联` holds `### 库内笔记` and `### 关键前置文献`; an empty `库内笔记` reads `库里暂无相关笔记`, or `当前为 workspace 模式，未连接知识库` in workspace mode. `我的笔记` is the last section and, in a generated draft, holds only this guidance line:
+The workflow subsection heading and table header come from `contracts_by_paper_type[paper_type].workflow`; the weak-evidence callout is `> [!warning] 论文报告不足`. `阅读收获` holds exactly two subsections, `### 可迁移` and `### 下一步`; an item tied to the user's stated research direction starts with `判断：`. `关联` holds `### 库内笔记` and `### 关键前置文献`; an empty `库内笔记` reads `库里暂无相关笔记`, or `当前为 workspace 模式，未连接知识库` in workspace mode. `我的笔记` is the last section and, in a generated draft, holds only this guidance line:
 
 ```md
 > [!note] 这一节留给你自己：写下你的判断、它和你研究的联系、想验证的点。重新生成这篇笔记时，这一节会原样保留。
@@ -45,15 +41,11 @@ Use these top-level sections in this order:
 2. `Abstract`
 3. `Contributions`
 4. `One-Sentence Summary`
-5. `Research Question`
-6. `Data and Task Definition`
-7. `Method`
-8. `Key Results`
-9. `Deep Analysis`
-10. `Limitations`
-11. `Takeaways`
-12. `Connections`
-13. `My Notes`
+5. the middle sections of the paper type, in order (`contracts_by_paper_type[paper_type].middle_sections`, see `paper-types.md`)
+6. `Limitations`
+7. `Takeaways`
+8. `Connections`
+9. `My Notes`
 
 `Takeaways` holds exactly two subsections, `### Transferable Ideas` and `### Next Steps`; an item tied to the user's stated research direction starts with `Judgment:`. `Connections` holds `### In Your Vault` and `### Key Prior Work`; an in-vault entry reads `- [[target|Title]] (relation): reason`, and an empty `In Your Vault` reads `No related notes in your vault yet.`, or `Workspace mode: not connected to a vault.` in workspace mode. `My Notes` is the last section and, in a generated draft, holds only this guidance line:
 
@@ -65,7 +57,7 @@ The allowed Core Information fields, in order, are:
 
 `Title`, `Translated title`, `Authors`, `Institutions`, `Publication date`, `Venue`, `DOI`, `arXiv`, `Paper link`, `Code / Project`, `Data / Resources`, `Paper type`.
 
-Use `### Mechanism Flow` for the mechanism-flow subsection. Each figure placeholder uses:
+The workflow subsection heading and table header come from `contracts_by_paper_type[paper_type].workflow`; the weak-evidence callout is `> [!warning] Limited reporting`. Each figure placeholder uses:
 
 ```md
 > [!figure] Figure 2 Human-readable label

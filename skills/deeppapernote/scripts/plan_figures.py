@@ -78,7 +78,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
         r"(?:produces|achieves|outperforms|improves|reduces|increases)\b",
         text,
     ):
-        return "main_result", "关键结果", "这张图或表直接承载主结果，适合放在关键结果部分。"
+        return "main_result", "结果节", "这张图或表直接承载主结果，适合放在本类型承载结果的那一节。"
     if any(
         token in text
         for token in [
@@ -92,7 +92,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
             "identification of studies",
         ]
     ):
-        return "data_or_task_overview", "数据与任务定义", "这张图解释文献筛选或纳入流程；如果候选图质量足够，适合放在数据与任务定义部分帮助读者理解综述证据来源。"
+        return "data_or_task_overview", "流程小节", "这张图解释文献筛选或纳入流程；如果候选图质量足够，适合放在检索与筛选流程小节帮助读者理解综述证据来源。"
     if any(
         token in text
         for token in [
@@ -107,7 +107,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
             "process",
         ]
     ):
-        return "method_overview", "机制流程", "这张图概括了整体方法或系统流程；如果匹配置信度足够高，最适合放在 `### 机制流程` 帮助快速建立执行链理解。"
+        return "method_overview", "流程小节", "这张图概括了整体方法或系统流程；如果匹配置信度足够高，最适合紧跟在流程小节的步骤表后面，帮助快速建立执行链理解。"
     if any(
         token in text
         for token in [
@@ -121,7 +121,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
             "issue",
         ]
     ):
-        return "data_or_task_overview", "数据与任务定义", "这张图解释任务或数据集如何被构造；如果候选图质量足够，适合放在数据与任务定义部分帮助读者理解数据来源。"
+        return "data_or_task_overview", "流程小节", "这张图解释任务或数据集如何被构造；如果候选图质量足够，适合放在构造流程小节帮助读者理解数据来源。"
     if any(
         token in text
         for token in [
@@ -138,7 +138,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
             "attribute",
         ]
     ):
-        return "data_or_task", "数据与任务定义", "这张图更像任务设定或数据说明，放在数据与任务定义最合适。"
+        return "data_or_task", "任务或数据相关节", "这张图更像任务设定或数据说明，放在本类型介绍任务或数据的那一节最合适。"
     if any(
         token in text
         for token in [
@@ -155,20 +155,20 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
             "block translation",
         ]
     ):
-        return "method_detail", "方法主线", "这张图解释方法内部机制或关键执行状态，适合放在方法主线部分作为机制细节占位。"
+        return "method_detail", "方法或设计节", "这张图解释方法内部机制或关键执行状态，适合放在方法或设计那一节作为机制细节。"
     if item_id.lower().startswith(("table", "表")):
-        return "table_result", "关键结果", "这是关键结果表，适合放在关键结果部分辅助定位核心数值。"
-    return "supporting_figure", "深度分析", "这张图更适合作为补充图，放在深度分析部分帮助解释作者论点。"
+        return "table_result", "结果节", "这是关键结果表，适合放在本类型承载结果的那一节辅助定位核心数值。"
+    return "supporting_figure", "分析节", "这张图更适合作为补充图，放在分析或讨论那一节帮助解释作者论点。"
 
 
 ENGLISH_FIGURE_PLACEMENT: dict[str, tuple[str, str]] = {
-    "main_result": ("Key Results", "This figure or table carries a primary result and belongs in Key Results."),
-    "data_or_task_overview": ("Data and Task Definition", "This visual explains the source, construction, screening, or scope of the data and task."),
-    "method_overview": ("Mechanism Flow", "This visual summarizes the method or system flow and belongs in Mechanism Flow when the match is reliable."),
-    "data_or_task": ("Data and Task Definition", "This visual clarifies the task setting, sample, or dataset."),
-    "method_detail": ("Method", "This visual explains an internal mechanism or execution state and belongs in Method."),
-    "table_result": ("Key Results", "This result table helps readers locate the central quantitative evidence."),
-    "supporting_figure": ("Deep Analysis", "This supporting visual helps explain the authors' argument in Deep Analysis."),
+    "main_result": ("results section", "This figure or table carries a primary result and belongs in the section that carries results for this paper type."),
+    "data_or_task_overview": ("workflow subsection", "This visual explains the source, construction, screening, or scope of the data and belongs with the workflow subsection."),
+    "method_overview": ("workflow subsection", "This visual summarizes the method or system flow and belongs right after the workflow table when the match is reliable."),
+    "data_or_task": ("task or data section", "This visual clarifies the task setting, sample, or dataset."),
+    "method_detail": ("method or design section", "This visual explains an internal mechanism or execution state and belongs in the method or design section."),
+    "table_result": ("results section", "This result table helps readers locate the central quantitative evidence."),
+    "supporting_figure": ("analysis section", "This supporting visual helps explain the authors' argument in the analysis section."),
 }
 
 

@@ -14,8 +14,8 @@ from localization import (
     normalize_output_language,
     note_schema,
     require_artifact_output_language,
-    required_sections,
 )
+from contracts import note_required_sections
 from plan_figures import build_figure_items
 
 ENGLISH_SECTIONS = (
@@ -23,10 +23,11 @@ ENGLISH_SECTIONS = (
     "Abstract",
     "Contributions",
     "One-Sentence Summary",
-    "Research Question",
-    "Data and Task Definition",
+    "Background and Problem",
+    "Limitations of Prior Work",
+    "Key Idea and Challenges",
     "Method",
-    "Key Results",
+    "Experimental Evidence",
     "Deep Analysis",
     "Limitations",
     "Takeaways",
@@ -43,7 +44,7 @@ aliases:
   - "Auditable Tool Use"
 date: 2024
 doi: 10.1234/example
-paper_type: AI_method
+paper_type: method
 methods: [auditable tool-state tracking]
 datasets: []
 tasks: [multi-hop question answering]
@@ -74,29 +75,36 @@ The paper develops an auditable state machine for multi-step question answering 
 
 An explicit tool-state record reduces error propagation in multi-step question answering.
 
-## Research Question
+## Background and Problem
 
 How can a multi-step question-answering system remain traceable when retrieval is incomplete, external tools fail, or intermediate results are misused?
 
-## Data and Task Definition
+## Limitations of Prior Work
 
-The input contains a question, candidate evidence, and available tools; the output contains an answer, a state trace, and a failure label when completion is unsupported.
+Answer-only systems cannot tell missing evidence apart from reasoning errors, and failed tool calls leave no inspectable record.
+
+## Key Idea and Challenges
+
+The key idea is to record every tool call in an auditable state machine; the challenge is that failure confidence must be consumed explicitly by later steps.
 
 ## Method
 
-### Mechanism Flow
+### Method Workflow
 
-1. **Input:** A question and candidate evidence. **Operation:** Extract relevant evidence. **Output:** A grounded initial state.
-2. **Input:** The current state and tool registry. **Operation:** Align the request with an available tool. **Output:** A planned call.
-3. **Input:** Tool output and confidence. **Operation:** Update or roll back the state. **Output:** An auditable execution record.
-4. **Input:** The final state. **Operation:** Decode an answer or refusal. **Output:** A response with provenance.
+Evidence selection → Tool planning → Answer decoding
+
+| Step | Input | What happens | Output | New in this paper |
+| --- | --- | --- | --- | --- |
+| Evidence selection | Question and candidate evidence | Extract relevant evidence | Grounded initial state | No |
+| Tool planning | Current state and tool registry | Align the request with a tool, update or roll back | Auditable execution record | Yes |
+| Answer decoding | Final state | Decode an answer or refusal | Response with provenance | Yes |
 
 > [!figure] Figure 1 System overview
 > Suggested location: Method
 > Why it matters: The figure shows how evidence and tool states move through the execution chain.
 > Current status: Placeholder retained; the extracted crop is incomplete and cannot be interpreted independently.
 
-## Key Results
+## Experimental Evidence
 
 Across three datasets, answer accuracy increased from 71.2% to 78.5%, while untraceable errors fell from 18% to 9%.
 
@@ -138,8 +146,22 @@ No related notes in your vault yet.
 def plan_payload() -> dict:
     return {
         "output_language": "en",
-        "paper_type": "AI_method",
+        "paper_type": "method",
         "paper_type_rationale": "The paper proposes and evaluates a model mechanism.",
+        "positioning": "technique",
+        "survey_mode": "",
+        "secondary_type": "",
+        "secondary_host_section": "",
+        "core_answers": {
+            qid: {"answer": f"Answer for {qid}.", "evidence_refs": [{"pages": [1]}]}
+            for qid in ("method.problem", "method.prior_gaps", "method.key_idea",
+                        "method.claim_evidence", "method.comparison", "method.boundary_cost")
+        },
+        "workflow": [{"name": "inference", "steps": [
+            {"step": "Evidence selection", "input": "Question and candidate evidence", "operation": "Extract relevant evidence", "output": "Grounded initial state", "novel": False},
+            {"step": "Tool planning", "input": "Current state and tool registry", "operation": "Align the request with a tool, update or roll back", "output": "Auditable execution record", "novel": True},
+            {"step": "Answer decoding", "input": "Final state", "operation": "Decode an answer or refusal", "output": "Response with provenance", "novel": True},
+        ]}],
         "dominant_domain": "reasoning",
         "must_cover": ["Method"],
         "key_numbers": ["78.5%"],
@@ -183,9 +205,11 @@ def test_artifact_language_requires_exact_supported_value() -> None:
 def test_english_contract_exposes_localized_schema() -> None:
     contract = compact_writing_contract("en")
     assert contract["language"] == "en"
-    assert tuple(contract["must_include_sections"]) == ENGLISH_SECTIONS
-    assert tuple(required_sections("en")) == ENGLISH_SECTIONS
-    assert contract["mechanism_flow_heading"] == "Mechanism Flow"
+    assert contract["section_order"]["head"] + contract["section_order"]["tail"] == [
+        *ENGLISH_SECTIONS[:4], *ENGLISH_SECTIONS[-4:]
+    ]
+    assert note_required_sections("en", "method") == ENGLISH_SECTIONS
+    assert contract["contracts_by_paper_type"]["method"]["workflow"]["heading"] == "Method Workflow"
     assert contract["core_info_fields"] == [
         "Title",
         "Translated title",
@@ -228,10 +252,11 @@ def test_english_grounding_accepts_english_section_plan() -> None:
             "evidence_sources": [{"section_id": "sec:method"}],
         }
         for section in (
-            "Research Question",
-            "Data and Task Definition",
+            "Background and Problem",
+            "Limitations of Prior Work",
+            "Key Idea and Challenges",
             "Method",
-            "Key Results",
+            "Experimental Evidence",
             "Deep Analysis",
             "Limitations",
         )
@@ -249,7 +274,7 @@ def test_english_figure_plan_uses_english_targets_and_reasons() -> None:
         {"figure_captions": [{"id": "Figure 1", "caption": "Overview of the system architecture."}]},
         language="en",
     )
-    assert items[0]["section"] == "Mechanism Flow"
+    assert items[0]["section"] == "workflow subsection"
     assert "visual" in items[0]["reason"].lower()
     assert not any("\u4e00" <= character <= "\u9fff" for character in json.dumps(items, ensure_ascii=False))
 
@@ -413,7 +438,7 @@ def test_english_lint_rejects_chinese_prose_disguised_as_bounded_span(
     ("original", "invalid"),
     [
         ("- Authors: Smith et al.", "- Author: Smith et al."),
-        ("### Mechanism Flow", "### mechanism flow"),
+        ("### Method Workflow", "### method workflow"),
     ],
 )
 def test_english_lint_requires_exact_labels_and_mechanism_heading(
@@ -440,7 +465,7 @@ def test_english_lint_requires_complete_top_level_heading_order(tmp_path: Path) 
     note_path = tmp_path / "paper.md"
     plan_path = tmp_path / "paper.plan.json"
     output_path = tmp_path / "lint.json"
-    note = english_note().replace("## Method", "## TEMP").replace("## Key Results", "## Method").replace("## TEMP", "## Key Results")
+    note = english_note().replace("## Method", "## TEMP").replace("## Experimental Evidence", "## Method").replace("## TEMP", "## Experimental Evidence")
     note_path.write_text(note, encoding="utf-8")
     plan_path.write_text(json.dumps(plan_payload()), encoding="utf-8")
     script = Path(__file__).resolve().parents[1] / "skills/deeppapernote/scripts/lint_note.py"
@@ -514,8 +539,8 @@ def test_english_local_pdf_pipeline_lints_and_formally_saves_note_with_images_di
             "evidence_sources": [{"pages": [1]}],
         }
         for section in (
-            "Research Question", "Data and Task Definition", "Method",
-            "Key Results", "Deep Analysis", "Limitations",
+            "Background and Problem", "Limitations of Prior Work", "Key Idea and Challenges",
+            "Method", "Experimental Evidence", "Deep Analysis", "Limitations",
         )
     ]
     plan["central_claims"][0]["supporting_evidence"] = [{"pages": [1]}]
