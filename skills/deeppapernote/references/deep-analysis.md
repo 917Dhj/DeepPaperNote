@@ -221,7 +221,7 @@ Typical cases where a formula should appear:
 - scaling-law fit
 
 Prefer a few stable, well-explained formulas over many noisy ones.
-- after each retained formula, add one short engineering explanation of what it means in implementation terms
+- after each retained formula, add one plain sentence saying what it means
 - do not stop at naming variables; explain what operation, objective term, or state update the formula corresponds to
 
 ## Minimum Honesty Standard

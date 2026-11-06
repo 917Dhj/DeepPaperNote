@@ -409,6 +409,10 @@ def compact_writing_contract(language: str | None = None) -> dict:
             key: list(value) if isinstance(value, tuple) else deepcopy(value)
             for key, value in rules["connections_contract"].items()
         },
+        "storyline_contract": {
+            **rules["storyline_contract"],
+            "sentences": list(rules["storyline_contract"]["sentences"]),
+        },
         "my_notes_contract": dict(rules["my_notes_contract"]),
         "frontmatter_contract": {
             key: list(value) if isinstance(value, tuple) else value

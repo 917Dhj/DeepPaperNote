@@ -26,6 +26,7 @@ from contracts import (
     connection_target_issues,
     core_answer_form,
     grounding_required_sections,
+    storyline_plan_issues,
     takeaway_plan_issues,
     type_plan_issues,
 )
@@ -463,6 +464,7 @@ def validate_note_plan(
         *takeaway_plan_issues(note_plan),
         *connection_plan_issues(note_plan),
         *type_plan_issues(note_plan, language),
+        *storyline_plan_issues(note_plan),
     ]:
         code = item.pop("code")
         issues.append(issue(code, **item))

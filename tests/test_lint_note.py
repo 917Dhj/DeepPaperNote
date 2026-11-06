@@ -44,7 +44,9 @@ def _method_note_structure():
 
 
 def _type_fields() -> dict:
+    """Plan fields added with the type-specific note body (the storyline rides along)."""
     return {
+        "storyline": _valid_plan_payload()["storyline"],
         "positioning": "technique",
         "survey_mode": "",
         "secondary_type": "",
@@ -168,6 +170,7 @@ def _valid_plan_payload() -> dict:
         "secondary_host_section": "",
         "core_answers": _method_core_answers(),
         "workflow": [_method_workflow()],
+        "storyline": "多步问答在工具失败后会悄悄累积错误。作者把每次工具调用写进可审计的状态机。消融显示收益来自状态日志而不是额外重试。所以这条思路适合需要审计链路的问答系统。",
         "dominant_domain": "reasoning",
         "must_cover": ["方法"],
         "key_numbers": ["78.5"],
@@ -1214,6 +1217,7 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
                     "paper_type": "",
                 "paper_type_rationale": "",
                 "dominant_domain": "   ",
+                "storyline": "",
                 "must_cover": [],
                 "key_numbers": [],
                 "real_comparisons": [],
@@ -1247,6 +1251,7 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
         "planning_paper_type_empty",
         "planning_paper_type_rationale_empty",
         "planning_dominant_domain_empty",
+        "planning_storyline_empty",
         "planning_must_cover_empty",
         "planning_key_numbers_empty",
         "planning_real_comparisons_empty",

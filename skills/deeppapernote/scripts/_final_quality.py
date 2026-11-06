@@ -5,12 +5,14 @@ import json
 import math
 import re
 
-# Version 2 added the takeaways check; version 3 added the connections check. The
-# readability receipt and the revision journal kept their shape and stay at version 1.
-QUALITY_REVIEW_SCHEMA_VERSION = 3
+# Version 2 added the takeaways check; version 3 added the connections check; version 4
+# added the core_questions and narrative checks. The readability receipt and the revision
+# journal kept their shape and stay at version 1.
+QUALITY_REVIEW_SCHEMA_VERSION = 4
 RECEIPT_SCHEMA_VERSION = 1
 QUALITY_CHECKS = (
     "central_claims", "mechanism_result_map", "claim_boundaries", "takeaways", "connections",
+    "core_questions", "narrative",
 )
 # Plan lists each check reviews; a blocking finding must point at an item of one of them.
 QUALITY_CHECK_PLAN_FIELDS = {
@@ -20,6 +22,10 @@ QUALITY_CHECK_PLAN_FIELDS = {
     "takeaways": ("reuse_takeaways", "followup_questions"),
     "connections": ("connections", "key_prior_work"),
 }
+# The two v4 checks review plan fields that are not lists: core_answers is keyed by
+# question id, and storyline is one string.
+QUESTION_REF_RE = re.compile(r"/core_answers/([a-z_]+\.[a-z_]+)")
+STORYLINE_REF = "/storyline"
 # A vault may hold no related notes; the connections check then reviews key_prior_work alone.
 MAY_BE_EMPTY_PLAN_FIELDS = frozenset({"connections"})
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
@@ -92,6 +98,11 @@ def _sha(value: object, name: str, *, empty: bool = False) -> None:
 
 
 def _valid_plan_ref(reference: str, check: str, plan: dict) -> bool:
+    if check == "core_questions":
+        match = QUESTION_REF_RE.fullmatch(reference)
+        return match is not None and match.group(1) in plan.get("core_answers", {})
+    if check == "narrative":
+        return reference == STORYLINE_REF
     match = PLAN_REF_RE.fullmatch(reference)
     if match is None:
         return False
@@ -133,7 +144,7 @@ def validate_quality(
     _version_language(
         review, language, "Final Quality Review",
         version=QUALITY_REVIEW_SCHEMA_VERSION,
-        hint=" A review written before the connections check is stale; rerun the full review.",
+        hint=" A review written before the core_questions and narrative checks is stale; rerun the full review.",
     )
     for key, expected in (
         ("reviewed_note_sha256", note_sha256),
@@ -151,9 +162,14 @@ def validate_quality(
             for fields in QUALITY_CHECK_PLAN_FIELDS.values()
             for field in fields
         )
+        or not isinstance(plan.get("core_answers"), dict)
+        or not plan["core_answers"]
+        or not isinstance(plan.get("storyline"), str)
+        or not plan["storyline"].strip()
     ):
         raise ValueError(
-            "Note Plan requires the current language and nonempty quality-check lists."
+            "Note Plan requires the current language, nonempty quality-check lists, "
+            "core_answers, and a storyline."
         )
     _keys(review["checks"], set(QUALITY_CHECKS), "Final Quality Review checks")
     if any(type(value) is not bool for value in review["checks"].values()):

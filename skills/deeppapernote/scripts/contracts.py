@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from typing import Any, TypedDict
 
@@ -45,7 +46,13 @@ NOTE_PLAN_STRING_FIELDS: tuple[str, ...] = (
     "paper_type",
     "paper_type_rationale",
     "dominant_domain",
+    "storyline",
 )
+# The storyline is the paper's own story in a few sentences: problem, idea, evidence, so what.
+STORYLINE_SENTENCE_RANGE = (3, 5)
+# Periods inside these do not end a sentence.
+_NON_TERMINAL_ABBREVIATIONS = re.compile(r"\b(?:et al|e\.g|i\.e|vs|cf|Fig|Figs|Eq|Eqs|No|Sec|Tab)\.", re.IGNORECASE)
+_SENTENCE_END = re.compile(r"[。！？!?]+|\.(?=\s|$)")
 
 NOTE_PLAN_LIST_FIELDS: tuple[str, ...] = (
     "must_cover",
@@ -262,6 +269,11 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
         # Used when the request names no direction: the user's confirmed research memory.
         "reader_context_fallback": "research_memory.suggested_reader_research_direction",
     },
+    "storyline_contract": {
+        "plan_field": "storyline",
+        "sentences": STORYLINE_SENTENCE_RANGE,
+        "role": "writing_outline_and_review_basis_not_note_text",
+    },
     "type_structure_contract": {
         "plan_fields": tuple(NOTE_PLAN_TYPE_FIELDS),
         "middle_sections_source": "contracts_by_paper_type[note_plan.paper_type].middle_sections",
@@ -354,6 +366,23 @@ def takeaway_plan_issues(note_plan: dict[str, Any]) -> list[dict[str, Any]]:
     if reader_field in note_plan and not isinstance(note_plan[reader_field], str):
         issues.append({"code": "note_plan_reader_research_direction_invalid", "field": reader_field})
     return issues
+
+
+def storyline_sentence_count(text: str) -> int:
+    cleaned = _NON_TERMINAL_ABBREVIATIONS.sub("", text)
+    return sum(1 for part in _SENTENCE_END.split(cleaned) if part.strip())
+
+
+def storyline_plan_issues(note_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """The storyline is 3 to 5 sentences (an empty one is reported as a missing required field)."""
+    value = note_plan.get("storyline")
+    if not isinstance(value, str) or not value.strip():
+        return []
+    low, high = STORYLINE_SENTENCE_RANGE
+    count = storyline_sentence_count(value)
+    if not low <= count <= high:
+        return [{"code": "note_plan_storyline_sentence_count_invalid", "field": "storyline", "count": count}]
+    return []
 
 
 def _text(value: Any) -> str:

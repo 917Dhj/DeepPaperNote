@@ -29,6 +29,11 @@ def plan_payload() -> dict:
             {"work": "Schick et al. 2023. Toolformer", "role": "method source"},
             {"work": "Brown et al. 2020. GPT-3", "role": "backbone"},
         ],
+        "storyline": "Tool chains fail silently. The paper records each call as state. Ablations show the log, not retries, carries the gain.",
+        "core_answers": {
+            "method.problem": {"answer": "Silent tool failures.", "evidence_refs": [{"pages": [1]}]},
+            "method.comparison": {"not_reported": True, "reason": "Single run only."},
+        },
     }
 
 
@@ -46,7 +51,7 @@ def review_payload(note_sha: str = "a" * 64, plan_sha: str = "b" * 64, *, failed
             }
         ]
     return {
-        "schema_version": 3,
+        "schema_version": quality_module().QUALITY_REVIEW_SCHEMA_VERSION,
         "output_language": "en",
         "verdict": "fail" if failed else "pass",
         "reviewed_note_sha256": note_sha,
@@ -245,3 +250,62 @@ def test_corrupt_journal_does_not_reset_revision_usage() -> None:
     ]:
         with pytest.raises(ValueError):
             observe({**state, field: value}, "c")
+
+
+# --- v4: core questions and narrative ------------------------------------------
+
+def failing_review(check: str, plan_ref: str) -> dict:
+    review = review_payload()
+    review["verdict"] = "fail"
+    review["checks"][check] = False
+    review["blocking_findings"] = [{
+        "check": check, "plan_ref": plan_ref,
+        "reason": "Missing.", "required_revision": "Add it.",
+    }]
+    return review
+
+
+def test_v4_adds_core_questions_and_narrative() -> None:
+    module = quality_module()
+    assert module.QUALITY_REVIEW_SCHEMA_VERSION == 4
+    assert module.QUALITY_CHECKS[-2:] == ("core_questions", "narrative")
+
+
+@pytest.mark.parametrize(
+    ("check", "plan_ref"),
+    [("core_questions", "/core_answers/method.problem"), ("core_questions", "/core_answers/method.comparison"), ("narrative", "/storyline")],
+)
+def test_new_checks_point_at_their_plan_items(check: str, plan_ref: str) -> None:
+    assert len(validate(failing_review(check, plan_ref))) == 64
+
+
+@pytest.mark.parametrize(
+    ("check", "plan_ref"),
+    [
+        ("core_questions", "/core_answers/method.unknown"),
+        ("core_questions", "/core_answers/0"),
+        ("core_questions", "/storyline"),
+        ("narrative", "/core_answers/method.problem"),
+        ("narrative", "/storyline/0"),
+    ],
+)
+def test_new_checks_reject_foreign_or_missing_refs(check: str, plan_ref: str) -> None:
+    with pytest.raises(ValueError, match="existing item"):
+        validate(failing_review(check, plan_ref))
+
+
+def test_a_v3_review_is_stale() -> None:
+    review = review_payload()
+    review["schema_version"] = 3
+    with pytest.raises(ValueError, match="schema_version 4"):
+        validate(review)
+
+
+@pytest.mark.parametrize("field,value", [("storyline", ""), ("core_answers", {})])
+def test_review_needs_a_storyline_and_core_answers(field: str, value: object) -> None:
+    plan = plan_payload()
+    plan[field] = value
+    with pytest.raises(ValueError, match="Note Plan"):
+        quality_module().validate_quality(
+            review_payload(), note_sha256="a" * 64, plan_sha256="b" * 64, plan=plan, language="en"
+        )

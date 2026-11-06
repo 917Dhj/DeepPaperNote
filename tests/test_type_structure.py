@@ -286,3 +286,37 @@ def test_english_type_sections(tmp_path: Path) -> None:
         "Method", "Experimental Evidence", "Deep Analysis",
     )
     assert note_schema("en")["sections"]["limitations"] == sections[10]
+
+
+# --- storyline ------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    ("storyline", "ok"),
+    [
+        ("工具链会悄悄失败。论文把每次调用记成状态。消融显示收益来自日志而非重试。", True),
+        ("Tool chains fail silently (e.g. timeouts). The paper, like Yao et al., logs each call as state. "
+         "Ablations show 3.5 points come from the log. So logging, not retries, matters.", True),
+        ("只有一句话。", False),
+        ("一。二。三。四。五。六。", False),
+    ],
+)
+def test_storyline_is_three_to_five_sentences(storyline: str, ok: bool) -> None:
+    plan = _valid_plan_payload()
+    plan["storyline"] = storyline
+    issues = {item["code"] for item in contracts.storyline_plan_issues(plan)}
+    assert (not issues) is ok
+
+
+def test_storyline_is_a_required_plan_field() -> None:
+    assert "storyline" in contracts.NOTE_PLAN_REQUIRED_FIELDS
+    plan = grounded_note_plan()
+    plan["storyline"] = "只有一句话。"
+    found = {item["code"] for item in lint_grounding.validate_note_plan(plan, source_manifest(), "zh-CN")}
+    assert "note_plan_storyline_sentence_count_invalid" in found
+
+
+def test_bundle_carries_the_storyline_contract() -> None:
+    from build_synthesis_bundle import compact_writing_contract
+
+    storyline = compact_writing_contract("zh-CN")["storyline_contract"]
+    assert storyline == {"plan_field": "storyline", "sentences": [3, 5], "role": "writing_outline_and_review_basis_not_note_text"}

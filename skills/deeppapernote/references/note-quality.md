@@ -14,6 +14,7 @@ The note is high quality only if it satisfies most of the checks below.
 - It includes an explicit judgment about the paper's actual contribution.
 - It includes at least one paper-specific technical subsection rather than only broad top-level sections.
 - For method-heavy papers, it explains enough mechanism detail that an engineer could re-explain the pipeline without reopening the PDF.
+- A researcher from an adjacent field can follow it: the middle sections tell one story, paragraphs lead with their point, and every term is explained where it first appears.
 
 ## Structural Checks
 
@@ -51,6 +52,8 @@ Bad sign:
 
 - It only repeats the introduction and abstract.
 - It lists model names without explaining the pipeline.
+- It uses a term or acronym before saying what it is, or translates an established English name word for word.
+- Its sections read as separate fact dumps with no thread from one to the next.
 - It copies metrics without noting the evaluation setting.
 - It says the paper is innovative without locating the innovation.
 - It has no dedicated `创新点` section and leaves the paper's novelty scattered across the note.

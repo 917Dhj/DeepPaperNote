@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import _final_quality
+
 
 def canonical_note_path(tmp_path: Path, note_text: str, language: str = "zh-CN") -> Path:
     path = tmp_path / f"review-note.{language}.md"
@@ -28,18 +30,12 @@ def final_review_args(
     note_hash = hashlib.sha256(content_path.read_bytes()).hexdigest()
     quality_path = tmp_path / f"quality-review.{output_language}.json"
     quality_path.write_text(json.dumps({
-        "schema_version": 3,
+        "schema_version": _final_quality.QUALITY_REVIEW_SCHEMA_VERSION,
         "output_language": output_language,
         "verdict": "pass",
         "reviewed_note_sha256": note_hash,
         "reviewed_plan_sha256": hashlib.sha256(plan_path.read_bytes()).hexdigest(),
-        "checks": {
-            "central_claims": True,
-            "mechanism_result_map": True,
-            "claim_boundaries": True,
-            "takeaways": True,
-            "connections": True,
-        },
+        "checks": dict.fromkeys(_final_quality.QUALITY_CHECKS, True),
         "blocking_findings": [],
     }), encoding="utf-8")
     readability_path = tmp_path / f"readability-review.{output_language}.json"
@@ -96,6 +92,8 @@ def formal_save_args(
                 {"work": "Author B 2021. Prior work two", "role": "backbone"},
                 {"work": "Author C 2022. Prior work three", "role": "data source"},
             ],
+            "storyline": "The paper takes on one problem. It answers with one mechanism. The evidence supports that mechanism in the reported setting.",
+            "core_answers": {"method.problem": {"answer": "The reported problem.", "evidence_refs": [{"pages": [1]}]}},
         }), encoding="utf-8")
     source_manifest_path = source_manifest_path or tmp_path / "source-manifest.json"
     if not source_manifest_path.exists():
