@@ -125,10 +125,12 @@ Skip matches inside:
 
 - YAML frontmatter;
 - headings;
-- fenced or inline code;
+- fenced code, and inline code other than a span whose whole content is a selected form;
 - URLs, Markdown links, HTML, and existing wiki links;
 - reference sections;
 - a larger identifier or word.
+
+Inline code whose whole content, after CommonMark's one-space padding is removed, is exactly a selected form competes with prose in document order; it is replaced by the link without its backticks, so `` `DPO` `` becomes `[[DPO]]`. Partial matches inside inline code stay untouched.
 
 Match longer terms before shorter ones. Preserve the original surface text through an alias link. Add at most one outlink per term. A repeated run must not add another link.
 
