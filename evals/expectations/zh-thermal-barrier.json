@@ -84,7 +84,7 @@
   "known_gaps": {
     "review:图 3": "A bilingual caption pair: crops attach to the Chinese caption, but the plan keeps the English one.",
     "review:图 10": "A bilingual caption pair: crops attach to the Chinese caption, but the plan keeps the English one.",
-    "crop:表 1": "The table sits below its caption, but the crop takes the body text and running header above the caption.",
+    "crop:表 1": "The caption is centered and narrower than the table, so its midpoint falls just right of the page midline and the crop drops the table's left group-label column.",
     "crop:Table 1": "The caption is centered and narrower than the table, so its midpoint falls just right of the page midline and the crop drops the table's left group-label column."
   }
 }

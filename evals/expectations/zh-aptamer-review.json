@@ -103,9 +103,8 @@
     ]
   ],
   "known_gaps": {
-    "review:Table 1": "The visual quality gate rejects this crop; the cause is not analyzed yet.",
     "same_visual:*": "A bilingual caption pair creates two decisions for one visual.",
-    "crop:Table 1": "The Chinese caption stacked under it blocks the table, so the crop takes the page above the caption.",
+    "crop:Table 1": "The crop runs past the table into the next section heading and its paragraph.",
     "crop:表 1": "The crop runs past the table into the next section heading and its paragraph."
   }
 }
