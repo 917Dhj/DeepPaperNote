@@ -67,13 +67,13 @@ The note ends with `阅读收获`, then `关联`, then `我的笔记`. `writing_
 - `### 可迁移` comes from `note_plan.reuse_takeaways`. Each item names the paper's concrete mechanism or practice, where it would transfer, and the precondition for the transfer to hold.
 - `### 下一步` comes from `note_plan.followup_questions`. Each item is a follow-up question or experiment specific to this paper. At least one item tests the paper's own claims or evidence rather than only a transfer setting. A doubt belongs here only together with the experiment that would test it; plain criticism stays in `深度分析` and `局限`. A recommended next paper must already appear in `关联`; never invent a title.
 
-When the user's request states their own research direction, record it verbatim in `note_plan.reader_research_direction` and write `### 可迁移` against it:
+The user's research direction comes from the request, recorded verbatim in `note_plan.reader_research_direction`. When the request states none, it comes from the user's research memory: copy the bundle's `research_memory.suggested_reader_research_direction` when `research_memory.status` is `ok`. A direction from the request always wins. Write `### 可迁移` against the direction:
 1. Whenever a credible transfer exists, at least one item connects to the user's direction.
 2. Each such item names the paper's mechanism, the user's problem it would transfer to, and the precondition.
 3. Start every item that connects to the user's direction with `takeaways_contract.judgment_marker` (`判断：` in `zh-CN`, `Judgment:` in `en`), keeping the judgment separate from the paper's facts. Final Note Lint fails when a direction is stated and no transferable item carries the marker.
 4. When no credible transfer exists, say plainly that the paper bears little on the user's current direction, then give one general item. Never force a connection.
 
-When the request states no research direction, leave `reader_research_direction` as an empty string and write general takeaways.
+With no direction from either source, leave `reader_research_direction` as an empty string and write general takeaways.
 
 `我的笔记` belongs to the user. It is the last section, and in the draft it holds exactly the standard guidance line and nothing else. Formal Save keeps the user's own `我的笔记` block from the note it replaces.
 

@@ -24,6 +24,7 @@ from contracts import (
 )
 from localization import normalize_output_language, require_artifact_output_language
 from glossary_terms import body_text_from_raw_sections, glossary_terms
+from research_memory import read_research_memory
 from vault_connections import connection_candidates
 
 
@@ -502,6 +503,7 @@ def bundle(
         "glossary_terms": glossary_terms(
             config, body_text_from_raw_sections(source_manifest.get("raw_sections_path"))
         ),
+        "research_memory": read_research_memory(config, resolved_output_language),
         "figure_table_manifest": figure_table_manifest(
             figure_decisions_wrapper,
             source_manifest,

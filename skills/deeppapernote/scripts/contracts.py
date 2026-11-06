@@ -578,6 +578,8 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
         "max_items": 2,
         "min_item_chars": 20,
         "reader_context_field": "reader_research_direction",
+        # Used when the request names no direction: the user's confirmed research memory.
+        "reader_context_fallback": "research_memory.suggested_reader_research_direction",
     },
     "analysis_coverage_contract": {
         "central_claim_fields": tuple(CENTRAL_CLAIM_FIELD_TYPES),
