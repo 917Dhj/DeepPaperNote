@@ -45,6 +45,7 @@ from common import (
 from lint_grounding import validate_figure_decisions
 from lint_note import inspect_reference_hygiene
 from localization import normalize_output_language, require_artifact_output_language
+from glossary_terms import frontmatter_links_outside_glossary, glossary_followup
 from vault_connections import generated_wikilinks, unresolved_wikilinks
 from paper_archive import (
     ArchiveError,
@@ -208,7 +209,7 @@ def safe_image_filename(filename: str, label: str) -> str:
 
 
 def require_resolvable_links(
-    note_text: str, output_language: str, output_mode: str, root_path: Path
+    note_text: str, output_language: str, output_mode: str, root_path: Path, config: dict
 ) -> None:
     """Every generated `[[link]]` must open a vault note; workspace notes carry none.
 
@@ -229,6 +230,17 @@ def require_resolvable_links(
         raise SystemExit(
             "These [[links]] do not match any file in the Obsidian vault; link only to "
             f"connection candidates or listed glossary terms: {', '.join(missing)}"
+        )
+    outside, status = frontmatter_links_outside_glossary(generated, config)
+    if outside:
+        reason = (
+            "they are not notes in the paper-glossary terms directory"
+            if status == "ok"
+            else f"no paper-glossary library shares this vault ({status})"
+        )
+        raise SystemExit(
+            "Frontmatter [[links]] may only name glossary terms listed in the bundle's "
+            f"glossary_terms, but {reason}: {', '.join(outside)}"
         )
 
 
@@ -993,7 +1005,7 @@ def main() -> None:
         validate_readability(readability, note_sha256=note_sha256, language=output_language)
     except (OSError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
-    require_resolvable_links(note_text, output_language, output_mode, root_path)
+    require_resolvable_links(note_text, output_language, output_mode, root_path, config)
 
     with archive_lock(root_path) if output_mode == "obsidian" else nullcontext():
         if pdf_path and file_sha256(pdf_path) != source_manifest["source_sha256"]:
@@ -1168,6 +1180,16 @@ def main() -> None:
             payload["source_sha256"] = str(source_manifest["source_sha256"])
         payload["output_mode"] = output_mode
         payload["base_output_root"] = str(root_path)
+        payload["glossary_followup"] = glossary_followup(
+            config,
+            source_manifest=(
+                str(Path(args.source_manifest).expanduser().resolve())
+                if Path(args.source_manifest).expanduser().is_file()
+                else ""
+            ),
+            note_path=str(target_path),
+            regenerated=overwrote_existing_note,
+        )
         if config.get("obsidian_vault"):
             payload["vault"] = str(Path(config["obsidian_vault"]).expanduser().resolve())
         emit(payload, args.output)

@@ -23,8 +23,12 @@ from glossary_config import load_config, resolve_terms_dir, validate_article
 from glossary_library import _normalized_key, build_alias_index
 
 
+# Everything from the first of these headings to the end is never linked: the
+# bibliography, a connections section that already links related papers, and a
+# user-owned notes block.
 REFERENCE_HEADING_RE = re.compile(
-    r"^[ \t]{0,3}#{1,6}[ \t]+(?:references|bibliography|参考文献)[ \t]*\r?$",
+    r"^[ \t]{0,3}#{1,6}[ \t]+"
+    r"(?:references|bibliography|参考文献|引用|关联|connections|我的笔记|my notes)[ \t]*\r?$",
     re.IGNORECASE | re.MULTILINE,
 )
 

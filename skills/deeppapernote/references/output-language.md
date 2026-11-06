@@ -78,7 +78,7 @@ For a materialized image, use the normal image embed followed immediately by one
 
 `Abstract` is a faithful rendering of the source abstract in English. Preserve its meaning and scope; contribution claims, result interpretation, and hindsight judgment belong later unless the source abstract itself contains them.
 
-The English style gate checks headings, Core Information labels, figure callouts, inserted-image captions, and prose. Mark original non-English metadata with inline code inside `Core Information`, or with inline code or a Markdown link inside `Connections`, where wikilinks are also exempt; closed fenced code blocks and URLs keep their normal source text. In prose, a CJK identifier or stable proper noun must be an HTTP Markdown link or Obsidian wikilink. A source formula may retain only these CJK `\operatorname{...}` labels: `输入`, `输出`, `损失`, `状态`, `动作`, `奖励`, `标签`, `样本`, `预测`, and `目标`. The surrounding text remains subject to the English gate; inline code and free-form math text do not exempt Chinese prose.
+The English style gate checks headings, Core Information labels, figure callouts, inserted-image captions, and prose. Mark original non-English metadata with inline code inside `Core Information`, or with inline code or a Markdown link inside `Connections`, where wikilinks are also exempt; closed fenced code blocks and URLs keep their normal source text. In prose, a CJK identifier or stable proper noun must be an HTTP Markdown link. A source formula may retain only these CJK `\operatorname{...}` labels: `输入`, `输出`, `损失`, `状态`, `动作`, `奖励`, `标签`, `样本`, `预测`, and `目标`. The surrounding text remains subject to the English gate; inline code and free-form math text do not exempt Chinese prose.
 
 ## Contract ownership
 

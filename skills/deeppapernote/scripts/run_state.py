@@ -198,6 +198,14 @@ def validate_bindings(bindings: dict) -> dict:
     return {"artifacts": artifacts, "context": context}
 
 
+WIKILINK_TEXT_RE = re.compile(r"(?<!!)\[\[([^\[\]\n]+?)\]\]")
+
+
+def unlinked_text(text: str) -> str:
+    """`[[target|shown]]` -> shown, `[[target]]` -> target."""
+    return WIKILINK_TEXT_RE.sub(lambda match: match.group(1).split("|", 1)[-1], text)
+
+
 def resolved_path(value: str | Path, base: Path) -> Path:
     path = Path(value).expanduser()
     return (path if path.is_absolute() else base / path).resolve()
@@ -775,6 +783,13 @@ class Inspection:
             except ValueError:
                 pass
         matched = hashlib.sha256(generated.encode("utf-8")).hexdigest() == self.hashes.get("draft")
+        if not matched and draft_raw is not None:
+            # paper-glossary may wrap a term in a [[link]] after the save; the visible
+            # text is unchanged, so compare with links reduced to their display text.
+            try:
+                matched = unlinked_text(generated) == unlinked_text(canonical_note_text(draft_raw))
+            except ValueError:
+                matched = False
         if not matched:
             self.problem(
                 result,

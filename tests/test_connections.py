@@ -593,8 +593,8 @@ def save(tmp_path: Path, vault: Path, text: str) -> subprocess.CompletedProcess:
     )
 
 
-def test_save_accepts_links_to_existing_notes(tmp_path: Path, vault: Path) -> None:
-    result = save(tmp_path, vault, linked_note(frontmatter_link="[[Alpaca.zh-CN]]"))
+def test_save_accepts_connection_links_to_existing_notes(tmp_path: Path, vault: Path) -> None:
+    result = save(tmp_path, vault, linked_note())
     assert result.returncode == 0, result.stderr
 
 
