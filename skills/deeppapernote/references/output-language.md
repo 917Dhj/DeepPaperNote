@@ -27,7 +27,7 @@ Use these top-level sections in this order:
 12. `引用`
 13. `我的笔记`
 
-Use `### 机制流程` for the mechanism-flow subsection. `阅读收获` holds exactly two subsections, `### 可迁移` and `### 下一步`. `我的笔记` is the last section and, in a generated draft, holds only this guidance line:
+Use `### 机制流程` for the mechanism-flow subsection. `阅读收获` holds exactly two subsections, `### 可迁移` and `### 下一步`; an item tied to the user's stated research direction starts with `判断：`. `我的笔记` is the last section and, in a generated draft, holds only this guidance line:
 
 ```md
 > [!note] 这一节留给你自己：写下你的判断、它和你研究的联系、想验证的点。重新生成这篇笔记时，这一节会原样保留。
@@ -55,7 +55,7 @@ Use these top-level sections in this order:
 12. `References`
 13. `My Notes`
 
-`Takeaways` holds exactly two subsections, `### Transferable Ideas` and `### Next Steps`. `My Notes` is the last section and, in a generated draft, holds only this guidance line:
+`Takeaways` holds exactly two subsections, `### Transferable Ideas` and `### Next Steps`; an item tied to the user's stated research direction starts with `Judgment:`. `My Notes` is the last section and, in a generated draft, holds only this guidance line:
 
 ```md
 > [!note] This section is yours: write down your own judgments, how the paper connects to your research, and what you want to verify. When this note is regenerated, this section is kept exactly as it is.

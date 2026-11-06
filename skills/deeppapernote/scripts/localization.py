@@ -18,6 +18,8 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "figure_labels": {"location": "建议位置：", "reason": "放置原因：", "status": "当前状态：", "original_caption": "论文原图编号："},
         "mechanism_flow": "机制流程",
         "takeaways_subsections": {"transferable": "可迁移", "next_steps": "下一步"},
+        "takeaways_judgment_marker": "判断：",
+        "takeaways_max_item_chars": 120,
         "my_notes_guidance": "> [!note] 这一节留给你自己：写下你的判断、它和你研究的联系、想验证的点。重新生成这篇笔记时，这一节会原样保留。",
     },
     "en": {
@@ -27,6 +29,8 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "figure_labels": {"location": "Suggested location:", "reason": "Why it matters:", "status": "Current status:", "original_caption": "Original paper item:"},
         "mechanism_flow": "Mechanism Flow",
         "takeaways_subsections": {"transferable": "Transferable Ideas", "next_steps": "Next Steps"},
+        "takeaways_judgment_marker": "Judgment:",
+        "takeaways_max_item_chars": 320,
         "my_notes_guidance": "> [!note] This section is yours: write down your own judgments, how the paper connects to your research, and what you want to verify. When this note is regenerated, this section is kept exactly as it is.",
         "abstract_contract": {
             "source": "source_abstract",

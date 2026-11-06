@@ -35,12 +35,14 @@ FIGURE_TARGET_SECTIONS: set[str] = set()
 FIGURE_LABELS: dict[str, str] = {}
 MECHANISM_FLOW_HEADING = "机制流程"
 TAKEAWAY_SUBSECTIONS: tuple[str, ...] = ()
+TAKEAWAY_JUDGMENT_MARKER = ""
+TAKEAWAY_MAX_ITEM_CHARS = 0
 MY_NOTES_GUIDANCE = ""
 
 def configure_output_language(language: str | None = None) -> str:
     global ACTIVE_LANGUAGE, SCHEMA, SECTIONS, REQUIRED_SECTIONS, CORE_INFO_FIELDS
     global CORE_INFO_FIELD_INDEX, CORE_INFO_FIELD_ALIASES, FIGURE_TARGET_SECTIONS, FIGURE_LABELS, MECHANISM_FLOW_HEADING
-    global TAKEAWAY_SUBSECTIONS, MY_NOTES_GUIDANCE
+    global TAKEAWAY_SUBSECTIONS, TAKEAWAY_JUDGMENT_MARKER, TAKEAWAY_MAX_ITEM_CHARS, MY_NOTES_GUIDANCE
     ACTIVE_LANGUAGE = normalize_output_language(language)
     SCHEMA = note_schema(ACTIVE_LANGUAGE)
     SECTIONS = dict(SCHEMA["sections"])
@@ -52,6 +54,8 @@ def configure_output_language(language: str | None = None) -> str:
     FIGURE_LABELS = dict(SCHEMA["figure_labels"])
     MECHANISM_FLOW_HEADING = str(SCHEMA["mechanism_flow"])
     TAKEAWAY_SUBSECTIONS = tuple(SCHEMA["takeaways_subsections"].values())
+    TAKEAWAY_JUDGMENT_MARKER = str(SCHEMA["takeaways_judgment_marker"])
+    TAKEAWAY_MAX_ITEM_CHARS = int(SCHEMA["takeaways_max_item_chars"])
     MY_NOTES_GUIDANCE = str(SCHEMA["my_notes_guidance"])
     return ACTIVE_LANGUAGE
 
@@ -1657,6 +1661,7 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
 
 
 LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+\S")
+LIST_ITEM_PREFIX_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 
 
 def inspect_takeaways(text: str) -> list[dict[str, object]]:
@@ -1670,10 +1675,38 @@ def inspect_takeaways(text: str) -> list[dict[str, object]]:
         if not re.search(rf"^###\s+{re.escape(subsection)}\s*$", section_body(text, heading), flags=re.MULTILINE):
             issues.append(issue(heading, "takeaways_subsection_missing", "error", subsection))
             continue
-        count = sum(1 for line in body.splitlines() if LIST_ITEM_RE.match(line))
-        if not contract["min_items"] <= count <= contract["max_items"]:
-            issues.append(issue(heading, "takeaways_item_count_invalid", "error", f"{subsection}: {count}"))
+        items = takeaway_items(body)
+        if not contract["min_items"] <= len(items) <= contract["max_items"]:
+            issues.append(issue(heading, "takeaways_item_count_invalid", "error", f"{subsection}: {len(items)}"))
+        for item in items:
+            if sum(1 for ch in item if not ch.isspace()) > TAKEAWAY_MAX_ITEM_CHARS:
+                issues.append(issue(heading, "takeaways_item_too_long", "warning", item))
     return issues
+
+
+def takeaway_items(body: str) -> list[str]:
+    return [LIST_ITEM_PREFIX_RE.sub("", line, count=1).strip() for line in body.splitlines() if LIST_ITEM_RE.match(line)]
+
+
+def inspect_takeaway_judgment(text: str, reader_research_direction: str) -> list[dict[str, object]]:
+    """With a stated research direction, at least one transferable idea must carry the judgment marker."""
+    if not reader_research_direction.strip():
+        return []
+    heading = section("takeaways")
+    transferable = TAKEAWAY_SUBSECTIONS[0]
+    items = takeaway_items(subsection_body(text, heading, transferable))
+    if any(item.lstrip("*_ ").startswith(TAKEAWAY_JUDGMENT_MARKER) for item in items):
+        return []
+    return [issue(heading, "takeaways_judgment_marker_missing", "error", transferable)]
+
+
+def plan_reader_research_direction(plan_path: Path | None) -> str:
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path else {}
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return ""
+    value = plan.get("reader_research_direction", "") if isinstance(plan, dict) else ""
+    return value if isinstance(value, str) else ""
 
 
 def inspect_my_notes(text: str) -> list[dict[str, object]]:
@@ -1771,6 +1804,9 @@ def main() -> None:
     plan_path = resolve_note_plan_path(path, args.plan_file)
     note_plan_sha256 = json_input_sha256(plan_path)
     planning_artifact_found, planning_artifact_issues = inspect_note_plan(plan_path, output_language)
+    substantive_issues.extend(
+        inspect_takeaway_judgment(text, plan_reader_research_direction(plan_path))
+    )
     warnings.extend(inspect_figure_callouts(text))
     for issue in figure_issues:
         reason = str(issue.get("reason", ""))

@@ -428,8 +428,10 @@ def test_inspect_existing_user_notes_for_preflight() -> None:
     assert _user_notes.inspect_existing_user_notes(old_note_with(USER_BLOCK), "zh-CN")["status"] == "present"
     assert _user_notes.inspect_existing_user_notes(
         old_note_with(f"## 我的笔记\n\n{ZH_GUIDANCE}\n"), "zh-CN"
-    ) == {"status": "none", "chars": 0}
-    assert _user_notes.inspect_existing_user_notes("# T\n", "zh-CN") == {"status": "heading_missing", "chars": 0}
+    ) == {"status": "none", "chars": 0, "legacy_format": False}
+    assert _user_notes.inspect_existing_user_notes("# T\n", "zh-CN") == {
+        "status": "heading_missing", "chars": 0, "legacy_format": False,
+    }
 
 
 # --- Formal Save integration -----------------------------------------------
@@ -523,3 +525,99 @@ def test_workspace_save_preserves_user_notes(tmp_path: Path) -> None:
     assert second.returncode == 0, second.stderr
     assert json.loads(second.stdout)["user_notes"]["status"] == "preserved"
     assert note_path.read_text(encoding="utf-8").endswith(USER_BLOCK)
+
+
+# --- follow-up: legacy detection and tighter takeaway rules ------------------
+
+LEGACY_NOTE = """# Paper
+
+## 局限
+
+论文只在英文数据上验证。
+
+## 我的笔记
+
+模型在改版前写的旧式笔记内容，用户后来又补了一句。
+
+## 引用
+
+- Smith et al. 2024.
+"""
+
+
+def test_preserved_block_from_a_pre_takeaways_note_is_flagged_legacy() -> None:
+    _, info = _user_notes.merge_user_notes(draft(), LEGACY_NOTE, "zh-CN")
+    assert info["status"] == "preserved"
+    assert info["legacy_format"] is True
+    assert _user_notes.inspect_existing_user_notes(LEGACY_NOTE, "zh-CN")["legacy_format"] is True
+
+
+def test_preserved_block_from_a_current_note_is_not_legacy() -> None:
+    _, info = _user_notes.merge_user_notes(draft(), old_note_with(USER_BLOCK), "zh-CN")
+    assert info["legacy_format"] is False
+    assert _user_notes.inspect_existing_user_notes(old_note_with(USER_BLOCK), "zh-CN")["legacy_format"] is False
+
+
+def test_workspace_save_reports_legacy_format_in_receipt(tmp_path: Path) -> None:
+    os.environ.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
+    first = run_writer(tmp_path, "--title", "Legacy Paper", *formal_save_args(tmp_path, draft()))
+    assert first.returncode == 0, first.stderr
+    note_path = Path(json.loads(first.stdout)["note_path"])
+    note_path.write_text(LEGACY_NOTE, encoding="utf-8")
+    second = run_writer(tmp_path, "--title", "Legacy Paper", *formal_save_args(tmp_path, draft()))
+    assert second.returncode == 0, second.stderr
+    user_notes = json.loads(second.stdout)["user_notes"]
+    assert user_notes["status"] == "preserved" and user_notes["legacy_format"] is True
+
+
+JUDGED = "判断：把标签先行生成迁移到咨询风险分级数据上，前提是由专业人员先定义风险等级并复核标签。"
+UNJUDGED = "把标签先行生成迁移到咨询风险分级数据上，前提是由专业人员先定义风险等级并复核标签。"
+
+
+def marker_reasons(transferable: list[str], direction: str) -> set[str]:
+    note = zh_note(zh_tail(transferable=transferable))
+    return {str(item["reason"]) for item in lint_note.inspect_takeaway_judgment(note, direction)}
+
+
+def test_stated_direction_requires_a_judgment_marked_transferable_item() -> None:
+    assert "takeaways_judgment_marker_missing" in marker_reasons([UNJUDGED], "心理咨询数据合成")
+    assert marker_reasons([JUDGED], "心理咨询数据合成") == set()
+    assert marker_reasons([f"**{JUDGED[:3]}**{JUDGED[3:]}", UNJUDGED], "心理咨询数据合成") == set()
+
+
+def test_no_stated_direction_needs_no_judgment_marker() -> None:
+    assert marker_reasons([UNJUDGED], "") == set()
+
+
+def test_overlong_takeaway_item_is_a_warning() -> None:
+    long_item = "判断：" + "把标签先行生成迁移到咨询风险分级数据上，前提是由专业人员先定义风险等级并复核标签，" * 4
+    issues = lint_note.inspect_substantive_content(zh_note(zh_tail(transferable=[long_item])))
+    found = [item for item in issues if item["reason"] == "takeaways_item_too_long"]
+    assert found and found[0]["severity"] == "warning"
+    assert not any(item["severity"] == "error" for item in issues)
+
+
+def test_takeaways_contract_exposes_marker_and_length_limit() -> None:
+    for language, marker in (("zh-CN", "判断："), ("en", "Judgment:")):
+        contract = build_synthesis_bundle.compact_writing_contract(language)["takeaways_contract"]
+        assert contract["judgment_marker"] == marker
+        assert contract["max_item_chars"] > 0
+
+
+def test_note_lint_cli_checks_judgment_marker_against_plan(tmp_path: Path) -> None:
+    from test_lint_note import _valid_plan_payload
+
+    note_path = tmp_path / "note.md"
+    note_path.write_text(zh_note(zh_tail(transferable=[UNJUDGED])), encoding="utf-8")
+    plan = _valid_plan_payload()
+    plan["reader_research_direction"] = "心理咨询数据合成"
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+    script = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "lint_note.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "--input", str(note_path), "--plan-file", str(plan_path), "--language", "zh-CN"],
+        capture_output=True, text=True, check=True,
+    )
+    payload = json.loads(result.stdout)
+    assert "takeaways_judgment_marker_missing" in payload["warnings"]
+    assert payload["passes_substantive_content"] is False
