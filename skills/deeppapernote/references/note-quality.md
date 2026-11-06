@@ -29,7 +29,7 @@ The note should usually include:
 - `深度分析`
 - `局限`
 - `阅读收获`
-- `引用`
+- `关联`
 - `我的笔记`
 
 For non-trivial papers, it should usually also include multiple `###` subheadings inside:

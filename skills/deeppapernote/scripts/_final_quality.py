@@ -5,21 +5,27 @@ import json
 import math
 import re
 
-# Version 2 added the takeaways check. The readability receipt and the revision
-# journal kept their shape and stay at version 1.
-QUALITY_REVIEW_SCHEMA_VERSION = 2
+# Version 2 added the takeaways check; version 3 added the connections check. The
+# readability receipt and the revision journal kept their shape and stay at version 1.
+QUALITY_REVIEW_SCHEMA_VERSION = 3
 RECEIPT_SCHEMA_VERSION = 1
-QUALITY_CHECKS = ("central_claims", "mechanism_result_map", "claim_boundaries", "takeaways")
+QUALITY_CHECKS = (
+    "central_claims", "mechanism_result_map", "claim_boundaries", "takeaways", "connections",
+)
 # Plan lists each check reviews; a blocking finding must point at an item of one of them.
 QUALITY_CHECK_PLAN_FIELDS = {
     "central_claims": ("central_claims",),
     "mechanism_result_map": ("mechanism_result_map",),
     "claim_boundaries": ("claim_boundaries",),
     "takeaways": ("reuse_takeaways", "followup_questions"),
+    "connections": ("connections", "key_prior_work"),
 }
+# A vault may hold no related notes; the connections check then reviews key_prior_work alone.
+MAY_BE_EMPTY_PLAN_FIELDS = frozenset({"connections"})
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 PLAN_REF_RE = re.compile(
-    r"/(central_claims|mechanism_result_map|claim_boundaries|reuse_takeaways|followup_questions)"
+    r"/(central_claims|mechanism_result_map|claim_boundaries|reuse_takeaways|followup_questions"
+    r"|connections|key_prior_work)"
     r"/(0|[1-9][0-9]*)(/what_it_does_not_prove)?"
 )
 
@@ -127,7 +133,7 @@ def validate_quality(
     _version_language(
         review, language, "Final Quality Review",
         version=QUALITY_REVIEW_SCHEMA_VERSION,
-        hint=" A review written before the takeaways check is stale; rerun the full review.",
+        hint=" A review written before the connections check is stale; rerun the full review.",
     )
     for key, expected in (
         ("reviewed_note_sha256", note_sha256),
@@ -140,7 +146,8 @@ def validate_quality(
         not isinstance(plan, dict)
         or plan.get("output_language") != language
         or any(
-            not isinstance(plan.get(field), list) or not plan[field]
+            not isinstance(plan.get(field), list)
+            or (not plan[field] and field not in MAY_BE_EMPTY_PLAN_FIELDS)
             for fields in QUALITY_CHECK_PLAN_FIELDS.values()
             for field in fields
         )

@@ -22,7 +22,12 @@ from _final_quality import (
     validate_readability,
 )
 from _frontmatter import FrontmatterError, parse_frontmatter
-from _user_notes import inspect_existing_user_notes, merge_user_notes, restore_generated_text
+from _user_notes import (
+    inspect_existing_user_notes,
+    merge_user_notes,
+    restore_generated_text,
+    split_user_notes,
+)
 from _note_paths import (
     resolve_domain_subdir,
     resolve_note_asset_dir,
@@ -40,6 +45,7 @@ from common import (
 from lint_grounding import validate_figure_decisions
 from lint_note import inspect_reference_hygiene
 from localization import normalize_output_language, require_artifact_output_language
+from vault_connections import generated_wikilinks, unresolved_wikilinks
 from paper_archive import (
     ArchiveError,
     admit_directory,
@@ -199,6 +205,31 @@ def safe_image_filename(filename: str, label: str) -> str:
     ):
         raise SystemExit(f"Unsafe figure image filename in insert decision: {candidate}")
     return candidate
+
+
+def require_resolvable_links(
+    note_text: str, output_language: str, output_mode: str, root_path: Path
+) -> None:
+    """Every generated `[[link]]` must open a vault note; workspace notes carry none.
+
+    My Notes is the user's, so links there are never checked.
+    """
+    split = split_user_notes(note_text, output_language)
+    generated = split[0] if split is not None else note_text
+    if output_mode != "obsidian":
+        links = generated_wikilinks(generated)
+        if links:
+            raise SystemExit(
+                "Workspace mode is not connected to a vault, so the note must not contain "
+                f"[[links]]: {', '.join(links)}"
+            )
+        return
+    missing = unresolved_wikilinks(generated, root_path)
+    if missing:
+        raise SystemExit(
+            "These [[links]] do not match any file in the Obsidian vault; link only to "
+            f"connection candidates or listed glossary terms: {', '.join(missing)}"
+        )
 
 
 def embed_target_matches(target: str, expected_relative: str) -> bool:
@@ -962,6 +993,7 @@ def main() -> None:
         validate_readability(readability, note_sha256=note_sha256, language=output_language)
     except (OSError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
+    require_resolvable_links(note_text, output_language, output_mode, root_path)
 
     with archive_lock(root_path) if output_mode == "obsidian" else nullcontext():
         if pdf_path and file_sha256(pdf_path) != source_manifest["source_sha256"]:

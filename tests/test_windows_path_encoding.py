@@ -20,11 +20,11 @@ from pathlib import Path
 from formal_save_helpers import formal_save_args, reviewed_insert_fields
 
 import _note_paths
-import citation_links
 import common
 import lint_grounding
 import lint_note
 import plan_figure_table_decisions
+import vault_connections
 import write_obsidian_note
 from _note_paths import resolve_obsidian_note_path
 from common import load_json_file
@@ -116,7 +116,7 @@ def test_load_domain_rules_strips_bom(tmp_path: Path, monkeypatch) -> None:
     assert "测试专用域ZZZ" in labels
 
 
-def test_citation_index_includes_bom_prefixed_note(tmp_path: Path) -> None:
+def test_connection_recall_includes_bom_prefixed_note(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     papers = vault / "Research" / "Papers"
     papers.mkdir(parents=True)
@@ -125,11 +125,12 @@ def test_citation_index_includes_bom_prefixed_note(tmp_path: Path) -> None:
         + "---\naliases:\n  - Attention Is All You Need\n---\n# Transformer\n".encode("utf-8")
     )
     candidates = [{"display_text": "Vaswani et al. (2017). Attention Is All You Need."}]
-    resolved = citation_links.resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
+    result = vault_connections.connection_candidates(
+        {"obsidian_vault": str(vault), "papers_dir": "Research/Papers"}, candidates, "", "zh-CN"
+    )
     # A BOM before "---" used to break the frontmatter check, dropping the note
     # from the index so the wiki-link never resolved.
-    assert resolved[0]["match_status"] == "vault_match"
-    assert resolved[0]["vault_target"] == "attention_transformer"
+    assert [item["target"] for item in result["cited"]] == ["attention_transformer"]
 
 
 # --------------------------------------------------------------------------- #

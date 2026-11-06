@@ -8,6 +8,7 @@ from _final_quality import QUALITY_CHECKS, QUALITY_REVIEW_SCHEMA_VERSION
 from build_synthesis_bundle import bundle as build_synthesis_bundle
 from contracts import (
     NOTE_PLAN_LIST_FIELDS,
+    NOTE_PLAN_OPTIONAL_LIST_FIELDS,
     NOTE_PLAN_OPTIONAL_STRING_FIELDS,
     NOTE_PLAN_REQUIRED_FIELDS,
     NOTE_PLAN_STRING_FIELDS,
@@ -543,7 +544,7 @@ def test_bundle_routes_to_the_final_quality_gate_contract() -> None:
     contract = bundle(metadata={}, evidence_wrapper={}, assets_wrapper={})["writing_contract"]
     gate = contract["final_quality_gate"]
     assert gate["checks"] == list(QUALITY_CHECKS)
-    assert gate["schema_version"] == QUALITY_REVIEW_SCHEMA_VERSION == 2
+    assert gate["schema_version"] == QUALITY_REVIEW_SCHEMA_VERSION == 3
     assert gate["max_revisions"] == 2
     assert gate["reviewed_bytes"] == "raw_sha256"
     reference = (SKILL_ROOT / gate["reference"]).read_text(encoding="utf-8")
@@ -611,7 +612,8 @@ def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
     example = json.loads(match.group(1))
 
     assert tuple(example.keys()) == (
-        "output_language", *NOTE_PLAN_REQUIRED_FIELDS, *NOTE_PLAN_OPTIONAL_STRING_FIELDS
+        "output_language", *NOTE_PLAN_REQUIRED_FIELDS, *NOTE_PLAN_OPTIONAL_STRING_FIELDS,
+        *NOTE_PLAN_OPTIONAL_LIST_FIELDS,
     )
     assert example["output_language"] == "zh-CN"
     assert all(isinstance(example[field], str) for field in NOTE_PLAN_REQUIRED_FIELDS[:3])

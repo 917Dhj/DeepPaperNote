@@ -23,6 +23,12 @@ def plan_payload() -> dict:
         "claim_boundaries": ["Evidence covers only the reported benchmark."],
         "reuse_takeaways": ["Log tool failures as explicit state wherever later steps consume tool output."],
         "followup_questions": ["Does the state log still help when tools time out under injected latency?"],
+        "connections": [],
+        "key_prior_work": [
+            {"work": "Yao et al. 2023. ReAct", "role": "baseline"},
+            {"work": "Schick et al. 2023. Toolformer", "role": "method source"},
+            {"work": "Brown et al. 2020. GPT-3", "role": "backbone"},
+        ],
     }
 
 
@@ -40,7 +46,7 @@ def review_payload(note_sha: str = "a" * 64, plan_sha: str = "b" * 64, *, failed
             }
         ]
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "output_language": "en",
         "verdict": "fail" if failed else "pass",
         "reviewed_note_sha256": note_sha,
@@ -72,7 +78,7 @@ def test_quality_schema_accepts_complete_consistent_review(failed: str) -> None:
     [
         ("schema_version", True),
         ("schema_version", 1),
-        ("schema_version", 3),
+        ("schema_version", 2),
         ("output_language", "English"),
         ("verdict", "approved"),
         ("verdict", []),

@@ -9,13 +9,13 @@ from pathlib import Path
 
 from _final_quality import QUALITY_CHECKS, QUALITY_REVIEW_SCHEMA_VERSION
 from _identity import canonical_identity_acceptance_error
-from citation_links import resolve_reference_links
 from common import (
     maybe_load_json_record,
     normalize_whitespace,
     runtime_config,
 )
 from contracts import (
+    NOTE_PLAN_OPTIONAL_LIST_FIELDS,
     NOTE_PLAN_OPTIONAL_STRING_FIELDS,
     NOTE_PLAN_REQUIRED_FIELDS,
     PAPER_TYPE_VALUES,
@@ -23,6 +23,7 @@ from contracts import (
     writing_contract_rules,
 )
 from localization import normalize_output_language, require_artifact_output_language
+from vault_connections import connection_candidates
 
 
 def parser() -> argparse.ArgumentParser:
@@ -38,6 +39,11 @@ def parser() -> argparse.ArgumentParser:
         help="Figure/table decision JSON path or string.",
     )
     p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
+    p.add_argument(
+        "--admission",
+        default="",
+        help="Save Target Admission JSON; its directory is excluded from connection recall.",
+    )
     p.add_argument("--output", default="", help="Output JSON path.")
     return p
 
@@ -46,51 +52,37 @@ def load_record(value: str) -> dict:
     return maybe_load_json_record(value) or {}
 
 
-def sanitize_reference_candidates(
-    evidence_pack: dict, config: dict, *, limit: int = 20
-) -> list[dict]:
-    candidates = evidence_pack.get("reference_candidates", []) or []
-    if not isinstance(candidates, list):
-        return []
+def full_source_text(source_manifest: dict) -> str:
+    path_value = str(source_manifest.get("full_text_md_path", "") or "")
+    path = Path(path_value).expanduser() if path_value else None
+    if path is None or not path.is_file():
+        return ""
     try:
-        matched_candidates = resolve_reference_links(candidates[:limit], config)
-    except Exception:
-        matched_candidates = [
-            {
-                **candidate,
-                "wikilink": "",
-                "vault_target": "",
-                "match_status": "vault_unavailable",
-                "match_reason": "none",
-            }
-            for candidate in candidates[:limit]
-            if isinstance(candidate, dict)
-        ]
+        return path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
 
-    sanitized: list[dict] = []
-    for item in matched_candidates:
-        if not isinstance(item, dict):
-            continue
-        raw_text = normalize_whitespace(str(item.get("raw_text", "")))
-        display_text = normalize_whitespace(str(item.get("display_text", "")))
-        if not raw_text and not display_text:
-            continue
-        sanitized.append(
-            {
-                "raw_text": raw_text,
-                "display_text": display_text,
-                "page_hint": normalize_whitespace(str(item.get("page_hint", ""))),
-                "doi": normalize_whitespace(str(item.get("doi", ""))),
-                "arxiv_id": normalize_whitespace(str(item.get("arxiv_id", ""))),
-                "wikilink": normalize_whitespace(str(item.get("wikilink", ""))),
-                "vault_target": normalize_whitespace(str(item.get("vault_target", ""))),
-                "match_status": normalize_whitespace(
-                    str(item.get("match_status", "no_vault_match"))
-                ),
-                "match_reason": normalize_whitespace(str(item.get("match_reason", "none"))),
-            }
+
+def admitted_target_directory(value: str) -> str:
+    """The admitted note directory, so the paper never recalls its own notes."""
+    admission = load_record(value) if value else {}
+    return str(admission.get("target_directory", "") or "") if isinstance(admission, dict) else ""
+
+
+def recalled_connections(
+    evidence_pack: dict, source_manifest: dict, config: dict, language: str, own_directory: str
+) -> dict:
+    references = evidence_pack.get("reference_candidates", []) or []
+    try:
+        return connection_candidates(
+            config,
+            references if isinstance(references, list) else [],
+            full_source_text(source_manifest),
+            language,
+            own_directory=own_directory or None,
         )
-    return sanitized
+    except Exception:
+        return {"status": "vault_unavailable", "cited": [], "related": []}
 
 
 def figure_quality_summary(assets_wrapper: dict) -> dict[str, int]:
@@ -289,6 +281,8 @@ def note_plan_template(rules: dict) -> dict:
     ]
     for field in NOTE_PLAN_OPTIONAL_STRING_FIELDS:
         template[field] = ""
+    for field in NOTE_PLAN_OPTIONAL_LIST_FIELDS:
+        template[field] = []
     focus_field = rules["note_plan_depth_requirements"]["required_section_focus_fields"][0]
     template["section_plan"] = [
         {"section": section, focus_field: "", "subsections": [], "evidence_sources": []}
@@ -337,7 +331,7 @@ def compact_writing_contract(language: str | None = None) -> dict:
         "mechanism_flow_heading": rules["mechanism_flow_heading"],
         "note_plan_contract": {
             "required_fields": ["output_language", *NOTE_PLAN_REQUIRED_FIELDS],
-            "optional_fields": list(NOTE_PLAN_OPTIONAL_STRING_FIELDS),
+            "optional_fields": [*NOTE_PLAN_OPTIONAL_STRING_FIELDS, *NOTE_PLAN_OPTIONAL_LIST_FIELDS],
             "field_types": {
                 "output_language": "string",
                 **dict(rules["note_plan_field_types"]),
@@ -399,6 +393,10 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "plan_fields": list(rules["takeaways_contract"]["plan_fields"]),
             "subsections": list(rules["takeaways_contract"]["subsections"]),
         },
+        "connections_contract": {
+            key: list(value) if isinstance(value, tuple) else deepcopy(value)
+            for key, value in rules["connections_contract"].items()
+        },
         "my_notes_contract": dict(rules["my_notes_contract"]),
         "frontmatter_contract": {
             key: list(value) if isinstance(value, tuple) else value
@@ -433,6 +431,7 @@ def bundle(
     output_language: str | None = None,
     figures_path: str = "",
     assets_path: str = "",
+    own_directory: str = "",
 ) -> dict:
     evidence_pack = (
         evidence_wrapper.get("evidence_pack", {})
@@ -506,7 +505,9 @@ def bundle(
             "coverage": source_manifest.get("coverage", {}) or {},
         },
         "source_index": source_index(source_manifest),
-        "references": {"candidates": sanitize_reference_candidates(evidence_pack, config)},
+        "connection_candidates": recalled_connections(
+            evidence_pack, source_manifest, config, resolved_output_language, own_directory
+        ),
         "figure_table_manifest": figure_table_manifest(
             figure_decisions_wrapper,
             source_manifest,
@@ -548,6 +549,7 @@ def main() -> None:
             args.language,
             figures_path=resolved_file_path(args.figures),
             assets_path=resolved_file_path(args.assets),
+            own_directory=admitted_target_directory(args.admission),
         ),
         args.output,
     )

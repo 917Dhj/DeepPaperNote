@@ -24,10 +24,10 @@ Use these top-level sections in this order:
 9. `深度分析`
 10. `局限`
 11. `阅读收获`
-12. `引用`
+12. `关联`
 13. `我的笔记`
 
-Use `### 机制流程` for the mechanism-flow subsection. `阅读收获` holds exactly two subsections, `### 可迁移` and `### 下一步`; an item tied to the user's stated research direction starts with `判断：`. `我的笔记` is the last section and, in a generated draft, holds only this guidance line:
+Use `### 机制流程` for the mechanism-flow subsection. `阅读收获` holds exactly two subsections, `### 可迁移` and `### 下一步`; an item tied to the user's stated research direction starts with `判断：`. `关联` holds `### 库内笔记` and `### 关键前置文献`; an empty `库内笔记` reads `库里暂无相关笔记`, or `当前为 workspace 模式，未连接知识库` in workspace mode. `我的笔记` is the last section and, in a generated draft, holds only this guidance line:
 
 ```md
 > [!note] 这一节留给你自己：写下你的判断、它和你研究的联系、想验证的点。重新生成这篇笔记时，这一节会原样保留。
@@ -52,10 +52,10 @@ Use these top-level sections in this order:
 9. `Deep Analysis`
 10. `Limitations`
 11. `Takeaways`
-12. `References`
+12. `Connections`
 13. `My Notes`
 
-`Takeaways` holds exactly two subsections, `### Transferable Ideas` and `### Next Steps`; an item tied to the user's stated research direction starts with `Judgment:`. `My Notes` is the last section and, in a generated draft, holds only this guidance line:
+`Takeaways` holds exactly two subsections, `### Transferable Ideas` and `### Next Steps`; an item tied to the user's stated research direction starts with `Judgment:`. `Connections` holds `### In Your Vault` and `### Key Prior Work`; an in-vault entry reads `- [[target|Title]] (relation): reason`, and an empty `In Your Vault` reads `No related notes in your vault yet.`, or `Workspace mode: not connected to a vault.` in workspace mode. `My Notes` is the last section and, in a generated draft, holds only this guidance line:
 
 ```md
 > [!note] This section is yours: write down your own judgments, how the paper connects to your research, and what you want to verify. When this note is regenerated, this section is kept exactly as it is.
@@ -78,7 +78,7 @@ For a materialized image, use the normal image embed followed immediately by one
 
 `Abstract` is a faithful rendering of the source abstract in English. Preserve its meaning and scope; contribution claims, result interpretation, and hindsight judgment belong later unless the source abstract itself contains them.
 
-The English style gate checks headings, Core Information labels, figure callouts, inserted-image captions, and prose. Mark original non-English metadata with inline code inside `Core Information`, or with inline code or a Markdown link inside `References`; closed fenced code blocks and URLs keep their normal source text. In prose, a CJK identifier or stable proper noun must be an HTTP Markdown link or Obsidian wikilink. A source formula may retain only these CJK `\operatorname{...}` labels: `输入`, `输出`, `损失`, `状态`, `动作`, `奖励`, `标签`, `样本`, `预测`, and `目标`. The surrounding text remains subject to the English gate; inline code and free-form math text do not exempt Chinese prose.
+The English style gate checks headings, Core Information labels, figure callouts, inserted-image captions, and prose. Mark original non-English metadata with inline code inside `Core Information`, or with inline code or a Markdown link inside `Connections`, where wikilinks are also exempt; closed fenced code blocks and URLs keep their normal source text. In prose, a CJK identifier or stable proper noun must be an HTTP Markdown link or Obsidian wikilink. A source formula may retain only these CJK `\operatorname{...}` labels: `输入`, `输出`, `损失`, `状态`, `动作`, `奖励`, `标签`, `样本`, `预测`, and `目标`. The surrounding text remains subject to the English gate; inline code and free-form math text do not exempt Chinese prose.
 
 ## Contract ownership
 

@@ -121,6 +121,7 @@ def test_prepare_runs_offline_stages_with_workspace_images(
 
     assert step_names(calls) == PREPARE_STEPS
     assert flag_value(calls, "plan_figure_table_decisions.py", "--asset-subdir") == "images"
+    assert "--admission" not in next(c for c in calls if c[1].endswith("build_synthesis_bundle.py"))
     assert f"bundle={workdir.resolve() / 'paper_bundle.json'}" in capsys.readouterr().out
 
 
@@ -145,6 +146,8 @@ def test_prepare_carries_the_admitted_asset_subdir(tmp_path: Path, monkeypatch, 
         flag_value(calls, "plan_figure_table_decisions.py", "--asset-subdir")
         == f"images/{SOURCE_SHA256}"
     )
+    # The bundle excludes the paper's own vault directory from connection recall.
+    assert flag_value(calls, "build_synthesis_bundle.py", "--admission") == str(receipt.resolve())
 
 
 def test_obsidian_prepare_requires_an_admission(tmp_path: Path, monkeypatch, calls) -> None:

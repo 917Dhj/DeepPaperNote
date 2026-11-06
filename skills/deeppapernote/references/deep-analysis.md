@@ -195,7 +195,7 @@ Prefer:
 This section answers "what do I do with this paper", not "what did it prove". Doubts about the evidence stay in `深度分析` and `局限`.
 
 - `### 可迁移`: one or two reusable ideas, each naming the paper's concrete mechanism or practice, where it would transfer, and the precondition for the transfer to hold. An item tied to the user's stated research direction starts with `判断：`.
-- `### 下一步`: one or two follow-up questions or experiments specific to this paper, at least one of them testing the paper's own claims or evidence. A doubt is welcome here when it comes with the experiment that would test it. A recommended next paper must already appear in `引用`.
+- `### 下一步`: one or two follow-up questions or experiments specific to this paper, at least one of them testing the paper's own claims or evidence. A doubt is welcome here when it comes with the experiment that would test it. A recommended next paper must already appear in `关联`.
 
 `final-writing.md` holds the full rules, including how to use a research direction the user stated in the request.
 

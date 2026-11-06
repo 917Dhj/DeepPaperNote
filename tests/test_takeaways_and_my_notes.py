@@ -38,9 +38,17 @@ def zh_tail(transferable: list[str] | None = None, next_steps: list[str] | None 
     lines += [f"- {item}" for item in next_steps]
     lines += [
         "",
-        "## 引用",
+        "## 关联",
         "",
-        "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
+        "### 库内笔记",
+        "",
+        "库里暂无相关笔记",
+        "",
+        "### 关键前置文献",
+        "",
+        "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering（基线）",
+        "- Yao et al. 2023. ReAct: Synergizing Reasoning and Acting in Language Models（方法来源）",
+        "- Schick et al. 2023. Toolformer: Language Models Can Teach Themselves to Use Tools（方法来源）",
         "",
         "## 我的笔记",
         "",
@@ -117,8 +125,8 @@ def zh_lint_profile():
 def test_section_order_puts_takeaways_before_references_and_my_notes_last() -> None:
     zh = list(note_schema("zh-CN")["sections"].values())
     en = list(note_schema("en")["sections"].values())
-    assert zh[-4:] == ["局限", "阅读收获", "引用", "我的笔记"]
-    assert en[-4:] == ["Limitations", "Takeaways", "References", "My Notes"]
+    assert zh[-4:] == ["局限", "阅读收获", "关联", "我的笔记"]
+    assert en[-4:] == ["Limitations", "Takeaways", "Connections", "My Notes"]
 
 
 def test_writing_contract_carries_takeaways_and_my_notes_contracts() -> None:
@@ -195,6 +203,8 @@ def plan(**overrides) -> dict:
     payload = {
         "reuse_takeaways": [GOOD_TAKEAWAY],
         "followup_questions": [GOOD_QUESTION],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
         "reader_research_direction": "",
     }
     payload.update(overrides)
@@ -262,6 +272,8 @@ def quality_plan() -> dict:
         "claim_boundaries": ["b"],
         "reuse_takeaways": [GOOD_TAKEAWAY],
         "followup_questions": [GOOD_QUESTION],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
     }
 
 
@@ -277,7 +289,7 @@ def quality_review(*, finding_ref: str = "") -> dict:
             "required_revision": "Name the paper mechanism and the target problem.",
         }]
     return {
-        "schema_version": 2,
+        "schema_version": _final_quality.QUALITY_REVIEW_SCHEMA_VERSION,
         "output_language": "en",
         "verdict": "fail" if finding_ref else "pass",
         "reviewed_note_sha256": "a" * 64,
@@ -310,17 +322,15 @@ def test_takeaways_finding_rejects_other_or_missing_refs(ref: str) -> None:
         validate_review(quality_review(finding_ref=ref))
 
 
-def test_quality_review_schema_is_version_two() -> None:
-    assert _final_quality.QUALITY_REVIEW_SCHEMA_VERSION == 2
-    assert quality_review()["schema_version"] == 2
+def test_bundle_routes_the_current_quality_review_schema() -> None:
     contract = build_synthesis_bundle.compact_writing_contract("en")
-    assert contract["final_quality_gate"]["schema_version"] == 2
+    assert contract["final_quality_gate"]["schema_version"] == _final_quality.QUALITY_REVIEW_SCHEMA_VERSION
 
 
 def test_version_one_review_is_rejected_with_a_rerun_hint() -> None:
     review = quality_review()
     review["schema_version"] = 1
-    with pytest.raises(ValueError, match="schema_version 2.*rerun"):
+    with pytest.raises(ValueError, match="schema_version 3.*rerun"):
         validate_review(review)
 
 

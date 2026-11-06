@@ -17,6 +17,7 @@ from contracts import (
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
     required_field_value_error,
+    connection_plan_issues,
     takeaway_plan_issues,
 )
 from _frontmatter import FrontmatterError, parse_frontmatter
@@ -40,11 +41,15 @@ TAKEAWAY_SUBSECTIONS: tuple[str, ...] = ()
 TAKEAWAY_JUDGMENT_MARKER = ""
 TAKEAWAY_MAX_ITEM_CHARS = 0
 MY_NOTES_GUIDANCE = ""
+CONNECTION_SUBSECTIONS: dict[str, str] = {}
+CONNECTION_RELATION_LABELS: dict[str, str] = {}
+CONNECTION_EMPTY_STATEMENTS: tuple[str, ...] = ()
 
 def configure_output_language(language: str | None = None) -> str:
     global ACTIVE_LANGUAGE, SCHEMA, SECTIONS, REQUIRED_SECTIONS, CORE_INFO_FIELDS
     global CORE_INFO_FIELD_INDEX, CORE_INFO_FIELD_ALIASES, FIGURE_TARGET_SECTIONS, FIGURE_LABELS, MECHANISM_FLOW_HEADING
     global TAKEAWAY_SUBSECTIONS, TAKEAWAY_JUDGMENT_MARKER, TAKEAWAY_MAX_ITEM_CHARS, MY_NOTES_GUIDANCE
+    global CONNECTION_SUBSECTIONS, CONNECTION_RELATION_LABELS, CONNECTION_EMPTY_STATEMENTS
     ACTIVE_LANGUAGE = normalize_output_language(language)
     SCHEMA = note_schema(ACTIVE_LANGUAGE)
     SECTIONS = dict(SCHEMA["sections"])
@@ -59,6 +64,9 @@ def configure_output_language(language: str | None = None) -> str:
     TAKEAWAY_JUDGMENT_MARKER = str(SCHEMA["takeaways_judgment_marker"])
     TAKEAWAY_MAX_ITEM_CHARS = int(SCHEMA["takeaways_max_item_chars"])
     MY_NOTES_GUIDANCE = str(SCHEMA["my_notes_guidance"])
+    CONNECTION_SUBSECTIONS = dict(SCHEMA["connections_subsections"])
+    CONNECTION_RELATION_LABELS = dict(SCHEMA["connections_relation_labels"])
+    CONNECTION_EMPTY_STATEMENTS = tuple(SCHEMA["connections_empty_statements"].values())
     return ACTIVE_LANGUAGE
 
 def section(key: str) -> str:
@@ -347,8 +355,15 @@ def inspect_note_plan(
         "note_plan_takeaway_item_invalid": "item_invalid",
         "note_plan_takeaway_item_too_thin": "item_too_thin",
         "note_plan_reader_research_direction_invalid": "invalid",
+        "note_plan_key_prior_work_count_invalid": "count_invalid",
+        "note_plan_key_prior_work_item_invalid": "item_invalid",
+        "note_plan_connections_invalid": "invalid",
+        "note_plan_connections_count_invalid": "count_invalid",
+        "note_plan_connection_item_invalid": "item_invalid",
+        "note_plan_connection_relation_invalid": "relation_invalid",
+        "note_plan_connection_duplicate": "duplicate",
     }
-    for item in takeaway_plan_issues(plan):
+    for item in [*takeaway_plan_issues(plan), *connection_plan_issues(plan)]:
         code = f"planning_{item['field']}_{plan_codes[item['code']]}"
         if code not in issues:
             issues.append(code)
@@ -705,9 +720,11 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
         if ACTIVE_LANGUAGE == "en":
             checked = stripped
             section_name = section_name_for_line(lines, idx - 1)
-            if section_name in {section("core_information"), section("references")}:
+            if section_name in {section("core_information"), section("connections")}:
                 for pattern in ENGLISH_METADATA_SOURCE_SPAN_PATTERNS:
                     checked = pattern.sub("", checked)
+            if section_name == section("connections"):
+                checked = WIKILINK_SPAN_RE.sub("", checked)
             if stripped.startswith(f"*{FIGURE_LABELS['original_caption']}"):
                 checked = ENGLISH_METADATA_SOURCE_SPAN_PATTERNS[0].sub("", checked)
             checked = ENGLISH_CJK_ENTITY_LINK_RE.sub("", checked)
@@ -723,7 +740,7 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
             continue
         section_name = section_name_for_line(lines, idx - 1)
         subsection_name = subsection_name_for_line(lines, idx - 1)
-        if section_name in {section("core_information"), section("references")}:
+        if section_name in {section("core_information"), section("connections")}:
             continue
         if not re.search(r"[\u4e00-\u9fff]", stripped):
             continue
@@ -1563,25 +1580,6 @@ def is_honest_missing_declaration(text: str) -> bool:
     return len(normalized) >= 30
 
 
-def has_reference_entry(text: str) -> bool:
-    normalized = normalize_lint_whitespace(text)
-    if re.search(r"10\.\d{4,9}/\S+", normalized):
-        return True
-    if re.search(r"\barXiv[:：]?\s*\d{4}\.\d{4,5}", normalized, flags=re.IGNORECASE):
-        return True
-    if re.search(r"\[\[[^\]]+\]\]", normalized):
-        return True
-    if re.search(r"\[[0-9]+\]", normalized):
-        return True
-    if re.search(r"\b[A-Z][A-Za-z-]+ et al\.?\s*,?\s*(?:19|20)\d{2}\b", normalized):
-        return True
-    if re.search(r"\b[A-Z][A-Za-z-]+(?:\s+(?:and|&|et al\.?|[A-Z][A-Za-z-]+))*\s*\((?:19|20)\d{2}\)", normalized):
-        return True
-    if re.search(r"(?:19|20)\d{2}.*(?:DOI|doi|会议|期刊|arXiv)", normalized):
-        return True
-    return False
-
-
 def inspect_substantive_content(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
     my_notes_heading = section("my_notes")
@@ -1592,7 +1590,7 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
         content = normalized_section_content(body)
         if is_placeholder_like(content):
             issues.append(issue(section_heading, "section_empty_shell", "error", content or section_heading))
-        if section_heading not in {section("key_results"), section("references")} and is_honest_missing_declaration(content):
+        if section_heading not in {section("key_results"), section("connections")} and is_honest_missing_declaration(content):
             issues.append(issue(section_heading, "section_honest_missing_not_allowed", "error", content))
 
     contributions_heading = section("contributions")
@@ -1627,14 +1625,6 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
                 key_results_content,
             )
         )
-
-    references_heading = section("references")
-    references = section_body(text, references_heading)
-    references_content = normalized_section_content(references)
-    if is_honest_missing_declaration(references_content):
-        issues.append(issue(references_heading, "references_unavailable_declared", "warning", references_content))
-    elif is_placeholder_like(references_content) or not has_reference_entry(references_content):
-        issues.append(issue(references_heading, "references_placeholder", "error", references_content))
 
     limitations_heading = section("limitations")
     limitations = section_body(text, limitations_heading)
@@ -1769,6 +1759,84 @@ def plan_reader_research_direction(plan_path: Path | None) -> str:
     return value if isinstance(value, str) else ""
 
 
+WIKILINK_SPAN_RE = re.compile(r"\[\[[^\[\]\n]*\]\]")
+CONNECTION_ENTRY_RES = {
+    "zh-CN": re.compile(r"^-\s+\[\[([^\[\]|#\n]+)\|([^\[\]\n]+)\]\]（([^（）]+)）：\s*\S.*$"),
+    "en": re.compile(r"^-\s+\[\[([^\[\]|#\n]+)\|([^\[\]\n]+)\]\]\s+\(([^()]+)\):\s+\S.*$"),
+}
+
+
+def load_plan(plan_path: Path | None) -> dict:
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path else {}
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+    return plan if isinstance(plan, dict) else {}
+
+
+def inspect_connections(text: str, plan: dict) -> list[dict[str, object]]:
+    """The Connections section mirrors the plan: same link targets, same relations."""
+    heading = section("connections")
+    body = section_body(text, heading)
+    if not body:
+        return []
+    contract = WRITING_CONTRACT_RULES["connections_contract"]
+    issues: list[dict[str, object]] = []
+    missing = [
+        name for name in CONNECTION_SUBSECTIONS.values()
+        if not re.search(rf"^###\s+{re.escape(name)}\s*$", body, flags=re.MULTILINE)
+    ]
+    for name in missing:
+        issues.append(issue(heading, "connections_subsection_missing", "error", name))
+    if missing:
+        return issues
+
+    planned = {
+        item["target"]: item.get("relation", "")
+        for item in plan.get("connections") or []
+        if isinstance(item, dict) and isinstance(item.get("target"), str)
+    }
+    label_to_relation = {label: key for key, label in CONNECTION_RELATION_LABELS.items()}
+    in_vault = subsection_body(text, heading, CONNECTION_SUBSECTIONS["in_vault"])
+    lines = [line.strip() for line in in_vault.splitlines() if line.strip()]
+    entries = [line for line in lines if LIST_ITEM_RE.match(line)]
+    if not entries:
+        if " ".join(lines) not in CONNECTION_EMPTY_STATEMENTS:
+            issues.append(issue(heading, "connections_empty_statement_invalid", "error", " ".join(lines)))
+    else:
+        if len(entries) != len(lines):
+            issues.append(issue(heading, "connections_entry_invalid", "error", in_vault.strip()))
+        if len(entries) > contract["max_in_vault"]:
+            issues.append(issue(heading, "connections_count_invalid", "error", str(len(entries))))
+    written: dict[str, str] = {}
+    for entry in entries:
+        match = CONNECTION_ENTRY_RES[ACTIVE_LANGUAGE].match(entry)
+        if match is None:
+            issues.append(issue(heading, "connections_entry_invalid", "error", entry))
+            continue
+        target, _, label = match.groups()
+        relation = label_to_relation.get(label.strip())
+        if relation is None:
+            issues.append(issue(heading, "connections_relation_invalid", "error", entry))
+        elif target.strip() in planned and planned[target.strip()] != relation:
+            issues.append(issue(heading, "connections_relation_mismatch", "error", entry))
+        written[target.strip()] = label
+    if set(written) != set(planned) and not any(
+        item["reason"] == "connections_entry_invalid" for item in issues
+    ):
+        issues.append(
+            issue(heading, "connections_targets_mismatch_plan", "error",
+                  f"note: {sorted(written)}; plan: {sorted(planned)}")
+        )
+
+    prior = subsection_body(text, heading, CONNECTION_SUBSECTIONS["key_prior_work"])
+    count = sum(1 for line in prior.splitlines() if LIST_ITEM_RE.match(line))
+    limits = contract["key_prior_work_items"]
+    if not limits["min"] <= count <= limits["max"]:
+        issues.append(issue(heading, "key_prior_work_count_invalid", "error", str(count)))
+    return issues
+
+
 def inspect_my_notes(text: str) -> list[dict[str, object]]:
     heading = section("my_notes")
     pattern = rf"^##\s+{re.escape(heading)}\s*$"
@@ -1864,6 +1932,7 @@ def main() -> None:
     plan_path = resolve_note_plan_path(path, args.plan_file)
     note_plan_sha256 = json_input_sha256(plan_path)
     planning_artifact_found, planning_artifact_issues = inspect_note_plan(plan_path, output_language)
+    substantive_issues.extend(inspect_connections(text, load_plan(plan_path)))
     substantive_issues.extend(
         inspect_takeaway_judgment(text, plan_reader_research_direction(plan_path))
     )

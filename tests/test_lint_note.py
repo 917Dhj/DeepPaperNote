@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from formal_save_helpers import formal_save_args, reviewed_insert_fields
 
+import lint_note
 from localization import note_schema
 from lint_note import (
     core_info_structure_issues,
@@ -109,9 +110,17 @@ read_date: 2026-11-06
 
 - 怀疑状态机在高延迟外部服务下会失效，可以在注入超时的环境里复跑主实验来检验。
 
-## 引用
+## 关联
 
-- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example
+### 库内笔记
+
+库里暂无相关笔记
+
+### 关键前置文献
+
+- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering（基线）
+- Yao et al. 2023. ReAct: Synergizing Reasoning and Acting in Language Models（方法来源）
+- Schick et al. 2023. Toolformer: Language Models Can Teach Themselves to Use Tools（方法来源）
 
 ## 我的笔记
 
@@ -141,6 +150,8 @@ def _valid_plan_payload() -> dict:
         "comparative_positioning": ["The method is compared against answer-only baselines."],
         "reuse_takeaways": ["Track tool failure state explicitly so later steps can tell missing evidence apart."],
         "followup_questions": ["Check whether the mechanism survives missing tool outputs under injected timeouts."],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
         "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
     }
 
@@ -171,8 +182,8 @@ def test_reference_hygiene_gate_flags_runtime_artifact_references(tmp_path) -> N
     plan_path = tmp_path / "Paper.plan.json"
     note_path.write_text(
         _valid_note_text().replace(
-            "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
-            "- LLaMA source: /private/tmp/dpn-test-runs/candidate/artifacts/llama_source_manifest.json",
+            "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering（基线）",
+            "- LLaMA source: /private/tmp/dpn-test-runs/candidate/artifacts/llama_source_manifest.json（基线）",
         ),
         encoding="utf-8",
     )
@@ -839,39 +850,18 @@ def test_substantive_gate_rejects_honest_missing_outside_references() -> None:
     assert any(issue["severity"] == "error" for issue in issues)
 
 
-def test_substantive_gate_rejects_placeholder_references() -> None:
-    note = _valid_note_text().replace(
-        "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
-        "待补充。",
-    )
+def test_connections_gate_rejects_placeholder_text() -> None:
+    note = _valid_note_text().replace("库里暂无相关笔记", "待补充。")
 
-    issues = inspect_substantive_content(note)
+    issues = lint_note.inspect_connections(note, {"connections": []})
 
-    assert any(issue["reason"] == "references_placeholder" for issue in issues)
-    assert any(issue["severity"] == "error" for issue in issues)
+    assert [issue["reason"] for issue in issues] == ["connections_empty_statement_invalid"]
 
 
-def test_substantive_gate_accepts_real_reference_entry() -> None:
-    note = _valid_note_text().replace(
-        "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
-        "- [[Auditable Tool Use|Smith et al. 2024]] 提供了工具调用审计的直接参考。",
-    )
+def test_substantive_gate_accepts_the_empty_vault_statement() -> None:
+    issues = inspect_substantive_content(_valid_note_text())
 
-    issues = inspect_substantive_content(note)
-
-    assert not any(issue["section"] == "引用" for issue in issues)
-
-
-def test_substantive_gate_allows_honest_missing_in_references() -> None:
-    note = _valid_note_text().replace(
-        "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
-        "本文未给出可解析的参考文献条目；依据是正文和附录未提供 DOI、arXiv 或编号引用，因此引用完整性受限。",
-    )
-
-    issues = inspect_substantive_content(note)
-
-    assert not any(issue["severity"] == "error" for issue in issues)
-    assert any(issue["reason"] == "references_unavailable_declared" for issue in issues)
+    assert not any(issue["section"] == "关联" for issue in issues)
 
 
 def test_substantive_gate_rejects_generic_limitation() -> None:
@@ -1019,6 +1009,8 @@ def test_core_info_issues_fail_basic_structure_gate(tmp_path) -> None:
                 "comparative_positioning": ["The method is compared against answer-only baselines."],
                 "reuse_takeaways": ["Track failure state explicitly."],
                 "followup_questions": ["Check whether the mechanism survives missing tool outputs."],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
             }
         ),
@@ -1127,6 +1119,8 @@ def test_mechanical_translation_artifacts_fail_style_gate(tmp_path) -> None:
                 "comparative_positioning": ["The method is compared against answer-only baselines."],
                 "reuse_takeaways": ["Track failure state explicitly."],
                 "followup_questions": ["Check whether the mechanism survives missing tool outputs."],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
             }
         ),
@@ -1175,6 +1169,8 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
                 "comparative_positioning": [],
                 "reuse_takeaways": [],
                 "followup_questions": [],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [],
             }
         ),
@@ -1238,6 +1234,8 @@ def test_note_plan_explicit_not_reported_entries_pass_plan_gate(tmp_path) -> Non
                 "comparative_positioning": ["The method is positioned against answer-only tool use."],
                 "reuse_takeaways": ["Use explicit state logs when evaluating tool chains."],
                 "followup_questions": ["Test the state log with slower external tools."],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),
@@ -1943,6 +1941,8 @@ def test_inspect_note_plan_rejects_invalid_paper_type(tmp_path) -> None:
                 "comparative_positioning": ["The plan names the relevant baseline comparison."],
                 "reuse_takeaways": ["Track the mechanism separately from the final result."],
                 "followup_questions": ["Check whether the mechanism transfers to a new dataset."],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),
@@ -1973,6 +1973,8 @@ def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
                 "comparative_positioning": [],
                 "reuse_takeaways": [],
                 "followup_questions": [],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),
@@ -2009,6 +2011,8 @@ def test_inspect_note_plan_names_each_missing_field(tmp_path) -> None:
         "comparative_positioning": ["The plan names the baseline comparison."],
         "reuse_takeaways": ["Track the mechanism separately from the result."],
         "followup_questions": ["Check whether the mechanism transfers."],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
     }
     plan_path.write_text(json.dumps(plan), encoding="utf-8")
 
@@ -2071,6 +2075,8 @@ def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
                 "comparative_positioning": [],
                 "reuse_takeaways": [],
                 "followup_questions": [],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [],
             }
         ),
@@ -2120,6 +2126,8 @@ def test_inspect_note_plan_accepts_valid_plan(tmp_path) -> None:
                 "comparative_positioning": ["The plan names the relevant baseline comparison."],
                 "reuse_takeaways": ["Track the mechanism separately from the final result."],
                 "followup_questions": ["Check whether the mechanism transfers to a new dataset."],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),
