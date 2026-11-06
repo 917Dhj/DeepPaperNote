@@ -414,7 +414,6 @@ def test_output_language_reference_matches_both_machine_schemas() -> None:
         assert section_positions == sorted(section_positions)
         for label in schema["figure_labels"].values():
             assert label in contract
-        assert schema["mechanism_flow"] in contract
 
 
 def test_configuration_cli_keeps_semantic_failures_repairable(

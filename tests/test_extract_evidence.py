@@ -15,7 +15,6 @@ except ImportError:  # pragma: no cover
 
 from build_synthesis_bundle import bundle as build_synthesis_bundle
 from _pdf_text import extract_caption_lines
-from contracts import NOTE_REQUIRED_SECTIONS
 import extract_evidence
 from extract_evidence import build_appendix_evidence, evidence_quality, extract_equation_candidates
 
@@ -261,7 +260,7 @@ def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
     assert mechanism_evidence
     assert payload["summary"]["ablation_signals"]
     assert payload["summary"]["mechanism_signals"]
-    assert payload["summary"]["paper_type"] == "AI_method"
+    assert payload["summary"]["paper_type"] == "method"
     assert payload["evidence_pack"]["reference_candidates"] == []
 
 
@@ -1094,7 +1093,7 @@ def test_bundle_removes_top_n_evidence_and_uses_compact_contract() -> None:
                 ]
             },
             "summary": {
-                "paper_type": "AI_method",
+                "paper_type": "method",
                 "ablation_signals": ["Removing the decoder causes a 2-point drop."],
             },
         },
@@ -1107,34 +1106,31 @@ def test_bundle_removes_top_n_evidence_and_uses_compact_contract() -> None:
     assert "candidate_chunks" not in synthesis
     assert "section_texts" not in synthesis
     contract = synthesis["writing_contract"]
-    method_contract = contract["contracts_by_paper_type"]["AI_method"]
-    formula_rules = method_contract["formula_rules"]
-    mechanism_flow_contract = method_contract["mechanism_flow_contract"]
+    method_contract = contract["contracts_by_paper_type"]["method"]
 
     assert contract["paper_type_selection"]["source_of_truth"] == "note_plan.paper_type"
     assert contract["grounding_contract"]["source_of_truth"] == "source_manifest"
     assert "section_id" in contract["grounding_contract"]["accepted_reference_forms"]
     assert "pages" in contract["grounding_contract"]["accepted_reference_forms"]
-    assert any("工程含义" in rule for rule in formula_rules)
-    assert method_contract["section_semantics"]["方法主线"] == "模型、算法、训练或推理机制。"
-    assert method_contract["recommended_subsections"]["方法主线"] == [
-        "机制流程",
-        "模型结构",
-        "训练目标",
-        "推理与采样链路",
-        "关键实现细节",
-    ]
-    assert mechanism_flow_contract["required_step_count"] == "3_to_4"
+    assert method_contract["formula_rules"]
+    assert [item["section"] for item in method_contract["middle_sections"]][3] == "方法"
+    assert method_contract["workflow"]["heading"] == "方法流程"
+    assert method_contract["workflow"]["table_headers"] == ["步骤", "输入", "做什么", "输出", "本文新做法"]
 
 
 @pytest.mark.parametrize(
     ("paper_type", "expected_token"),
     [
-        ("AI_method", "方法机制"),
-        ("benchmark_or_dataset", "benchmark"),
-        ("clinical_or_psychology_empirical", "临床"),
-        ("humanities_or_social_science", "理论"),
-        ("survey_or_review", "综述"),
+        ("method", "核心思路"),
+        ("system", "瓶颈"),
+        ("theory", "假设"),
+        ("position", "立场"),
+        ("benchmark_or_dataset", "构造流程"),
+        ("discovery_empirical", "备择解释"),
+        ("human_subjects_empirical", "效应量"),
+        ("survey_or_review", "分类"),
+        ("qualitative_empirical", "主题"),
+        ("humanities_argument", "论证"),
     ],
 )
 def test_bundle_exposes_all_paper_type_contracts_for_model_selection(
@@ -1143,7 +1139,7 @@ def test_bundle_exposes_all_paper_type_contracts_for_model_selection(
 ) -> None:
     synthesis = bundle(
         metadata={"title": "Typed Paper"},
-        evidence_wrapper={"summary": {"paper_type": "AI_method"}, "evidence_pack": {}},
+        evidence_wrapper={"summary": {"paper_type": "method"}, "evidence_pack": {}},
         figures_wrapper={},
         assets_wrapper={},
     )
@@ -1153,21 +1149,10 @@ def test_bundle_exposes_all_paper_type_contracts_for_model_selection(
     typed_text = json.dumps(typed_contract, ensure_ascii=False)
 
     assert typed_contract["paper_type"] == paper_type
-    assert {
-        "paper_type",
-        "reader_lens",
-        "section_focus",
-        "required_checks",
-        "avoid_rules",
-        "section_semantics",
-        "recommended_subsections",
-    } <= set(typed_contract)
-    assert typed_contract["section_focus"]
-    assert typed_contract["required_checks"]
-    assert typed_contract["avoid_rules"]
-    assert typed_contract["section_semantics"]
-    assert typed_contract["recommended_subsections"]
-    assert set(typed_contract["recommended_subsections"]) <= set(NOTE_REQUIRED_SECTIONS)
+    assert {"label", "middle_sections", "core_questions", "workflow", "secondary_heading", "formula_rules"} <= set(typed_contract)
+    assert typed_contract["middle_sections"] and typed_contract["core_questions"]
+    sections = {item["section"] for item in typed_contract["middle_sections"]}
+    assert {item["section"] for item in typed_contract["core_questions"]} <= sections
     assert expected_token in typed_text
     assert "active_paper_type_contract" not in contract
     assert contract["paper_type_selection"] == {

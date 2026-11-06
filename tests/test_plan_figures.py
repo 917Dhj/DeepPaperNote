@@ -200,7 +200,7 @@ def test_system_result_figure_is_prioritized_even_with_dataset_word() -> None:
     )
 
     assert items[0]["kind"] == "main_result"
-    assert items[0]["section"] == "关键结果"
+    assert items[0]["section"] == "结果节"
     assert items[0]["priority"] == 2
 
 
@@ -219,7 +219,7 @@ def test_parallel_generation_result_figure_is_prioritized() -> None:
     )
 
     assert items[0]["kind"] == "main_result"
-    assert items[0]["section"] == "关键结果"
+    assert items[0]["section"] == "结果节"
     assert items[0]["priority"] == 2
 
 
@@ -238,7 +238,7 @@ def test_result_claim_with_architecture_word_stays_result() -> None:
     )
 
     assert items[0]["kind"] == "main_result"
-    assert items[0]["section"] == "关键结果"
+    assert items[0]["section"] == "结果节"
     assert items[0]["priority"] == 2
 
 
@@ -257,7 +257,7 @@ def test_prisma_flow_diagram_is_data_overview() -> None:
     )
 
     assert items[0]["kind"] == "data_or_task_overview"
-    assert items[0]["section"] == "数据与任务定义"
+    assert items[0]["section"] == "流程小节"
     assert items[0]["priority"] == 2
 
 
@@ -281,10 +281,10 @@ def test_method_detail_figures_are_kept_as_method_placeholders() -> None:
 
     by_id = {item["id"]: item for item in items}
     assert by_id["Figure 5"]["kind"] == "method_detail"
-    assert by_id["Figure 5"]["section"] == "方法主线"
+    assert by_id["Figure 5"]["section"] == "方法或设计节"
     assert by_id["Figure 5"]["priority"] == 2
     assert by_id["Figure 6"]["kind"] == "method_detail"
-    assert by_id["Figure 6"]["section"] == "方法主线"
+    assert by_id["Figure 6"]["section"] == "方法或设计节"
     assert by_id["Figure 6"]["priority"] == 2
 
 

@@ -950,7 +950,7 @@ def test_incidental_application_keyword_does_not_reuse_unrelated_folder(tmp_path
         (
             "Sparse Transformers for Long Context Modeling",
             "We propose a new attention mechanism and evaluate ablations.",
-            "AI_method",
+            "method",
         ),
         (
             "A Benchmark for Multimodal Reasoning",
@@ -960,12 +960,22 @@ def test_incidental_application_keyword_does_not_reuse_unrelated_folder(tmp_path
         (
             "Patient Anxiety Screening with Mobile Signals",
             "A clinical patient study measures depression and anxiety symptoms.",
-            "clinical_or_psychology_empirical",
+            "human_subjects_empirical",
         ),
         (
             "Digital Labor and Platform Governance",
             "This paper develops a theoretical framing for a social science corpus.",
-            "humanities_or_social_science",
+            "humanities_argument",
+        ),
+        (
+            "Position: Benchmarks Should Report Contamination",
+            "We argue that evaluation reports must include contamination checks.",
+            "position",
+        ),
+        (
+            "How Counselors Use Chatbots",
+            "Semi-structured interviews with 20 counselors were analysed with thematic analysis.",
+            "qualitative_empirical",
         ),
         (
             "A Systematic Review of Retrieval-Augmented Generation",
@@ -975,12 +985,12 @@ def test_incidental_application_keyword_does_not_reuse_unrelated_folder(tmp_path
         (
             "A Review-Aware Optimizer for Neural Networks",
             "We propose a training method with ablation studies.",
-            "AI_method",
+            "method",
         ),
         (
             "A Review of Optimizer Stability",
             "We propose a training method with ablation studies.",
-            "AI_method",
+            "method",
         ),
     ],
 )

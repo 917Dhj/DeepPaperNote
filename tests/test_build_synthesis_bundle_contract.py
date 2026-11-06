@@ -99,9 +99,10 @@ def test_bundle_compact_writing_contract_keeps_depth_rules_without_old_bundle_fi
     assert contract["grounding_contract"]["excluded_model_input_fields"] == list(
         WRITING_CONTRACT_RULES["excluded_model_input_fields"]
     )
-    assert contract["grounding_contract"]["required_sections"] == list(
-        WRITING_CONTRACT_RULES["grounding_required_sections"]
-    )
+    assert contract["grounding_contract"]["required_sections"] == [
+        "contracts_by_paper_type[note_plan.paper_type].middle_sections",
+        "局限",
+    ]
     assert contract["grounding_contract"]["note_plan_depth_requirements"] == {
         "required_section_focus_min_chars": WRITING_CONTRACT_RULES[
             "note_plan_depth_requirements"

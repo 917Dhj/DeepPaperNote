@@ -65,7 +65,7 @@ The note ends with `阅读收获`, then `关联`, then `我的笔记`. `writing_
 
 `阅读收获` answers "what do I do with this paper". It holds exactly two `###` subsections, each with one or two list items. Keep each item to one or two sentences; Final Note Lint warns when an item exceeds `takeaways_contract.max_item_chars` non-space characters.
 - `### 可迁移` comes from `note_plan.reuse_takeaways`. Each item names the paper's concrete mechanism or practice, where it would transfer, and the precondition for the transfer to hold.
-- `### 下一步` comes from `note_plan.followup_questions`. Each item is a follow-up question or experiment specific to this paper. At least one item tests the paper's own claims or evidence rather than only a transfer setting. A doubt belongs here only together with the experiment that would test it; plain criticism stays in `深度分析` and `局限`. A recommended next paper must already appear in `关联`; never invent a title.
+- `### 下一步` comes from `note_plan.followup_questions`. Each item is a follow-up question or experiment specific to this paper. At least one item tests the paper's own claims or evidence rather than only a transfer setting. A doubt belongs here only together with the experiment that would test it; plain criticism stays in the analysis sections and `局限`. A recommended next paper must already appear in `关联`; never invent a title.
 
 The user's research direction comes from the request, recorded verbatim in `note_plan.reader_research_direction`. When the request states none, it comes from the user's research memory: copy the bundle's `research_memory.suggested_reader_research_direction` when `research_memory.status` is `ok`. A direction from the request always wins. Write `### 可迁移` against the direction:
 1. Whenever a credible transfer exists, at least one item connects to the user's direction.
@@ -170,31 +170,7 @@ It should use meaningful `###` subheadings where they improve technical clarity.
 
 Draft only from a note plan that has already passed grounding. Use its paper type, evidence-backed claims, boundaries, limiting results, mechanism-result links, comparisons, reusable takeaways, and follow-up questions as writing commitments rather than reopening the planning contract here.
 
-Examples:
-- `### 数据来源`
-- `### 任务定义`
-- `### 中间特征抽取`
-- `### 训练细节`
-- `### 哪些结果最重要`
-- `### 哪些地方容易被误读`
-
-For technical papers, also strongly consider subsections such as:
-- `### 机制流程`
-- `### 训练目标`
-- `### 推理与采样链路`
-- `### 关键实现细节`
-- `### 复杂度与扩展性`
-- `### 消融到底说明了什么`
-
-For method, framework, and system papers, prefer an explicit `### 机制流程` subsection instead of hiding the execution chain inside generic prose.
-That subsection should usually be a 3 to 4 step numbered list covering:
-- what the Input is
-- what the main intermediate transformations are
-- what the Output is
-- what the training or inference loop is actually doing
-- do not rely on a damaged Algorithm block to carry this explanation for you
-- do not let the steps collapse into module-name listing; each step should describe an operation
-- if a high-confidence pipeline or architecture figure matches this execution chain, place it in `### 机制流程`
+Write the middle sections of `contracts_by_paper_type[paper_type]` in order. Answer each core question in its home section from `note_plan.core_answers`; a `not_reported` answer becomes a plain sentence such as "论文没有报告 X". When the type has a workflow, write its subsection as `paper-types.md` shows: an overview chain, then the step table mirroring `note_plan.workflow`, then any matching pipeline or framework figure. Inside sections, add `###` subsections where they help, for example `### 为什么结果成立` or `### 哪些地方容易被误读`.
 
 ## Formula Rule
 
@@ -256,7 +232,8 @@ Before handing the draft to `final_quality_review`, the author must explicitly c
 - does the note contain concrete numbers, dimensions, complexity terms, or formulas when the paper clearly depends on them?
 - can a reader familiar with Python and deep learning frameworks follow the core method from this note alone?
 - does the method section explain the mechanism rather than only summarize the claim?
-- if this is a method/system/framework paper, does `方法主线` explicitly contain `### 机制流程` with a 3 to 4 step numbered list?
+- does every core question of the paper type have an answer, or a plain not-reported sentence, in its home section?
+- if the type has a workflow, does its subsection hold an overview chain and a step table that match `note_plan.workflow`?
 - if the raw source reports negative or unstable ablation settings, did the note include at least one of them?
 - if the raw source does not clearly report such settings, did the note avoid inventing failed or unstable cases?
 - does the note contain at least one honest limitation and one paper-specific insight?

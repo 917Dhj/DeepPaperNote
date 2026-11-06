@@ -34,6 +34,26 @@ from lint_note import (
 MY_NOTES_GUIDANCE = note_schema("zh-CN")["my_notes_guidance"]
 
 
+@pytest.fixture(autouse=True)
+def _method_note_structure():
+    """Module-level lint helpers read the configured language and paper type."""
+    lint_note.configure_output_language("zh-CN")
+    lint_note.configure_paper_type("method")
+    yield
+    lint_note.configure_output_language("zh-CN")
+
+
+def _type_fields() -> dict:
+    return {
+        "positioning": "technique",
+        "survey_mode": "",
+        "secondary_type": "",
+        "secondary_host_section": "",
+        "core_answers": _method_core_answers(),
+        "workflow": [_method_workflow()],
+    }
+
+
 def _valid_note_text() -> str:
     return """---
 tags:
@@ -41,7 +61,7 @@ tags:
 aliases:
   - "Paper"
 date: 2024
-paper_type: AI_method
+paper_type: method
 methods: [tool-state tracking]
 datasets: []
 tasks: [multi-hop question answering]
@@ -69,26 +89,36 @@ read_date: 2026-11-06
 
 这篇论文用可审计的工具调用状态机降低长链路问答中的错误累积。
 
-## 研究问题
+## 背景与问题
 
 论文关注多步问答系统在检索证据不完整、工具调用失败和中间状态被误用时，如何保持最终答案的可追溯性与可靠性。
 
-## 数据与任务定义
+## 现有方法的局限
 
-任务输入包括用户问题、候选检索证据和可调用工具列表；输出包括最终答案、每一步工具调用记录以及失败原因标注。
+已有的只看答案的方法无法区分证据不足和推理错误，失败的工具调用也不会留下可检查的记录。
 
-## 方法主线
+## 核心思路与挑战
 
-### 机制流程
+核心思路是把每一步工具调用写进可审计的状态机；难点在于失败调用的置信度和异常类型需要在后续步骤中被显式消费。
 
-输入问题先进入证据筛选模块，随后工具规划器选择下一步调用，最后由答案生成器结合状态日志输出可追溯结论。
+## 方法
+
+### 方法流程
+
+证据筛选 → 工具规划 → 答案生成
+
+| 步骤 | 输入 | 做什么 | 输出 | 本文新做法 |
+| --- | --- | --- | --- | --- |
+| 证据筛选 | 问题与候选证据 | 过滤低置信证据 | 证据集合 | 否 |
+| 工具规划 | 证据集合与状态日志 | 选择下一步调用 | 调用记录 | 是 |
+| 答案生成 | 状态日志 | 结合日志输出结论 | 可追溯答案 | 是 |
 
 > [!figure] 图一 方法概览
-> 建议位置：方法主线
+> 建议位置：方法
 > 放置原因：帮助理解整体过程。
 > 当前状态：保留占位；未找到高置信度整图。
 
-## 关键结果
+## 实验证据
 
 在三个多步问答数据集上，方法把答案准确率从 71.2% 提升到 78.5%，并将不可追溯错误比例从 18% 降到 9%。
 
@@ -130,10 +160,16 @@ read_date: 2026-11-06
 def _valid_plan_payload() -> dict:
     return {
         "output_language": "zh-CN",
-        "paper_type": "AI_method",
+        "paper_type": "method",
         "paper_type_rationale": "The paper proposes a model mechanism and evaluates it experimentally.",
+        "positioning": "technique",
+        "survey_mode": "",
+        "secondary_type": "",
+        "secondary_host_section": "",
+        "core_answers": _method_core_answers(),
+        "workflow": [_method_workflow()],
         "dominant_domain": "reasoning",
-        "must_cover": ["方法主线"],
+        "must_cover": ["方法"],
         "key_numbers": ["78.5"],
         "real_comparisons": ["baseline"],
         "central_claims": [
@@ -152,8 +188,27 @@ def _valid_plan_payload() -> dict:
         "followup_questions": ["Check whether the mechanism survives missing tool outputs under injected timeouts."],
         "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
         "connections": [],
-        "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
+        "section_plan": [{"section": "方法", "evidence_sources": [{"section_id": "sec:method"}]}],
     }
+
+
+def _method_core_answers() -> dict:
+    answers = {
+        qid: {"answer": f"Answer for {qid}.", "evidence_refs": [{"section_id": "sec:method"}]}
+        for qid in ("method.problem", "method.prior_gaps", "method.key_idea", "method.claim_evidence", "method.boundary_cost")
+    }
+    answers["method.comparison"] = {"not_reported": True, "reason": "The paper reports a single run without error bars."}
+    return answers
+
+
+def _method_workflow() -> dict:
+    steps = [("证据筛选", "问题与候选证据", "过滤低置信证据", "证据集合", False),
+             ("工具规划", "证据集合与状态日志", "选择下一步调用", "调用记录", True),
+             ("答案生成", "状态日志", "结合日志输出结论", "可追溯答案", True)]
+    return {"name": "推理", "steps": [
+        {"step": step, "input": inp, "operation": op, "output": out, "novel": novel}
+        for step, inp, op, out, novel in steps
+    ]}
 
 
 def _source_manifest_path(tmp_path: Path) -> Path:
@@ -259,7 +314,7 @@ def test_figure_callout_target_section_mismatch_is_flagged() -> None:
 ## 深度分析
 
 > [!figure] Fig. 1 问题边界图
-> 建议位置：研究问题
+> 建议位置：背景与问题
 > 放置原因：帮助定义问题边界。
 > 当前状态：保留占位；未找到高置信度整图。
 """
@@ -270,12 +325,12 @@ def test_figure_callout_target_section_mismatch_is_flagged() -> None:
 def test_figure_callout_inside_declared_section_passes() -> None:
     note = """# Title
 
-## 方法主线
+## 方法
 
-### 机制流程
+### 方法流程
 
 > [!figure] Fig. 2 总体流程
-> 建议位置：方法主线
+> 建议位置：方法
 > 放置原因：帮助理解执行链。
 > 当前状态：保留占位；未找到高置信度整图。
 
@@ -441,10 +496,10 @@ def test_usable_candidate_soft_placeholder_reasons_fail_figure_structure_gate() 
 def test_usable_candidate_visual_defect_placeholder_reason_passes() -> None:
     note = """# Title
 
-## 方法主线
+## 方法
 
 > [!figure] Table 5 评测表
-> 建议位置：方法主线
+> 建议位置：方法
 > 放置原因：帮助理解评测协议。
 > 当前状态：候选裁剪可用，但混入相邻 Table 6。
 """
@@ -470,10 +525,10 @@ def test_usable_candidate_lower_priority_placeholder_reason_fails() -> None:
 def test_usable_candidate_materialization_blocked_reason_passes() -> None:
     note = """# Title
 
-## 方法主线
+## 方法
 
 > [!figure] Fig. 4 工具链图
-> 建议位置：方法主线
+> 建议位置：方法
 > 放置原因：帮助理解工具链。
 > 当前状态：候选可用但 materialize_figure_asset.py 复制失败/权限不足。
 """
@@ -839,14 +894,14 @@ def test_substantive_gate_rejects_honest_missing_in_key_results() -> None:
 
 def test_substantive_gate_rejects_honest_missing_outside_references() -> None:
     note = _valid_note_text().replace(
-        "输入问题先进入证据筛选模块，随后工具规划器选择下一步调用，最后由答案生成器结合状态日志输出可追溯结论。",
+        "已有的只看答案的方法无法区分证据不足和推理错误，失败的工具调用也不会留下可检查的记录。",
         "本文未给出可复现的方法流程；依据是正文和附录都没有展开模块输入输出，因此这里不能补写机制细节，只能说明方法理解受限。",
     )
 
     issues = inspect_substantive_content(note)
 
     assert any(issue["reason"] == "section_honest_missing_not_allowed" for issue in issues)
-    assert any(issue["section"] == "方法主线" for issue in issues)
+    assert any(issue["section"] == "现有方法的局限" for issue in issues)
     assert any(issue["severity"] == "error" for issue in issues)
 
 
@@ -1214,7 +1269,8 @@ def test_note_plan_explicit_not_reported_entries_pass_plan_gate(tmp_path) -> Non
         json.dumps(
                 {
                     "output_language": "zh-CN",
-                    "paper_type": "AI_method",
+                    "paper_type": "method",
+                    **_type_fields(),
                 "paper_type_rationale": "The paper proposes a model mechanism and evaluates it experimentally.",
                 "dominant_domain": "reasoning",
                 "must_cover": ["方法主线"],
@@ -1921,7 +1977,7 @@ def test_inspect_note_plan_rejects_invalid_paper_type(tmp_path) -> None:
     plan_path.write_text(
         json.dumps(
             {
-                "paper_type": "method",
+                "paper_type": "AI_method",
                 "paper_type_rationale": "The model-facing plan should use the shared paper type enum.",
                 "dominant_domain": "reasoning",
                 "must_cover": ["方法主线"],
@@ -1960,7 +2016,8 @@ def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
         json.dumps(
                 {
                     "output_language": "zh-CN",
-                    "paper_type": "AI_method",
+                    "paper_type": "method",
+                    **_type_fields(),
                 "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": "method",
@@ -2062,7 +2119,8 @@ def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
         json.dumps(
                 {
                     "output_language": "zh-CN",
-                    "paper_type": "AI_method",
+                    "paper_type": "method",
+                    **_type_fields(),
                 "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": [],
@@ -2106,7 +2164,8 @@ def test_inspect_note_plan_accepts_valid_plan(tmp_path) -> None:
         json.dumps(
                 {
                     "output_language": "zh-CN",
-                    "paper_type": "AI_method",
+                    "paper_type": "method",
+                    **_type_fields(),
                 "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": ["方法主线"],

@@ -7,7 +7,7 @@ The note is high quality only if it satisfies most of the checks below.
 ## Minimum Bar
 
 - It is not a paraphrase of the abstract.
-- It distinguishes `research problem` from `task definition`.
+- It answers every core question of its paper type, or says plainly that the paper does not report it.
 - It explains how the method or analysis actually works.
 - It reports the most meaningful results, not only the prettiest numbers.
 - It includes at least one real limitation.
@@ -22,21 +22,13 @@ The note should usually include:
 - `原文摘要翻译`
 - `创新点`
 - `一句话总结`
-- `研究问题`
-- `数据与任务定义`
-- `方法主线`
-- `关键结果`
-- `深度分析`
+- the middle sections of its paper type, in order (`contracts_by_paper_type[paper_type].middle_sections`; see `paper-types.md`)
 - `局限`
 - `阅读收获`
 - `关联`
 - `我的笔记`
 
-For non-trivial papers, it should usually also include multiple `###` subheadings inside:
-- `数据与任务定义`
-- `方法主线`
-- `关键结果`
-- `深度分析`
+For non-trivial papers, it should usually also include multiple `###` subheadings inside the middle sections, and the workflow subsection when the paper type has one.
 
 Before the final note is written, the run should already have an inspectable, grounded plan whose analytical commitments are paper-specific.
 

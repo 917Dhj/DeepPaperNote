@@ -19,11 +19,12 @@ Priority order:
 
 ## Placement Logic
 
-- Put method overview figures in `### 机制流程` when they directly explain the core execution chain
-- If the match is weaker or the note does not need that micro-structure, keep them in `方法主线`
-- Put data or task figures in `数据与任务定义`
-- Put main result figures or tables in `关键结果`
-- Put conceptual diagrams in `研究问题` or `深度分析` if they clarify the argument
+- Put pipeline, framework, or construction overview figures right after the step table of the workflow subsection when they directly explain the execution chain
+- If the match is weaker, keep them in the method or design section of the paper type
+- Put data or task figures in the section that introduces the task or data
+- Put main result figures or tables in the section that carries the results
+- Put conceptual diagrams in the opening or analysis section if they clarify the argument
+- The figure plan's `section` is a role such as `结果节` or `流程小节`; write the type's actual section name in `建议位置`
 
 ## What to Read
 

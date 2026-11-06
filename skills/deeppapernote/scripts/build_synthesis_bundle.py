@@ -15,6 +15,7 @@ from common import (
     runtime_config,
 )
 from contracts import (
+    NOTE_PLAN_TYPE_FIELDS,
     NOTE_PLAN_OPTIONAL_LIST_FIELDS,
     NOTE_PLAN_OPTIONAL_STRING_FIELDS,
     NOTE_PLAN_REQUIRED_FIELDS,
@@ -275,10 +276,13 @@ def note_plan_template(rules: dict) -> dict:
         template[field] = ""
     for field in NOTE_PLAN_OPTIONAL_LIST_FIELDS:
         template[field] = []
+    for field, field_type in NOTE_PLAN_TYPE_FIELDS.items():
+        template[field] = {"string": "", "array": [], "object": {}}[field_type]
     focus_field = rules["note_plan_depth_requirements"]["required_section_focus_fields"][0]
+    # One entry per middle section of the chosen paper_type, then limitations.
     template["section_plan"] = [
         {"section": section, focus_field: "", "subsections": [], "evidence_sources": []}
-        for section in rules["grounding_required_sections"]
+        for section in ("", rules["limitations_section"])
     ]
     return template
 
@@ -317,13 +321,17 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "SKILL.md defines the workflow; scripts/contracts.py defines "
             "machine-checkable contract data."
         ),
-        "must_include_sections": list(rules["required_sections"]),
+        "section_order": {
+            "head": list(rules["fixed_head_sections"]),
+            "middle": rules["type_structure_contract"]["middle_sections_source"],
+            "tail": list(rules["fixed_tail_sections"]),
+        },
         "core_info_fields": list(rules["core_info_fields"]),
         "figure_labels": dict(rules["figure_labels"]),
-        "mechanism_flow_heading": rules["mechanism_flow_heading"],
         "note_plan_contract": {
             "required_fields": ["output_language", *NOTE_PLAN_REQUIRED_FIELDS],
             "optional_fields": [*NOTE_PLAN_OPTIONAL_STRING_FIELDS, *NOTE_PLAN_OPTIONAL_LIST_FIELDS],
+            "type_fields": dict(NOTE_PLAN_TYPE_FIELDS),
             "field_types": {
                 "output_language": "string",
                 **dict(rules["note_plan_field_types"]),
@@ -342,6 +350,15 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "allowed_paper_types": list(PAPER_TYPE_VALUES),
         },
         "contracts_by_paper_type": paper_type_contracts(rules["language"]),
+        "type_structure_contract": {
+            "plan_fields": list(rules["type_structure_contract"]["plan_fields"]),
+            "core_answer_forms": deepcopy(list(rules["type_structure_contract"]["core_answer_forms"])),
+            "secondary_question_limit": rules["type_structure_contract"]["secondary_question_limit"],
+            "workflow_step_range": list(rules["type_structure_contract"]["workflow_step_range"]),
+            "weak_evidence_rule": rules["type_structure_contract"]["weak_evidence_rule"],
+            "weak_evidence_callout": rules["weak_evidence_callout"],
+            "not_reported_phrase": rules["not_reported_phrase"],
+        },
         "grounding_contract": {
             "source_of_truth": "source_manifest",
             "source_index_source_of_truth": "source_manifest",
@@ -350,7 +367,10 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "accepted_reference_forms": list(
                 rules["allowed_grounding_reference_forms"]
             ),
-            "required_sections": list(rules["grounding_required_sections"]),
+            "required_sections": [
+                rules["type_structure_contract"]["middle_sections_source"],
+                rules["limitations_section"],
+            ],
             "note_plan_depth_requirements": depth_requirements,
             "excluded_model_input_fields": list(
                 rules["excluded_model_input_fields"]

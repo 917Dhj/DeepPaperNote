@@ -577,9 +577,9 @@ def infer_domain_label(title: str, abstract: str = "") -> str:
         return scored[0][1]
 
     paper_type, _ = infer_paper_type(title, abstract)
-    if paper_type == "clinical_or_psychology_empirical":
+    if paper_type == "human_subjects_empirical":
         return "医疗健康"
-    if paper_type == "AI_method":
+    if paper_type in {"method", "theory", "system"}:
         return "机器学习"
     return "未分类"
 
