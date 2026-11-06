@@ -34,7 +34,20 @@ MY_NOTES_GUIDANCE = note_schema("zh-CN")["my_notes_guidance"]
 
 
 def _valid_note_text() -> str:
-    return """# Paper
+    return """---
+tags:
+  - papers/机器学习
+aliases:
+  - "Paper"
+date: 2024
+paper_type: AI_method
+methods: [tool-state tracking]
+datasets: []
+tasks: [multi-hop question answering]
+read_date: 2026-11-06
+---
+
+# Paper
 
 ## 核心信息
 
