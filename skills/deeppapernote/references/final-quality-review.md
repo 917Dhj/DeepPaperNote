@@ -16,13 +16,15 @@ Give the reviewer this prompt with the explicit paths and resolved language fill
 >
 > Review from scratch on every attempt. Do not rely on an earlier verdict, author assurances, a passing lint, or an earlier drafting rationale. Write only the quality-review JSON artifact. Do not edit the note, plan, readability receipt, or revision journal.
 >
-> Check every planned item in these five groups:
+> Check every planned item in these seven groups:
 >
 > - `central_claims`: the note explains each claim and the evidence-to-claim relationship, including what the evidence actually proves. A keyword mention is insufficient.
 > - `mechanism_result_map`: the note explains each planned mechanism-to-result relationship. Listing a mechanism and a result separately is insufficient.
 > - `claim_boundaries`: the note faithfully carries every boundary and each central claim's `what_it_does_not_prove`. Unsupported generalization fails this check.
 > - `takeaways`: the Takeaways section carries every `reuse_takeaways` and `followup_questions` item, and each is specific to this paper rather than a sentence that would fit any paper. A transferable idea names the paper's mechanism, where it would transfer, and its precondition. At least one next step tests the paper's own claims or evidence. When `reader_research_direction` is non-empty, at least one transferable idea connects to that direction whenever a credible transfer exists, every item that connects to it starts with the judgment marker from `writing_contract.takeaways_contract`, and an absent transfer is stated plainly instead of forced. The My Notes section holds only the standard guidance.
 > - `connections`: every `connections` entry links its planned target with the planned relation label, and the relation and reason are true of the two papers as the note and plan describe them; a link kept only to fill the list fails. Every `key_prior_work` item is a real work this paper uses, its role matches how the paper uses it, and the list is not a copy of the bibliography. With no planned connection, the In Your Vault subsection holds only the fixed empty statement.
+> - `core_questions`: every `core_answers` entry is answered in the note, in its question's home section from `contracts_by_paper_type[paper_type].core_questions`, and the answer matches the plan and its evidence. A `not_reported` entry appears as a plain statement that the paper does not report it, never as a claim that the authors failed to do it, and no answer carries a score or a low/high rating.
+> - `narrative`: the middle sections tell the story of `storyline` in order; each section continues the thread of the one before it, and no paragraph wanders off that story. Sections that read as separate fact lists fail this check.
 >
 > Mark a group true only when all its relevant plan items are faithfully reflected. For each missing or incorrect relationship, identify the exact plan item and a concrete required revision. Do not invent facts, weaken the plan to fit the draft, or turn broad stylistic preferences into V1 blocking findings. The wider writing requirements still apply to the author.
 >
@@ -32,7 +34,7 @@ Quality artifact shape:
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "output_language": "en",
   "verdict": "pass",
   "reviewed_note_sha256": "<actual raw draft SHA-256>",
@@ -42,15 +44,17 @@ Quality artifact shape:
     "mechanism_result_map": true,
     "claim_boundaries": true,
     "takeaways": true,
-    "connections": true
+    "connections": true,
+    "core_questions": true,
+    "narrative": true
   },
   "blocking_findings": []
 }
 ```
 
-The quality artifact is `schema_version` 3; an older review predates the `connections` check and must be redone in full. The readability receipt and revision journal stay at version 1.
+The quality artifact is `schema_version` 4; an older review predates the `core_questions` and `narrative` checks and must be redone in full. The readability receipt and revision journal stay at version 1.
 
-Use lowercase 64-character SHA-256 values. A passing artifact has all five literal booleans true and no findings. A failing artifact uses `verdict: "fail"`, at least one false check, and a finding for every false check. Every finding names a false check and contains exactly:
+Use lowercase 64-character SHA-256 values. A passing artifact has all seven literal booleans true and no findings. A failing artifact uses `verdict: "fail"`, at least one false check, and a finding for every false check. Every finding names a false check and contains exactly:
 
 ```json
 {
@@ -61,7 +65,7 @@ Use lowercase 64-character SHA-256 values. A passing artifact has all five liter
 }
 ```
 
-Allowed references name an existing item at `/central_claims/N`, `/mechanism_result_map/N`, or `/claim_boundaries/N`, matching the failed check; a `takeaways` finding names `/reuse_takeaways/N` or `/followup_questions/N`; a `connections` finding names `/connections/N` or `/key_prior_work/N`. Boundary findings may also use `/central_claims/N/what_it_does_not_prove`. Indices are zero-based canonical decimals. Empty strings, arbitrary pointers, unknown fields, duplicate keys, and inconsistent verdicts are invalid executions.
+Allowed references name an existing item at `/central_claims/N`, `/mechanism_result_map/N`, or `/claim_boundaries/N`, matching the failed check; a `takeaways` finding names `/reuse_takeaways/N` or `/followup_questions/N`; a `connections` finding names `/connections/N` or `/key_prior_work/N`; a `core_questions` finding names `/core_answers/<question id>`, for example `/core_answers/method.claim_evidence`; a `narrative` finding names `/storyline`. Boundary findings may also use `/central_claims/N/what_it_does_not_prove`. Indices are zero-based canonical decimals. Empty strings, arbitrary pointers, unknown fields, duplicate keys, and inconsistent verdicts are invalid executions.
 
 ## Record every result
 
@@ -81,7 +85,7 @@ An initial valid fail authorizes a revision. The next valid review of changed no
 
 ## Readability and final save
 
-After a recorded quality pass, read the whole note for fluency, terminology, line breaks, and renderable math. Preserve evidence, numerical results, stable proper nouns, and analytical depth. If this pass changes the draft, rerun Final Note Lint and a fresh full quality review, record the result, and reread the resulting version for readability.
+After a recorded quality pass, read the whole note as the adjacent-field reader of `final-writing.md` would, and check three things besides fluency, line breaks, and renderable math: the story holds together from section to section; every term, acronym, and model name is explained where it first appears and established English names are not translated word for word; and each paragraph leads with its point. Preserve evidence, numerical results, stable proper nouns, and analytical depth. If this pass changes the draft, rerun Final Note Lint and a fresh full quality review, record the result, and reread the resulting version for readability.
 
 For the final unchanged version, write a separate receipt with exactly:
 

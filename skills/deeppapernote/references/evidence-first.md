@@ -36,6 +36,7 @@ Require a compact and inspectable JSON plan that satisfies the generated bundle 
 The plan should state:
 - the `paper_type` (and `positioning`, `survey_mode`, `secondary_type`, `secondary_host_section` where they apply), chosen as `paper-types.md` describes; the type fixes the middle sections, so `section_plan` has one entry per middle section plus `局限`
 - `core_answers` for every core question of the type: an answer with `evidence_refs`, or `not_reported` with a reason
+- a `storyline` of three to five sentences: this paper's own story from problem through idea and evidence to what it means, which the middle sections then follow
 - the `workflow` steps when the type has one
 - which sections need more technical depth
 - which subsections deserve `###` headings
@@ -66,6 +67,7 @@ Recommended shape:
   "paper_type": "method",
   "paper_type_rationale": "The paper proposes a model mechanism and evaluates it against baselines; the script suggestion was treated only as a hint.",
   "dominant_domain": "machine learning",
+  "storyline": "多步工具调用一旦中途失败，错误会悄悄传到最终答案。作者的思路是把每次调用写进可回溯的状态机，让失败状态被后续步骤读取和修复。消融显示收益主要来自状态保留而非额外重试。所以对需要审计链路的问答系统，这是一种低成本的可靠性补丁。",
   "must_cover": [
     "失败状态如何被记录",
     "关键消融"

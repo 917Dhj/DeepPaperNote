@@ -481,6 +481,7 @@ def quality_plan(connections: list | None = None) -> dict:
     return {
         "output_language": "en",
         "central_claims": [{"claim": "c", "what_it_does_not_prove": "d"}],
+        "storyline": "The paper takes on one problem. It answers with one mechanism. The evidence supports that mechanism in the reported setting.", "core_answers": {"method.problem": {"answer": "The reported problem.", "evidence_refs": [{"pages": [1]}]}},
         "mechanism_result_map": ["m"],
         "claim_boundaries": ["b"],
         "reuse_takeaways": ["t" * 30],
@@ -499,7 +500,7 @@ def quality_review(ref: str = "") -> dict:
             {"check": "connections", "plan_ref": ref, "reason": "r", "required_revision": "v"}
         ]
     return {
-        "schema_version": 3,
+        "schema_version": _final_quality.QUALITY_REVIEW_SCHEMA_VERSION,
         "output_language": "en",
         "verdict": "fail" if ref else "pass",
         "reviewed_note_sha256": "a" * 64,
@@ -519,13 +520,12 @@ def validate(review: dict, plan: dict | None = None) -> str:
     )
 
 
-def test_quality_review_is_version_three_with_connections_check() -> None:
-    assert _final_quality.QUALITY_REVIEW_SCHEMA_VERSION == 3
+def test_quality_review_keeps_the_connections_check() -> None:
     assert "connections" in _final_quality.QUALITY_CHECKS
     validate(quality_review())
     old = quality_review()
     old["schema_version"] = 2
-    with pytest.raises(ValueError, match="schema_version 3"):
+    with pytest.raises(ValueError, match="schema_version 4"):
         validate(old)
 
 

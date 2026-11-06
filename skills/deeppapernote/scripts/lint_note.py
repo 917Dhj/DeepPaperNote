@@ -18,6 +18,7 @@ from contracts import (
     required_field_value_error,
     connection_plan_issues,
     note_required_sections,
+    storyline_plan_issues,
     takeaway_plan_issues,
     type_plan_issues,
     weak_evidence_question_ids,
@@ -390,7 +391,7 @@ def inspect_note_plan(
         code = f"planning_{item['field']}_{plan_codes[item['code']]}"
         if code not in issues:
             issues.append(code)
-    for item in type_plan_issues(plan, output_language):
+    for item in [*type_plan_issues(plan, output_language), *storyline_plan_issues(plan)]:
         code = "planning_" + item["code"].removeprefix("note_plan_")
         if code not in issues:
             issues.append(code)

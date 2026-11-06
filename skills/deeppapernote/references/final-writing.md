@@ -79,27 +79,27 @@ With no direction from either source, leave `reader_research_direction` as an em
 
 ## Writer Persona
 
-Default to a high-bar technical reader and writer persona:
-- you are a top-tier AI researcher and algorithm engineer
-- you are preparing an internal replication-oriented reading note for your lab
-- you are not writing a science-pop summary
-- you should assume the reader is comfortable with Python, PyTorch, training loops, evaluation protocols, and ablation logic
+You are a senior colleague explaining the paper to a smart researcher from an adjacent field. The reader reads papers for a living but does not know this paper's subfield: its jargon, its standard baselines, or why its problem is hard. The note should leave that reader able to retell the paper's story, judge how far its evidence goes, and decide what to take from it.
 
-For technical or method papers, write as if the note may later be used for:
-- implementation planning
-- reproduction
-- comparison against later papers
-- deciding whether the method is actually novel or just well-packaged
+Technical depth follows the paper type. Method, system, and theory notes keep the equations, settings, and implementation details a researcher would need to reuse or check the work. Benchmark, empirical, survey, qualitative, and argument notes spend that depth on construction, measurement, design, and reasoning instead, and carry no equations beyond what `formula_rules` allows.
+
+## Readable Prose
+
+- **Story first.** The middle sections follow `note_plan.storyline` in order. Each section picks up the thread the previous one left, so a reader skimming only the first sentence of every paragraph still gets the paper's argument. A paragraph that serves no part of the story is cut.
+- **Conclusion first.** Each paragraph opens with its point, then gives the evidence, numbers, and caveats behind it.
+- **One point per paragraph.** Split a paragraph that argues two things.
+- **Explain terms on first use.** The first time a term, acronym, or model name appears, add one plain sentence or a short parenthetical on what it is or does, for example `PPR`（个性化 PageRank：从与查询相关的节点出发、沿图随机游走打分的检索方法）. Keep an established English name rather than translating it word for word (write `Personalized PageRank` or `PPR`, never 个性化网页排名).
+- **Numbers that carry conclusions.** Keep in the prose only the numbers a conclusion rests on; put the rest in a table with one sentence saying what the table shows. Tables are welcome wherever they make a comparison, a set of steps, or a checklist clearer.
+- **Plain register.** Prefer ordinary words to field jargon when both say the same thing; keep jargon where it is the precise name.
 
 ## Writing Priorities
 
 1. explain the paper rather than quote it
-2. distinguish research problem from task definition
-3. explain the method or analysis flow in your own words
+2. tell the paper's story in the order the middle sections give it
+3. answer every core question of the paper type, or say plainly that the paper does not report it
 4. choose the most meaningful results rather than repeating every number
 5. say what the paper does not prove
-6. keep the note readable weeks later
-7. make the technical core understandable enough for an engineer to re-explain it
+6. keep the note readable weeks later by someone outside the subfield
 
 ## What Scripts Should Not Try To Fully Replace
 
@@ -188,7 +188,7 @@ Use formulas sparingly and purposefully:
 - each formula should help explain the method
 - do not dump many formulas just to look technical
 - if the source extraction is noisy, prefer reconstructing a small, stable core formula rather than copying broken math verbatim
-- after each retained formula, add one sentence explaining what it corresponds to in engineering or code terms
+- after each retained formula, add one plain sentence saying what it means
 - do not only translate variable names; explain the concrete operation, loss term, update rule, or control effect
 - formulas in the final Markdown should be written as directly renderable Obsidian/MathJax math, not as JSON-style escaped strings
 - do not double-escape TeX commands such as `\\tau`, `\\frac`, `\\bar`, `\\begin`, or `\\end` when the final note should contain `\tau`, `\frac`, `\bar`, `\begin`, or `\end`
@@ -230,7 +230,7 @@ Before handing the draft to `final_quality_review`, the author must explicitly c
 - does it explain the paper's own Discussion/Limitations claims mechanistically when those sections exist?
 - are the planned `claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, `reuse_takeaways`, and `followup_questions` reflected in the final prose?
 - does the note contain concrete numbers, dimensions, complexity terms, or formulas when the paper clearly depends on them?
-- can a reader familiar with Python and deep learning frameworks follow the core method from this note alone?
+- can a researcher from an adjacent field retell the paper's story from the first sentences of its paragraphs, and is every term explained where it first appears?
 - does the method section explain the mechanism rather than only summarize the claim?
 - does every core question of the paper type have an answer, or a plain not-reported sentence, in its home section?
 - if the type has a workflow, does its subsection hold an overview chain and a step table that match `note_plan.workflow`?

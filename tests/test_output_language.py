@@ -162,6 +162,7 @@ def plan_payload() -> dict:
             {"step": "Tool planning", "input": "Current state and tool registry", "operation": "Align the request with a tool, update or roll back", "output": "Auditable execution record", "novel": True},
             {"step": "Answer decoding", "input": "Final state", "operation": "Decode an answer or refusal", "output": "Response with provenance", "novel": True},
         ]}],
+        "storyline": "Multi-step question answering silently accumulates errors after tool failures. The authors record every tool call in an auditable state machine. Ablations show the gain comes from the state log rather than extra retries.",
         "dominant_domain": "reasoning",
         "must_cover": ["Method"],
         "key_numbers": ["78.5%"],

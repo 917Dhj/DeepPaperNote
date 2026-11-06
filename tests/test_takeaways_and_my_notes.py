@@ -272,6 +272,7 @@ def quality_plan() -> dict:
     return {
         "output_language": "en",
         "central_claims": [{"claim": "c", "what_it_does_not_prove": "d"}],
+        "storyline": "The paper takes on one problem. It answers with one mechanism. The evidence supports that mechanism in the reported setting.", "core_answers": {"method.problem": {"answer": "The reported problem.", "evidence_refs": [{"pages": [1]}]}},
         "mechanism_result_map": ["m"],
         "claim_boundaries": ["b"],
         "reuse_takeaways": [GOOD_TAKEAWAY],
@@ -334,7 +335,7 @@ def test_bundle_routes_the_current_quality_review_schema() -> None:
 def test_version_one_review_is_rejected_with_a_rerun_hint() -> None:
     review = quality_review()
     review["schema_version"] = 1
-    with pytest.raises(ValueError, match="schema_version 3.*rerun"):
+    with pytest.raises(ValueError, match="schema_version 4.*rerun"):
         validate_review(review)
 
 

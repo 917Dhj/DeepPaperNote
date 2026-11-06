@@ -40,7 +40,8 @@ def save_inputs(tmp_path: Path) -> dict[str, Path]:
         for name in ("plan", "source", "decisions", "lint", "grounding")
     }
     write_json(paths["plan"], {
-        "output_language": "en", "paper_type": "AI_method",
+        "output_language": "en", "paper_type": "method",
+        "storyline": "The paper takes on one problem. It answers with one mechanism. The evidence supports that mechanism in the reported setting.", "core_answers": {"method.problem": {"answer": "The reported problem.", "evidence_refs": [{"pages": [1]}]}},
         "central_claims": [{
             "claim": "The reported evidence supports this reading.",
             "what_it_does_not_prove": "It does not establish broader validity.",

@@ -137,6 +137,7 @@ def note_plan_with_sources(sources_by_section: dict[str, list[dict] | list[str]]
             {"step": name, "input": "issue", "operation": f"{name} the repository", "output": "patch", "novel": index == 1}
             for index, name in enumerate(("locate", "edit", "verify"))
         ]}],
+        "storyline": "多步问答在工具失败后会悄悄累积错误。作者把每次工具调用写进可审计的状态机。消融显示收益来自状态日志而不是额外重试。所以这条思路适合需要审计链路的问答系统。",
         "dominant_domain": "AI",
         "must_cover": ["method"],
         "key_numbers": ["91.2"],
