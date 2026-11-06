@@ -58,6 +58,24 @@ It should usually:
 - explain what new capability, mechanism, or evaluation angle it enables
 - avoid generic praise such as `the paper is novel` without locating the novelty
 
+## Takeaways and My Notes
+
+The note ends with `阅读收获`, then `引用`, then `我的笔记`. `writing_contract.takeaways_contract` and `writing_contract.my_notes_contract` carry the exact headings, limits, and guidance text.
+
+`阅读收获` answers "what do I do with this paper". It holds exactly two `###` subsections, each with one or two list items:
+- `### 可迁移` comes from `note_plan.reuse_takeaways`. Each item names the paper's concrete mechanism or practice, where it would transfer, and the precondition for the transfer to hold.
+- `### 下一步` comes from `note_plan.followup_questions`. Each item is a follow-up question or experiment specific to this paper. A doubt belongs here only together with the experiment that would test it; plain criticism stays in `深度分析` and `局限`. A recommended next paper must already appear in `引用`; never invent a title.
+
+When the user's request states their own research direction, record it verbatim in `note_plan.reader_research_direction` and write `### 可迁移` against it:
+1. Whenever a credible transfer exists, at least one item connects to the user's direction.
+2. Each such item names the paper's mechanism, the user's problem it would transfer to, and the precondition.
+3. Mark the connection as your judgment, separate from the paper's facts.
+4. When no credible transfer exists, say plainly that the paper bears little on the user's current direction, then give one general item. Never force a connection.
+
+When the request states no research direction, leave `reader_research_direction` as an empty string and write general takeaways.
+
+`我的笔记` belongs to the user. It is the last section, and in the draft it holds exactly the standard guidance line and nothing else. Formal Save keeps the user's own `我的笔记` block from the note it replaces.
+
 ## Writer Persona
 
 Default to a high-bar technical reader and writer persona:
@@ -241,12 +259,13 @@ Before handing the draft to `final_quality_review`, the author must explicitly c
 - if the raw source reports negative or unstable ablation settings, did the note include at least one of them?
 - if the raw source does not clearly report such settings, did the note avoid inventing failed or unstable cases?
 - does the note contain at least one honest limitation and one paper-specific insight?
+- does `阅读收获` give paper-specific takeaways rather than restating the limitations, and does `我的笔记` hold only the standard guidance?
 - are there any suspicious mid-sentence line breaks left in the prose?
 - if the note includes LaTeX formulas, did you quickly check that the final Markdown uses directly renderable TeX rather than double-escaped commands or broken math delimiters?
 
 If the author's self-review finds missing evidence-chain coverage, missing mechanism-to-result explanation, missing comparative positioning, missing boundary judgment, missing negative/limiting result discussion, or generic reusable takeaways or follow-up questions, return to the source artifacts and revise the note before saving.
 
-Use `final-quality-review.md` for the dedicated review, strict artifacts, and revision protocol. These broader writing checks remain required; the V1 save gate records its three plan-coverage checks separately.
+Use `final-quality-review.md` for the dedicated review, strict artifacts, and revision protocol. These broader writing checks remain required; the V1 save gate records its four plan-coverage checks separately.
 
 After a recorded passing `final_quality_review`, run `final_readability_review` and retain its receipt for the final draft bytes.
 This review is a language-and-expression pass, not a second evidence-judgment pass:

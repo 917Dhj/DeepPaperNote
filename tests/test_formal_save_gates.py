@@ -47,6 +47,8 @@ def save_inputs(tmp_path: Path) -> dict[str, Path]:
         }],
         "mechanism_result_map": ["The described mechanism explains the reported result."],
         "claim_boundaries": ["The conclusion is limited to the reported evidence."],
+        "reuse_takeaways": ["Reuse the reported mechanism where its stated preconditions hold."],
+        "followup_questions": ["Test whether the result survives outside the reported setting."],
     })
     write_json(paths["source"], {
         "status": "ok", "paper_id": "paper:formal-save", "source_sha256": "a" * 64,

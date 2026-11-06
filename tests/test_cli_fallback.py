@@ -67,7 +67,8 @@ def test_write_note_creates_language_variant_and_directory_sidecar(tmp_path: Pat
     assert sidecar['schema_version'] == 2
     assert sidecar['sources']['a' * 64]['notes'] == {
         'zh-CN': {'filename': note_path.name,
-                  'note_sha256': hashlib.sha256(note_text.encode('utf-8')).hexdigest()}
+                  'note_sha256': hashlib.sha256(note_text.encode('utf-8')).hexdigest(),
+                  'generated_note_sha256': hashlib.sha256(note_text.encode('utf-8')).hexdigest()}
     }
 
 

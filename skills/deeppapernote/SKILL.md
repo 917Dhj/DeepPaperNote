@@ -37,14 +37,14 @@ Run the steps in order. A step is complete at its **done when**, never because a
    | Result | Action |
    |---|---|
    | reuse of an existing directory | Use that directory and its domain. A verified PDF-only directory needs no confirmation. |
-   | `same_language_note_exists` | Ask whether to overwrite the reported note. On yes, rerun with `--overwrite-existing-note --expected-existing-note-sha256 <reported_sha256>` and carry it to Formal Save. On no, stop without writing. |
+   | `same_language_note_exists` | Ask whether to overwrite the reported note, and say what its `user_notes` result means: `present` keeps the user's My Notes block (about `chars` characters) and regenerates everything else; `none` found no notes of the user's; `heading_missing` found no My Notes heading, so nothing can be kept. Edits elsewhere in the note are replaced. On yes, rerun with `--overwrite-existing-note --expected-existing-note-sha256 <reported_sha256>` and carry it to Formal Save. On no, stop without writing. |
    | several matching directories or sources | Ask for the selection as `references/paper-archive.md` describes, and carry it through Formal Save. |
    | any other conflict | Report it and stop. |
 
    Workspace mode skips this step and routes the domain normally. **Done when** an admitted result is saved.
 4. **Prepare.** `scripts/run_pipeline.py prepare --workdir <run_directory> --prefix <run_prefix> --admission <admission.json>` (workspace mode omits `--admission`) extracts structure and PDF assets, plans figures, builds the complete figure/table decision table, and writes the synthesis bundle, all offline. It refuses to replace decisions that hold Visual Review work unless the user accepts repeating those reviews and you pass `--discard-reviews`. Rerun a failed phase whole. **Done when** the bundle exists.
 5. **Visual Review and Figure/Table Decision Freeze.** Record a verdict for every `review_pending` item with `scripts/plan_figure_table_decisions.py review`, send any Figure/Table the note needs into review with `promote`, and drop a usable candidate the note has no use for with a recorded reason, as `references/figure-placement.md` describes. Every decision must satisfy `writing_contract.figure_table_contract`. **Done when** `scripts/plan_figure_table_decisions.py summary --decisions <decisions.json>` lists no `review_pending_labels`; its table gives each insert's embed.
-6. **Note plan.** Read the bundle and the raw sections, choose the paper type, and fill every value of `writing_contract.note_plan_contract.template` to create a short JSON `note_plan` with the exact `output_language`. `references/evidence-first.md` shows a complete plan. **Done when** Grounding passes.
+6. **Note plan.** Read the bundle and the raw sections, choose the paper type, and fill every value of `writing_contract.note_plan_contract.template` to create a short JSON `note_plan` with the exact `output_language`. When the request states the user's own research direction, copy it into `reader_research_direction`; otherwise leave that optional field empty. `references/evidence-first.md` shows a complete plan. **Done when** Grounding passes.
 7. **Grounding.** `scripts/lint_grounding.py --note-plan <note_plan> --source-manifest <manifest> --bundle-json <bundle> --figure-decisions <decisions.json> --language <language> --output <grounding.json>`. **Done when** it reports no issue; keep its JSON for Formal Save.
 8. **Draft.** Write the note from the plan, following Note Shape, as one Markdown file in UTF-8 without BOM and with LF line endings. **Done when** the complete draft is on disk.
 9. **Final Note Lint.** `scripts/lint_note.py --input <note> --plan-file <note_plan> --language <language> --output <lint.json>`. **Done when** every reported `passes_*` gate is `true`. A failed style gate is normal for several rounds: fix the reported text and rerun. Each `zh-CN` mixed-language issue names the English it counted in `english_run` or `english_words`; translate that wording, or wrap a retained proper noun in backticks, keeping formulas inline and proper nouns intact. Escalate to the user only when the same failures repeat unchanged across several rounds.
@@ -96,6 +96,8 @@ When any other step fails, retry it or take a fallback this skill names. Otherwi
 - Contributions lists the paper's actual innovations and why each matters.
 - A method, framework, or system paper gets the localized mechanism-flow subsection under its method section, usually 3 to 4 numbered steps that each name the input, the operation, and where the output goes.
 - Give replication-grade detail: key settings and numbers, plus the central formulas, objectives, or complexity expressions as `$...$` or `$$...$$`. Write a central comparison of three or more systems, settings, tasks, datasets, metrics, or ablation rows as a compact Markdown table followed by its interpretation.
+- Takeaways holds exactly the two subsections of `writing_contract.takeaways_contract`, one or two items each: reusable ideas that name the paper's mechanism, where it transfers, and its precondition, then follow-up questions or experiments specific to this paper. With a non-empty `reader_research_direction`, connect at least one transferable idea to that direction whenever a credible transfer exists, mark the connection as judgment, and say plainly when none exists.
+- My Notes is the last section and belongs to the user. The draft holds exactly `writing_contract.my_notes_contract.guidance` there. Formal Save keeps the user's own block from the note it replaces.
 - A short paper still gets a complete deep note: spend the space on protocol details, ablations, limitations, and replication implications.
 - The readability pass rewrites leftover language into natural prose in the configured language and keeps stable proper nouns. It adds no new facts or filler.
 
@@ -122,7 +124,8 @@ Final user report:
   1. the paper title and strongest verified identifier
   2. the Grounding Lint, Final Note Lint, Final Quality Review, and Final Readability Review results, plus the warning count
   3. the materialized and retained-placeholder figure/table counts, plus each dropped item with its reason from `figure_drops`
-  4. whether the saved note SHA-256 matches the Final Note Lint `note_sha256`
+  4. whether the generated part of the saved note matches the Final Note Lint `note_sha256`
+- When the save replaced an existing note, report the save receipt's `user_notes.status`: `preserved` kept the user's My Notes; `untouched` found none to keep; `heading_missing` found no My Notes heading. A preserved block that predates this format may be model-written text; say the user can delete it.
 - Add overwrite actions, preference changes, or user-relevant warnings only when they occurred.
 
 ## References

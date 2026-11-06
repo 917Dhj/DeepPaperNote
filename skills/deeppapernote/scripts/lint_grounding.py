@@ -22,6 +22,7 @@ from contracts import (
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
     required_field_value_error,
+    takeaway_plan_issues,
     writing_contract_rules,
 )
 from localization import normalize_output_language, require_artifact_output_language
@@ -453,6 +454,9 @@ def validate_note_plan(
         issues.append(issue("section_plan_required_section_missing", section=section_name))
 
     issues.extend(validate_central_claims(note_plan, valid_ids, max_page))
+    for item in takeaway_plan_issues(note_plan):
+        code = item.pop("code")
+        issues.append(issue(code, **item))
 
     if contains_old_reference(note_plan):
         issues.append(issue("note_plan_old_bundle_reference_present"))

@@ -16,6 +16,7 @@ from contracts import (
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
     required_field_value_error,
+    takeaway_plan_issues,
 )
 from localization import (
     normalize_output_language,
@@ -33,10 +34,13 @@ CORE_INFO_FIELD_ALIASES: dict[str, str] = {}
 FIGURE_TARGET_SECTIONS: set[str] = set()
 FIGURE_LABELS: dict[str, str] = {}
 MECHANISM_FLOW_HEADING = "机制流程"
+TAKEAWAY_SUBSECTIONS: tuple[str, ...] = ()
+MY_NOTES_GUIDANCE = ""
 
 def configure_output_language(language: str | None = None) -> str:
     global ACTIVE_LANGUAGE, SCHEMA, SECTIONS, REQUIRED_SECTIONS, CORE_INFO_FIELDS
     global CORE_INFO_FIELD_INDEX, CORE_INFO_FIELD_ALIASES, FIGURE_TARGET_SECTIONS, FIGURE_LABELS, MECHANISM_FLOW_HEADING
+    global TAKEAWAY_SUBSECTIONS, MY_NOTES_GUIDANCE
     ACTIVE_LANGUAGE = normalize_output_language(language)
     SCHEMA = note_schema(ACTIVE_LANGUAGE)
     SECTIONS = dict(SCHEMA["sections"])
@@ -44,9 +48,11 @@ def configure_output_language(language: str | None = None) -> str:
     CORE_INFO_FIELDS = list(SCHEMA["core_info_fields"])
     CORE_INFO_FIELD_INDEX = {field: idx for idx, field in enumerate(CORE_INFO_FIELDS)}
     CORE_INFO_FIELD_ALIASES = dict(SCHEMA.get("core_info_aliases", {}))
-    FIGURE_TARGET_SECTIONS = {SECTIONS[key] for key in ("research_questions", "data_and_task", "method", "key_results", "deep_analysis", "limitations", "my_notes")}
+    FIGURE_TARGET_SECTIONS = {SECTIONS[key] for key in ("research_questions", "data_and_task", "method", "key_results", "deep_analysis", "limitations")}
     FIGURE_LABELS = dict(SCHEMA["figure_labels"])
     MECHANISM_FLOW_HEADING = str(SCHEMA["mechanism_flow"])
+    TAKEAWAY_SUBSECTIONS = tuple(SCHEMA["takeaways_subsections"].values())
+    MY_NOTES_GUIDANCE = str(SCHEMA["my_notes_guidance"])
     return ACTIVE_LANGUAGE
 
 def section(key: str) -> str:
@@ -330,6 +336,16 @@ def inspect_note_plan(
             for field in invalid_fields
         )
     issues.extend(inspect_central_claims_plan(plan.get("central_claims")))
+    plan_codes = {
+        "note_plan_takeaway_item_count_invalid": "count_invalid",
+        "note_plan_takeaway_item_invalid": "item_invalid",
+        "note_plan_takeaway_item_too_thin": "item_too_thin",
+        "note_plan_reader_research_direction_invalid": "invalid",
+    }
+    for item in takeaway_plan_issues(plan):
+        code = f"planning_{item['field']}_{plan_codes[item['code']]}"
+        if code not in issues:
+            issues.append(code)
 
     return True, issues
 
@@ -1562,7 +1578,10 @@ def has_reference_entry(text: str) -> bool:
 
 def inspect_substantive_content(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
+    my_notes_heading = section("my_notes")
     for section_heading in REQUIRED_SECTIONS:
+        if section_heading == my_notes_heading:
+            continue  # user-owned: generated drafts carry only the standard guidance
         body = section_body(text, section_heading)
         content = normalized_section_content(body)
         if is_placeholder_like(content):
@@ -1623,6 +1642,9 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
         if not meaningful_units(body):
             issues.append(issue(section_heading, "section_empty_shell", "error", content or section_heading))
 
+    issues.extend(inspect_takeaways(text))
+    issues.extend(inspect_my_notes(text))
+
     deduped: list[dict[str, object]] = []
     seen: set[tuple[str, str, str]] = set()
     for item in issues:
@@ -1632,6 +1654,42 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
         seen.add(key)
         deduped.append(item)
     return deduped
+
+
+LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+\S")
+
+
+def inspect_takeaways(text: str) -> list[dict[str, object]]:
+    heading = section("takeaways")
+    if not section_body(text, heading):
+        return []
+    contract = WRITING_CONTRACT_RULES["takeaways_contract"]
+    issues: list[dict[str, object]] = []
+    for subsection in TAKEAWAY_SUBSECTIONS:
+        body = subsection_body(text, heading, subsection)
+        if not re.search(rf"^###\s+{re.escape(subsection)}\s*$", section_body(text, heading), flags=re.MULTILINE):
+            issues.append(issue(heading, "takeaways_subsection_missing", "error", subsection))
+            continue
+        count = sum(1 for line in body.splitlines() if LIST_ITEM_RE.match(line))
+        if not contract["min_items"] <= count <= contract["max_items"]:
+            issues.append(issue(heading, "takeaways_item_count_invalid", "error", f"{subsection}: {count}"))
+    return issues
+
+
+def inspect_my_notes(text: str) -> list[dict[str, object]]:
+    heading = section("my_notes")
+    pattern = rf"^##\s+{re.escape(heading)}\s*$"
+    match = re.search(pattern, text, flags=re.MULTILINE)
+    if not match:
+        return []
+    issues: list[dict[str, object]] = []
+    later_heading = re.search(r"^##\s+.+$", text[match.end():], flags=re.MULTILINE)
+    if later_heading:
+        issues.append(issue(heading, "my_notes_not_last", "error", later_heading.group(0)))
+    body = section_body(text, heading).strip()
+    if body != MY_NOTES_GUIDANCE:
+        issues.append(issue(heading, "my_notes_guidance_mismatch", "error", body))
+    return issues
 
 
 def method_section_requires_mechanism_flow(text: str) -> bool:

@@ -5,11 +5,18 @@ import json
 import math
 import re
 
-QUALITY_CHECKS = ("central_claims", "mechanism_result_map", "claim_boundaries")
+QUALITY_CHECKS = ("central_claims", "mechanism_result_map", "claim_boundaries", "takeaways")
+# Plan lists each check reviews; a blocking finding must point at an item of one of them.
+QUALITY_CHECK_PLAN_FIELDS = {
+    "central_claims": ("central_claims",),
+    "mechanism_result_map": ("mechanism_result_map",),
+    "claim_boundaries": ("claim_boundaries",),
+    "takeaways": ("reuse_takeaways", "followup_questions"),
+}
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 PLAN_REF_RE = re.compile(
-    r"/(central_claims|mechanism_result_map|claim_boundaries)/(0|[1-9][0-9]*)"
-    r"(/what_it_does_not_prove)?"
+    r"/(central_claims|mechanism_result_map|claim_boundaries|reuse_takeaways|followup_questions)"
+    r"/(0|[1-9][0-9]*)(/what_it_does_not_prove)?"
 )
 
 
@@ -80,7 +87,7 @@ def _valid_plan_ref(reference: str, check: str, plan: dict) -> bool:
     if suffix:
         if check != "claim_boundaries" or group != "central_claims":
             return False
-    elif group != check:
+    elif group not in QUALITY_CHECK_PLAN_FIELDS[check]:
         return False
     items = plan.get(group)
     if not isinstance(items, list) or int(index) >= len(items):
@@ -122,7 +129,11 @@ def validate_quality(
     if (
         not isinstance(plan, dict)
         or plan.get("output_language") != language
-        or any(not isinstance(plan.get(check), list) or not plan[check] for check in QUALITY_CHECKS)
+        or any(
+            not isinstance(plan.get(field), list) or not plan[field]
+            for fields in QUALITY_CHECK_PLAN_FIELDS.values()
+            for field in fields
+        )
     ):
         raise ValueError(
             "Note Plan requires the current language and nonempty quality-check lists."

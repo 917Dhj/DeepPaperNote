@@ -8,6 +8,7 @@ from _final_quality import QUALITY_CHECKS
 from build_synthesis_bundle import bundle as build_synthesis_bundle
 from contracts import (
     NOTE_PLAN_LIST_FIELDS,
+    NOTE_PLAN_OPTIONAL_STRING_FIELDS,
     NOTE_PLAN_REQUIRED_FIELDS,
     NOTE_PLAN_STRING_FIELDS,
     NOTE_REQUIRED_SECTIONS,
@@ -609,7 +610,9 @@ def test_evidence_first_note_plan_example_matches_lint_contract() -> None:
     assert match is not None
     example = json.loads(match.group(1))
 
-    assert tuple(example.keys()) == ("output_language", *NOTE_PLAN_REQUIRED_FIELDS)
+    assert tuple(example.keys()) == (
+        "output_language", *NOTE_PLAN_REQUIRED_FIELDS, *NOTE_PLAN_OPTIONAL_STRING_FIELDS
+    )
     assert example["output_language"] == "zh-CN"
     assert all(isinstance(example[field], str) for field in NOTE_PLAN_REQUIRED_FIELDS[:3])
     assert all(isinstance(example[field], list) for field in NOTE_PLAN_REQUIRED_FIELDS[3:])

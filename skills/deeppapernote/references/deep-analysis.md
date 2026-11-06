@@ -190,13 +190,18 @@ Prefer:
 - missing baselines
 - unrealistic task framing
 
+### 阅读收获
+
+This section answers "what do I do with this paper", not "what did it prove". Doubts about the evidence stay in `深度分析` and `局限`.
+
+- `### 可迁移`: one or two reusable ideas, each naming the paper's concrete mechanism or practice, where it would transfer, and the precondition for the transfer to hold.
+- `### 下一步`: one or two follow-up questions or experiments specific to this paper. A doubt is welcome here when it comes with the experiment that would test it. A recommended next paper must already appear in `引用`.
+
+`final-writing.md` holds the full rules, including how to use a research direction the user stated in the request.
+
 ### 我的笔记
 
-Seed future follow-up with prompts such as:
-- one reusable idea
-- one questionable assumption
-- one experiment worth replicating
-- one related paper to compare next
+This section belongs to the user. Write only the standard guidance from `writing_contract.my_notes_contract.guidance`, and nothing else.
 
 ## Figures And Tables
 

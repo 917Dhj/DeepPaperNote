@@ -21,6 +21,7 @@ from _final_quality import (
     validate_quality,
     validate_readability,
 )
+from _user_notes import inspect_existing_user_notes, merge_user_notes, restore_generated_text
 from _note_paths import (
     resolve_domain_subdir,
     resolve_note_asset_dir,
@@ -457,12 +458,25 @@ def block_note_conflict(
             "target_directory": str(target_path.parent),
             "existing_note_path": str(target_path),
             "existing_note_sha256": file_sha256(target_path),
+            "user_notes": existing_user_notes(target_path, output_language),
             "source_sha256": source_sha256,
             "output_language": output_language,
         },
         args.output,
     )
     raise SystemExit(2)
+
+
+def existing_user_notes(target_path: Path, output_language: str) -> dict:
+    """Summarize the user's My Notes in a note that would be replaced."""
+    text = target_path.read_bytes().decode("utf-8", errors="replace")
+    return inspect_existing_user_notes(text, output_language)
+
+
+def recorded_saved_note_sha256(registry: dict | None, source_sha256: str, output_language: str) -> str:
+    source = ((registry or {}).get("sources") or {}).get(source_sha256) or {}
+    note = (source.get("notes") or {}).get(output_language) or {}
+    return str(note.get("note_sha256", ""))
 
 
 def resolve_obsidian_save_target(
@@ -581,6 +595,7 @@ def write_paper_directory_sidecar(
     source_sha256: str,
     output_language: str,
     note_sha256: str,
+    generated_note_sha256: str = "",
     registry: dict | None = None,
 ) -> Path:
     sidecar_path = target_path.parent / PAPER_DIRECTORY_SIDECAR
@@ -594,7 +609,11 @@ def write_paper_directory_sidecar(
         )
     )
     source = register_source(payload, source_sha256, {})
-    source["notes"][output_language] = {"filename": target_path.name, "note_sha256": note_sha256}
+    source["notes"][output_language] = {
+        "filename": target_path.name,
+        "note_sha256": note_sha256,
+        "generated_note_sha256": generated_note_sha256 or note_sha256,
+    }
     write_record(target_path.parent, payload)
     ensure_sidecar_hidden(sidecar_path)
     return sidecar_path
@@ -834,6 +853,11 @@ def main() -> None:
                 "asset_subdir": args.admitted_asset_subdir,
                 "source_sha256": str(source_manifest["source_sha256"]),
                 "output_language": output_language,
+                **(
+                    {"user_notes": existing_user_notes(target_path, output_language)}
+                    if target_path.is_file()
+                    else {}
+                ),
             },
             args.output,
         )
@@ -995,12 +1019,40 @@ def main() -> None:
                     source_sha256=str(source_manifest["source_sha256"]),
                     output_language=output_language,
                 )
+            existing_text = None
+            if target_path.is_file():
+                try:
+                    existing_text = target_path.read_bytes().decode("utf-8")
+                except UnicodeDecodeError as exc:
+                    raise SystemExit(
+                        "The existing note is not UTF-8, so its My Notes section cannot be kept."
+                    ) from exc
+            try:
+                saved_text, user_notes = merge_user_notes(
+                    note_text,
+                    existing_text,
+                    output_language,
+                    recorded_saved_sha256=recorded_saved_note_sha256(
+                        getattr(args, "archive_registry", None),
+                        str(source_manifest["source_sha256"]),
+                        output_language,
+                    ) if output_mode == "obsidian" else "",
+                )
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+            saved_note_sha256 = hashlib.sha256(saved_text.encode("utf-8")).hexdigest()
             note_attempted = True
-            atomic_write_note(target_path, note_text)
-            if file_sha256(target_path) != note_sha256:
+            atomic_write_note(target_path, saved_text)
+            written_text = target_path.read_text(encoding="utf-8")
+            if (
+                file_sha256(target_path) != saved_note_sha256
+                or hashlib.sha256(
+                    restore_generated_text(written_text, note_text, output_language).encode("utf-8")
+                ).hexdigest() != note_sha256
+            ):
                 raise SystemExit("Saved note SHA-256 does not match the reviewed final draft.")
             require_reference_hygiene(
-                target_path.read_text(encoding="utf-8"),
+                restore_generated_text(written_text, note_text, output_language),
                 "after save",
             )
             asset_dir.mkdir(parents=True, exist_ok=True)
@@ -1012,7 +1064,8 @@ def main() -> None:
                     title=title,
                     source_sha256=str(source_manifest["source_sha256"]),
                     output_language=output_language,
-                    note_sha256=note_sha256,
+                    note_sha256=saved_note_sha256,
+                    generated_note_sha256=note_sha256,
                     registry=args.archive_registry,
                 )
         except BaseException:
@@ -1055,6 +1108,12 @@ def main() -> None:
             "final_quality_review": "pass",
             "final_readability_review": "pass",
             "reviewed_note_sha256": note_sha256,
+            "saved_note_sha256": saved_note_sha256,
+            "user_notes": {
+                "status": user_notes["status"],
+                "chars": user_notes["chars"],
+                "sha256": user_notes["user_notes_sha256"],
+            },
         }
         if sidecar_path is not None:
             payload["sidecar_path"] = str(sidecar_path)

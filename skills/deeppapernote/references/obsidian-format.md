@@ -60,7 +60,7 @@ Formatting and scope rules:
 - omit fields that are unavailable or not applicable; do not add placeholder rows just to fill the schema
 - do not add interpretation, commentary, judgment, or takeaway lines inside `核心信息`
 - do not use the last metadata bullet as a place to append extra analysis
-- move explanatory content to `一句话总结`、`深度分析`、`我的笔记` or another true analysis section
+- move explanatory content to `一句话总结`、`深度分析`、`阅读收获` or another true analysis section
 
 ## YAML Frontmatter
 
@@ -136,8 +136,9 @@ The embed must be followed immediately by exactly one italic caption line:
 8. `关键结果`
 9. `深度分析`
 10. `局限`
-11. `我的笔记`
+11. `阅读收获`
 12. `引用`
+13. `我的笔记`
 
 When abstract metadata exists, `原文摘要翻译` should be a single Chinese translation block for the original abstract rather than a bilingual subsection pair.
 
@@ -148,6 +149,32 @@ When the paper is complex, add `###` subsections such as:
 - `### 机制流程`
 - `### 为什么结果成立`
 - `### 哪些地方容易被误读`
+
+## 阅读收获 Section Format
+
+```md
+## 阅读收获
+
+### 可迁移
+
+- 一到两条：论文里的具体机制或做法、能迁移到哪里、迁移成立的前提。
+
+### 下一步
+
+- 一到两条：针对这篇论文的追问或实验；推荐的论文必须已出现在 `引用` 中。
+```
+
+## 我的笔记 Section Format
+
+`我的笔记` is always the last section. A generated draft holds exactly this guidance line under the heading:
+
+```md
+## 我的笔记
+
+> [!note] 这一节留给你自己：写下你的判断、它和你研究的联系、想验证的点。重新生成这篇笔记时，这一节会原样保留。
+```
+
+Everything from the `## 我的笔记` heading line to the end of the file belongs to the user, including any `##` headings the user adds. Formal Save keeps that block from the note it replaces, unless the old note is byte-identical to its last recorded save or the block is exactly the standard guidance. When the old note has no `## 我的笔记` heading, nothing can be kept and the overwrite prompt says so.
 
 ## 引用 Section Format
 

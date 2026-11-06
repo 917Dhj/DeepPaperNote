@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from formal_save_helpers import formal_save_args, reviewed_insert_fields
 
+from localization import note_schema
 from lint_note import (
     core_info_structure_issues,
     figure_structure_issues,
@@ -27,6 +28,9 @@ from lint_note import (
     suspicious_code_formatted_math,
     suspicious_mid_sentence_linebreaks,
 )
+
+
+MY_NOTES_GUIDANCE = note_schema("zh-CN")["my_notes_guidance"]
 
 
 def _valid_note_text() -> str:
@@ -82,14 +86,23 @@ def _valid_note_text() -> str:
 
 论文主要在英文问答数据上验证，工具集合也集中在检索和计算两类，尚未证明该状态机能稳定覆盖多模态工具或高延迟外部服务。
 
-## 我的笔记
+## 阅读收获
 
-我会重点关注它的失败回溯机制是否能迁移到论文精读流程，因为 DeepPaperNote 同样需要区分证据缺失和模型总结不足。
+### 可迁移
+
+- 失败回溯机制可以迁移到论文精读流程：把证据缺失和模型总结不足记录成两类不同的状态，前提是每一步都有可判定的返回结果。
+
+### 下一步
+
+- 怀疑状态机在高延迟外部服务下会失效，可以在注入超时的环境里复跑主实验来检验。
 
 ## 引用
 
 - Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example
-"""
+
+## 我的笔记
+
+""" + MY_NOTES_GUIDANCE + "\n"
 
 
 def _valid_plan_payload() -> dict:
@@ -113,8 +126,8 @@ def _valid_plan_payload() -> dict:
         "negative_or_limiting_results": ["The paper does not report multi-service failures."],
         "mechanism_result_map": ["The failure-state mechanism explains lower unrecoverable errors."],
         "comparative_positioning": ["The method is compared against answer-only baselines."],
-        "reuse_takeaways": ["Track failure state explicitly."],
-        "followup_questions": ["Check whether the mechanism survives missing tool outputs."],
+        "reuse_takeaways": ["Track tool failure state explicitly so later steps can tell missing evidence apart."],
+        "followup_questions": ["Check whether the mechanism survives missing tool outputs under injected timeouts."],
         "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
     }
 

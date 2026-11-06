@@ -43,7 +43,8 @@ The plan should state:
 - which central claims are supported by which source sections or pages
 - what each central claim actually proves and does not prove
 - which weak, negative, limiting, or explicitly unreported results constrain the conclusion
-- which research or engineering takeaways are reusable beyond the current paper
+- one or two reusable takeaways and one or two follow-up questions or experiments, each specific to this paper and at least 20 characters long
+- the research direction the user stated in the request, verbatim in `reader_research_direction`, or an empty string when none was stated
 - whether this is mostly a method note, system note, dataset note, benchmark note, or empirical/clinical note
 - whether key formulas or complexity expressions need to appear in the final note
 
@@ -117,7 +118,8 @@ Recommended shape:
       "subsections": [],
       "evidence_sources": [{"section_id": "sec:limitations"}]
     }
-  ]
+  ],
+  "reader_research_direction": ""
 }
 ```
 

@@ -21,6 +21,7 @@ from _final_quality import (
     validate_state,
 )
 from _identity import canonical_identity_acceptance_error
+from _user_notes import restore_generated_text
 from _note_paths import safe_relative_path_parts
 from lint_grounding import validate_bundle_contract, validate_figure_decisions, validate_note_plan
 from run_pipeline import has_review_work, pipeline_artifact_paths
@@ -758,16 +759,28 @@ class Inspection:
                 path,
             )
             return
-        canonical_note_text(raw)
+        saved_text = canonical_note_text(raw)
         digest = hashlib.sha256(raw).hexdigest()
-        self.matches(result, record, "reviewed_note_sha256", "saved note", expected=digest)
-        matched = self.hashes.get("draft") == digest
+        self.matches(result, record, "reviewed_note_sha256", "draft")
+        # The My Notes block is user-owned: Formal Save may carry it over from the
+        # replaced note and the user may keep editing it, so only the generated
+        # part has to match the reviewed draft.
+        draft_raw = self.raw.get("draft")
+        generated = saved_text
+        if draft_raw is not None:
+            try:
+                generated = restore_generated_text(
+                    saved_text, canonical_note_text(draft_raw), self.context["output_language"]
+                )
+            except ValueError:
+                pass
+        matched = hashlib.sha256(generated.encode("utf-8")).hexdigest() == self.hashes.get("draft")
         if not matched:
             self.problem(
                 result,
                 "stale",
                 "saved_note_sha256_mismatch",
-                "Saved note bytes differ from the selected draft.",
+                "The generated part of the saved note differs from the selected draft.",
                 path,
             )
         if (
