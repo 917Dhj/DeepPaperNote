@@ -1239,6 +1239,33 @@ def test_table_crop_ignores_a_page_sized_drawing(tmp_path: Path) -> None:
         doc.close()
 
 
+@pytest.mark.parametrize("chinese_first", [True, False], ids=["chinese-first", "english-first"])
+def test_bilingual_table_captions_both_crop_the_table_below(
+    tmp_path: Path, chinese_first: bool
+) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for table bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=600.0, height=800.0)
+        page.insert_textbox(fitz.Rect(60.0, 60.0, 540.0, 200.0), SIDE_PROSE, fontsize=9)
+        chinese = "表1　热障涂层材料的性能"
+        english = "Table 1　Performance of thermal barrier coating materials"
+        captions = (chinese, english) if chinese_first else (english, chinese)
+        for y, text in zip((230.0, 244.0), captions):
+            page.insert_text((180.0, y), text, fontsize=9, fontname="china-s")
+        add_table_rows(page, 270.0, "Row")
+
+        crops = table_crop_text(page, tmp_path)
+
+        assert set(crops) == {"表1", "Table 1"}
+        for label, text in crops.items():
+            assert "Row0" in text and "Row5" in text, label
+            assert "running text" not in text, label
+    finally:
+        doc.close()
+
+
 def test_text_box_figure_is_kept_whole_and_inside_its_column(tmp_path: Path) -> None:
     if fitz is None:
         pytest.skip("PyMuPDF is required for figure bbox tests.")

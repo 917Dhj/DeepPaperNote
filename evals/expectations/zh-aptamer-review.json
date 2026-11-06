@@ -50,7 +50,28 @@
     "Fig 6",
     "Table 1"
   ],
-  "crops": {},
+  "crops": {
+    "Table 1": {
+      "contains": [
+        "癌种",
+        "CD71［29］、JUP［30］"
+      ],
+      "excludes": [
+        "瘤标志物的发现提供新的策略",
+        "液体活检能够监测"
+      ]
+    },
+    "表 1": {
+      "contains": [
+        "癌种",
+        "CD71［29］、JUP［30］"
+      ],
+      "excludes": [
+        "瘤标志物的发现提供新的策略",
+        "液体活检能够监测"
+      ]
+    }
+  },
   "same_visual": [
     [
       "Fig 1",
@@ -83,6 +104,8 @@
   ],
   "known_gaps": {
     "review:Table 1": "The visual quality gate rejects this crop; the cause is not analyzed yet.",
-    "same_visual:*": "A bilingual caption pair creates two decisions for one visual."
+    "same_visual:*": "A bilingual caption pair creates two decisions for one visual.",
+    "crop:Table 1": "The Chinese caption stacked under it blocks the table, so the crop takes the page above the caption.",
+    "crop:表 1": "The crop runs past the table into the next section heading and its paragraph."
   }
 }

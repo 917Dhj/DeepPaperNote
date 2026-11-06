@@ -68,12 +68,23 @@
         "热喷涂工艺难以解决",
         "热障涂层材料与技术发展综述"
       ]
+    },
+    "Table 1": {
+      "contains": [
+        "熔点",
+        "复杂化合物"
+      ],
+      "excludes": [
+        "热喷涂工艺难以解决",
+        "热障涂层材料与技术发展综述"
+      ]
     }
   },
   "same_visual": [],
   "known_gaps": {
     "review:图 3": "A bilingual caption pair: crops attach to the Chinese caption, but the plan keeps the English one.",
     "review:图 10": "A bilingual caption pair: crops attach to the Chinese caption, but the plan keeps the English one.",
-    "crop:表 1": "The table sits below its caption, but the crop takes the body text and running header above the caption."
+    "crop:表 1": "The table sits below its caption, but the crop takes the body text and running header above the caption.",
+    "crop:Table 1": "The caption is centered and narrower than the table, so its midpoint falls just right of the page midline and the crop drops the table's left group-label column."
   }
 }
