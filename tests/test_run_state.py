@@ -390,6 +390,17 @@ def test_user_edits_in_my_notes_keep_the_save_verified(completed_run: tuple) -> 
     assert report["summary"]["saved_verified"] is True
 
 
+def test_glossary_links_added_after_save_keep_the_save_verified(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    note = saved_note(workdir)
+    note.write_bytes(
+        note.read_bytes().replace(b"A grounded final note.", b"A [[Grounding|grounded]] final [[note]].")
+    )
+    report = run_state.inspect_run(workdir, bindings=bindings)
+    assert stages(report)["save_receipt"]["status"] == "passed"
+    assert report["summary"]["saved_verified"] is True
+
+
 def test_edits_outside_my_notes_make_the_save_stale(completed_run: tuple) -> None:
     workdir, bindings, paths = completed_run
     note = saved_note(workdir)

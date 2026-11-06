@@ -23,6 +23,7 @@ from contracts import (
     writing_contract_rules,
 )
 from localization import normalize_output_language, require_artifact_output_language
+from glossary_terms import body_text_from_raw_sections, glossary_terms
 from vault_connections import connection_candidates
 
 
@@ -507,6 +508,9 @@ def bundle(
         "source_index": source_index(source_manifest),
         "connection_candidates": recalled_connections(
             evidence_pack, source_manifest, config, resolved_output_language, own_directory
+        ),
+        "glossary_terms": glossary_terms(
+            config, body_text_from_raw_sections(source_manifest.get("raw_sections_path"))
         ),
         "figure_table_manifest": figure_table_manifest(
             figure_decisions_wrapper,

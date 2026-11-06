@@ -1450,3 +1450,34 @@ def test_final_review_protects_long_delimiter_inline_code(tmp_path: Path) -> Non
         "ReAct prose", "[[ReAct]] prose"
     )
     assert result["results"] == [{"link_stem": "ReAct", "status": "linked"}]
+
+
+@pytest.mark.parametrize(
+    "heading",
+    ["## 关联", "## Connections", "## 引用", "## 我的笔记", "## My Notes"],
+)
+def test_deeppapernote_tail_sections_are_protected(tmp_path: Path, heading: str) -> None:
+    article = tmp_path / "Paper.md"
+    original = f"## 局限\n\nNo term here.\n\n{heading}\n\nReAct is mentioned only here.\n".encode()
+    article.write_bytes(original)
+
+    result = link_article_terms(
+        article,
+        [{"link_stem": "ReAct", "forms": ["ReAct"]}],
+        digest(article),
+    )
+
+    assert article.read_bytes() == original
+    assert result["results"] == [{"link_stem": "ReAct", "status": "not_found"}]
+
+
+def test_user_moved_my_notes_protects_from_its_own_heading(tmp_path: Path) -> None:
+    article = tmp_path / "Paper.md"
+    article.write_bytes(
+        "## 我的笔记\n\nReAct 是我关心的。\n\n## 方法主线\n\nReAct 出现在正文。\n".encode()
+    )
+
+    link_article_terms(article, [{"link_stem": "ReAct", "forms": ["ReAct"]}], digest(article))
+
+    assert "ReAct 是我关心的" in article.read_text(encoding="utf-8")
+    assert "[[ReAct]]" not in article.read_text(encoding="utf-8")

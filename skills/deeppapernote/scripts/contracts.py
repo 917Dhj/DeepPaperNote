@@ -555,6 +555,9 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
         "domain_tag_prefix": "papers/",
         "read_date_format": "YYYY-MM-DD",
         "paper_type_source": "note_plan.paper_type",
+        # A list value naming a listed glossary term is written as that term's link.
+        "term_link_source": "glossary_terms",
+        "term_link_fields": ("methods", "datasets", "tasks"),
     },
     "connections_contract": {
         "plan_fields": ("connections", "key_prior_work"),

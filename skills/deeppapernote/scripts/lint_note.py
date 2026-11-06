@@ -223,9 +223,9 @@ ENGLISH_METADATA_SOURCE_SPAN_PATTERNS = (
     re.compile(r"`[^`\n]+`"),
     re.compile(r"\[[^\]\n]+\]\([^)\n]+\)"),
 )
+# Body wikilinks are left to paper-glossary, so only an HTTP link can carry a CJK name.
 ENGLISH_CJK_ENTITY_LINK_RE = re.compile(
     r"\[[^\]\n]*[\u4e00-\u9fff][^\]\n]*\]\(https?://[^)\n]+\)"
-    r"|\[\[[^\]\n]*[\u4e00-\u9fff][^\]\n]*\]\]"
 )
 ENGLISH_CJK_MATH_LABEL_RE = re.compile(
     r"\\operatorname\{(?:输入|输出|损失|状态|动作|奖励|标签|样本|预测|目标)\}"
@@ -1639,6 +1639,7 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
             issues.append(issue(section_heading, "section_empty_shell", "error", content or section_heading))
 
     issues.extend(inspect_takeaways(text))
+    issues.extend(body_wikilink_issues(text))
     issues.extend(inspect_my_notes(text))
 
     deduped: list[dict[str, object]] = []
@@ -1834,6 +1835,37 @@ def inspect_connections(text: str, plan: dict) -> list[dict[str, object]]:
     limits = contract["key_prior_work_items"]
     if not limits["min"] <= count <= limits["max"]:
         issues.append(issue(heading, "key_prior_work_count_invalid", "error", str(count)))
+    return issues
+
+
+BODY_WIKILINK_RE = re.compile(r"(?<!!)\[\[[^\[\]\n]+\]\]")
+
+
+def body_wikilink_issues(text: str) -> list[dict[str, object]]:
+    """Only Connections links notes; term links in prose belong to paper-glossary."""
+    lines = text.splitlines()
+    start = 0
+    if lines and lines[0].strip() == "---":
+        closing = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+        start = closing + 1 if closing is not None else len(lines)
+    issues: list[dict[str, object]] = []
+    in_fence = False
+    current = ""
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            continue
+        heading = re.match(r"^##\s+(.+)$", stripped)
+        if heading and not in_fence:
+            current = heading.group(1).strip()
+            if current == section("my_notes"):
+                break  # user-owned to the end of the file
+            continue
+        if in_fence or current == section("connections"):
+            continue
+        if BODY_WIKILINK_RE.search(line):
+            issues.append(issue(current, "wikilink_outside_connections", "error", stripped))
     return issues
 
 

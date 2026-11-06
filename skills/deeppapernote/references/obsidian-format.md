@@ -99,7 +99,9 @@ Rules:
 - Do not invent placeholder values for missing fields; omit them instead.
 - The `tags` field must always be present with at least one `papers/<domain>` tag.
 - `aliases` should be the paper's short name or acronym (e.g. "GPT-4", "LoRA"), not a paraphrase.
-- `methods`, `datasets`, and `tasks` name only what is central to the paper, never every term it mentions. Write the values as plain text.
+- `methods`, `datasets`, and `tasks` name only what is central to the paper, never every term it mentions.
+- When a value names a term listed in the bundle's `glossary_terms`, write that term's `link` verbatim as a quoted list item, for example `methods: ["[[DPO]]", knowledge distillation]`. A `link` carries a folder path, as in `[[Glossary/DPO|DPO]]`, when another vault file shares the term's file name. Every other value is plain text. These are the only `[[links]]` allowed in the properties block; Formal Save refuses any other.
+- `glossary_terms.status` other than `ok` means no glossary library shares this vault; write every value as plain text.
 - When an existing note is replaced, copy `existing_read_date` from the admission result into `read_date`; otherwise use today's date.
 
 ## Figure Placeholder Style
@@ -209,6 +211,7 @@ Everything from the `## 我的笔记` heading line to the end of the file belong
 
 ### 库内笔记
 
+- Outside this subsection and the properties block, the generated note carries no `[[link]]`; Final Note Lint fails on one. paper-glossary links terms in the body after saving, and never inside `关联` or `我的笔记`.
 - Choose only from `connection_candidates` in the synthesis bundle. `cited` holds vault papers this paper cites (matched by DOI, arXiv ID, or title/alias); `related` holds vault papers that share methods, datasets, tasks, or aliases with this paper's full text. Scripts recall; you judge. Drop a candidate unless one relation below is true and you can state why in one sentence.
 - Record each kept link in `note_plan.connections` as `{target, relation, reason}`. `target` is the candidate's `target` exactly; `relation` is one key of `connections_contract.relations`; `reason` is the one-sentence justification. The section lists exactly the planned links, in plan order.
 - Entry format: `- [[target|标题]]（关系）：理由`. The display title is the paper's short name or title, not the file name. The relation label comes from `connections_contract.relation_labels`:
