@@ -5,7 +5,7 @@ Two kinds of candidate reach the synthesis bundle:
 
 - cited: a bibliography entry of this paper matches a vault paper by DOI, arXiv
   ID, or title/alias. An entry matching two different papers is dropped.
-- related: the paper's full text mentions at least two distinct `methods`,
+- related: the paper's body text (bibliography excluded) mentions at least two distinct `methods`,
   `datasets`, `tasks`, or alias values of a vault paper, or one dataset/task value.
 
 The zh-CN and en notes of one paper share a directory and count as one paper;
@@ -201,7 +201,7 @@ def _cited(papers: list[dict], references: list[dict]) -> list[dict]:
     return list(cited.values())
 
 
-def _related(papers: list[dict], full_text: str, exclude: set[str]) -> list[dict]:
+def _related(papers: list[dict], body_text: str, exclude: set[str]) -> list[dict]:
     scored = []
     for paper in papers:
         if paper["target"] in exclude:
@@ -210,7 +210,7 @@ def _related(papers: list[dict], full_text: str, exclude: set[str]) -> list[dict
             field: [
                 value
                 for value in paper[field]
-                if len(value) >= 2 and _contains_key(full_text, value)
+                if len(value) >= 2 and _contains_key(body_text, value)
             ]
             for field in (*PROPERTY_FIELDS, "aliases")
         }
@@ -235,7 +235,7 @@ def _related(papers: list[dict], full_text: str, exclude: set[str]) -> list[dict
 def connection_candidates(
     config: dict[str, Any],
     references: list[dict],
-    full_text: str,
+    body_text: str,
     language: str,
     *,
     own_directory: str | Path | None = None,
@@ -260,7 +260,7 @@ def connection_candidates(
     own = Path(own_directory).expanduser().resolve() if own_directory else None
     papers = _paper_groups(base_dir, vault, language, own)
     cited = _cited(papers, references or [])
-    related = _related(papers, full_text or "", {item["target"] for item in cited})
+    related = _related(papers, body_text or "", {item["target"] for item in cited})
     return {"status": "ok", "cited": cited, "related": related}
 
 

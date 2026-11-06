@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import build_synthesis_bundle
@@ -304,8 +305,17 @@ def bundle_for(monkeypatch, tmp_path: Path, references: list[dict], *, admission
             "papers_dir": "Research/Papers",
         },
     )
+    # The full text also holds the bibliography; recall must read only the body.
     full_text = tmp_path / "full_text.md"
-    full_text.write_text("We evaluate on SuperNI.", encoding="utf-8")
+    full_text.write_text("We evaluate on SuperNI.\n\nReferences\nDeng 2009. ImageNet.", encoding="utf-8")
+    raw_sections = tmp_path / "raw_sections.jsonl"
+    raw_sections.write_text(
+        "\n".join(json.dumps(record) for record in [
+            {"record_type": "section", "kind": "experiment", "text": "We evaluate on SuperNI."},
+            {"record_type": "section", "kind": "references", "text": "Deng 2009. ImageNet."},
+        ]),
+        encoding="utf-8",
+    )
     return build_synthesis_bundle.bundle(
         metadata={"title": "Citation Paper"},
         evidence_wrapper={"evidence_pack": {"reference_candidates": references}},
@@ -314,6 +324,7 @@ def bundle_for(monkeypatch, tmp_path: Path, references: list[dict], *, admission
         figure_decisions_wrapper={"output_language": "zh-CN", "decisions": []},
         source_manifest={
             "full_text_md_path": str(full_text),
+            "raw_sections_path": str(raw_sections),
             "identity_contract": {
                 "artifact_type": "canonical_identity",
                 "schema_version": 2,
@@ -347,6 +358,14 @@ def test_bundle_exposes_connection_candidates_and_no_bibliography(monkeypatch, t
     assert recalled["status"] == "ok"
     assert [item["target"] for item in recalled["cited"]] == ["Transformer.zh-CN"]
     assert [item["target"] for item in recalled["related"]] == ["SuperNI.zh-CN"]
+
+
+def test_related_recall_ignores_names_found_only_in_the_bibliography(monkeypatch, tmp_path: Path) -> None:
+    papers = papers_dir(tmp_path)
+    (papers / "AI" / "ViT").mkdir(parents=True)
+    (papers / "AI" / "ViT" / "ViT.en.md").write_text("---\ndatasets: [ImageNet]\n---\n# ViT\n", encoding="utf-8")
+    synthesis = bundle_for(monkeypatch, tmp_path, [])
+    assert synthesis["connection_candidates"]["related"] == []
 
 
 def test_bundle_excludes_the_admitted_paper_directory(monkeypatch, tmp_path: Path) -> None:

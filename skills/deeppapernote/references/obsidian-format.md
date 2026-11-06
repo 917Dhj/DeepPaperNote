@@ -212,7 +212,7 @@ Everything from the `## 我的笔记` heading line to the end of the file belong
 ### 库内笔记
 
 - Outside this subsection and the properties block, the generated note carries no `[[link]]`; Final Note Lint fails on one. paper-glossary links terms in the body after saving, and never inside `关联` or `我的笔记`.
-- Choose only from `connection_candidates` in the synthesis bundle. `cited` holds vault papers this paper cites (matched by DOI, arXiv ID, or title/alias); `related` holds vault papers that share methods, datasets, tasks, or aliases with this paper's full text. Scripts recall; you judge. Drop a candidate unless one relation below is true and you can state why in one sentence.
+- Choose only from `connection_candidates` in the synthesis bundle. `cited` holds vault papers this paper cites (matched by DOI, arXiv ID, or title/alias); `related` holds vault papers that share methods, datasets, tasks, or aliases with this paper's body text; a name that appears only in the bibliography does not count. Scripts recall; you judge. Drop a candidate unless one relation below is true and you can state why in one sentence.
 - Record each kept link in `note_plan.connections` as `{target, relation, reason}`. `target` is the candidate's `target` exactly; `relation` is one key of `connections_contract.relations`; `reason` is the one-sentence justification. The section lists exactly the planned links, in plan order.
 - Entry format: `- [[target|标题]]（关系）：理由`. The display title is the paper's short name or title, not the file name. The relation label comes from `connections_contract.relation_labels`:
 

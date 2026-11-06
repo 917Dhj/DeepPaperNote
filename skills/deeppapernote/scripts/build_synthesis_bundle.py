@@ -53,17 +53,6 @@ def load_record(value: str) -> dict:
     return maybe_load_json_record(value) or {}
 
 
-def full_source_text(source_manifest: dict) -> str:
-    path_value = str(source_manifest.get("full_text_md_path", "") or "")
-    path = Path(path_value).expanduser() if path_value else None
-    if path is None or not path.is_file():
-        return ""
-    try:
-        return path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return ""
-
-
 def admitted_target_directory(value: str) -> str:
     """The admitted note directory, so the paper never recalls its own notes."""
     admission = load_record(value) if value else {}
@@ -78,7 +67,8 @@ def recalled_connections(
         return connection_candidates(
             config,
             references if isinstance(references, list) else [],
-            full_source_text(source_manifest),
+            # Body only: a dataset named just in the bibliography is not shared work.
+            body_text_from_raw_sections(source_manifest.get("raw_sections_path")),
             language,
             own_directory=own_directory or None,
         )
