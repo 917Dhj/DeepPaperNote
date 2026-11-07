@@ -26,7 +26,7 @@ The note's `tags` carry exactly one `papers/<domain>` tag, naming the saved doma
 
 ## The Domains File
 
-`<Vault>/DeepPaperNote/domains.md` is the user's classification convention, maintained with the user outside DeepPaperNote. DeepPaperNote only reads it:
+`<Vault>/DeepPaperNote/domains.md` is the user's classification convention, which the organize-wiki skill keeps with the user. DeepPaperNote only reads it:
 
 ```markdown
 ---

@@ -122,7 +122,7 @@ Lint is a floor, not polish: while the readability review is pending, say the dr
 Final user report:
 
 - After a successful Formal Save, report in the user's conversation language, and derive every claim from current-run artifacts; the `summary` of `scripts/run_state.py status` carries these fields.
-- Lead with the final note link or path, the save mode, and the actual saved domain, read from the note path under the configured papers root in Obsidian mode or the output root in workspace mode. When admission reused an existing directory, report that directory's existing domain. When the save receipt's `new_domain` is true, say that this domain folder was created and give its `new_domain_reason`.
+- Lead with the final note link or path, the save mode, and the actual saved domain, read from the note path under the configured papers root in Obsidian mode or the output root in workspace mode. When admission reused an existing directory, report that directory's existing domain. When the save receipt's `new_domain` is true, say that this domain folder was created, give its `new_domain_reason`, and suggest the organize-wiki skill to add the domain to the user's convention.
 - Then report, in order:
   1. the paper title and strongest verified identifier
   2. the Grounding Lint, Final Note Lint, Final Quality Review, and Final Readability Review results, plus the warning count

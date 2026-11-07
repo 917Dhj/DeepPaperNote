@@ -71,7 +71,7 @@ claude plugin install deeppapernote@deeppapernote
 npx skills add 917Dhj/DeepPaperNote
 ```
 
-两条路径安装的是同一组 skill。插件路径会一并装上 `deeppapernote`、`paper-glossary` 与 `research-memory`；skills CLI 安装程序则让你选择需要安装的 skill，以及要安装到哪些 Agent。大多数用户可以先选择 `deeppapernote`；需要可复用术语笔记时，再选择 `paper-glossary`；希望阅读收获贴合自己的研究方向时，再选择 `research-memory`。
+两条路径安装的是同一组 skill。插件路径会一并装上 `deeppapernote`、`paper-glossary`、`research-memory` 与 `organize-wiki`；skills CLI 安装程序则让你选择需要安装的 skill，以及要安装到哪些 Agent。大多数用户可以先选择 `deeppapernote`；需要可复用术语笔记时，再选择 `paper-glossary`；希望阅读收获贴合自己的研究方向时，再选择 `research-memory`；想让 agent 帮你整理知识库的领域文件夹时，再选择 `organize-wiki`。
 
 ### 2. 安装核心 PDF 依赖
 
@@ -124,6 +124,7 @@ DeepPaperNote 仍然是唯一主产品。仓库同时提供几个可选 companio
 | [`deeppapernote`](./skills/deeppapernote/SKILL.md) | **核心产品 · 推荐安装** | 精读单篇论文，生成包含图表、关键结果与局限的结构化、证据充分的 Obsidian 笔记 |
 | [`paper-glossary`](./skills/paper-glossary/SKILL.md) | 可选 companion | 从已有论文材料中筛选术语，创建可复用的 Obsidian 术语笔记，并按需链接回论文笔记 |
 | [`research-memory`](./skills/research-memory/SKILL.md) | 可选 companion | 由 agent 结合你读过的论文向你提问，把你的研究方向记录在 Obsidian 里；DeepPaperNote 之后会据此写每篇笔记的"可迁移" |
+| [`organize-wiki`](./skills/organize-wiki/SKILL.md) | 可选 companion | 和 agent 一起商定知识库的领域分类，预览确认后再把放错的论文归位、修正标签；DeepPaperNote 之后按这份约定为新论文选择文件夹，上一次整理可以撤销 |
 
 你不需要一次安装所有 skill。安装时选择适合自己工作流的部分即可。
 
