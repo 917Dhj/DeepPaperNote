@@ -266,7 +266,6 @@ def test_bundle_uses_only_canonical_accepted_metadata_for_model_input() -> None:
             "identity_contract": {
                 "artifact_type": "canonical_identity",
                 "schema_version": 2,
-                "schema_version": 2,
                 "paper_id": "doi:10.1234/accepted",
                 "identity_verdict": "accepted",
                 "work_level_identity": {
