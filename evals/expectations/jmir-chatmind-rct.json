@@ -35,8 +35,5 @@
   ],
   "crops": {},
   "same_visual": [],
-  "known_gaps": {
-    "caption:Table 3": "The superscript footnote marker 'a' after the caption's final period is kept as caption text ('effects.a').",
-    "review:Figure 1": "The caption sits above the figure; the crop takes the page-header strip above the caption, misses the flow diagram, and the quality gate rejects it."
-  }
+  "known_gaps": {}
 }

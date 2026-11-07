@@ -777,6 +777,66 @@ def test_side_caption_asset_passes_the_visual_quality_gate(tmp_path: Path) -> No
         doc.close()
 
 
+def add_bitmap(page, rect: tuple[float, float, float, float]) -> None:
+    pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 200, 300), False)
+    pixmap.set_rect(pixmap.irect, (40, 120, 200))
+    page.insert_image(fitz.Rect(*rect), pixmap=pixmap, keep_proportion=False)
+
+
+def caption_above_figure_page(doc):
+    """Lay out a journal page with a running header, then a caption, then its figure."""
+    page = doc.new_page(width=595.0, height=842.0)
+    page.insert_text((42.0, 50.0), "JOURNAL OF MENTAL HEALTH", fontsize=10)
+    page.insert_text((400.0, 50.0), "Author et al", fontsize=10)
+    page.insert_text(
+        (42.0, 76.0),
+        "Figure 1. Consolidated Standards of Reporting Trials flow diagram.",
+        fontsize=8.5,
+    )
+    add_bitmap(page, (75.0, 85.0, 520.0, 770.0))
+    return page
+
+
+def test_caption_above_its_figure_crops_the_figure_below(tmp_path: Path) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = caption_above_figure_page(doc)
+
+        assets = extract_figure_regions(page, 1, tmp_path, find_caption_blocks(page))
+
+        assert [asset["label"] for asset in assets] == ["Figure 1"]
+        x0, y0, x1, y1 = assets[0]["bbox_pt"]
+        assert x0 <= 75.0 and x1 >= 520.0
+        assert 76.0 < y0 <= 85.0 and y1 >= 770.0
+        assert assets[0]["quality_signals"]["visual_quality_status"] == "usable"
+    finally:
+        doc.close()
+
+
+def test_caption_with_no_visual_above_leaves_the_next_captioned_figure_alone(
+    tmp_path: Path,
+) -> None:
+    if fitz is None:
+        pytest.skip("PyMuPDF is required for figure bbox tests.")
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.0, height=842.0)
+        page.insert_textbox(fitz.Rect(72.0, 60.0, 523.0, 200.0), SIDE_PROSE, fontsize=9)
+        page.insert_text((72.0, 230.0), "Figure 1. A diagram drawn as text.", fontsize=9)
+        add_bitmap(page, (150.0, 240.0, 450.0, 500.0))
+        page.insert_text((72.0, 515.0), "Figure 2. The figure above this caption.", fontsize=9)
+
+        assets = extract_figure_regions(page, 1, tmp_path, find_caption_blocks(page))
+        crops = {asset["label"]: asset["bbox_pt"] for asset in assets}
+
+        assert crops["Figure 2"][1] < 240.0 and crops["Figure 2"][3] < 515.0
+        assert "Figure 1" not in crops or crops["Figure 1"][3] < 240.0
+    finally:
+        doc.close()
+
+
 def add_table_rows(page, top: float, name: str, rows: int = 6) -> None:
     for row in range(rows):
         y = top + row * 12.0
