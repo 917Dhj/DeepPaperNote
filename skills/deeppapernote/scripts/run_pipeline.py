@@ -329,6 +329,13 @@ def prepare_steps(
     ]
 
 
+def print_outputs(outputs: list[tuple[str, object]]) -> None:
+    """Print `name=path` lines as UTF-8, so paths survive a console encoding such as cp1252."""
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    print("\n".join(f"{name}={path}" for name, path in outputs))
+
+
 def main() -> None:
     argv = sys.argv[1:]
     phase = argv[0] if argv and argv[0] in PHASES else ""
@@ -397,7 +404,7 @@ def main() -> None:
             ("figure_table_decisions", paths["figure_table_decisions"]),
             ("bundle", paths["bundle"]),
         ]
-    print("\n".join(f"{name}={path}" for name, path in outputs))
+    print_outputs(outputs)
 
 
 if __name__ == "__main__":

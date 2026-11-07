@@ -65,12 +65,12 @@ def json_input_sha256(value: str | Path) -> str:
 
 
 def emit(payload: dict[str, Any], output_path: str | None = None) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
     if output_path:
         ensure_parent(output_path)
-        Path(output_path).write_text(text + "\n", encoding="utf-8")
+        Path(output_path).write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     else:
-        print(text)
+        # ASCII JSON reads back under any console encoding, such as cp1252 on Windows.
+        print(json.dumps(payload, indent=2))
 
 
 def load_json_file(path: str | Path) -> dict[str, Any]:

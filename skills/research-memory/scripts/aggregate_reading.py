@@ -200,11 +200,11 @@ def main() -> None:
     else:
         language = args.language or located["language"]
         payload = aggregate(Path(located["vault"]), located["papers_dir"], language=language, today=args.today)
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
     if args.output:
-        Path(args.output).write_text(text + "\n", encoding="utf-8")
+        Path(args.output).write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     else:
-        sys.stdout.write(text + "\n")
+        # ASCII JSON reads back under any console encoding, such as cp1252 on Windows.
+        sys.stdout.write(json.dumps(payload, indent=2) + "\n")
 
 
 if __name__ == "__main__":

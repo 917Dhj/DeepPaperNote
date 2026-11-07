@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -34,6 +35,8 @@ def write(tmp_path: Path, vault: Path, mode: str, payload: dict, expected: str, 
         [sys.executable, str(SCRIPT), "--vault", str(vault), f"--{mode}", str(data),
          "--expected-sha256", expected, "--today", "2026-11-06", *extra],
         capture_output=True, text=True,
+        # cp1252 stands in for a Windows console, where non-ASCII output fails.
+        env={**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"},
     )
 
 
