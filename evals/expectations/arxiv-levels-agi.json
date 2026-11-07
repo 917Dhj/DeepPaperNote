@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "pdf": "arxiv-levels-agi.pdf",
+  "sha256": "fe9a2a1b9abc47386129be97f655aba69f273bdc56d6989f09bd5d1592ff36fb",
+  "source": "arXiv:2311.02462 (ICML 2024)",
+  "traits": [
+    "no-figures",
+    "position",
+    "table-period",
+    "two-column"
+  ],
+  "readable": true,
+  "title": "Position: Levels of AGI for Operationalizing Progress on the Path to AGI",
+  "labels": [
+    "Table 1",
+    "Table 2"
+  ],
+  "captions": {},
+  "review": [
+    "Table 1",
+    "Table 2"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {
+    "title": "Identity resolution takes the arXiv title, which lacks the 'Position:' prefix that the ICML 2024 version and the PDF carry."
+  }
+}

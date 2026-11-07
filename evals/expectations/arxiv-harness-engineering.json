@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "pdf": "arxiv-harness-engineering.pdf",
+  "sha256": "e81b5a4855adda8cc5e46db0a05cd69e0d0d542bd49cec6b157c17e6001395d7",
+  "source": "arXiv:2609.00006",
+  "traits": [
+    "empirical-comparison",
+    "figure-colon",
+    "inline-label-references",
+    "long-document",
+    "many-tables",
+    "single-column"
+  ],
+  "readable": true,
+  "title": "Harness Engineering: Anatomy, Architecture, and Evolution of Coding Agents -- A Source-Code Study of Eleven Systems",
+  "labels": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Figure 5",
+    "Figure 6",
+    "Figure 7",
+    "Table 1",
+    "Table 2",
+    "Table 3",
+    "Table 4",
+    "Table 5",
+    "Table 6",
+    "Table 7",
+    "Table 8",
+    "Table 9",
+    "Table 10",
+    "Table 11",
+    "Table 12",
+    "Table 13",
+    "Table 14",
+    "Table 15",
+    "Table 16",
+    "Table 17",
+    "Table 18"
+  ],
+  "captions": {
+    "Figure 1": {
+      "starts": "The canonical anatomy of a coding-agent harness",
+      "ends": "observed range per subsystem."
+    },
+    "Table 1": {
+      "starts": "The component map of a coding-agent harness",
+      "ends": "observed in the corpus."
+    }
+  },
+  "review": [
+    "Figure 1",
+    "Table 1",
+    "Table 4"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {}
+}
