@@ -713,7 +713,6 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
         if is_exempt_line(line):
             continue
         section_name = section_name_for_line(lines, idx - 1)
-        subsection_name = subsection_name_for_line(lines, idx - 1)
         if section_name in {section("core_information"), section("connections")}:
             continue
         if not re.search(r"[\u4e00-\u9fff]", stripped):

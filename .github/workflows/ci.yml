@@ -42,8 +42,12 @@ jobs:
 
       - name: Run syntax check
         run: |
-          python -m compileall -q skills/deeppapernote/scripts
+          python -m compileall -q skills
+
+      - name: Run lint
+        run: |
+          python -m ruff check skills tests
 
       - name: Run tests
         run: |
-          python -m pytest -q
+          python -m pytest -q -n auto

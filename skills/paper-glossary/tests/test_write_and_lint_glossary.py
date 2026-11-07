@@ -22,7 +22,8 @@ from glossary_contracts import (
     GLOSSARY_OCCURRENCE_HEADING,
 )
 from glossary_library import inspect_selected_terms
-from lint_glossary import GLOSSARY_DISCLAIMER, lint_term_file_text, main as lint_main
+from glossary_contracts import GLOSSARY_DISCLAIMER
+from lint_glossary import lint_term_file_text, main as lint_main
 from write_glossary_terms import (
     append_occurrence,
     build_alias_index,
