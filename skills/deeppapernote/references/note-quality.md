@@ -9,7 +9,7 @@ The note is high quality only if it satisfies most of the checks below.
 - It is not a paraphrase of the abstract.
 - It answers every core question of its paper type, or says plainly that the paper does not report it.
 - It explains how the method or analysis actually works.
-- It reports the most meaningful results, not only the prettiest numbers.
+- It reports every main result, not only the prettiest numbers.
 - It includes at least one real limitation.
 - It includes an explicit judgment about the paper's actual contribution.
 - It includes at least one paper-specific technical subsection rather than only broad top-level sections.

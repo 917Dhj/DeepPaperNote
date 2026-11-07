@@ -26,6 +26,13 @@ WORKFLOW_STEP_RANGE = (3, 7)
 
 WORKFLOW_STEP_FIELDS = ("step", "input", "operation", "output", "novel")
 BENCHMARK_WORKFLOW_STEP_FIELDS = ("step", "input", "operation", "output", "who", "quality_gate")
+# Empirical studies follow an established design, so their steps record the key design choice, not novelty.
+STUDY_WORKFLOW_STEP_FIELDS = ("step", "input", "operation", "output", "design_choice")
+STEP_FIELDS = {
+    "default": WORKFLOW_STEP_FIELDS,
+    "benchmark": BENCHMARK_WORKFLOW_STEP_FIELDS,
+    "study": STUDY_WORKFLOW_STEP_FIELDS,
+}
 
 WORKFLOW_TABLE_HEADERS = {
     "default": {
@@ -35,6 +42,10 @@ WORKFLOW_TABLE_HEADERS = {
     "benchmark": {
         "zh-CN": ("步骤", "输入", "做什么", "输出", "谁来做", "质量关卡"),
         "en": ("Step", "Input", "What happens", "Output", "Who", "Quality gate"),
+    },
+    "study": {
+        "zh-CN": ("步骤", "输入", "做什么", "输出", "关键设计选择"),
+        "en": ("Step", "Input", "What happens", "Output", "Key design choice"),
     },
 }
 
@@ -68,7 +79,7 @@ def _workflow(section: str, zh: str, en: str, *, steps: str = "default", may_be_
     return {
         "section": section,
         "heading": {"zh-CN": zh, "en": en},
-        "step_fields": BENCHMARK_WORKFLOW_STEP_FIELDS if steps == "benchmark" else WORKFLOW_STEP_FIELDS,
+        "step_fields": STEP_FIELDS[steps],
         "table_headers": WORKFLOW_TABLE_HEADERS[steps],
         "may_be_unreported": may_be_unreported,
     }
@@ -203,8 +214,10 @@ PROFILES: dict[str, dict[str, Any]] = {
         ),
         "secondary_question_ids": ("theory.result", "theory.assumptions"),
         "formula_rules": {
-            "zh-CN": ["公式是主角：给出主要定理与关键定义的形式化陈述，并用一句话解释含义。"],
-            "en": ["Equations carry the paper: state the main theorems and key definitions formally, each with a one-sentence reading."],
+            "zh-CN": ["公式是主角：给出主要定理与关键定义的形式化陈述，并用一句话解释含义。",
+                      "复杂度类、语言类和计算模型（例如 NC¹、L、TC⁰）第一次出现时，用一句白话说明它代表多强的计算能力，再写符号。"],
+            "en": ["Equations carry the paper: state the main theorems and key definitions formally, each with a one-sentence reading.",
+                   "The first time a complexity class, language class, or model of computation appears (for example NC¹, L, TC⁰), say in one plain sentence how much computation it stands for before using the symbol."],
         },
     },
     "position": {
@@ -307,7 +320,7 @@ PROFILES: dict[str, dict[str, Any]] = {
             _section("strength", "结论强度", "Strength of the Conclusion",
                      "结论强度是否超过证据，适用到哪里为止。", "Whether the conclusion outruns the evidence, and how far it extends."),
         ),
-        "workflow": _workflow("design", "实验流程", "Experiment Workflow"),
+        "workflow": _workflow("design", "实验流程", "Experiment Workflow", steps="study"),
         "core_questions": (
             _question("discovery.hypothesis", "question", "研究问题和假设是什么，有哪些备择解释？",
                       "What are the question and hypotheses, and what alternative explanations exist?"),
@@ -349,7 +362,7 @@ PROFILES: dict[str, dict[str, Any]] = {
                      tables=(_table("偏倚风险表", "Bias Table", "偏倚域 / 论文怎么处理 / 原文依据或论文没有报告",
                                     "Bias domain / How the paper handles it / Source or not reported"),)),
         ),
-        "workflow": _workflow("design", "研究流程", "Study Workflow"),
+        "workflow": _workflow("design", "研究流程", "Study Workflow", steps="study"),
         "core_questions": (
             _question("human.design_claim", "design", "这是什么设计，作者的结论（因果、预测或描述）有没有超出设计能支撑的范围？",
                       "What is the design, and does the conclusion (causal, predictive, or descriptive) go beyond what it can support?"),
@@ -422,7 +435,7 @@ PROFILES: dict[str, dict[str, Any]] = {
             _section("trust", "可信度与可迁移性", "Trustworthiness and Transferability",
                      "研究者立场、反例与替代解释、可迁移的边界。", "Researcher position, counter-examples and alternative readings, and the bounds of transferability."),
         ),
-        "workflow": _workflow("materials", "研究流程", "Study Workflow"),
+        "workflow": _workflow("materials", "研究流程", "Study Workflow", steps="study"),
         "core_questions": (
             _question("qual.approach", "question", "研究问题与方法论取向是什么，为什么适合？",
                       "What are the question and the methodological approach, and why do they fit?"),
@@ -448,11 +461,11 @@ PROFILES: dict[str, dict[str, Any]] = {
                      "核心主张及其类别（经验、概念或规范）。", "The core claims and their kind (empirical, conceptual, or normative).",
                      results=True),
             _section("structure", "论证结构", "Argument Structure",
-                     "每条关键主张凭什么材料、靠什么桥接（warrant）与支撑（backing）。",
-                     "For each key claim, its material, the warrant that bridges to it, and the backing for that warrant.",
-                     tables=(_table("论证结构拆解表", "Argument Breakdown Table",
-                                    "主张 / 材料 / 桥接 / 支撑 / 限定 / 反驳（已处理或未处理）",
-                                    "Claim / Data / Warrant / Backing / Qualifier / Rebuttal (handled or not)"),)),
+                     "按论文自己的推理顺序还原论证：从哪些前提或材料出发，经过哪几步（分情形、反证、类比、概念区分等）推到结论；每一步写清它靠什么成立（桥接）以及这座桥的依据（支撑）。",
+                     "Rebuild the argument in the paper's own order: the premises or material it starts from, and each step (cases, reductio, analogy, conceptual distinction, and so on) that leads to the conclusion; for each step, what makes it hold (the warrant) and what backs that warrant.",
+                     tables=(_table("论证步骤表", "Argument Steps Table",
+                                    "步骤 / 前提或材料 / 推出什么 / 靠什么成立 / 作者回应的反驳",
+                                    "Step / Premises or material / What follows / What makes it hold / Objection the author answers"),)),
             _section("qualifiers", "限定与反驳", "Qualifiers and Rebuttals",
                      "主张被限定到什么程度，承认与遗漏的反例和替代解释。", "How far the claims are qualified, and the counter-examples and alternative readings admitted or missed."),
             _section("literature", "与既有研究的关系", "Relation to Prior Work",

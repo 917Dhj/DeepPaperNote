@@ -988,3 +988,34 @@ def test_lint_grounding_rejects_insert_decision_without_source_image(
 
     assert result["passes_grounding"] is False
     assert "figure_insert_decision_missing_source_image" in codes
+
+
+def _main_result_decisions(*decisions: str) -> dict:
+    items = [{"source_id": "Figure 1", "decision": "insert", "plan_kind": "method_overview"}]
+    for index, decision in enumerate(decisions, 2):
+        items.append({
+            "source_id": f"Figure {index}",
+            "decision": decision,
+            "plan_kind": "main_result",
+            "skip_reason": f"reason {index}" if decision == "dropped" else "",
+        })
+    return {"decisions": items}
+
+
+def _codes(wrapper: dict) -> list[str]:
+    from lint_grounding import validate_figure_decisions
+
+    return [item["code"] for item in validate_figure_decisions({}, wrapper)]
+
+
+def test_dropping_every_main_result_figure_fails() -> None:
+    assert "figure_main_results_all_dropped" in _codes(_main_result_decisions("dropped", "dropped"))
+
+
+@pytest.mark.parametrize("kept", ["insert", "placeholder", "visual_defect"])
+def test_one_main_result_left_in_place_passes(kept: str) -> None:
+    assert "figure_main_results_all_dropped" not in _codes(_main_result_decisions("dropped", kept))
+
+
+def test_a_plan_without_main_results_needs_none() -> None:
+    assert "figure_main_results_all_dropped" not in _codes(_main_result_decisions())

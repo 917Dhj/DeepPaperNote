@@ -688,6 +688,20 @@ def validate_figure_decisions(
                     skip_reason=skip_reason,
                 )
             )
+    main_results = [
+        item for item in decisions
+        if isinstance(item, dict) and normalize_whitespace(str(item.get("plan_kind", ""))) == "main_result"
+    ]
+    if main_results and all(
+        normalize_whitespace(str(item.get("decision", ""))) == "dropped" for item in main_results
+    ):
+        # A drop is an editorial choice per item; dropping every main result removes the paper's evidence.
+        issues.append(
+            issue(
+                "figure_main_results_all_dropped",
+                source_ids=[item.get("source_id") or item.get("label") or "" for item in main_results],
+            )
+        )
     return issues
 
 
