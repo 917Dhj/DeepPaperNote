@@ -1685,6 +1685,134 @@ def test_exact_swe_bench_title_admits_one_unique_arxiv_match(
     )
 
 
+AGI_ARXIV_TITLE = "Levels of AGI for Operationalizing Progress on the Path to AGI"
+
+
+def prefixed_title_payloads(
+    *,
+    title: str,
+    title_source: str,
+    first_page_title: str,
+    observation: dict,
+) -> tuple[dict, dict]:
+    """Return a local PDF's resolve record and its metadata with one provider observation."""
+    resolve_payload = {
+        "status": "ok",
+        "script": "resolve_paper.py",
+        "paper_id": "arxiv:2311.02462",
+        "source_type": "local_pdf",
+        "source_url": "/papers/levels-agi.pdf",
+        "local_pdf_path": "/papers/levels-agi.pdf",
+        "title": title,
+        "local_pdf_title_source": title_source,
+        "arxiv_id": "2311.02462",
+        "metadata_sources": ["local_pdf"],
+    }
+    if first_page_title:
+        resolve_payload["local_pdf_first_page_title"] = first_page_title
+    metadata_payload = {
+        **resolve_payload,
+        "script": "collect_metadata.py",
+        "identity_observations": [
+            {
+                "provider": observation["source"],
+                "retrieved_by": {"kind": "arxiv_id", "value": "2311.02462"},
+                "record": observation,
+            }
+        ],
+    }
+    return resolve_payload, metadata_payload
+
+
+ARXIV_AGI_RECORD = {
+    "source": "arxiv",
+    "source_type": "arxiv",
+    "source_url": "http://arxiv.org/abs/2311.02462v5",
+    "arxiv_id": "2311.02462",
+    "title": AGI_ARXIV_TITLE,
+    "venue": "Proceedings of ICML 2024",
+    "authors": ["Meredith Ringel Morris"],
+    "year": "2023",
+}
+
+
+@pytest.mark.parametrize(
+    ("title", "title_source", "first_page_title"),
+    [
+        (AGI_ARXIV_TITLE, "pdf_metadata_title_used", f"Position: {AGI_ARXIV_TITLE}"),
+        (f"Position: {AGI_ARXIV_TITLE}", "first_page_title_used", ""),
+    ],
+)
+def test_pdf_title_keeps_a_prefix_the_arxiv_title_lacks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    title: str,
+    title_source: str,
+    first_page_title: str,
+) -> None:
+    resolve_payload, metadata_payload = prefixed_title_payloads(
+        title=title,
+        title_source=title_source,
+        first_page_title=first_page_title,
+        observation=ARXIV_AGI_RECORD,
+    )
+
+    identity, _ = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload=resolve_payload,
+        metadata_payload=metadata_payload,
+    )
+
+    assert identity["identity_verdict"] == "accepted"
+    assert identity["work_level_identity"]["title"] == f"Position: {AGI_ARXIV_TITLE}"
+    assert identity["work_level_identity"]["arxiv_id"] == "2311.02462"
+
+
+@pytest.mark.parametrize(
+    ("first_page_title", "observation"),
+    [
+        # A published record's title is the version of record.
+        (
+            f"Position: {AGI_ARXIV_TITLE}",
+            {
+                "source": "crossref",
+                "source_type": "crossref",
+                "arxiv_id": "2311.02462",
+                "doi": "10.5555/icml.2024.agi",
+                "title": AGI_ARXIV_TITLE,
+                "venue": "International Conference on Machine Learning",
+            },
+        ),
+        # A long lead-in is a header or venue line joined to the title, not a prefix.
+        (f"Proceedings of the Forty First Conference: {AGI_ARXIV_TITLE}", ARXIV_AGI_RECORD),
+        (f"Position: {AGI_ARXIV_TITLE} and Beyond", ARXIV_AGI_RECORD),
+        ("Position: A Different Paper Entirely", ARXIV_AGI_RECORD),
+    ],
+)
+def test_provider_title_wins_unless_the_pdf_only_adds_a_short_prefix(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    first_page_title: str,
+    observation: dict,
+) -> None:
+    resolve_payload, metadata_payload = prefixed_title_payloads(
+        title=AGI_ARXIV_TITLE.upper(),
+        title_source="pdf_metadata_title_used",
+        first_page_title=first_page_title,
+        observation=observation,
+    )
+
+    identity, _ = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload=resolve_payload,
+        metadata_payload=metadata_payload,
+    )
+
+    assert identity["work_level_identity"]["title"] == AGI_ARXIV_TITLE
+
+
 @pytest.mark.parametrize(
     "module",
     [extract_source_text, extract_evidence, extract_pdf_assets],

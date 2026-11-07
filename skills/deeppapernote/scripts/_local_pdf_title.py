@@ -13,6 +13,7 @@ from _identity import (
     extract_arxiv_id,
     extract_doi,
     is_probable_local_pdf_artifact_title,
+    normalize_identity_title,
     publication_quality_score,
     title_similarity,
 )
@@ -167,6 +168,12 @@ def extract_local_pdf_hints(pdf_path: Path) -> dict[str, Any]:
     if metadata_title:
         hints["title"] = metadata_title
         hints["local_pdf_title_source"] = "pdf_metadata_title_used"
+        # Tools that write the metadata can drop part of the printed title, such as a
+        # venue's "Position:" lead-in, so identity resolution also sees the printed one.
+        if layout_title and normalize_identity_title(layout_title) != normalize_identity_title(
+            metadata_title
+        ):
+            hints["local_pdf_first_page_title"] = layout_title
     else:
         page_title = layout_title or first_page_title_candidate(first_page_text)
         if page_title:

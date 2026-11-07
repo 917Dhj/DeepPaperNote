@@ -94,3 +94,38 @@ def test_crossref_title_keeps_its_subtitle(
     record = normalize_crossref_work({"title": title, "subtitle": subtitle})
 
     assert record["title"] == expected
+
+
+def test_first_page_title_is_kept_beside_a_differing_metadata_title(tmp_path: Path) -> None:
+    pdf = write_first_page(
+        tmp_path / "paper.pdf",
+        [
+            (80, 16, "Position: Levels of AGI for Operationalizing Progress"),
+            (100, 16, "on the Path to AGI"),
+            (140, 10, "Meredith Ringel Morris, Jascha Sohl-Dickstein"),
+        ],
+    )
+    with fitz.open(pdf) as doc:
+        doc.set_metadata(
+            {"title": "Levels of AGI for Operationalizing Progress on the Path to AGI"}
+        )
+        doc.saveIncr()
+
+    hints = extract_local_pdf_hints(pdf)
+
+    assert hints["title"] == "Levels of AGI for Operationalizing Progress on the Path to AGI"
+    assert hints["local_pdf_title_source"] == "pdf_metadata_title_used"
+    assert hints["local_pdf_first_page_title"] == (
+        "Position: Levels of AGI for Operationalizing Progress on the Path to AGI"
+    )
+
+
+def test_first_page_title_is_not_repeated_when_it_matches_the_metadata(tmp_path: Path) -> None:
+    pdf = write_first_page(tmp_path / "paper.pdf", [(80, 16, "Segment Anything Everywhere")])
+    with fitz.open(pdf) as doc:
+        doc.set_metadata({"title": "Segment Anything Everywhere"})
+        doc.saveIncr()
+
+    hints = extract_local_pdf_hints(pdf)
+
+    assert "local_pdf_first_page_title" not in hints

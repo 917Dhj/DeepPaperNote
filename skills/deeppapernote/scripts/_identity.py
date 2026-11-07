@@ -1030,6 +1030,33 @@ def _bound_sources_from_record(
     return sources
 
 
+TITLE_LEAD_IN_MAX_WORDS = 3
+
+
+def _printed_title_with_lead_in(record: dict[str, Any], observation: dict[str, Any]) -> str:
+    """Return the PDF's printed title when it is a preprint's title after a short lead-in.
+
+    A venue can require a lead-in such as "Position:" that the preprint record never
+    gains, so the printed title is then the published one. A published record's title
+    still wins, and a longer lead-in is more likely a header line joined to the title.
+    """
+    if publication_quality_score(observation) != 0:
+        return ""
+    printed = _string_field(record, "local_pdf_first_page_title")
+    if not printed and _string_field(record, "local_pdf_title_source") == "first_page_title_used":
+        printed = _string_field(record, "title")
+    lead_in, colon, rest = printed.partition(":")
+    observed = normalize_identity_title(_string_field(observation, "title"))
+    if (
+        colon
+        and observed
+        and normalize_identity_title(rest) == observed
+        and 1 <= len(lead_in.split()) <= TITLE_LEAD_IN_MAX_WORDS
+    ):
+        return printed
+    return ""
+
+
 def _merge_admitted_observation(
     accepted: dict[str, Any],
     observation: dict[str, Any],
@@ -1056,7 +1083,9 @@ def _merge_admitted_observation(
                     or _has_stronger_identity_evidence(observation)
                 )
             ):
-                merged["title"] = deepcopy(value)
+                merged["title"] = _printed_title_with_lead_in(merged, observation) or deepcopy(
+                    value
+                )
                 merged.pop("local_pdf_title_source", None)
                 merged.pop("local_pdf_artifact_title", None)
                 merged["identity_confidence_reasons"] = [
