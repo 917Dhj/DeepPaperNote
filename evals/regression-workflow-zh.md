@@ -55,16 +55,24 @@
 
 使用 `evals/papers/` 中的固定论文集。PDF 只在本地、被 Git 忽略；它们的哈希提交在 `evals/expectations/` 中。
 
-| 角色 | 论文 | 压力点 |
-| --- | --- | --- |
-| 主测 | `arxiv-sam` | 方法加数据集，图表密集，有附录，Visual Review 负担重 |
-| 主测 | `tacl-lost-middle` | 评测类论文，图多，结论受局限性约束 |
-| 主测 | `osdi-distserve` | 系统论文，含算法和对比表 |
-| 主测 | `ncomms-medsam` | 期刊版式，医学领域，通栏图注 |
-| 备用 | `arxiv-transformer` | 短篇机制论文 |
-| 备用 | `zh-aptamer-review` | 中文综述 |
+| 角色 | 论文 | 预期 `paper_type` | 压力点 |
+| --- | --- | --- | --- |
+| 主测 | `arxiv-sam` | `method` | 方法加数据集，图表密集，有附录，Visual Review 负担重 |
+| 主测 | `tacl-lost-middle` | `discovery_empirical` | 评测类论文，图多，结论受局限性约束 |
+| 主测 | `osdi-distserve` | `system` | 系统论文，含算法和对比表 |
+| 主测 | `arxiv-lvbench` | `benchmark_or_dataset` | benchmark 的构造与评测协议，结果表 |
+| 主测 | `arxiv-code-harness` | `survey_or_review` | 叙述性综述，102 页，分类体系与大量汇总表 |
+| 主测 | `arxiv-levels-agi` | `position` | 立场论文，无图，框架表 |
+| 类型冒烟 | `jmir-chatmind-rct` | `human_subjects_empirical` | 随机对照试验，期刊版式，图注在图上方 |
+| 类型冒烟 | `npj-genai-mental-health` | `qualitative_empirical` | 访谈研究，主题分析 |
+| 类型冒烟 | `eit-chatgpt-bullshit` | `humanities_argument` | 哲学论证，无图无表 |
+| 类型冒烟 | `arxiv-cot-expressivity` | `theory` | 定理与证明 |
+| 类型冒烟 | `arxiv-harness-engineering` | `discovery_empirical` | 对 11 个系统的源码研究，带论点；读起来像综述，83 页 |
+| 备用 | `ncomms-medsam` | `method` | 期刊版式，医学领域，通栏图注 |
+| 备用 | `arxiv-transformer` | `method` | 短篇机制论文 |
+| 备用 | `zh-aptamer-review` | `survey_or_review` | 中文综述 |
 
-冒烟层级使用 `arxiv-transformer` 和 `arxiv-sam`。只有当某篇主测论文因与改动无关的原因无法启动时，才用备用论文替换，并记录原因。
+预期 `paper_type` 是细心的读者会给出的类型，评估对的必答问题按它取。冒烟层级使用 `arxiv-transformer` 和 `arxiv-sam`；改动涉及论文类型或按类型的笔记结构时，还要跑类型冒烟论文，冒烟报告把每次运行选定的 `paper_type` 与预期类型并列记录。只有当某篇主测论文因与改动无关的原因无法启动时，才用备用论文替换，并记录原因。
 
 扩充论文集时，由 Paper Finder agent 挑选身份稳定、PDF 可读、技术深度足以写深读笔记，并且补上现有论文集缺少的压力点的论文：benchmark 或评测、方法或系统、附录密集、图表密集、局限性密集。新论文在被实验使用之前，先按 `evals/paper-corpus.md` 建立 `evals/expectations/` 条目。
 
@@ -123,7 +131,7 @@ baseline-run-manifest.md
 
 ### 运行
 
-每篇主测论文在每组各跑两次，每次都是新的子会话：四篇论文乘两组乘两次，共 16 次运行。运行目录使用中性编号，例如 `run-07`，让路径不暴露分组；编号与分组的对应关系记在 manifest 中。
+每篇主测论文在每组各跑两次，每次都是新的子会话：六篇论文乘两组乘两次，共 24 次运行。运行目录使用中性编号，例如 `run-07`，让路径不暴露分组；编号与分组的对应关系记在 manifest 中。
 
 只有当提交、宿主、模型、论文集、输入模式、子会话提示词和运行配置全部一致时，才能复用此前的 baseline 运行。
 
@@ -196,7 +204,7 @@ Regression Judge 读取以上所有文档，包括 `blinding-map.json`，并揭�
 实验的判定是 `hard_fail`、`regression`、`no_material_change`、`partial_improvement`、`real_improvement` 或 `architectural_improvement_only` 之一：
 
 - 任一论文为 `hard_fail` 时，判定为 `hard_fail`。
-- 只有当四篇论文中至少三篇为 `real_improvement` 且没有任何一篇为 `regression` 时，才判定为 `real_improvement`。
+- 只有当六篇论文中至少四篇为 `real_improvement` 且没有任何一篇为 `regression` 时，才判定为 `real_improvement`。
 - 产物或契约改进了，但没有任何论文超过 `no_material_change` 时，判定为 `architectural_improvement_only`。
 - 其他情况，选最能概括各论文结果的判定，并写明理由。
 

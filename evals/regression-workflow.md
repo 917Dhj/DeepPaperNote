@@ -53,16 +53,24 @@ Hold these fixed across every run of one experiment, and record them in the mani
 
 Use this fixed set from `evals/papers/`. The PDFs are local and ignored by Git; their hashes are committed in `evals/expectations/`.
 
-| Role | Paper | Stress points |
-| --- | --- | --- |
-| primary | `arxiv-sam` | method plus dataset, figure- and table-heavy, appendix, heavy Visual Review |
-| primary | `tacl-lost-middle` | evaluation paper, many figures, conclusions bounded by limitations |
-| primary | `osdi-distserve` | systems paper, algorithms, comparison tables |
-| primary | `ncomms-medsam` | journal layout, medical domain, full-width captions |
-| spare | `arxiv-transformer` | short mechanism paper |
-| spare | `zh-aptamer-review` | Chinese review article |
+| Role | Paper | Expected `paper_type` | Stress points |
+| --- | --- | --- | --- |
+| primary | `arxiv-sam` | `method` | method plus dataset, figure- and table-heavy, appendix, heavy Visual Review |
+| primary | `tacl-lost-middle` | `discovery_empirical` | evaluation paper, many figures, conclusions bounded by limitations |
+| primary | `osdi-distserve` | `system` | systems paper, algorithms, comparison tables |
+| primary | `arxiv-lvbench` | `benchmark_or_dataset` | benchmark construction and protocol, results tables |
+| primary | `arxiv-code-harness` | `survey_or_review` | narrative survey, 102 pages, taxonomy and many summary tables |
+| primary | `arxiv-levels-agi` | `position` | position paper, no figures, framework tables |
+| type smoke | `jmir-chatmind-rct` | `human_subjects_empirical` | randomized trial, journal layout, caption above its figure |
+| type smoke | `npj-genai-mental-health` | `qualitative_empirical` | interview study, themes |
+| type smoke | `eit-chatgpt-bullshit` | `humanities_argument` | philosophical argument, no figures or tables |
+| type smoke | `arxiv-cot-expressivity` | `theory` | theorems and proofs |
+| type smoke | `arxiv-harness-engineering` | `discovery_empirical` | source-code study of eleven systems with a thesis; reads like a survey, 83 pages |
+| spare | `ncomms-medsam` | `method` | journal layout, medical domain, full-width captions |
+| spare | `arxiv-transformer` | `method` | short mechanism paper |
+| spare | `zh-aptamer-review` | `survey_or_review` | Chinese review article |
 
-The smoke tier uses `arxiv-transformer` and `arxiv-sam`. Replace a primary paper with a spare only when its run cannot start for a reason unrelated to the change, and record why.
+The expected `paper_type` is the type a careful reader assigns; evaluation pairs take their core questions from it. The smoke tier uses `arxiv-transformer` and `arxiv-sam`; a change to paper types or type-specific note structure also runs the type smoke papers, and the smoke report records the `paper_type` each run chose next to the expected one. Replace a primary paper with a spare only when its run cannot start for a reason unrelated to the change, and record why.
 
 To extend the set, a Paper Finder agent picks papers with stable identity, a readable PDF, enough technical depth for a deep note, and a stress point the set lacks: benchmark or evaluation, method or system, appendix-heavy, figure- or table-heavy, or limitations-heavy. Each new paper gets an `evals/expectations/` entry as `evals/paper-corpus.md` describes before an experiment uses it.
 
@@ -121,7 +129,7 @@ baseline-run-manifest.md
 
 ### Runs
 
-Run each primary paper twice per arm, in fresh child sessions: four papers times two arms times two runs makes 16 runs. Name run directories with neutral ids such as `run-07`, so a path never reveals its arm; the manifests map ids to arms.
+Run each primary paper twice per arm, in fresh child sessions: six papers times two arms times two runs makes 24 runs. Name run directories with neutral ids such as `run-07`, so a path never reveals its arm; the manifests map ids to arms.
 
 Reuse earlier baseline runs only when the commit, host, model, paper set, input mode, child prompt, and run configuration all match.
 
@@ -194,7 +202,7 @@ Per paper, assign one verdict:
 The experiment's verdict is one of `hard_fail`, `regression`, `no_material_change`, `partial_improvement`, `real_improvement`, or `architectural_improvement_only`:
 
 - `hard_fail` when any paper is `hard_fail`.
-- `real_improvement` only when at least three of the four papers are `real_improvement` and none is `regression`.
+- `real_improvement` only when at least four of the six papers are `real_improvement` and none is `regression`.
 - `architectural_improvement_only` when artifacts or contracts improved but no paper shows more than `no_material_change`.
 - Otherwise, the verdict that best describes the per-paper results, with the reason.
 
