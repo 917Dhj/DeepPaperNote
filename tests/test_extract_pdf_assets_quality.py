@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -430,6 +432,42 @@ def test_extract_pdf_assets_default_truncates_after_40_pages(tmp_path: Path) -> 
         "asset_pages_scanned": 40,
         "truncated_due_to_asset_page_limit": True,
     }
+
+
+def _ocr_ready() -> bool:
+    if shutil.which("tesseract") is None:
+        return False
+    probe = subprocess.run([sys.executable, "-c", "import pytesseract"], env=_env_with_ocr())
+    return probe.returncode == 0
+
+
+def _env_with_ocr() -> dict[str, str]:
+    """The test environment minus the shadow pytesseract that conftest installs."""
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        part for part in env.get("PYTHONPATH", "").split(os.pathsep)
+        if part and Path(part).name != "no_ocr"
+    )
+    return env
+
+
+@pytest.mark.skipif(not _ocr_ready(), reason="needs tesseract and pytesseract")
+def test_a_page_without_searchable_text_is_ocred(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    write_test_pdf(pdf_path, ["OCR CHECK"])
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "assets.json"
+    write_fetch_input(input_path, pdf_path, title="OCR Paper")
+    subprocess.run(
+        [sys.executable, str(EXTRACT_PDF_ASSETS_SCRIPT), "--input", str(input_path),
+         "--output", str(output_path), "--assets-dir", str(tmp_path / "assets")],
+        check=True, env=_env_with_ocr(),
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["ocr_available"] is True
+    page = payload["page_assets"][0]
+    assert page["text_extraction_method"] == "ocr"
+    assert "OCR" in page["page_text"]
 
 
 def test_text_table_row_accepts_explicit_column_separators() -> None:

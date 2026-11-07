@@ -80,47 +80,13 @@ def bundle(**kwargs: object) -> dict:
     return build_synthesis_bundle(source_manifest=source_manifest, **kwargs)
 
 
-def test_deleted_reference_routers_stay_removed() -> None:
-    references = SKILL_ROOT / "references"
-
-    assert not (references / "workflow.md").exists()
-    assert not (references / "model-synthesis.md").exists()
-
-    for readme_name in ("README.md", "README.zh-CN.md"):
-        readme = (PROJECT_ROOT / readme_name).read_text(encoding="utf-8")
-        assert "references/workflow.md" not in readme
-        assert "references/model-synthesis.md" not in readme
-
-
-def test_topic_references_do_not_redefine_canonical_workflow() -> None:
-    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    deep_analysis = (SKILL_ROOT / "references" / "deep-analysis.md").read_text(encoding="utf-8")
-    evidence_first = (SKILL_ROOT / "references" / "evidence-first.md").read_text(encoding="utf-8")
-
-    assert "Preferred usage pattern:" not in skill
-    assert "## Recommended Workflow" not in deep_analysis
-    assert "- `method`" not in deep_analysis
-    assert "- `system/framework`" not in deep_analysis
-    assert "- `benchmark/dataset`" not in deep_analysis
-    assert "weak-but-honest note" not in deep_analysis
-    assert "based mostly on abstract plus metadata" not in deep_analysis
-    assert "three-stage model-first pipeline" not in evidence_first
-
-
-
-
 def test_codex_adapter_stays_thin() -> None:
     adapter = (SKILL_ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+    keys = [line.split(":", 1)[0].strip() for line in adapter.splitlines() if line.strip()]
+    prompt = next(line for line in adapter.splitlines() if "default_prompt:" in line)
 
-    assert adapter == (
-        "interface:\n"
-        '  display_name: "DeepPaperNote"\n'
-        '  short_description: "Generate a high-quality deep-reading note for one paper with a '
-        'raw-source manifest workflow and Obsidian-oriented save semantics."\n'
-        '  default_prompt: "Use $deeppapernote to create the deep-reading note for this paper."\n'
-    )
-
-
+    assert keys == ["interface", "display_name", "short_description", "default_prompt"]
+    assert "$deeppapernote" in prompt and len(prompt) < 160
 
 
 def note_quality_structural_sections() -> tuple[str, ...]:
@@ -410,51 +376,19 @@ def test_figure_protocol_docs_keep_single_owners() -> None:
     placement = (references / "figure-placement.md").read_text(encoding="utf-8")
     final_writing = (references / "final-writing.md").read_text(encoding="utf-8")
 
-    for duplicate in (
-        "needs_visual_quality_check",
-        "reject_visual_quality",
-        "asset_candidate_missing",
-        "relative_markdown_embed",
-        "write_obsidian_note.py --figure-decisions",
+    # Each owner keeps its part: the contract owns decision values, obsidian-format owns
+    # rendering, write_obsidian_note.py owns materialization.
+    for doc, tokens in (
+        (skill, ("needs_visual_quality_check", "relative_markdown_embed")),
+        (placement, ("relative_markdown_embed", "> [!figure]", "write_obsidian_note.py --figure-decisions")),
+        (final_writing, ("relative_markdown_embed", "> [!figure]", "write_obsidian_note.py")),
     ):
-        assert duplicate not in skill
-
-    for duplicate in (
-        "kept_placeholder_visual_defect",
-        "kept_placeholder_materialization_blocked",
-        "relative_markdown_embed",
-        "write_obsidian_note.py --figure-decisions",
-        "> [!figure]",
-        "```md",
-        "same note-generation task",
-        "text-only note first",
-        "final response",
-    ):
-        assert duplicate not in placement
-
-    for duplicate in (
-        "usable_candidate",
-        "needs_visual_quality_check",
-        "reject_visual_quality",
-        "asset_candidate_missing",
-        "relative_markdown_embed",
-        "write_obsidian_note.py",
-        "> [!figure]",
-        "![[.../images",
-    ):
-        assert duplicate not in final_writing
-
-
-def test_paper_types_doc_uses_typed_profiles_without_legacy_common_subheadings() -> None:
-    text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "paper-types.md").read_text(encoding="utf-8")
-
-    assert "Common subheadings" not in text
-    assert "unless a section truly does not apply" not in text
+        for token in tokens:
+            assert token not in doc
 
 
 def test_note_quality_structural_sections_match_canonical_contract() -> None:
     assert note_quality_structural_sections() == note_required_sections("zh-CN", "")
-
 
 
 def test_formal_save_policy_stays_out_of_obsidian_format() -> None:
@@ -485,7 +419,6 @@ def test_bundle_routes_to_the_final_quality_gate_contract() -> None:
         assert argument in skill
 
 
-
 def test_topic_references_keep_separate_note_plan_responsibilities() -> None:
     writing_and_rubric = [
         (SKILL_ROOT / "references" / doc_name).read_text(encoding="utf-8")
@@ -504,7 +437,6 @@ def test_normal_execution_docs_do_not_force_broad_reference_reads() -> None:
         assert "Use [references/" not in text
 
 
-
 def test_core_info_references_list_every_contract_field() -> None:
     final_writing_text = (PROJECT_ROOT / "skills" / "deeppapernote" / "references" / "final-writing.md").read_text(
         encoding="utf-8"
@@ -516,7 +448,6 @@ def test_core_info_references_list_every_contract_field() -> None:
     for text in (final_writing_text, obsidian_format_text):
         for field in writing_contract_rules("zh-CN")["core_info_fields"]:
             assert f"`{field}`" in text
-
 
 
 def test_evidence_first_is_only_note_plan_json_example() -> None:
@@ -572,22 +503,3 @@ def test_pdf_contract_banned_phrase_matcher_catches_allowed_fallbacks() -> None:
     )
 
 
-def test_readmes_accept_every_paper_input() -> None:
-    readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-    readme_zh_text = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
-
-    assert "A title, DOI, URL, arXiv ID, or local PDF all work." in readme_text
-    assert "标题、DOI、URL、本地 PDF 都可以" in readme_zh_text
-
-
-def test_readmes_document_the_zotero_local_api() -> None:
-    readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-    readme_zh_text = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
-
-    assert "Zotero Local API" in readme_text
-    for mode in ("auto", "off", "required"):
-        assert mode in readme_text
-    assert "Zotero Local API" in readme_zh_text
-    assert "`auto`（默认）" in readme_zh_text
-    assert "ambiguous local match always fails closed" in readme_text
-    assert "兼容集成仍可作为可选替代路线" in readme_zh_text

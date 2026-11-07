@@ -21,13 +21,11 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "sc
 
 # --- the profiles themselves -------------------------------------------------
 
-def test_there_are_ten_types_and_old_values_are_gone() -> None:
+def test_there_are_exactly_ten_types() -> None:
     assert contracts.PAPER_TYPE_VALUES == (
         "method", "system", "theory", "position", "benchmark_or_dataset", "discovery_empirical",
         "human_subjects_empirical", "survey_or_review", "qualitative_empirical", "humanities_argument",
     )
-    for old in ("AI_method", "clinical_or_psychology_empirical", "humanities_or_social_science"):
-        assert old not in contracts.PAPER_TYPE_VALUES
 
 
 @pytest.mark.parametrize("language", type_profiles.LANGUAGES)

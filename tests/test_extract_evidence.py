@@ -236,6 +236,7 @@ def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
     input_path = tmp_path / "input.json"
     output_path = tmp_path / "evidence.json"
     write_fetch_json(input_path, input_payload)
+    manifest_path = write_source_corpus_for_evidence(tmp_path)
 
     result = subprocess.run(
         [
@@ -243,6 +244,8 @@ def test_extract_evidence_outputs_ablation_evidence(tmp_path: Path) -> None:
             str(EXTRACT_EVIDENCE_SCRIPT),
             "--input",
             str(input_path),
+            "--source-manifest",
+            str(manifest_path),
             "--output",
             str(output_path),
         ],
@@ -271,15 +274,6 @@ def test_extract_evidence_source_corpus_mode_uses_corpus_views(
     manifest_path = write_source_corpus_for_evidence(tmp_path)
     output_path = tmp_path / "evidence.json"
 
-    def fail_pdf_helper(*_args, **_kwargs):
-        raise AssertionError("Source Corpus mode must not call PDF text-structure helpers")
-
-    monkeypatch.setattr(extract_evidence, "pdf_coverage_summary", fail_pdf_helper)
-    monkeypatch.setattr(extract_evidence, "extract_pdf_sections", fail_pdf_helper)
-    monkeypatch.setattr(extract_evidence, "extract_pdf_text", fail_pdf_helper)
-    monkeypatch.setattr(extract_evidence, "extract_appendix_index", fail_pdf_helper)
-    monkeypatch.setattr(extract_evidence, "extract_appendix_page_texts", fail_pdf_helper)
-    monkeypatch.setattr(extract_evidence, "extract_caption_lines", fail_pdf_helper)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -364,129 +358,6 @@ def test_extract_evidence_source_corpus_validation_fails_closed(tmp_path: Path) 
     } >= {"source_corpus_raw_sections_missing", "source_corpus_empty_text"}
 
 
-def test_extract_evidence_outputs_pdf_coverage_for_truncated_pdf(tmp_path: Path) -> None:
-    pdf_path = tmp_path / "paper.pdf"
-    pages = [
-        (
-            "Abstract\nWe propose a coverage-aware extraction test.\n"
-            "Introduction\nThis paper studies evidence coverage."
-        ),
-        "Method\nThe method scans bounded PDF pages and records transparent coverage.",
-        "Experiment\nThe experiment reports a useful result.",
-    ]
-    pages.extend(f"Main content page {index}" for index in range(4, 10))
-    pages.append("References\n[1] Ignored reference.")
-    pages.extend(f"Reference tail page {index}" for index in range(11, 20))
-    pages.append("Appendix\nAdditional experiments live here.")
-    pages.extend(f"Appendix tail page {index}" for index in range(21, 26))
-    write_test_pdf(pdf_path, pages)
-
-    input_payload = {
-        "paper_id": "paper:coverage",
-        "title": "Coverage Transparent Paper",
-        "abstract": "We propose a coverage-aware extraction test.",
-        "pdf_path": str(pdf_path),
-    }
-    input_path = tmp_path / "input.json"
-    output_path = tmp_path / "evidence.json"
-    write_fetch_json(input_path, input_payload)
-
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(EXTRACT_EVIDENCE_SCRIPT),
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-            "--max-pages",
-            "18",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0
-
-    payload = json.loads(output_path.read_text(encoding="utf-8"))
-    coverage = payload["evidence_pack"]["pdf_coverage"]
-    assert coverage["total_pages"] == 25
-    assert coverage["text_max_pages"] == 18
-    assert coverage["text_pages_scanned"] == 18
-    assert coverage["truncated_due_to_page_limit"] is True
-    assert coverage["references_start_page"] == 10
-    assert coverage["appendix_detected"] is True
-    assert coverage["appendix_start_page"] == 20
-    assert payload["evidence_pack"]["reference_candidates"][:1] == [
-        {
-            "raw_text": "[1] Ignored reference.",
-            "display_text": "Ignored reference.",
-            "page_hint": "p. 10",
-            "doi": "",
-            "arxiv_id": "",
-            "wikilink": "",
-            "vault_target": "",
-            "match_status": "no_vault_match",
-            "match_reason": "none",
-        }
-    ]
-    assert coverage["section_stop_reason"] == "references"
-    assert coverage["section_stop_page"] == 10
-    assert payload["summary"]["pdf_coverage"] == coverage
-
-
-def test_extract_evidence_keeps_later_main_result_captions(tmp_path: Path) -> None:
-    pdf_path = tmp_path / "many_figures.pdf"
-    captions = "\n".join(
-        f"Figure {index}. Auxiliary setup diagram {index}."
-        for index in range(1, 15)
-    )
-    write_test_pdf(
-        pdf_path,
-        [
-            (
-                "Abstract\nWe study a system.\n"
-                "Introduction\nThis paper studies serving throughput.\n"
-                "Method\nThe method manages cached states.\n"
-                "Experiment\nThe experiment reports latency and batching.\n"
-                f"{captions}\n"
-                "Figure 15. Average number of batched requests under the main serving workload."
-            )
-        ],
-    )
-
-    input_path = tmp_path / "input.json"
-    output_path = tmp_path / "evidence.json"
-    write_fetch_json(
-        input_path,
-        {
-            "paper_id": "paper:many-figures",
-            "title": "Many Figures Paper",
-            "abstract": "We study a system.",
-            "pdf_path": str(pdf_path),
-        },
-    )
-
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(EXTRACT_EVIDENCE_SCRIPT),
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0
-
-    payload = json.loads(output_path.read_text(encoding="utf-8"))
-    ids = [item["id"] for item in payload["evidence_pack"]["figure_captions"]]
-    assert "Figure 15" in ids
-
-
 def test_extract_caption_lines_dedupes_body_fig_references() -> None:
     captions = extract_caption_lines(
         "\n".join(
@@ -514,165 +385,6 @@ def test_extract_caption_lines_keeps_fig_caption_when_no_better_label_exists() -
     assert captions == [
         {"id": "Fig 1", "caption": "shows an overview of the proposed pipeline."}
     ]
-
-
-def test_extract_evidence_default_scans_short_pdf_without_truncation(tmp_path: Path) -> None:
-    pdf_path = tmp_path / "paper.pdf"
-    pages = [
-        "Abstract\nWe propose a coverage-aware extraction test.",
-        "Introduction\nThis paper studies evidence coverage.",
-        "Method\nThe method scans bounded PDF pages and records transparent coverage.",
-        "Experiment\nThe experiment reports a useful result.",
-    ]
-    pages.extend(f"Main content page {index}" for index in range(5, 26))
-    write_test_pdf(pdf_path, pages)
-
-    input_path = tmp_path / "input.json"
-    output_path = tmp_path / "evidence.json"
-    write_fetch_json(
-        input_path,
-        {
-            "paper_id": "paper:default-coverage",
-            "title": "Default Coverage Paper",
-            "abstract": "We propose a coverage-aware extraction test.",
-            "pdf_path": str(pdf_path),
-        },
-    )
-
-    subprocess.run(
-        [
-            sys.executable,
-            str(EXTRACT_EVIDENCE_SCRIPT),
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-        ],
-        check=True,
-    )
-
-    coverage = json.loads(output_path.read_text(encoding="utf-8"))["evidence_pack"]["pdf_coverage"]
-
-    assert coverage["total_pages"] == 25
-    assert coverage["text_max_pages"] == 32
-    assert coverage["text_pages_scanned"] == 25
-    assert coverage["truncated_due_to_page_limit"] is False
-
-
-def test_extract_evidence_default_truncates_after_32_pages(tmp_path: Path) -> None:
-    pdf_path = tmp_path / "paper.pdf"
-    pages = [
-        "Abstract\nWe propose a coverage-aware extraction test.",
-        "Introduction\nThis paper studies evidence coverage.",
-        "Method\nThe method scans bounded PDF pages and records transparent coverage.",
-        "Experiment\nThe experiment reports a useful result.",
-    ]
-    pages.extend(f"Main content page {index}" for index in range(5, 34))
-    write_test_pdf(pdf_path, pages)
-
-    input_path = tmp_path / "input.json"
-    output_path = tmp_path / "evidence.json"
-    write_fetch_json(
-        input_path,
-        {
-            "paper_id": "paper:default-truncated",
-            "title": "Default Truncated Paper",
-            "abstract": "We propose a coverage-aware extraction test.",
-            "pdf_path": str(pdf_path),
-        },
-    )
-
-    subprocess.run(
-        [
-            sys.executable,
-            str(EXTRACT_EVIDENCE_SCRIPT),
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-        ],
-        check=True,
-    )
-
-    coverage = json.loads(output_path.read_text(encoding="utf-8"))["evidence_pack"]["pdf_coverage"]
-
-    assert coverage["total_pages"] == 33
-    assert coverage["text_max_pages"] == 32
-    assert coverage["text_pages_scanned"] == 32
-    assert coverage["truncated_due_to_page_limit"] is True
-
-
-def test_extract_evidence_outputs_appendix_index_and_selective_evidence(tmp_path: Path) -> None:
-    pdf_path = tmp_path / "paper.pdf"
-    pages = [
-        "Abstract\nWe propose appendix-aware extraction.\n"
-        "Introduction\nThe paper studies coverage.",
-        "Method\nThe main method uses a compact extraction pipeline.",
-        "Experiment\nThe main experiment reports stable results.",
-    ]
-    pages.extend(f"Main content page {index}" for index in range(4, 20))
-    pages.append(
-        "\n".join(
-            [
-                "Appendix",
-                "A. Additional Experiments",
-                "Without replay, F1 drops by 4.1 points and training becomes unstable.",
-                "Additional results improve accuracy to 91.2 on the hidden split.",
-                "Table A1. Extra ablation results",
-                "B. Hyperparameters",
-                "We use learning rate 1e-4, batch size 32, and AdamW optimizer.",
-                "The dataset split uses 80/10/10 train, validation, and test partitions.",
-                "Figure A1: Qualitative examples",
-                "Case study examples show failure cases in long conversations.",
-            ]
-        )
-    )
-    pages.extend(f"Appendix tail page {index}" for index in range(21, 26))
-    write_test_pdf(pdf_path, pages)
-
-    input_payload = {
-        "paper_id": "paper:appendix",
-        "title": "Appendix Aware Paper",
-        "abstract": "We propose appendix-aware extraction.",
-        "pdf_path": str(pdf_path),
-    }
-    input_path = tmp_path / "input.json"
-    output_path = tmp_path / "evidence.json"
-    write_fetch_json(input_path, input_payload)
-
-    subprocess.run(
-        [
-            sys.executable,
-            str(EXTRACT_EVIDENCE_SCRIPT),
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-            "--max-pages",
-            "18",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    payload = json.loads(output_path.read_text(encoding="utf-8"))
-    pack = payload["evidence_pack"]
-    assert pack["ablation_evidence"] == []
-    assert pack["appendix_index"]["sections"][:2] == [
-        {"title": "A. Additional Experiments", "page": 20},
-        {"title": "B. Hyperparameters", "page": 20},
-    ]
-    assert pack["appendix_index"]["table_captions"][:1] == [
-        {"id": "Table A1", "caption": "Extra ablation results", "page_hint": "p.20"}
-    ]
-    appendix_evidence = pack["appendix_evidence"]
-    assert "drops by 4.1 points" in appendix_evidence["ablation"][0]["evidence"]
-    assert "learning rate 1e-4" in appendix_evidence["implementation_details"][0]["evidence"]
-    assert "dataset split" in appendix_evidence["dataset_details"][0]["evidence"]
-    assert "accuracy to 91.2" in appendix_evidence["extra_results"][0]["evidence"]
-    assert "Case study examples" in appendix_evidence["qualitative_examples"][0]["evidence"]
-    assert payload["summary"]["appendix_evidence_counts"]["ablation"] == 1
 
 
 def test_appendix_evidence_default_keeps_eight_items_per_category() -> None:

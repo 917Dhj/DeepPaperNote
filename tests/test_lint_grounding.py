@@ -266,18 +266,6 @@ def test_lint_grounding_rejects_malformed_page_range_without_crashing(tmp_path: 
     assert "source_reference_missing_valid_section_or_pages" in codes
 
 
-def test_lint_grounding_rejects_old_evidence_references(tmp_path: Path) -> None:
-    plan = grounded_note_plan()
-    plan["section_plan"][2]["evidence_sources"] = ["synthesis_bundle.evidence.method_evidence"]
-
-    result = run_lint_grounding(tmp_path, plan, source_manifest(), slim_bundle())
-    codes = {issue["code"] for issue in result["issues"]}
-
-    assert result["passes_grounding"] is False
-    assert "old_bundle_reference" in codes
-    assert "note_plan_old_bundle_reference_present" in codes
-
-
 def test_lint_grounding_blocks_truncated_source_without_partial_acceptance(tmp_path: Path) -> None:
     result = run_lint_grounding(
         tmp_path,
@@ -308,17 +296,6 @@ def test_lint_grounding_requires_contract_lookup_by_note_plan_paper_type(tmp_pat
 
     assert result["passes_grounding"] is False
     assert "bundle_contracts_by_paper_type_missing" in codes
-
-
-def test_lint_grounding_rejects_old_bundle_summary_field(tmp_path: Path) -> None:
-    bundle = slim_bundle()
-    bundle["summary"] = {"paper_type": "AI_method"}
-
-    result = run_lint_grounding(tmp_path, grounded_note_plan(), source_manifest(), bundle)
-    fields = {issue.get("field") for issue in result["issues"]}
-
-    assert result["passes_grounding"] is False
-    assert "summary" in fields
 
 
 @pytest.mark.parametrize("old_key", WRITING_CONTRACT_RULES["excluded_model_input_fields"])

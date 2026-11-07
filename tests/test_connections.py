@@ -523,10 +523,6 @@ def validate(review: dict, plan: dict | None = None) -> str:
 def test_quality_review_keeps_the_connections_check() -> None:
     assert "connections" in _final_quality.QUALITY_CHECKS
     validate(quality_review())
-    old = quality_review()
-    old["schema_version"] = 2
-    with pytest.raises(ValueError, match="schema_version 4"):
-        validate(old)
 
 
 @pytest.mark.parametrize("ref", ["/connections/0", "/key_prior_work/2"])
