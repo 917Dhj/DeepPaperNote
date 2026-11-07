@@ -571,7 +571,7 @@ def verify(vault: Path, papers_dir: str) -> dict:
 
 
 def emit(payload: dict, code: int = 0) -> int:
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+    sys.stdout.write(json.dumps(payload, indent=2) + "\n")
     return code
 
 

@@ -187,12 +187,11 @@ def main() -> int:
     payload = {**located, "today": date.today().isoformat()}
     if located["status"] == "ok":
         payload.update(scan(Path(located["vault"]), located["papers_dir"], located["language"]))
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
     if args.output:
-        Path(args.output).write_text(text + "\n", encoding="utf-8")
+        Path(args.output).write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print(json.dumps({"status": payload["status"], "output": args.output}))
     else:
-        sys.stdout.write(text + "\n")
+        sys.stdout.write(json.dumps(payload, indent=2) + "\n")
     return 0
 
 

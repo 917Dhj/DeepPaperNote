@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -72,7 +73,8 @@ def run(tmp_path: Path):
             command += ["--vault", str(vault)]
         result = subprocess.run(
             command, capture_output=True, text=True,
-            env={"DEEPPAPERNOTE_CONFIG_PATH": str(config), "PATH": "/usr/bin:/bin"},
+            # cp1252 stands in for a Windows console, where non-ASCII output fails.
+            env={**os.environ, "DEEPPAPERNOTE_CONFIG_PATH": str(config), "PYTHONIOENCODING": "cp1252"},
         )
         try:
             payload = json.loads(result.stdout)
