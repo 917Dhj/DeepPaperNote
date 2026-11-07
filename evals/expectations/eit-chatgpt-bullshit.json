@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "pdf": "eit-chatgpt-bullshit.pdf",
+  "sha256": "ddb390bba4bd3c5344814b528ef1fc6cd2c21e16cfcc26ba013a7e0a21dd2a52",
+  "source": "doi:10.1007/s10676-024-09775-5",
+  "traits": [
+    "humanities",
+    "no-figures",
+    "no-tables",
+    "two-column"
+  ],
+  "readable": true,
+  "title": "ChatGPT is bullshit",
+  "labels": [],
+  "captions": {},
+  "review": [],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {}
+}

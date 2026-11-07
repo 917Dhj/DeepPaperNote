@@ -13,13 +13,18 @@ Pick the type by what the paper contributes, and record the deciding signals in 
 | `method` | a new method or mechanism; set `positioning`: `technique` (a known problem, solved better) or `new_problem` (a new problem or setting, defined and made feasible) |
 | `system` | a built system judged by its design trade-offs and measured performance |
 | `theory` | proved results |
-| `position` | an argued stance with a call to action |
+| `position` | an argued stance on how a field should work, with a call to action; this includes a conceptual framework or definition proposed for CS or AI, such as levels of AGI |
 | `benchmark_or_dataset` | a new benchmark or dataset; a paper that audits existing benchmarks is `discovery_empirical` or `survey_or_review` instead |
-| `discovery_empirical` | a finding from experiments: an analysis of model behavior ("does the model have capability X") or a natural-science discovery |
+| `discovery_empirical` | a finding from experiments or measurement: an analysis of model behavior ("does the model have capability X"), a study of systems, source code, or other artifacts, or a natural-science discovery |
 | `human_subjects_empirical` | a quantitative study of people: clinical, psychological, or social-science experiments and surveys |
-| `survey_or_review` | a synthesis of prior work; set `survey_mode`: `systematic` (reports search and screening, PRISMA-style) or `narrative` |
+| `survey_or_review` | a synthesis of prior literature; set `survey_mode`: `systematic` (reports search and screening, PRISMA-style) or `narrative` |
 | `qualitative_empirical` | interviews, focus groups, observation, or thematic analysis of texts |
-| `humanities_argument` | an interpretive or conceptual argument |
+| `humanities_argument` | an interpretive or conceptual argument in philosophy or another humanities field |
+
+Two boundaries decide most hard cases:
+
+- **Position or humanities argument.** A conceptual paper that tells a CS or AI community what to adopt, measure, or build is `position`, even when it reasons like philosophy. `humanities_argument` is for an argument whose audience is a humanities field, for example about what a concept means.
+- **Survey or empirical study.** A survey's material is prior papers. A paper whose material is systems, code, products, or data it examined itself is `discovery_empirical`, even when it compares many systems and reads like a survey; when it also argues a thesis, add `position` as its `secondary_type`.
 
 A paper with a second, real contribution gets one `secondary_type`, for example a benchmark with a companion method. Its `secondary_question_ids` join the core questions, and the note answers them under one `### <secondary_heading>` subsection placed in the primary section named by `secondary_host_section`. Leave both fields empty otherwise.
 
@@ -30,7 +35,9 @@ A paper with a second, real contribution gets one `secondary_type`, for example 
 - `{"answer": "...", "evidence_refs": [...]}`, with the same `section_id` or `pages` references as `section_plan`;
 - `{"not_reported": true, "reason": "..."}`, when the paper does not report it.
 
-Unreported is a finding, not a failure: write it in the note as "论文没有报告 X" (`en`: "The paper does not report X") and carry it into `局限` when it limits the conclusion. Never turn it into "the authors did not do X", and never score or rate (no low/high risk labels). The note answers each question in its home section.
+Unreported is a finding, not a failure: write it in the note as "论文没有报告 X" (`en`: "The paper does not report X") and carry it into `局限` only when it limits a conclusion the paper draws. Never turn it into "the authors did not do X", and never score or rate (no low/high risk labels). The note answers each question in its home section.
+
+Use `not_reported` only for what this kind of paper would report. When a question does not fit the work, answer it with what the paper does instead: a conceptual argument has no measurement, so its evidence question is answered by the cases or reasoning it rests on, and the note does not list the missing measurement as a weakness.
 
 When more than half of the primary type's questions are `not_reported`, put this callout between the title and `核心信息`, followed by one line naming the unreported questions:
 
@@ -55,4 +62,4 @@ Types with `workflow` need that `###` subsection in the host section, mirroring 
 | … | … | … | … | … |
 ```
 
-Keep one short phrase per cell and put details in the module subsections after the table. The table needs one row per planned step and the header from `workflow.table_headers`. The paper's own pipeline or framework figure goes right after the table. A survey whose paper does not report search and screening keeps the subsection with the not-reported sentence and an empty `workflow`; types without `workflow` keep `workflow` empty.
+Keep one short phrase per cell and put details in the module subsections after the table. The last column depends on the type: method, system, and survey steps say whether the step is new in this paper (`novel`); benchmark steps name who does it and its quality gate; discovery, human-subjects, and qualitative studies follow an established design, so each step names its key design choice (`design_choice`), such as randomizing by site or sampling until saturation. The table needs one row per planned step and the header from `workflow.table_headers`. The paper's own pipeline or framework figure goes right after the table. A survey whose paper does not report search and screening keeps the subsection with the not-reported sentence and an empty `workflow`; types without `workflow` keep `workflow` empty.

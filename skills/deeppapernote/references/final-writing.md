@@ -89,7 +89,8 @@ Technical depth follows the paper type. Method, system, and theory notes keep th
 - **Conclusion first.** Each paragraph opens with its point, then gives the evidence, numbers, and caveats behind it.
 - **One point per paragraph.** Split a paragraph that argues two things.
 - **Explain terms on first use.** The first time a term, acronym, or model name appears, add one plain sentence or a short parenthetical on what it is or does, for example `PPR`（个性化 PageRank：从与查询相关的节点出发、沿图随机游走打分的检索方法）. Keep an established English name rather than translating it word for word (write `Personalized PageRank` or `PPR`, never 个性化网页排名).
-- **Numbers that carry conclusions.** Keep in the prose only the numbers a conclusion rests on; put the rest in a table with one sentence saying what the table shows. Tables are welcome wherever they make a comparison, a set of steps, or a checklist clearer.
+- **Numbers that carry conclusions.** Keep in the prose only the numbers a conclusion rests on; the other results move into a table with one sentence saying what the table shows, and stay in the note. Tables are welcome wherever they make a comparison, a set of steps, or a checklist clearer.
+- **Complete results.** Every main experiment the paper reports appears in the note: each workload, dataset family, and ablation, with its setting. The same holds for what the paper enumerates as its findings (theorems and their corollaries, numbered observations, design patterns, recommendations, themes): list them all, in a table when the list is long.
 - **Plain register.** Prefer ordinary words to field jargon when both say the same thing; keep jargon where it is the precise name.
 
 ## Writing Priorities
@@ -97,7 +98,7 @@ Technical depth follows the paper type. Method, system, and theory notes keep th
 1. explain the paper rather than quote it
 2. tell the paper's story in the order the middle sections give it
 3. answer every core question of the paper type, or say plainly that the paper does not report it
-4. choose the most meaningful results rather than repeating every number
+4. cover every main result, leading with the ones the conclusions rest on
 5. say what the paper does not prove
 6. keep the note readable weeks later by someone outside the subfield
 

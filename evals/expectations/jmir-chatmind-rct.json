@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "pdf": "jmir-chatmind-rct.pdf",
+  "sha256": "75f8e8c5ba56d8eef49426102cf2a43090d12791211a748b2d49313ec243c165",
+  "source": "doi:10.2196/82642",
+  "traits": [
+    "figure-period",
+    "human-subjects",
+    "journal-layout",
+    "rct",
+    "table-footnote-marker"
+  ],
+  "readable": true,
+  "title": "Effectiveness of a Fully Automated Mobile Therapeutic Versus a General Chatbot in Reducing Depression and Anxiety and Improving Well-Being: Feasibility Randomized Controlled Trial",
+  "labels": [
+    "Figure 1",
+    "Table 1",
+    "Table 2",
+    "Table 3"
+  ],
+  "captions": {
+    "Figure 1": {
+      "starts": "Consolidated Standards of Reporting Trials flow diagram.",
+      "ends": "AI: artificial intelligence."
+    },
+    "Table 3": {
+      "starts": "Effect sizes (Cohen d, 95% CI)",
+      "ends": "intervention effects."
+    }
+  },
+  "review": [
+    "Figure 1",
+    "Table 2",
+    "Table 3"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {
+    "caption:Table 3": "The superscript footnote marker 'a' after the caption's final period is kept as caption text ('effects.a').",
+    "review:Figure 1": "The caption sits above the figure; the crop takes the page-header strip above the caption, misses the flow diagram, and the quality gate rejects it."
+  }
+}

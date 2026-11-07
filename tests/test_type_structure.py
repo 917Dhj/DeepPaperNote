@@ -133,6 +133,27 @@ def test_benchmark_steps_name_who_and_the_quality_gate() -> None:
     assert codes(plan) == {"note_plan_workflow_step_invalid"}
 
 
+@pytest.mark.parametrize("paper_type", ["discovery_empirical", "human_subjects_empirical", "qualitative_empirical"])
+def test_study_steps_name_the_key_design_choice(paper_type: str) -> None:
+    workflow = type_profiles.PROFILES[paper_type]["workflow"]
+    assert workflow["table_headers"]["zh-CN"][-1] == "关键设计选择"
+    assert workflow["table_headers"]["en"][-1] == "Key design choice"
+    plan = position_plan()
+    plan.update(paper_type=paper_type, core_answers=answers_for(paper_type))
+    step = {"step": "s", "input": "i", "operation": "o", "output": "out", "design_choice": "randomized by site"}
+    plan["workflow"] = [{"name": "study", "steps": [dict(step) for _ in range(3)]}]
+    assert codes(plan) == set()
+    plan["workflow"][0]["steps"][0] = {**step, "design_choice": " "}
+    assert codes(plan) == {"note_plan_workflow_step_invalid"}
+    plan["workflow"][0]["steps"][0] = {"step": "s", "input": "i", "operation": "o", "output": "out", "novel": False}
+    assert codes(plan) == {"note_plan_workflow_step_invalid"}
+
+
+def test_method_like_types_keep_the_novelty_column() -> None:
+    for paper_type in ("method", "system", "survey_or_review"):
+        assert type_profiles.PROFILES[paper_type]["workflow"]["step_fields"][-1] == "novel"
+
+
 def test_secondary_type_adds_two_questions_and_needs_a_host_section() -> None:
     plan = _valid_plan_payload()
     plan["secondary_type"] = "benchmark_or_dataset"

@@ -120,7 +120,8 @@ python3 scripts/plan_figure_table_decisions.py review \
 A drop is an editorial choice, never a visual verdict:
 
 - A crop with a visual problem takes `repair` or `fail`. If the note needs the visual, repair it instead of dropping it. A failure reason is refused as a `--reason`, and an item with a recorded visual failure cannot become a drop.
-- Do not drop a key method overview or main result figure to save work; the priorities in What to Prefer still apply.
+- Keep the key method overview and main result figures; the priorities in What to Prefer still apply. A table you write in the note reports numbers, but it does not replace the paper's own result figure. Grounding fails a run that drops every item the planner marked `main_result`.
+- Give each drop its own reason about that item. One reason copied across many items is a sign you are dropping by category instead of judging each item.
 - An item the planner left out of review needs no drop: it is already not inserted.
 - Later verdicts replace a drop if your judgment changes. Grounding rejects a drop with no reason, no recorded review, or a stale asset hash.
 

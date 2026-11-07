@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "pdf": "arxiv-cot-expressivity.pdf",
+  "sha256": "4017f54b9b7357d6da491e2edd5c315b75b1d0659c4844e5c06e1ab22a2be20c",
+  "source": "arXiv:2310.07923 (ICLR 2024)",
+  "traits": [
+    "figure-colon",
+    "multi-line-caption-start",
+    "single-column",
+    "theory"
+  ],
+  "readable": true,
+  "title": "The Expressive Power of Transformers with Chain of Thought",
+  "labels": [
+    "Figure 1"
+  ],
+  "captions": {
+    "Figure 1": {
+      "starts": "Summary of results: transformers with intermediate generation",
+      "ends": "known to be non-empty."
+    }
+  },
+  "review": [
+    "Figure 1"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {}
+}
