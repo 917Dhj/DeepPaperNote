@@ -22,6 +22,7 @@ from _final_quality import (
 )
 from _identity import canonical_identity_acceptance_error
 from _user_notes import restore_generated_text
+from _domain_routing import DOMAIN_CHOICE_CODES
 from _note_paths import safe_relative_path_parts
 from lint_grounding import validate_bundle_contract, validate_figure_decisions, validate_note_plan
 from run_pipeline import has_review_work, pipeline_artifact_paths
@@ -143,6 +144,8 @@ CONTEXT_KEYS = {
     "vault",
     "papers_dir",
     "target_directory",
+    "domain",
+    "new_domain_reason",
     "workspace_root",
     "zotero_mode",
     "source_sha256",
@@ -161,8 +164,16 @@ SHA_RE = re.compile(r"[0-9a-f]{64}")
 OPTIONAL_FLAGS = {
     "resolve": (("--zotero-mode", "zotero_mode"),),
     "fetch": (("--target-directory", "target_directory"), ("--source-sha256", "source_sha256")),
-    "admission": (("--target-directory", "target_directory"),),
-    "save_receipt": (("--target-directory", "target_directory"),),
+    "admission": (
+        ("--target-directory", "target_directory"),
+        ("--domain", "domain"),
+        ("--new-domain-reason", "new_domain_reason"),
+    ),
+    "save_receipt": (
+        ("--target-directory", "target_directory"),
+        ("--domain", "domain"),
+        ("--new-domain-reason", "new_domain_reason"),
+    ),
 }
 REVISIONS = {
     "grounding_lint": ("grounding_gate_not_true", "note_plan"),
@@ -553,7 +564,10 @@ class Inspection:
             expected=self.data.get("source_manifest", {}).get("source_sha256"),
         )
         if record.get("status") == "blocked":
-            result.details["requires_user_action"] = True
+            if record.get("conflict_code") in DOMAIN_CHOICE_CODES:
+                result.details["domain_choice_required"] = True
+            else:
+                result.details["requires_user_action"] = True
         self.gap(result, "Admission is historical; current target conflicts have not been checked.")
         if self.context.get("save_mode") is None:
             self.problem(
@@ -1041,6 +1055,18 @@ def next_action(run: Inspection) -> dict:
         if "language_context_missing" in codes:
             action["missing_context"] = ["output_language"]
             return action
+        if result.details.get("domain_choice_required") and not run.context.get("domain"):
+            action.update(
+                missing_context=["domain"],
+                reference=str(
+                    Path(__file__).resolve().parents[1] / "references" / "domain-routing.md"
+                ),
+                message=(
+                    "Choose a domain from domain_overview in the admission receipt; set context "
+                    "domain, and new_domain_reason for a new domain."
+                ),
+            )
+            return action
         if result.details.get("requires_user_action") or codes & {
             "quality_revision_limit_exhausted",
             "quality_review_replay",
@@ -1136,6 +1162,11 @@ def next_action(run: Inspection) -> dict:
                     action["missing_context"].append(key)
                 else:
                     argv.extend(("--" + key.replace("_", "-"), value))
+        if stage.id == "save_receipt" and not run.context.get("domain"):
+            mode = run.context.get("save_mode")
+            admitted = run.data.get("admission", {}).get("admission")
+            if mode == "workspace" or (mode == "obsidian" and admitted == "new_directory"):
+                action["missing_context"].append("domain")
         for flag, key in OPTIONAL_FLAGS.get(stage.id, ()):
             if run.context.get(key):
                 argv.extend((flag, run.context[key]))

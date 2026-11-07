@@ -20,11 +20,7 @@ Default file name:
   - `<领域>/<paper_slug>/<paper_slug>.en.md`
   - `<领域>/<paper_slug>/images/...`
   - `<领域>/<paper_slug>/.deeppapernote.json`
-- when deciding `<领域>`, prefer matching an existing first-level domain folder under the user's papers directory
-- domain routing uses the editable taxonomy in `references/domain_rules.yaml`: application domains are checked before fallback method domains
-- reuse existing first-level folders conservatively; method-only evidence should not force reuse of an unrelated application folder
-- only create a new domain folder when no existing domain is a reasonable fit
-- do not save new papers directly into the bare papers root
+- `<领域>` is one domain folder directly under the papers root; you choose it as `domain-routing.md` describes
 - always create the paper-local `images/` directory during final save, even if no real image is inserted
 - the paper-local `images/` directory is part of the required note layout, not an optional optimization
 
@@ -67,7 +63,7 @@ Formatting and scope rules:
 Every note must start with an Obsidian properties block **above** the `#` title heading.
 
 Required fields:
-- `tags`: use `papers/<domain>` hierarchy, e.g. `papers/NLP`, `papers/CV`, `papers/multimodal`
+- `tags`: exactly one `papers/<domain>` tag naming the saved domain folder, e.g. `papers/长视频理解`; other tags stay outside `papers/`
 - `aliases`: English short name or common abbreviation for wikilink resolution
 - `date`: ISO publication date; use `YYYY` if only the year is known
 - `doi`: DOI string without the `https://doi.org/` prefix; omit the field entirely if unavailable
@@ -97,7 +93,7 @@ read_date: 2026-11-06
 
 Rules:
 - Do not invent placeholder values for missing fields; omit them instead.
-- The `tags` field must always be present with at least one `papers/<domain>` tag.
+- The `tags` field must always be present with exactly one `papers/<domain>` tag, matching the saved domain.
 - `aliases` should be the paper's short name or acronym (e.g. "GPT-4", "LoRA"), not a paraphrase.
 - `methods`, `datasets`, and `tasks` name only what is central to the paper, never every term it mentions.
 - When a value names a term listed in the bundle's `glossary_terms`, write that term's `link` verbatim as a quoted list item, for example `methods: ["[[DPO]]", knowledge distillation]`. A `link` carries a folder path, as in `[[Glossary/DPO|DPO]]`, when another vault file shares the term's file name. Every other value is plain text. These are the only `[[links]]` allowed in the properties block; Formal Save refuses any other.

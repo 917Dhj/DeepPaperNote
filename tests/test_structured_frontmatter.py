@@ -113,6 +113,13 @@ def test_domain_tag_is_required() -> None:
     assert "frontmatter_domain_tag_missing" in codes(GOOD.replace("papers/机器学习", "reading"))
 
 
+def test_only_one_domain_tag_is_allowed() -> None:
+    two = GOOD.replace("  - papers/机器学习\n", "  - papers/机器学习\n  - papers/多模态\n")
+    assert "frontmatter_domain_tag_multiple" in codes(two)
+    topical = GOOD.replace("  - papers/机器学习\n", "  - papers/机器学习\n  - instruction-data\n")
+    assert "frontmatter_domain_tag_multiple" not in codes(topical)
+
+
 def test_paper_type_must_match_the_plan() -> None:
     assert "frontmatter_paper_type_mismatch" in codes(GOOD, paper_type="benchmark_or_dataset")
     assert "frontmatter_paper_type_mismatch" not in codes(GOOD, paper_type="")
@@ -188,7 +195,7 @@ def test_overwrite_conflict_and_preflight_report_existing_read_date(tmp_path: Pa
     vault.mkdir()
     first = run_writer(
         tmp_path, "--vault", str(vault), "--title", "My Test Paper",
-        *source_manifest_args(tmp_path), *formal_save_args(tmp_path, GOOD.replace("2026-11-06", "2026-01-15")),
+        *source_manifest_args(tmp_path), *formal_save_args(tmp_path, GOOD.replace("2026-11-06", "2026-01-15"), domain="机器学习"),
     )
     assert first.returncode == 0, first.stderr
     conflict = run_writer(

@@ -580,6 +580,7 @@ def test_english_local_pdf_pipeline_lints_and_formally_saves_note_with_images_di
         [
             sys.executable, str(scripts / "write_obsidian_note.py"),
             "--language", "en", "--title", "English Local PDF",
+            "--domain", "methods", "--new-domain-reason", "Test fixture domain.",
             "--lint-json", str(lint_path),
             "--figure-decisions", str(workdir / "paper_figure_table_decisions.json"),
             "--source-manifest", str(workdir / "paper_source_manifest.json"),

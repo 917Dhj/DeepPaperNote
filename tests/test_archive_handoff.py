@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from formal_save_helpers import formal_save_args
+from formal_save_helpers import formal_save_args, tagged
 
 import fitz
 
@@ -27,7 +27,9 @@ def pdf(path: Path, version: int = 1, title: str = "Archive Handoff Paper") -> s
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def write_note(tmp_path: Path, vault: Path, source: Path, *, preflight=True, extra=()):
+def write_note(
+    tmp_path: Path, vault: Path, source: Path, *, preflight=True, extra=(), domain="Existing"
+):
     manifest = tmp_path / "source.json"
     manifest.write_text(
         json.dumps(
@@ -55,7 +57,7 @@ def write_note(tmp_path: Path, vault: Path, source: Path, *, preflight=True, ext
     if preflight:
         cmd.append("--preflight")
     else:
-        content = "# Archive Handoff Paper\n\nA verified reading.\n"
+        content = tagged("# Archive Handoff Paper\n\nA verified reading.\n", domain)
         lint = tmp_path / "lint.json"
         lint.write_text(
             json.dumps(
@@ -72,7 +74,7 @@ def write_note(tmp_path: Path, vault: Path, source: Path, *, preflight=True, ext
         decisions.write_text(json.dumps({"output_language": "en", "decisions": []}))
         cmd += formal_save_args(
             tmp_path, content, "en", lint_path=lint, decisions_path=decisions,
-            source_manifest_path=manifest,
+            source_manifest_path=manifest, domain=domain,
         )
     result = subprocess.run(cmd + list(extra), capture_output=True, text=True, env=os.environ)
     return result, json.loads(result.stdout) if result.stdout else {}
@@ -154,7 +156,8 @@ def test_multiple_directories_require_selection_and_selection_survives_save(tmp_
     assert result.returncode == 2
     assert report["conflict_code"] == "multiple_source_directories"
     result, report = write_note(
-        tmp_path, vault, first, preflight=False, extra=("--target-directory", str(second.parent))
+        tmp_path, vault, first, preflight=False, extra=("--target-directory", str(second.parent)),
+        domain="Two",
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert Path(report["note_path"]).parent == second.parent
@@ -338,7 +341,7 @@ def test_unique_verified_directory_wins_over_title_only_candidate(tmp_path):
     source = vault / "Verified/Archive_Handoff_Paper/original.pdf"
     pdf(source)
     (vault / "Other/Archive_Handoff_Paper").mkdir(parents=True)
-    result, report = write_note(tmp_path, vault, source, preflight=False)
+    result, report = write_note(tmp_path, vault, source, preflight=False, domain="Verified")
     assert result.returncode == 0, result.stdout + result.stderr
     assert Path(report["note_path"]).parent == source.parent
     record = json.loads((source.parent / ".deeppapernote.json").read_text())

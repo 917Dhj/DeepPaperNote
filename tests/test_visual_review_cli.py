@@ -869,8 +869,6 @@ def test_formal_save_writes_a_repaired_insert_under_its_label_name(
             "Label Named Figure",
             "--filename",
             "Label Named Figure.md",
-            "--subdir",
-            "Research/Papers/Label Named Figure",
             "--vault",
             str(vault),
             "--output",

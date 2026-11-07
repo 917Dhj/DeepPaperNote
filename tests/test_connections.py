@@ -589,7 +589,7 @@ def save(tmp_path: Path, vault: Path, text: str) -> subprocess.CompletedProcess:
         "--title",
         "My Test Paper",
         *source_manifest_args(tmp_path),
-        *formal_save_args(tmp_path, text),
+        *formal_save_args(tmp_path, text, domain="AI"),
     )
 
 
@@ -619,7 +619,7 @@ def test_links_in_my_notes_are_not_checked(tmp_path: Path, vault: Path) -> None:
 def test_workspace_save_refuses_any_generated_link(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("DEEPPAPERNOTE_OBSIDIAN_VAULT", raising=False)
     result = run_writer(
-        tmp_path, "--title", "Workspace Paper", *formal_save_args(tmp_path, linked_note())
+        tmp_path, "--title", "Workspace Paper", *formal_save_args(tmp_path, linked_note(), domain="AI")
     )
     assert result.returncode != 0
     assert "workspace" in (result.stderr + result.stdout).lower()
