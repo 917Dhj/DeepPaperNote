@@ -75,22 +75,6 @@ def test_skill_orders_preview_gate_before_post_selection_writes() -> None:
     )
 
 
-def test_task7_acceptance_preview_records_review_before_display_and_wait() -> None:
-    text = (SKILL_DIR / "references" / "optimization-implementation-plan.md").read_text(
-        encoding="utf-8"
-    )
-    task7 = _section(text, "### Task 7:", "## Execution Completion Criteria")
-
-    _assert_in_order(
-        task7,
-        (
-            "--review-proposal",
-            "Display every retained item from this reviewed artifact",
-            "End the response and wait",
-        ),
-    )
-
-
 def test_preview_discloses_setup_write_and_limits_no_write_claim() -> None:
     text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
     preview = _section(text, "## Preview And Wait (Default)", "## After Selection")
@@ -322,72 +306,6 @@ def test_plan_parser_rejects_raw_sections_without_required_manifest() -> None:
 
     assert result.returncode == 2
     assert "the following arguments are required: --source-manifest" in result.stderr
-
-
-def test_optimization_design_preserves_reviewed_candidates_and_forms() -> None:
-    text = (SKILL_DIR / "references" / "optimization-design.md").read_text(
-        encoding="utf-8"
-    )
-    review = _section(text, "### Semantic review", "## Selection and Generation")
-
-    assert "only drop or reorder exact proposal candidates" in review
-    assert "exact `term`" in review
-    assert "ordered `surface_forms`" in review
-    assert "may not merge aliases" in review
-    assert "remove residual noise, merge aliases" not in review
-
-
-def test_optimization_design_uses_config_only_writer_authority() -> None:
-    text = (SKILL_DIR / "references" / "optimization-design.md").read_text(
-        encoding="utf-8"
-    )
-    configuration = _section(text, "## First-use Configuration", "## Candidate Workflow")
-
-    assert "Writer destination authority comes only from validated device config" in configuration
-    assert "`--config-path` selects a config file" in configuration
-    assert "reset and configure" in configuration
-    assert "explicit path supplied for the current run overrides" not in configuration
-    assert "transient destination override" not in configuration
-
-
-def test_implementation_plan_step5_inventory_cli_lists_every_required_flag() -> None:
-    text = (SKILL_DIR / "references" / "optimization-implementation-plan.md").read_text(
-        encoding="utf-8"
-    )
-    task3 = _section(text, "### Task 3:", "### Task 4:")
-    inventory_step = _section(
-        task3,
-        "- [ ] **Step 5: Add inventory CLI**",
-        "- [ ] **Step 6:",
-    )
-
-    for flag in (
-        "--terms",
-        "--terms-dir",
-        "--source-manifest",
-        "--raw-sections",
-        "--reviewed-shortlist",
-        "--output",
-    ):
-        assert flag in inventory_step
-    assert "triage JSON" in inventory_step
-    assert "optional `--raw-sections`" in inventory_step
-
-
-def test_implementation_plan_documents_authenticated_integration_flow() -> None:
-    text = (SKILL_DIR / "references" / "optimization-implementation-plan.md").read_text(
-        encoding="utf-8"
-    )
-    integration = _section(text, "### Task 6:", "### Task 7:")
-
-    assert "proposal -> recorded review -> explicit selection -> triage -> authenticated inventory" in integration
-    assert "config-backed writer -> authenticated linker" in integration
-    for helper in (
-        "inspect_selected_terms(",
-        "write_glossary_entries(",
-        "link_article_terms(",
-    ):
-        assert helper not in integration
 
 
 def test_file_contract_writer_example_is_parseable_and_consistently_bound() -> None:

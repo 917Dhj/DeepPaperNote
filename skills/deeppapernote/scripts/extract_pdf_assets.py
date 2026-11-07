@@ -34,10 +34,16 @@ try:
 except ImportError:  # pragma: no cover
     Image = None
 
-try:
-    import pytesseract  # type: ignore
-except ImportError:  # pragma: no cover
-    pytesseract = None
+
+
+@lru_cache(maxsize=1)
+def load_pytesseract():
+    """Import pytesseract on first OCR use; importing it costs every script that imports this module."""
+    try:
+        import pytesseract  # type: ignore
+    except ImportError:
+        return None
+    return pytesseract
 
 FIGURE_RENDER_DPI = 96
 PAGE_PREVIEW_DPI = 96
@@ -227,6 +233,7 @@ def save_image_bytes(path: Path, data: bytes) -> None:
 
 
 def ocr_page(page, dpi: int) -> str:
+    pytesseract = load_pytesseract()
     if fitz is None or pytesseract is None or Image is None:
         return ""
     scale = dpi / 72.0
@@ -1734,7 +1741,7 @@ def main() -> None:
         "page_assets": page_records,
         "figure_assets": figure_assets,
         "asset_coverage": asset_coverage,
-        "ocr_available": bool(pytesseract and Image),
+        "ocr_available": bool(load_pytesseract() and Image),
     }
     emit(payload, args.output)
 

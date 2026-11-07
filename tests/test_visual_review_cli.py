@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+import plan_figure_table_decisions
 import pytest
 import run_pipeline
+from extract_pdf_assets import main as extract_pdf_assets_main
 from lint_grounding import validate_figure_decisions
 
 fitz = pytest.importorskip("fitz")
@@ -63,9 +69,10 @@ def asset(tmp_path: Path, label: str, page: int, status: str, preview: Path) -> 
     }
 
 
-@pytest.fixture
-def run(tmp_path: Path) -> dict[str, Path]:
+def build_planned_run(root: Path, env: dict[str, str]) -> dict[str, Path]:
     """Plan a run: Figure 1 selected, Figure 2 unselected, Table 1 no crop, Table 2 rejected."""
+    root.mkdir()
+    tmp_path = root
     pdf_path = tmp_path / "paper.pdf"
     write_pdf(pdf_path)
     previews = []
@@ -137,11 +144,55 @@ def run(tmp_path: Path) -> dict[str, Path]:
             str(paths["decisions"]),
         ],
         check=True,
+        env=env,
     )
     return paths
 
 
-def cli(*args: str) -> subprocess.CompletedProcess[str]:
+@pytest.fixture(scope="module")
+def planned_run(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
+    """Plan the run once per module; tests only ever read it through a private copy."""
+    base = tmp_path_factory.mktemp("planned")
+    config_path = base / "config.json"
+    config = {"output_language": "zh-CN", "save_mode": "workspace", "papers_dir": "Research/Papers"}
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    env = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("DEEPPAPERNOTE_")},
+        "DEEPPAPERNOTE_CONFIG_PATH": str(config_path),
+    }
+    return build_planned_run(base / "run", env)
+
+
+def retarget(value: object, old_roots: tuple[str, ...], new_root: str) -> object:
+    """Point every absolute path stored in the planned JSON at the copied run directory."""
+    if isinstance(value, str):
+        for old_root in old_roots:
+            value = value.replace(old_root, new_root)
+        return value
+    if isinstance(value, list):
+        return [retarget(item, old_roots, new_root) for item in value]
+    if isinstance(value, dict):
+        return {key: retarget(item, old_roots, new_root) for key, item in value.items()}
+    return value
+
+
+@pytest.fixture
+def run(planned_run: dict[str, Path], tmp_path: Path) -> dict[str, Path]:
+    """A private copy of the planned run, with its stored paths pointing at the copy."""
+    source_root = planned_run["decisions"].parent
+    root = tmp_path / "run"
+    shutil.copytree(source_root, root)
+    old_roots = tuple(dict.fromkeys((str(source_root), str(source_root.resolve()))))
+    for json_path in root.glob("*.json"):
+        record = json.loads(json_path.read_text(encoding="utf-8"))
+        json_path.write_text(
+            json.dumps(retarget(record, old_roots, str(root)), ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return {name: root / path.name for name, path in planned_run.items()}
+
+
+def cli_subprocess(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(DECISIONS_SCRIPT), *args],
         capture_output=True,
@@ -149,11 +200,48 @@ def cli(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def review(run: dict[str, Path], item: str, *args: str) -> subprocess.CompletedProcess[str]:
-    return cli("review", "--decisions", str(run["decisions"]), "--item", item, *args)
+def run_main_in_process(main, script: str, argv: list[str]) -> subprocess.CompletedProcess[str]:
+    """Call a script's main() the way the interpreter would, reporting a CompletedProcess.
+
+    A string SystemExit prints to stderr and exits 1, exactly as the interpreter does.
+    """
+    stdout, stderr = io.StringIO(), io.StringIO()
+    saved_argv = sys.argv
+    sys.argv = [script, *argv]
+    code = 0
+    try:
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            try:
+                main()
+            except SystemExit as exc:
+                if exc.code is None:
+                    code = 0
+                elif isinstance(exc.code, int):
+                    code = exc.code
+                else:
+                    print(exc.code, file=sys.stderr)
+                    code = 1
+    finally:
+        sys.argv = saved_argv
+    return subprocess.CompletedProcess(argv, code, stdout.getvalue(), stderr.getvalue())
 
 
-def promote(run: dict[str, Path], item: str, *args: str) -> subprocess.CompletedProcess[str]:
+def cli(*args: str, real: bool = False) -> subprocess.CompletedProcess[str]:
+    """Run the planner CLI in-process; real=True goes through a real interpreter."""
+    if real:
+        return cli_subprocess(*args)
+    return run_main_in_process(plan_figure_table_decisions.main, str(DECISIONS_SCRIPT), list(args))
+
+
+def review(
+    run: dict[str, Path], item: str, *args: str, real: bool = False
+) -> subprocess.CompletedProcess[str]:
+    return cli("review", "--decisions", str(run["decisions"]), "--item", item, *args, real=real)
+
+
+def promote(
+    run: dict[str, Path], item: str, *args: str, real: bool = False
+) -> subprocess.CompletedProcess[str]:
     return cli(
         "promote",
         "--decisions",
@@ -163,6 +251,7 @@ def promote(run: dict[str, Path], item: str, *args: str) -> subprocess.Completed
         "--item",
         item,
         *args,
+        real=real,
     )
 
 
@@ -188,7 +277,15 @@ def test_pass_records_the_script_computed_hash_and_clears_the_gate(
     assert gate_codes(run, "Figure 1") == ["figure_visual_review_unresolved"]
 
     result = review(
-        run, "Figure 1", "--verdict", "pass", "--preserved", "axes", "--preserved", "legend"
+        run,
+        "Figure 1",
+        "--verdict",
+        "pass",
+        "--preserved",
+        "axes",
+        "--preserved",
+        "legend",
+        real=True,
     )
 
     assert result.returncode == 0, result.stderr
@@ -240,7 +337,7 @@ def test_review_is_only_for_items_in_review(run: dict[str, Path]) -> None:
 
 
 def test_unknown_item_is_refused(run: dict[str, Path]) -> None:
-    result = review(run, "Figure 99", "--verdict", "pass", "--preserved", "diagram")
+    result = review(run, "Figure 99", "--verdict", "pass", "--preserved", "diagram", real=True)
 
     assert result.returncode != 0
     assert "Figure 99" in result.stderr
@@ -361,7 +458,7 @@ def test_repair_needs_a_repairable_reason_and_a_bbox(run: dict[str, Path]) -> No
 def test_promote_sends_an_unselected_crop_to_review(run: dict[str, Path]) -> None:
     assert entry(run, "Figure 2")["decision"] == "low_priority"
 
-    result = promote(run, "Figure 2")
+    result = promote(run, "Figure 2", real=True)
 
     assert result.returncode == 0, result.stderr
     item = entry(run, "Figure 2")
@@ -495,10 +592,10 @@ def test_every_page_preview_carries_a_ten_percent_grid(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     output_path = tmp_path / "assets.json"
-    subprocess.run(
+    extracted = run_main_in_process(
+        extract_pdf_assets_main,
+        str(EXTRACT_SCRIPT),
         [
-            sys.executable,
-            str(EXTRACT_SCRIPT),
             "--input",
             str(input_path),
             "--output",
@@ -506,8 +603,8 @@ def test_every_page_preview_carries_a_ten_percent_grid(tmp_path: Path) -> None:
             "--assets-dir",
             str(tmp_path / "assets"),
         ],
-        check=True,
     )
+    assert extracted.returncode == 0, extracted.stderr
 
     pages = json.loads(output_path.read_text(encoding="utf-8"))["page_assets"]
     assert [bool(page["page_preview_path"]) for page in pages] == [True, True]
@@ -574,9 +671,7 @@ def test_drop_takes_no_review_findings(run: dict[str, Path], extra: tuple[str, s
 
 
 def test_reason_only_applies_to_drop(run: dict[str, Path]) -> None:
-    result = review(
-        run, "Figure 1", "--verdict", "pass", "--preserved", "axes", "--reason", REASON
-    )
+    result = review(run, "Figure 1", "--verdict", "pass", "--preserved", "axes", "--reason", REASON)
 
     assert result.returncode != 0
     assert entry(run, "Figure 1")["decision"] == "review_pending"
@@ -714,15 +809,15 @@ def test_a_recorded_visual_failure_cannot_be_rewritten_as_a_drop(run: dict[str, 
     assert item["visual_review"]["failure_reason"] == "identity_mismatch"
 
 
-def summary(run: dict[str, Path]) -> subprocess.CompletedProcess[str]:
-    return cli("summary", "--decisions", str(run["decisions"]))
+def summary(run: dict[str, Path], real: bool = False) -> subprocess.CompletedProcess[str]:
+    return cli("summary", "--decisions", str(run["decisions"]), real=real)
 
 
 def test_summary_reports_the_decisions_as_reviewed(run: dict[str, Path]) -> None:
     assert review(run, "Figure 1", "--verdict", "pass", "--preserved", "axes").returncode == 0
     before = run["decisions"].read_bytes()
 
-    result = summary(run)
+    result = summary(run, real=True)
 
     assert result.returncode == 0, result.stderr
     assert run["decisions"].read_bytes() == before
@@ -785,31 +880,25 @@ def test_promote_embeds_a_label_named_vault_image(run: dict[str, Path]) -> None:
     assert promote(run, "Figure 2").returncode == 0
     assert promote(run, "Table 1", "--bbox", "0.1,0.2,0.9,0.6").returncode == 0
 
-    assert entry(run, "Figure 2")["relative_markdown_embed"] == (
-        "![Figure 2](images/figure_2.png)"
-    )
+    assert entry(run, "Figure 2")["relative_markdown_embed"] == ("![Figure 2](images/figure_2.png)")
     assert entry(run, "Table 1")["relative_markdown_embed"] == "![Table 1](images/table_1.png)"
 
 
 def test_source_version_subdir_keeps_the_label_name(run: dict[str, Path]) -> None:
     subdir = f"images/{'b' * 64}"
-    subprocess.run(
-        [
-            sys.executable,
-            str(DECISIONS_SCRIPT),
-            "--source-manifest",
-            str(run["source"]),
-            "--figures",
-            str(run["figures"]),
-            "--assets",
-            str(run["assets"]),
-            "--asset-subdir",
-            subdir,
-            "--output",
-            str(run["decisions"]),
-        ],
-        check=True,
+    replanned = cli(
+        "--source-manifest",
+        str(run["source"]),
+        "--figures",
+        str(run["figures"]),
+        "--assets",
+        str(run["assets"]),
+        "--asset-subdir",
+        subdir,
+        "--output",
+        str(run["decisions"]),
     )
+    assert replanned.returncode == 0, replanned.stderr
     assert entry(run, "Figure 1")["relative_markdown_embed"] == (
         f"![Figure 1]({subdir}/figure_1.png)"
     )
@@ -849,7 +938,8 @@ def test_formal_save_writes_a_repaired_insert_under_its_label_name(
     assert review(run, "Figure 1", *repair_args, "--bbox", "0.1,0.2,0.9,0.6").returncode == 0
     assert review(run, "Figure 1", "--verdict", "pass", "--preserved", "axes").returncode == 0
     embed = next(
-        item["embed"] for item in json.loads(summary(run).stdout)["items"]
+        item["embed"]
+        for item in json.loads(summary(run).stdout)["items"]
         if item["label"] == "Figure 1"
     )
     assert embed == "![Figure 1](images/figure_1.png)"
@@ -886,9 +976,7 @@ def test_formal_save_writes_a_repaired_insert_under_its_label_name(
 
     assert result.returncode == 0, result.stdout + result.stderr
     materialized = json.loads(output_path.read_text(encoding="utf-8"))["materialized_figures"]
-    assert [record["relative_markdown_path"] for record in materialized] == [
-        "images/figure_1.png"
-    ]
+    assert [record["relative_markdown_path"] for record in materialized] == ["images/figure_1.png"]
     saved = Path(materialized[0]["dest_image_path"])
     assert saved.name == "figure_1.png"
     assert saved.read_bytes() == Path(entry(run, "Figure 1")["source_image_path"]).read_bytes()

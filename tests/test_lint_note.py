@@ -1949,15 +1949,6 @@ def test_inspect_note_plan_reports_non_object(tmp_path: Path) -> None:
     assert issues == ["planning_artifact_not_object"]
 
 
-def test_inspect_note_plan_reports_missing_required_fields(tmp_path) -> None:
-    plan_path = tmp_path / "note.plan.json"
-    plan_path.write_text(json.dumps({"paper_type": "AI_method"}), encoding="utf-8")
-
-    found, issues = inspect_note_plan(plan_path)
-    assert found is True
-    assert "planning_required_fields_missing" in issues
-
-
 def test_inspect_note_plan_names_all_missing_fields(tmp_path: Path) -> None:
     plan = _valid_plan_payload()
     del plan["paper_type_rationale"]
@@ -2081,15 +2072,6 @@ def test_inspect_note_plan_names_each_missing_field(tmp_path) -> None:
     assert "planning_required_fields_missing" in issues
     assert "planning_claim_boundaries_missing" in issues
     assert "planning_section_plan_missing" in issues
-
-
-def test_inspect_note_plan_names_a_plan_that_is_not_an_object(tmp_path) -> None:
-    plan_path = tmp_path / "note.plan.json"
-    plan_path.write_text("[]", encoding="utf-8")
-
-    found, issues = inspect_note_plan(plan_path)
-    assert found is True
-    assert issues == ["planning_artifact_not_object"]
 
 
 @pytest.mark.parametrize(

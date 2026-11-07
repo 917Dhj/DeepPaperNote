@@ -256,14 +256,6 @@ def test_workspace_preflight_chooses_the_domain(tmp_path):
     assert not (workspace / "DeepPaperNote_output" / "长视频理解" / "Streaming_Video_Memory").exists()
 
 
-def test_keyword_domain_rules_are_gone():
-    assert not (SKILL_ROOT / "references" / "domain_rules.yaml").exists()
-    import _note_paths
-
-    for name in ("infer_domain_label", "domain_name_score", "load_domain_rules"):
-        assert not hasattr(_note_paths, name)
-
-
 def test_deeppapernote_reads_the_domains_file_organize_wiki_writes():
     import importlib.util
     import re

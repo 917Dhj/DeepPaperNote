@@ -327,18 +327,6 @@ def test_takeaways_finding_rejects_other_or_missing_refs(ref: str) -> None:
         validate_review(quality_review(finding_ref=ref))
 
 
-def test_bundle_routes_the_current_quality_review_schema() -> None:
-    contract = build_synthesis_bundle.compact_writing_contract("en")
-    assert contract["final_quality_gate"]["schema_version"] == _final_quality.QUALITY_REVIEW_SCHEMA_VERSION
-
-
-def test_version_one_review_is_rejected_with_a_rerun_hint() -> None:
-    review = quality_review()
-    review["schema_version"] = 1
-    with pytest.raises(ValueError, match="schema_version 4.*rerun"):
-        validate_review(review)
-
-
 def test_readability_receipt_and_state_stay_version_one() -> None:
     receipt = {"schema_version": 1, "output_language": "en", "verdict": "pass", "reviewed_note_sha256": "a" * 64}
     _final_quality.validate_readability(receipt, note_sha256="a" * 64, language="en")

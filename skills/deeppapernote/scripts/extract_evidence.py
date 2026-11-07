@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import re
-from pathlib import Path
 from typing import Any
 
 from _evidence_heuristics import (
@@ -22,13 +21,7 @@ from _identity import (
 )
 from _pdf_text import (
     SECTION_ALIASES,
-    extract_appendix_index,
-    extract_appendix_page_texts,
-    extract_caption_lines,
-    extract_pdf_sections,
-    extract_pdf_text,
     normalize_heading,
-    pdf_coverage_summary,
     split_sentences,
 )
 from common import (
@@ -37,11 +30,8 @@ from common import (
     normalize_whitespace,
 )
 from contracts import empty_evidence_pack
-from citation_links import extract_reference_candidates_from_pdf
 
 # Connections match the whole bibliography against the vault, not just its first page.
-FULL_BIBLIOGRAPHY_MAX_PAGES = 30
-FULL_BIBLIOGRAPHY_MAX_ITEMS = 400
 from source_corpus import SourceCorpus, SourceCorpusLoadError, load_source_corpus, validate_source_corpus
 
 
@@ -59,9 +49,8 @@ APPENDIX_EVIDENCE_CATEGORIES = (
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "extract evidence")
     p.add_argument("--input", default="", help="Successful fetch JSON path or JSON artifact.")
-    p.add_argument("--source-manifest", default="", help="Source Corpus source_manifest.json path.")
+    p.add_argument("--source-manifest", required=True, help="Source Corpus source_manifest.json path.")
     p.add_argument("--output", default="", help="Output JSON path.")
-    p.add_argument("--max-pages", type=int, default=32, help="Maximum number of PDF pages to scan.")
     p.add_argument("--max-chunks-per-section", type=int, default=12, help="Maximum number of candidate chunks to keep per section.")
     return p
 
@@ -683,68 +672,18 @@ def evidence_quality(pack: dict) -> str:
 
 def main() -> None:
     args = parser().parse_args()
-    section_map: dict[str, str] = {}
-    full_text = ""
     extraction_failures: list[str] = []
-    language_hint = ""
-    source_corpus_used = bool(args.source_manifest)
-    if not args.input and not args.source_manifest:
-        raise SystemExit("--input or --source-manifest is required.")
-
-    if source_corpus_used:
-        corpus = ensure_source_corpus(args.source_manifest, args.output)
-        record = record_from_source_corpus(corpus, args.input)
-        has_pdf = False
-        pdf_path = None
-        section_map = section_texts_from_source_corpus(corpus)
-        full_text = corpus.full_text()
-        pdf_coverage = pdf_coverage_from_source_corpus(corpus)
-        appendix_index = appendix_index_from_source_corpus(corpus)
-        appendix_pages = corpus.appendix_text_pages()
-        appendix_evidence = build_appendix_evidence(appendix_pages, appendix_index)
-        figure_captions = captions_from_source_corpus(corpus, "figure")
-        table_captions = captions_from_source_corpus(corpus, "table")
-        language_hint = corpus.language_hint()
-    else:
-        record = ensure_record(args.input)
-        pdf_value = str(record.get("pdf_path", "")).strip()
-        pdf_path = Path(pdf_value).expanduser() if pdf_value else None
-
-        if pdf_path is None or not pdf_path.is_file():
-            from_fetch = maybe_load_json_record(args.input) or {}
-            pdf_candidate = str(from_fetch.get("pdf_path", "")).strip()
-            if pdf_candidate:
-                candidate_path = Path(pdf_candidate).expanduser()
-                if candidate_path.is_file():
-                    pdf_path = candidate_path
-
-        has_pdf = pdf_path is not None and pdf_path.is_file()
-        pdf_coverage = (
-            pdf_coverage_summary(pdf_path.resolve(), max_pages=args.max_pages)
-            if has_pdf
-            else pdf_coverage_summary(Path(""), max_pages=args.max_pages)
-        )
-        appendix_index = (
-            extract_appendix_index(pdf_path.resolve(), pdf_coverage)
-            if has_pdf and pdf_coverage.get("appendix_detected")
-            else extract_appendix_index(Path(""), pdf_coverage)
-        )
-        appendix_pages = (
-            extract_appendix_page_texts(pdf_path.resolve(), pdf_coverage.get("appendix_start_page"))
-            if has_pdf and pdf_coverage.get("appendix_detected")
-            else []
-        )
-        appendix_evidence = build_appendix_evidence(appendix_pages, appendix_index)
-        if has_pdf:
-            try:
-                section_map = extract_pdf_sections(pdf_path.resolve(), max_pages=args.max_pages)
-                full_text = extract_pdf_text(pdf_path.resolve(), max_pages=args.max_pages)
-            except Exception as exc:
-                extraction_failures.append(f"pdf_parse_failed: {exc}")
-        else:
-            extraction_failures.append("pdf_missing")
-        figure_captions = extract_caption_lines(full_text, "figure")[:CAPTION_LIST_LIMIT] if full_text else []
-        table_captions = extract_caption_lines(full_text, "table")[:CAPTION_LIST_LIMIT] if full_text else []
+    corpus = ensure_source_corpus(args.source_manifest, args.output)
+    record = record_from_source_corpus(corpus, args.input)
+    section_map = section_texts_from_source_corpus(corpus)
+    full_text = corpus.full_text()
+    pdf_coverage = pdf_coverage_from_source_corpus(corpus)
+    appendix_index = appendix_index_from_source_corpus(corpus)
+    appendix_pages = corpus.appendix_text_pages()
+    appendix_evidence = build_appendix_evidence(appendix_pages, appendix_index)
+    figure_captions = captions_from_source_corpus(corpus, "figure")
+    table_captions = captions_from_source_corpus(corpus, "table")
+    language_hint = corpus.language_hint()
 
     paper_type, paper_type_rationale = infer_paper_type(record.get("title", ""), record.get("abstract", ""))
 
@@ -858,13 +797,6 @@ def main() -> None:
         conclusion_text=conclusion_text,
     )
     pack["reference_candidates"] = []
-    if has_pdf and pdf_coverage.get("references_start_page"):
-        pack["reference_candidates"] = extract_reference_candidates_from_pdf(
-            pdf_path.resolve(),
-            pdf_coverage.get("references_start_page"),
-            max_pages=FULL_BIBLIOGRAPHY_MAX_PAGES,
-            max_items=FULL_BIBLIOGRAPHY_MAX_ITEMS,
-        )
     pack["candidate_chunks"] = candidates
     pack["language_hint"] = language_hint or language_hint_for_text(
         " ".join(part for part in [full_text, abstract] if part)
@@ -912,8 +844,8 @@ def main() -> None:
                 category: len(items)
                 for category, items in appendix_evidence.items()
             },
-            "pdf_used": has_pdf,
-            "source_corpus_used": source_corpus_used,
+            "pdf_used": False,
+            "source_corpus_used": True,
             "candidate_chunk_sections": sorted([key for key, value in candidates.items() if value]),
         },
     }

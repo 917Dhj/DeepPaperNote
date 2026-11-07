@@ -8,10 +8,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     env:
       PYTHONUTF8: "1"
 
@@ -41,10 +46,12 @@ jobs:
           python -m pip install -e .[dev]
 
       - name: Run syntax check
+        if: matrix.os == 'ubuntu-latest'
         run: |
           python -m compileall -q skills
 
       - name: Run lint
+        if: matrix.os == 'ubuntu-latest'
         run: |
           python -m ruff check skills tests
 

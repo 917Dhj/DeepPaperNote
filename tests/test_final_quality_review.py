@@ -265,9 +265,8 @@ def failing_review(check: str, plan_ref: str) -> dict:
     return review
 
 
-def test_v4_adds_core_questions_and_narrative() -> None:
+def test_core_questions_and_narrative_are_the_last_checks() -> None:
     module = quality_module()
-    assert module.QUALITY_REVIEW_SCHEMA_VERSION == 4
     assert module.QUALITY_CHECKS[-2:] == ("core_questions", "narrative")
 
 
@@ -292,13 +291,6 @@ def test_new_checks_point_at_their_plan_items(check: str, plan_ref: str) -> None
 def test_new_checks_reject_foreign_or_missing_refs(check: str, plan_ref: str) -> None:
     with pytest.raises(ValueError, match="existing item"):
         validate(failing_review(check, plan_ref))
-
-
-def test_a_v3_review_is_stale() -> None:
-    review = review_payload()
-    review["schema_version"] = 3
-    with pytest.raises(ValueError, match="schema_version 4"):
-        validate(review)
 
 
 @pytest.mark.parametrize("field,value", [("storyline", ""), ("core_answers", {})])

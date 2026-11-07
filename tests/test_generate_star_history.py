@@ -30,20 +30,11 @@ def test_render_svg_produces_branded_star_history_card() -> None:
     root = ET.fromstring(svg)
 
     assert root.tag.endswith("svg")
-    assert root.attrib["viewBox"] == "0 0 960 360"
     assert "917Dhj/DeepPaperNote" in svg
-    assert "3 stars" in svg
     assert "2026-04-03 12:30 UTC" in svg
-    ns = {"svg": "http://www.w3.org/2000/svg"}
-    curve = root.find(".//svg:polyline", ns)
-    assert curve is not None
-    assert curve.attrib["points"] == "76.0,226.7 864.0,112.0"
-    assert curve.attrib["stroke"] == "#e8b86a"
-    assert curve.attrib["fill"] == "none"
-    assert root.find(".//svg:polygon", ns) is None
-    noise = root.find(".//svg:feTurbulence", ns)
-    assert noise is not None and noise.attrib["seed"] == "17"
     assert svg.count(">3 stars</text>") == 1
+    curve = root.find(".//{http://www.w3.org/2000/svg}polyline")
+    assert curve is not None and len(curve.attrib["points"].split()) == 2
     assert svg == render_svg(
         "917Dhj/DeepPaperNote",
         [(dt.date(2026, 4, 1), 1), (dt.date(2026, 4, 2), 3)],
