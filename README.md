@@ -71,7 +71,7 @@ claude plugin install deeppapernote@deeppapernote
 npx skills add 917Dhj/DeepPaperNote
 ```
 
-Both routes install the same skills. The plugin route brings `deeppapernote`, `paper-glossary`, and `research-memory`; the skills CLI installer lets you choose which skills to install and which agents should receive them. For most users, start with `deeppapernote`; add `paper-glossary` if you want reusable terminology notes, and `research-memory` if you want takeaways tailored to your own research.
+Both routes install the same skills. The plugin route brings `deeppapernote`, `paper-glossary`, `research-memory`, and `organize-wiki`; the skills CLI installer lets you choose which skills to install and which agents should receive them. For most users, start with `deeppapernote`; add `paper-glossary` if you want reusable terminology notes, `research-memory` if you want takeaways tailored to your own research, and `organize-wiki` if you want help keeping your library's domain folders in order.
 
 ### 2. Install the core PDF dependency
 
@@ -124,6 +124,7 @@ DeepPaperNote remains the main product. The repository also includes optional co
 | [`deeppapernote`](./skills/deeppapernote/SKILL.md) | **Core product · recommended** | Read one paper deeply and produce a structured, evidence-based Obsidian note with figures, results, and limitations |
 | [`paper-glossary`](./skills/paper-glossary/SKILL.md) | Optional companion | Select terms from existing paper artifacts, create reusable Obsidian glossary notes, and optionally link them back to the paper note |
 | [`research-memory`](./skills/research-memory/SKILL.md) | Optional companion | Let the agent interview you, with evidence from the papers you have read, to record your research directions in Obsidian; DeepPaperNote then tailors each note's transferable ideas to them |
+| [`organize-wiki`](./skills/organize-wiki/SKILL.md) | Optional companion | Agree on your library's domain folders with the agent, then refile misplaced papers and fix their tags after a preview; DeepPaperNote follows the resulting convention when it files a new paper, and the last reorganization can be undone |
 
 You do not need to install every skill. Choose the ones that match your workflow during installation.
 

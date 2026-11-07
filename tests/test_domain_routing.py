@@ -262,3 +262,39 @@ def test_keyword_domain_rules_are_gone():
 
     for name in ("infer_domain_label", "domain_name_score", "load_domain_rules"):
         assert not hasattr(_note_paths, name)
+
+
+def test_deeppapernote_reads_the_domains_file_organize_wiki_writes():
+    import importlib.util
+    import re
+
+    from _domain_routing import parse_domains_file
+
+    scripts = PROJECT_ROOT / "skills" / "organize-wiki" / "scripts"
+    sys.path.insert(0, str(scripts))
+    try:
+        spec = importlib.util.spec_from_file_location("organize_domains_file", scripts / "domains_file.py")
+        writer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(writer)
+    finally:
+        sys.path.remove(str(scripts))
+    contract = (PROJECT_ROOT / "skills/organize-wiki/references/file-contract.md").read_text(encoding="utf-8")
+    example = re.search(r"```md\n(.*?)```", contract, flags=re.DOTALL).group(1)
+    guide = (SKILL_ROOT / "references/domain-routing.md").read_text(encoding="utf-8")
+    guide_example = re.search(r"```markdown\n(.*?)```", guide, flags=re.DOTALL).group(1)
+    for text in (example, guide_example):
+        assert parse_domains_file(text) == writer.parse(text)["domains"]
+    domains = [
+        {"name": "长视频理解", "definition": "长视频。", "includes": "长视频问答。", "excludes": "短视频。",
+         "representative_papers": "[[LVBench|LVBench]]"},
+        {"name": "Agents", "definition": "LLM agents.", "includes": "", "excludes": "Robotics.",
+         "representative_papers": ""},
+    ]
+    for language in ("zh-CN", "en"):
+        parsed = parse_domains_file(writer.render(domains, language, "2026-11-07"))
+        assert list(parsed) == ["长视频理解", "Agents"]
+        assert parsed["长视频理解"] == {
+            "definition": "长视频。", "includes": "长视频问答。", "excludes": "短视频。",
+            "representative_papers": "[[LVBench|LVBench]]",
+        }
+        assert parsed["Agents"] == {"definition": "LLM agents.", "excludes": "Robotics."}

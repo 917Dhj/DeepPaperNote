@@ -16,6 +16,8 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - DeepPaperNote can now be installed as a Claude Code plugin from the repository's own marketplace, with `claude plugin marketplace add 917Dhj/DeepPaperNote`. The skills CLI (`npx skills add`) remains the agent-neutral route.
 
+- `organize-wiki` is a new companion skill that organizes the paper library with you. It agrees on the domain folders and writes them as `<Vault>/DeepPaperNote/domains.md`. After you confirm a preview, it moves misfiled paper folders, fixes `papers/` tags, and rewrites path links. Every reorganization is logged and the last one can be undone.
+
 ### Changed
 
 - The agent now chooses each new paper's domain folder after reading what the existing domains hold, or the user's convention in `<Vault>/DeepPaperNote/domains.md`. It reuses an existing domain by default and creates a new one only with a stated reason, which the final report repeats. The keyword table `domain_rules.yaml` is removed.
