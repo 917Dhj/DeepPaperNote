@@ -30,6 +30,9 @@ CAPTION_RE = re.compile(
 CAPTION_SEPARATORS = ":：.。|—–-"
 CJK_RE = re.compile(r"[　-〿㐀-鿿＀-￯]")
 CAPTION_SENTENCE_ENDS = (".", "?", "!", "。", "？", "！")
+# PyMuPDF sets this span flag on raised text; footnote marks are short.
+SUPERSCRIPT_FLAG = 1
+MAX_FOOTNOTE_MARK_CHARS = 3
 
 # Used to decide whether a continuation line still belongs to the caption text
 # or has already entered the data body of a table.  A row of pure tabular data
@@ -132,8 +135,31 @@ def dominant_font_size(blocks: list[dict]) -> float:
     return sizes.most_common(1)[0][0] if sizes else 0.0
 
 
+def spans_text(spans: list[dict]) -> str:
+    """Join a line's spans, leaving out footnote marks raised after its last sentence.
+
+    A table caption can end in a mark such as the "a" of "effects.a" that refers to a
+    note below the table. It is set as a superscript and is not part of the caption.
+    """
+    texts = [str(span.get("text", "")) for span in spans]
+    end = len(spans)
+    mark_chars = 0
+    while end and (
+        not texts[end - 1].strip()
+        or int(spans[end - 1].get("flags", 0)) & SUPERSCRIPT_FLAG
+    ):
+        mark_chars += len(texts[end - 1].strip())
+        end -= 1
+    head = "".join(texts[:end])
+    if 0 < mark_chars <= MAX_FOOTNOTE_MARK_CHARS and head.rstrip().endswith(
+        CAPTION_SENTENCE_ENDS
+    ):
+        return head
+    return "".join(texts)
+
+
 def block_lines(block: dict) -> list[str]:
-    lines = ("".join(s.get("text", "") for s in line.get("spans", [])) for line in block["lines"])
+    lines = (spans_text(line.get("spans", [])) for line in block["lines"])
     return [text for text in (line.strip() for line in lines) if text]
 
 
@@ -259,7 +285,7 @@ def find_caption_blocks(page) -> list[dict]:
     ]
     for block in blocks:
         lines = merge_line_fragments(block.get("lines", []))
-        line_texts = ["".join(s.get("text", "") for s in line.get("spans", [])) for line in lines]
+        line_texts = [spans_text(line.get("spans", [])) for line in lines]
         for line_idx, line in enumerate(lines):
             spans = line.get("spans", [])
             if not spans:
@@ -285,7 +311,7 @@ def find_caption_blocks(page) -> list[dict]:
                 cont_spans = cont_line.get("spans", [])
                 if not cont_spans:
                     break
-                cont_text = "".join(s.get("text", "") for s in cont_spans).strip()
+                cont_text = spans_text(cont_spans).strip()
                 if not cont_text:
                     break
                 if CAPTION_RE.match(cont_text) and not line_is_wrapped_reference(

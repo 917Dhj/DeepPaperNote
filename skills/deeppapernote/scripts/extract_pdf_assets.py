@@ -51,6 +51,8 @@ FULL_PAGE_IMAGE_RATIO = 0.7
 RUNNING_HEADER_RATIO = 0.05
 RUNNING_HEADER_SEARCH_RATIO = 0.1
 SIDE_FIGURE_PANEL_GAP_PT = 24.0
+# A figure printed under its caption starts within this distance of it.
+CAPTION_FIGURE_GAP_PT = 24.0
 
 _TEXT_TABLE_SEPARATOR_RE = re.compile(r"(?:\t+|\s{2,}|[|;])")
 _TEXT_TABLE_PROSE_STARTERS = {
@@ -811,6 +813,59 @@ def _estimate_figure_bbox_above_caption(
     return bbox
 
 
+def _estimate_figure_bbox_below_caption(
+    page,
+    caption_anchor: dict,
+    caption_anchors: list[dict],
+    page_rect,
+) -> tuple[float, float, float, float] | None:
+    """Estimate the figure printed under its caption, as journals such as JMIR set it.
+
+    The caller tries this only when no visual sits above the caption. The figure
+    must start right under the caption, and it must not end at a caption of its
+    own, which would make it the next figure.
+    """
+    cap_y1 = caption_anchor["bbox"][3]
+    col_x0, col_x1 = _caption_column(caption_anchor, page_rect)
+
+    def in_column(box: tuple[float, ...]) -> bool:
+        return box[0] < col_x1 and box[2] > col_x0
+
+    below = [
+        a["bbox"]
+        for a in caption_anchors
+        if a["bbox"] != caption_anchor["bbox"] and a["bbox"][1] >= cap_y1 and in_column(a["bbox"])
+    ]
+    prose = [b for b in _find_paragraph_blocks(page) if b[1] >= cap_y1 and in_column(b)]
+    lower_bound = min([page_rect.y1, *(box[1] for box in below + prose)])
+    visuals = sorted(
+        (
+            r
+            for r in _page_visual_rects(page)
+            if r[1] >= cap_y1 - 2.0 and r[3] <= lower_bound + 2.0 and in_column(r)
+        ),
+        key=lambda r: r[1],
+    )
+    if not visuals or visuals[0][1] - cap_y1 > CAPTION_FIGURE_GAP_PT:
+        return None
+    x0, top, x1, bottom = visuals[0]
+    for rect in visuals[1:]:
+        if rect[1] > bottom + SIDE_FIGURE_PANEL_GAP_PT:
+            break
+        x0, x1, bottom = min(x0, rect[0]), max(x1, rect[2]), max(bottom, rect[3])
+    if any(box[1] >= bottom - 2.0 and box[1] - bottom <= CAPTION_FIGURE_GAP_PT for box in below):
+        return None
+
+    bbox = _grow_bbox_over_figure_labels(
+        page, (x0, top, x1, bottom), upper_bound=cap_y1, lower_bound=lower_bound
+    )
+    bbox = _clip_to_page(bbox, page_rect, padding=2.0)
+    bbox = (bbox[0], max(bbox[1], cap_y1 + 1.0), bbox[2], bbox[3])
+    if bbox[2] - bbox[0] < MIN_FIGURE_WIDTH_PT or bbox[3] - bbox[1] < MIN_VISUAL_FIGURE_HEIGHT_PT:
+        return None
+    return bbox
+
+
 def _estimate_figure_bbox_beside_caption(
     page,
     caption_anchor: dict,
@@ -1539,6 +1594,8 @@ def extract_figure_regions(
                 )
         else:
             bbox = _estimate_figure_bbox_beside_caption(page, anchor, anchors, page_rect)
+            if bbox is None and not _visuals_above_caption(page, anchor, prev_anchor, anchors):
+                bbox = _estimate_figure_bbox_below_caption(page, anchor, anchors, page_rect)
             if bbox is None:
                 bbox = _estimate_figure_bbox_above_caption(
                     page, anchor, prev_anchor, page_rect, anchors

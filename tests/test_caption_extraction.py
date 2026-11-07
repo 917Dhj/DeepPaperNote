@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from _pdf_text import caption_label_key, extract_caption_lines, normalize_caption_label
-from pdf_captions import find_caption_blocks
+from pdf_captions import caption_item, find_caption_blocks
 from plan_figure_table_decisions import matched_figure_asset
 from plan_figures import _match_figure_asset, classify_caption_kind
 from test_extract_pdf_assets_quality import EXTRACT_PDF_ASSETS_SCRIPT, write_fetch_input
@@ -247,6 +247,37 @@ def test_caption_continues_in_a_text_block_right_below() -> None:
     page.insert_textbox(fitz.Rect(108, 460, 504, 760), BODY_TEXT, fontsize=10)
 
     assert find_caption_blocks(page)[0]["line_text"].endswith("trained via next-scale prediction.")
+
+
+def caption_with_superscript(text: str, superscript: str) -> fitz.Document:
+    """Set a caption line ending in a raised, smaller mark, as a footnote reference is set."""
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_text((72, 400), text, fontsize=8.5, fontname="tiro")
+    width = fitz.get_text_length(text, fontname="tiro", fontsize=8.5)
+    page.insert_text((72 + width, 397), superscript, fontsize=7, fontname="tiro")
+    page.insert_textbox(fitz.Rect(72, 460, 540, 760), BODY_TEXT, fontsize=10)
+    return doc
+
+
+@pytest.mark.parametrize(
+    ("text", "superscript", "caption"),
+    [
+        (
+            "Table 3. Effect sizes for intention-to-treat intervention effects.",
+            "a",
+            "Effect sizes for intention-to-treat intervention effects.",
+        ),
+        ("Table 3. Effect sizes by arm.", "*,†", "Effect sizes by arm."),
+        ("Figure 2. Leaf area per plant in cm", "2", "Leaf area per plant in cm2"),
+    ],
+)
+def test_footnote_mark_after_the_caption_sentence_is_not_caption_text(
+    text: str, superscript: str, caption: str
+) -> None:
+    doc = caption_with_superscript(text, superscript)
+
+    assert caption_item(find_caption_blocks(doc[0])[0])["caption"] == caption
 
 
 def test_table_header_below_an_unfinished_caption_stays_out() -> None:
