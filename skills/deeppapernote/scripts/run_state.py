@@ -1330,7 +1330,7 @@ def main() -> None:
         report = inspect_run(args.workdir, args.prefix, bindings)
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    print(json.dumps(report, indent=2))  # ASCII, readable under any console encoding
 
 
 if __name__ == "__main__":

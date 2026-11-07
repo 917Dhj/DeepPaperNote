@@ -121,9 +121,9 @@ def main() -> None:
     try:
         result = run(args)
     except (Refused, ValueError, OSError) as exc:
-        sys.stdout.write(json.dumps({"status": "refused", "reason": str(exc)}, ensure_ascii=False) + "\n")
+        sys.stdout.write(json.dumps({"status": "refused", "reason": str(exc)}) + "\n")
         raise SystemExit(1) from None
-    sys.stdout.write(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
+    sys.stdout.write(json.dumps(result, indent=2) + "\n")
 
 
 if __name__ == "__main__":

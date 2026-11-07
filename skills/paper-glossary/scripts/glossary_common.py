@@ -340,8 +340,8 @@ def maybe_load_json_record(value: str) -> dict[str, Any] | None:
 
 
 def emit(payload: dict[str, Any], output: str = "") -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
     if output:
-        Path(output).expanduser().write_text(text + "\n", encoding="utf-8")
+        Path(output).expanduser().write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     else:
-        print(text)
+        # ASCII JSON reads back under any console encoding, such as cp1252 on Windows.
+        print(json.dumps(payload, indent=2))

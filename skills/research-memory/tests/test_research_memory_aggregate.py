@@ -155,3 +155,13 @@ def test_cli_without_a_vault_reports_needs_vault(tmp_path: Path) -> None:
     result = subprocess.run([sys.executable, str(SCRIPT)], env=env, capture_output=True, text=True)
     assert result.returncode == 0
     assert json.loads(result.stdout)["status"] == "needs_vault"
+
+
+def test_cli_prints_json_a_windows_console_can_read(tmp_path: Path, library: Path) -> None:
+    env = {
+        **os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0",
+        "DEEPPAPERNOTE_CONFIG_PATH": str(write_config(tmp_path, {"obsidian_vault": str(library), "papers_dir": "Papers"})),
+    }
+    result = subprocess.run([sys.executable, str(SCRIPT), "--today", "2026-11-06"], env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["paper_count"] == 4
