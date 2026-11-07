@@ -447,6 +447,8 @@ def resolve_reference(value: str) -> dict[str, Any]:
             paper["local_pdf_title_source"] = hints["local_pdf_title_source"]
         if hints.get("local_pdf_artifact_title"):
             paper["local_pdf_artifact_title"] = True
+        if hints.get("local_pdf_first_page_title"):
+            paper["local_pdf_first_page_title"] = hints["local_pdf_first_page_title"]
         doi = normalize_whitespace(str(hints.get("doi", "")))
         arxiv_id = normalize_whitespace(str(hints.get("arxiv_id", "")))
         if doi:

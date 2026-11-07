@@ -22,7 +22,5 @@
   ],
   "crops": {},
   "same_visual": [],
-  "known_gaps": {
-    "title": "Identity resolution takes the arXiv title, which lacks the 'Position:' prefix that the ICML 2024 version and the PDF carry."
-  }
+  "known_gaps": {}
 }
