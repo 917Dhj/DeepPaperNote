@@ -1,12 +1,12 @@
 # DeepPaperNote Regression Workflow
 
-Status: v2
+Status: v3
 Audience: agents that run or review DeepPaperNote evaluation experiments
 Scope: checking a change against real papers, from a smoke run to a full note-quality regression
 
 This file is canonical. `evals/regression-workflow-zh.md` is its Chinese translation; when they disagree, this file wins and the translation is fixed.
 
-The scoring rubric lives in `evals/note-quality-rubric.md` (v2). The note evaluator's prompt template lives in `evals/note-evaluator-prompt.md`.
+The scoring rubric lives in `evals/note-quality-rubric.md` (v3). The note evaluator's prompt template lives in `evals/note-evaluator-prompt.md`.
 
 ## Choose A Tier
 
@@ -137,7 +137,7 @@ After every run is recorded, the Candidate Runner builds three pairs per paper:
 
 For each pair it randomly assigns which run is A, gives the pair a neutral id, shuffles all pairs together, and writes:
 
-- `evaluation-pairs.md`: per pair, its id, the paper, and the note, source evidence, and artifact root of A and of B
+- `evaluation-pairs.md`: per pair, its id, the paper, the paper's expected `paper_type` and its core questions as the rubric's Required Inputs describe, and the note, source evidence, and artifact root of A and of B
 - `blinding-map.json`: per pair, its kind and which run and arm is A and B. Only the Regression Judge reads it.
 
 ### Artifact Audit
@@ -186,10 +186,10 @@ Per paper and per rubric dimension:
 Per paper, assign one verdict:
 
 - `hard_fail`: a candidate note fails a hard gate that its baseline counterpart in the same pair passes.
-- `regression`: the candidate regresses on a core content dimension (D1 to D4) and improves on none.
+- `regression`: the candidate regresses on a core content dimension (D1 to D4, D9, or D10) and improves on none.
 - `no_material_change`: every difference is noise.
-- `partial_improvement`: the candidate improves some dimensions, but not D1 or D2, or it also regresses on one.
-- `real_improvement`: the candidate improves D1 or D2, does not regress on D4, introduces no hard-gate failure, and the evaluator's reasons tie the gain to paper evidence rather than formatting.
+- `partial_improvement`: the candidate improves some dimensions, but not D1, D2, D9, or D10, or it also regresses on one.
+- `real_improvement`: the candidate improves D1, D2, D9, or D10, does not regress on D4, introduces no hard-gate failure, and the evaluator's reasons tie the gain to paper evidence rather than formatting.
 
 The experiment's verdict is one of `hard_fail`, `regression`, `no_material_change`, `partial_improvement`, `real_improvement`, or `architectural_improvement_only`:
 

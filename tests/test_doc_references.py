@@ -232,3 +232,34 @@ def test_rubric_json_template_parses_and_matches_its_version() -> None:
 
     assert title_version and template
     assert json.loads(template.group(1))["rubric_version"] == title_version.group(1)
+
+
+def _rubric_dimensions(text: str) -> list[tuple[str, int]]:
+    """Each scored dimension's heading number and weight, in document order."""
+    return [
+        (number, int(weight))
+        for number, weight in re.findall(r"^### D(\d+)\..*?\n\nWeight: (\d+)$", text, re.MULTILINE | re.DOTALL)
+    ]
+
+
+def test_rubric_weights_sum_to_100_and_match_the_json_scores() -> None:
+    text = EVAL_DOCS["note-quality-rubric.md"].read_text(encoding="utf-8")
+    dimensions = _rubric_dimensions(text)
+    template = json.loads(re.search(r"```json\n(.*?)```", text, re.DOTALL).group(1))
+
+    assert [number for number, _ in dimensions] == [str(n) for n in range(1, len(dimensions) + 1)]
+    assert sum(weight for _, weight in dimensions) == 100
+    for note in ("note_a", "note_b"):
+        assert len(template[note]["scores"]) == len(dimensions)
+        assert len(template[note]["hard_gates"]) == len(re.findall(r"^### H\d+\.", text, re.MULTILINE))
+
+
+def test_rubric_paper_type_table_lists_every_type() -> None:
+    from type_profiles import TYPE_KEYS
+
+    text = EVAL_DOCS["note-quality-rubric.md"].read_text(encoding="utf-8")
+    section = text.split("## Paper Type", 1)[1].split("\n## ", 1)[0]
+
+    rows = re.findall(r"^\| `([a-z_]+)` \|", section, re.MULTILINE)
+    assert rows[0] == "paper_type"
+    assert rows[1:] == list(TYPE_KEYS)

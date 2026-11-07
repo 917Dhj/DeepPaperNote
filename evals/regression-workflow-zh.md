@@ -1,12 +1,12 @@
 # DeepPaperNote 回归评估流程
 
-状态：v2
+状态：v3
 读者：运行或审阅 DeepPaperNote 评估实验的 agent
 范围：用真实论文检验一次改动，从冒烟运行到完整的笔记质量回归
 
 本文是 `evals/regression-workflow.md` 的中文译文。两者不一致时以英文版为准，并修正本译文。
 
-评分标准见 `evals/note-quality-rubric.md`（v2），笔记评估者的提示词模板见 `evals/note-evaluator-prompt.md`。Agent 提示词模板只保留英文版，见英文正本的 Agent Prompt Templates 一节。
+评分标准见 `evals/note-quality-rubric.md`（v3），笔记评估者的提示词模板见 `evals/note-evaluator-prompt.md`。Agent 提示词模板只保留英文版，见英文正本的 Agent Prompt Templates 一节。
 
 下文保留英文的术语（如 canonical identity、repair trace、wrong PDF）是产物名、场景名或判定值，与英文正本一一对应，不要翻译。
 
@@ -139,7 +139,7 @@ baseline-run-manifest.md
 
 对每组配对，它随机决定哪次运行是 A，给配对一个中性编号，把所有配对一起打乱，然后写出：
 
-- `evaluation-pairs.md`：逐组记录编号、论文，以及 A 和 B 各自的笔记、源证据和产物根目录
+- `evaluation-pairs.md`：逐组记录编号、论文、论文预期的 `paper_type` 及其必答问题（按评分标准 Required Inputs 一节的要求），以及 A 和 B 各自的笔记、源证据和产物根目录
 - `blinding-map.json`：逐组记录配对类型，以及 A 和 B 分别对应哪次运行、哪一组。只有 Regression Judge 读取它。
 
 ### 产物审计
@@ -188,10 +188,10 @@ Regression Judge 读取以上所有文档，包括 `blinding-map.json`，并揭�
 每篇论文给出一个判定：
 
 - `hard_fail`：某篇 candidate 笔记未通过某个硬门槛，而同一配对中的 baseline 笔记通过了。
-- `regression`：candidate 在某个核心内容维度（D1 到 D4）退化，且没有任何维度改进。
+- `regression`：candidate 在某个核心内容维度（D1 到 D4、D9 或 D10）退化，且没有任何维度改进。
 - `no_material_change`：所有差异都是噪声。
-- `partial_improvement`：candidate 改进了部分维度，但不包括 D1 或 D2，或同时在某个维度退化。
-- `real_improvement`：candidate 改进了 D1 或 D2，没有在 D4 退化，没有引入硬门槛失败，且评估者给出的理由把提升归于论文证据而非格式。
+- `partial_improvement`：candidate 改进了部分维度，但不包括 D1、D2、D9 或 D10，或同时在某个维度退化。
+- `real_improvement`：candidate 改进了 D1、D2、D9 或 D10，没有在 D4 退化，没有引入硬门槛失败，且评估者给出的理由把提升归于论文证据而非格式。
 
 实验的判定是 `hard_fail`、`regression`、`no_material_change`、`partial_improvement`、`real_improvement` 或 `architectural_improvement_only` 之一：
 

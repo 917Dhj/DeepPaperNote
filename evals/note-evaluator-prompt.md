@@ -21,6 +21,9 @@ Inputs:
 - paper title: <PAPER_TITLE>
 - paper identity evidence: <DOI_OR_ARXIV_OR_PDF_OR_VENUE_INFO>
 - output language: <OUTPUT_LANGUAGE>
+- paper type: <PAPER_TYPE>
+- core questions, one per line as `<id>: <question>`:
+<CORE_QUESTIONS>
 - note A path: <NOTE_A_PATH>
 - note B path: <NOTE_B_PATH>
 - note A artifact root: <NOTE_A_ARTIFACT_ROOT_OR_NONE>
@@ -48,8 +51,9 @@ Constraints:
 Procedure:
 1. Confirm that both notes cover the same paper.
 2. Run every hard gate in the rubric on each note.
-3. Score note A and note B independently on all eight dimensions.
-4. Compare them dimension by dimension and fill in the pairwise result.
+3. Check every core question against each note, wherever in the note the answer sits.
+4. Score note A and note B independently on all ten dimensions, reading each through the paper type.
+5. Compare them dimension by dimension and fill in the pairwise result.
 
 Evidence discipline:
 - For every hard-gate failure, cite the exact note excerpt or artifact evidence.
@@ -57,13 +61,15 @@ Evidence discipline:
 - Prefer paper-specific evidence over generic quality language.
 - Pay special attention to:
   - central evidence chain coverage
-  - mechanism or protocol depth
+  - how clearly the paper's mechanism or flow is explained
+  - core question answers, and unreported items stated as unreported
+  - whether one narrative carries the note from problem to conclusion
   - key experimental settings, metrics, numbers, and comparisons
   - Discussion and Limitations conclusions
   - proven versus unproven claim boundaries
   - appendix and detail recovery when source evidence shows appendix material
   - figure, table, citation, and path problems
-  - readability in the output language
+  - plain readability in the output language for an adjacent-field reader
 
 Required output:
 - Emit the JSON object required by the rubric.
