@@ -206,6 +206,7 @@ def completed_run(tmp_path: Path) -> tuple[Path, dict, dict[str, Path]]:
             "output_language": "zh-CN",
             "save_mode": "workspace",
             "papers_dir": "Papers",
+            "domain": "AI",
             "workspace_root": str(tmp_path / "workspace"),
         },
     }
@@ -1237,3 +1238,80 @@ def test_recommended_command_runs_without_user_configuration(
     )
     assert result.returncode == 0, result.stderr
     assert paths["figure_table_decisions"].is_file()
+
+
+def obsidian_admission(workdir: Path, bindings: dict, paths: dict, receipt: dict) -> None:
+    bindings["context"].update(
+        save_mode="obsidian", vault=str(workdir.parent / "Vault"), papers_dir="Papers"
+    )
+    bindings["artifacts"]["admission"] = str(paths["admission"])
+    dump(paths["admission"], {
+        "script": "write_obsidian_note.py",
+        "phase": "save_target_admission",
+        "output_language": "zh-CN",
+        "source_sha256": sha(workdir / "source.pdf"),
+        **receipt,
+    })
+
+
+def test_domain_required_admission_asks_for_the_domain_then_reruns_with_it(
+    completed_run: tuple,
+) -> None:
+    workdir, bindings, paths = completed_run
+    bindings["context"].pop("domain")
+    obsidian_admission(workdir, bindings, paths, {
+        "status": "blocked", "conflict_code": "domain_required", "domain_overview": {},
+    })
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "admission"
+    assert action["kind"] == "missing_context"
+    assert action["missing_context"] == ["domain"]
+    assert action["reference"].endswith("domain-routing.md")
+    assert "argv" not in action
+    bindings["context"].update(domain="视频记忆", new_domain_reason="No domain fits.")
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["kind"] == "command"
+    argv = action["argv"]
+    assert argv[argv.index("--domain") + 1] == "视频记忆"
+    assert argv[argv.index("--new-domain-reason") + 1] == "No domain fits."
+
+
+def test_saving_a_new_directory_carries_the_chosen_domain(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    bindings["context"].pop("domain")
+    obsidian_admission(workdir, bindings, paths, {
+        "status": "ok", "admission": "new_directory", "domain": "AI", "asset_subdir": "images",
+    })
+    paths["save_receipt"].unlink()
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "save_receipt"
+    assert "domain" in action["missing_context"]
+    bindings["context"]["domain"] = "AI"
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["argv"][action["argv"].index("--domain") + 1] == "AI"
+
+
+def test_saving_into_a_reused_directory_needs_no_domain(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    bindings["context"].pop("domain")
+    obsidian_admission(workdir, bindings, paths, {
+        "status": "ok", "admission": "reuse_source_directory", "domain": "AI",
+        "asset_subdir": "images",
+    })
+    paths["save_receipt"].unlink()
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["stage"] == "save_receipt"
+    assert "domain" not in action.get("missing_context", [])
+    assert "--domain" not in action.get("argv", [])
+
+
+def test_workspace_save_needs_a_domain(completed_run: tuple) -> None:
+    workdir, bindings, paths = completed_run
+    bindings["context"].pop("domain")
+    paths["save_receipt"].unlink()
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["missing_context"] == ["domain"]
+    bindings["context"]["domain"] = "AI"
+    action = run_state.inspect_run(workdir, bindings=bindings)["next_action"]
+    assert action["kind"] == "command"
+    assert action["argv"][action["argv"].index("--domain") + 1] == "AI"

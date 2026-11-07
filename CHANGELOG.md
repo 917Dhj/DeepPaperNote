@@ -16,6 +16,11 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 - DeepPaperNote can now be installed as a Claude Code plugin from the repository's own marketplace, with `claude plugin marketplace add 917Dhj/DeepPaperNote`. The skills CLI (`npx skills add`) remains the agent-neutral route.
 
+### Changed
+
+- The agent now chooses each new paper's domain folder after reading what the existing domains hold, or the user's convention in `<Vault>/DeepPaperNote/domains.md`. It reuses an existing domain by default and creates a new one only with a stated reason, which the final report repeats. The keyword table `domain_rules.yaml` is removed.
+- A saved note carries exactly one `papers/<domain>` tag, and it must name the folder the note is saved in.
+
 ## v2.3.1
 
 ### Improved

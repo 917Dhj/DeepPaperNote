@@ -294,7 +294,7 @@ def save(tmp_path: Path, vault: Path, home: Path, text: str) -> subprocess.Compl
     manifest.write_text(json.dumps({"status": "ok", "paper_id": "paper:test", "source_sha256": "a" * 64}), encoding="utf-8")
     return run_writer(
         tmp_path, home, "--vault", str(vault), "--papers-dir", "Papers", "--title", "My Test Paper",
-        "--source-manifest", str(manifest), *formal_save_args(tmp_path, text),
+        "--source-manifest", str(manifest), *formal_save_args(tmp_path, text, domain="AI"),
     )
 
 

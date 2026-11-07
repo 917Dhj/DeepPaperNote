@@ -11,13 +11,9 @@ import pytest
 
 import _identity
 import _metadata_sources
-import _note_paths
 import common
 from _note_paths import (
-    domain_name_score,
     existing_domain_dirs,
-    infer_domain_label,
-    resolve_domain_subdir,
     resolve_note_output_mode,
     resolve_obsidian_note_path,
 )
@@ -711,82 +707,6 @@ def test_resolve_obsidian_note_path_allows_nested_filename_inside_save_target(
     assert path == vault / "Research/Papers/Benchmark/Paper/nested/Paper.md"
 
 
-def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_already_contains_slug(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    path = resolve_obsidian_note_path(
-        config,
-        title="My Test Paper",
-        subdir="心理健康/My_Test_Paper",
-    )
-    assert path == vault / "Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
-
-
-def test_resolve_obsidian_note_path_avoids_double_slug_when_subdir_is_papers_relative_path(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    path = resolve_obsidian_note_path(
-        config,
-        title="My Test Paper",
-        subdir="Research/Papers/心理健康/My_Test_Paper",
-    )
-    assert path == vault / "Research/Papers" / "心理健康" / "My_Test_Paper" / "My_Test_Paper.md"
-
-
-def test_resolve_obsidian_note_path_avoids_double_folder_when_subdir_is_title_slug_but_filename_is_readable(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    path = resolve_obsidian_note_path(
-        config,
-        title="SWE-bench: Can Language Models Resolve Real-World GitHub Issues?",
-        subdir="Research/Papers/Benchmark/SWE_bench_Can_Language_Models_Resolve_Real_World_GitHub_Issues",
-        filename="SWE-bench - Can Language Models Resolve Real-World GitHub Issues.md",
-    )
-    assert path == (
-        vault
-        / "Research/Papers"
-        / "Benchmark"
-        / "SWE_bench_Can_Language_Models_Resolve_Real_World_GitHub_Issues"
-        / "SWE-bench - Can Language Models Resolve Real-World GitHub Issues.md"
-    )
-
-
-def test_resolve_obsidian_note_path_accepts_windows_style_papers_relative_subdir(
-    tmp_path: Path,
-) -> None:
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    path = resolve_obsidian_note_path(
-        config,
-        title="My Test Paper",
-        subdir=r"Research\Papers\Benchmark\My_Test_Paper",
-    )
-    assert (
-        path
-        == vault / "Research/Papers" / "Benchmark" / "My_Test_Paper" / "My_Test_Paper.md"
-    )
-
-
 def test_existing_domain_dirs_excludes_root_level_paper_folder(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     papers = vault / "Research" / "Papers"
@@ -804,144 +724,6 @@ def test_existing_domain_dirs_excludes_root_level_paper_folder(tmp_path: Path) -
         "workspace_output_dir": "DeepPaperNote_output",
     }
     assert existing_domain_dirs(config) == ["大模型"]
-
-
-def test_resolve_domain_subdir_prefers_existing_domain(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    (papers / "大模型").mkdir(parents=True)
-    (papers / "心理健康").mkdir(parents=True)
-    paper_dir = papers / "Attention_Is_All_You_Need"
-    paper_dir.mkdir(parents=True)
-    (paper_dir / "Attention_Is_All_You_Need.md").write_text("# note\n", encoding="utf-8")
-
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    resolved = resolve_domain_subdir(
-        config,
-        title="Seeing, Listening, Remembering, and Reasoning: A Multimodal Agent with Long-Term Memory",
-        abstract="We present a multimodal large language model agent with long-term memory for reasoning over video and audio.",
-    )
-    assert resolved == "大模型"
-
-
-def test_infer_domain_label_routes_clinical_llm_paper_to_application_domain() -> None:
-    label = infer_domain_label(
-        "Using a fine-tuned large language model for symptom-based depression evaluation",
-        "We study clinical depression screening with patients and psychological symptom scales.",
-    )
-    assert label == "医疗健康"
-
-
-def test_infer_domain_label_prefers_application_domain_for_legal_rag() -> None:
-    label = infer_domain_label(
-        "Retrieval-augmented generation for legal question answering",
-        "We combine RAG with a large language model for contract and case law analysis.",
-    )
-    assert label == "法律"
-
-
-def test_infer_domain_label_uses_method_fallback_for_moe_algorithm() -> None:
-    label = infer_domain_label(
-        "A new mixture-of-experts routing algorithm",
-        "Sparse MoE routing improves transformer pretraining efficiency.",
-    )
-    assert label == "大模型"
-
-
-def test_infer_domain_label_defaults_generic_ai_method_to_machine_learning() -> None:
-    assert (
-        infer_domain_label("A new optimization algorithm", "We improve model training.")
-        == "机器学习"
-    )
-
-
-def test_resolve_domain_subdir_reuses_specialized_existing_folder(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    (papers / "心理健康").mkdir(parents=True)
-
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    resolved = resolve_domain_subdir(
-        config,
-        title="Large language models for depression screening",
-        abstract=(
-            "A clinical study with patients, symptom scales, therapy histories, "
-            "and mental health outcomes."
-        ),
-    )
-    label = infer_domain_label(
-        "Large language models for depression screening",
-        (
-            "A clinical study with patients, symptom scales, therapy histories, "
-            "and mental health outcomes."
-        ),
-    )
-    assert label == "医疗健康"
-    assert resolved == "心理健康"
-
-
-def test_resolve_domain_subdir_keeps_robotics_ahead_of_method_folder(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    (papers / "大模型").mkdir(parents=True)
-
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    resolved = resolve_domain_subdir(
-        config,
-        title="Diffusion Policy for Robot Manipulation",
-        abstract=(
-            "We learn control policies for robotic manipulation and navigation "
-            "from demonstrations."
-        ),
-    )
-    assert resolved == "机器人"
-
-
-def test_method_only_evidence_does_not_reuse_unrelated_application_folder(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    (papers / "金融").mkdir(parents=True)
-
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    title = "Efficient Transformer Scaling for Large Language Models"
-    abstract = "We improve pre-training, instruction tuning, and reasoning for a foundation model."
-
-    assert domain_name_score("金融", "大模型", title, abstract) == 0
-    assert resolve_domain_subdir(config, title=title, abstract=abstract) == "大模型"
-
-
-def test_incidental_application_keyword_does_not_reuse_unrelated_folder(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    (papers / "金融").mkdir(parents=True)
-
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    title = "Large language models for depression screening"
-    abstract = "A clinical patient study mentions risk factors and symptom screening."
-
-    assert infer_domain_label(title, abstract) == "医疗健康"
-    assert domain_name_score("金融", "医疗健康", title, abstract) == 0
-    assert resolve_domain_subdir(config, title=title, abstract=abstract) == "医疗健康"
 
 
 @pytest.mark.parametrize(
@@ -998,67 +780,6 @@ def test_infer_paper_type_distinguishes_supported_types(title: str, abstract: st
     paper_type, _ = infer_paper_type(title, abstract)
 
     assert paper_type == expected
-
-
-def test_resolve_domain_subdir_keeps_explicit_subdir_highest_priority(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    resolved = resolve_domain_subdir(
-        config,
-        title="Diffusion Policy for Robot Manipulation",
-        abstract="Robotic manipulation and navigation.",
-        subdir="Custom/Folder",
-    )
-    assert resolved == "Custom/Folder"
-
-
-def test_domain_rules_are_loaded_from_user_editable_yaml(tmp_path: Path, monkeypatch) -> None:
-    rules_path = tmp_path / "domain_rules.yaml"
-    rules_path.write_text(
-        """
-domains:
-  - label: 天文学
-    aliases:
-      - astronomy
-    keywords:
-      - galaxy survey
-      - telescope
-    methods:
-      - transformer
-fallback_domains:
-  - label: 机器学习
-    aliases:
-      - machine learning
-    keywords:
-      - transformer
-""".strip()
-        + "\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(_note_paths, "DOMAIN_RULES_PATH", rules_path)
-
-    assert infer_domain_label("Transformer analysis for galaxy survey data") == "天文学"
-
-
-def test_domain_rules_missing_or_invalid_falls_back(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(_note_paths, "DOMAIN_RULES_PATH", tmp_path / "missing.yaml")
-    assert (
-        infer_domain_label("Diffusion Policy for Robot Manipulation", "robotic control")
-        == "机器人"
-    )
-
-    invalid_path = tmp_path / "invalid.yaml"
-    invalid_path.write_text("domains:\n  - aliases:\n      - no label\n", encoding="utf-8")
-    monkeypatch.setattr(_note_paths, "DOMAIN_RULES_PATH", invalid_path)
-    assert (
-        infer_domain_label("Diffusion Policy for Robot Manipulation", "robotic control")
-        == "机器人"
-    )
 
 
 def test_env_config_value_falls_back_to_shell_file(tmp_path: Path, monkeypatch) -> None:

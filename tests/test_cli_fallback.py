@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 import write_obsidian_note
-from formal_save_helpers import canonical_note_path, formal_save_args, reviewed_insert_fields
+from formal_save_helpers import canonical_note_path, formal_save_args, reviewed_insert_fields, tagged, TEST_DOMAIN
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WRITE_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
@@ -46,10 +46,8 @@ def test_write_note_creates_language_variant_and_directory_sidecar(tmp_path: Pat
             str(vault),
             "--title",
             "My Test Paper",
-            "--subdir",
-            "Benchmark",
             *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, note_text),
+            *formal_save_args(tmp_path, note_text, domain="Benchmark"),
         ],
         cwd=tmp_path,
         env=env,
@@ -62,13 +60,14 @@ def test_write_note_creates_language_variant_and_directory_sidecar(tmp_path: Pat
     note_path = Path(payload["note_path"])
     sidecar_path = note_path.parent / ".deeppapernote.json"
     assert note_path.name == "My_Test_Paper.zh-CN.md"
-    assert note_path.read_text(encoding="utf-8") == note_text
+    saved_text = tagged(note_text, "Benchmark")
+    assert note_path.read_text(encoding="utf-8") == saved_text
     sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
     assert sidecar['schema_version'] == 2
     assert sidecar['sources']['a' * 64]['notes'] == {
         'zh-CN': {'filename': note_path.name,
-                  'note_sha256': hashlib.sha256(note_text.encode('utf-8')).hexdigest(),
-                  'generated_note_sha256': hashlib.sha256(note_text.encode('utf-8')).hexdigest()}
+                  'note_sha256': hashlib.sha256(saved_text.encode('utf-8')).hexdigest(),
+                  'generated_note_sha256': hashlib.sha256(saved_text.encode('utf-8')).hexdigest()}
     }
 
 
@@ -91,10 +90,8 @@ def test_write_note_reuses_empty_same_name_directory_before_domain_routing(
             str(vault),
             "--title",
             "My Test Paper",
-            "--subdir",
-            "NewDomain",
             *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, note_text),
+            *formal_save_args(tmp_path, tagged(note_text, "LegacyArchive"), domain="NewDomain"),
         ],
         cwd=tmp_path,
         env=env,
@@ -124,10 +121,8 @@ def test_write_note_reuses_source_directory_for_another_language(tmp_path: Path)
             str(vault),
             "--title",
             "My Test Paper",
-            "--subdir",
-            "ChineseDomain",
             *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, chinese_note),
+            *formal_save_args(tmp_path, chinese_note, domain="ChineseDomain"),
         ],
         cwd=tmp_path,
         env=env,
@@ -145,12 +140,10 @@ def test_write_note_reuses_source_directory_for_another_language(tmp_path: Path)
             str(vault),
             "--title",
             "My Test Paper",
-            "--subdir",
-            "EnglishDomain",
             "--language",
             "en",
             *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, english_note, "en"),
+            *formal_save_args(tmp_path, tagged(english_note, "ChineseDomain"), "en", domain="EnglishDomain"),
         ],
         cwd=tmp_path,
         env=env,
@@ -247,7 +240,7 @@ def test_formal_save_rolls_back_when_sidecar_finalization_fails(
 ) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
-    original_note = "# Rollback Paper\n\nOriginal body.\n"
+    original_note = tagged("# Rollback Paper\n\nOriginal body.\n")
     replacement_note = "# Rollback Paper\n\nReplacement body.\n"
     monkeypatch.setenv("DEEPPAPERNOTE_DISABLE_SHELL_CONFIG", "1")
     first = subprocess.run(
@@ -307,7 +300,7 @@ def test_write_note_blocks_same_source_and_language_without_mutating_vault(
     vault.mkdir()
     env = os.environ.copy()
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
-    original_note = "# My Test Paper\n\nOriginal note.\n"
+    original_note = tagged("# My Test Paper\n\nOriginal note.\n", "OriginalDomain")
     replacement_note = "# My Test Paper\n\nReplacement note.\n"
 
     first = subprocess.run(
@@ -318,10 +311,8 @@ def test_write_note_blocks_same_source_and_language_without_mutating_vault(
             str(vault),
             "--title",
             "My Test Paper",
-            "--subdir",
-            "OriginalDomain",
             *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, original_note),
+            *formal_save_args(tmp_path, original_note, domain="OriginalDomain"),
         ],
         cwd=tmp_path,
         env=env,
@@ -341,10 +332,8 @@ def test_write_note_blocks_same_source_and_language_without_mutating_vault(
             str(vault),
             "--title",
             "My Test Paper",
-            "--subdir",
-            "DifferentDomain",
             *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, replacement_note),
+            *formal_save_args(tmp_path, replacement_note, domain="DifferentDomain"),
         ],
         cwd=tmp_path,
         env=env,
@@ -373,8 +362,8 @@ def test_write_note_overwrites_only_with_matching_existing_note_sha256(
     vault.mkdir()
     env = os.environ.copy()
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
-    original_note = "# My Test Paper\n\nOriginal note.\n"
-    replacement_note = "# My Test Paper\n\nApproved replacement.\n"
+    original_note = tagged("# My Test Paper\n\nOriginal note.\n")
+    replacement_note = tagged("# My Test Paper\n\nApproved replacement.\n")
 
     first = subprocess.run(
         [
@@ -432,7 +421,7 @@ def test_write_note_blocks_overwrite_when_confirmed_hash_is_stale(tmp_path: Path
     vault.mkdir()
     env = os.environ.copy()
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
-    original_note = "# My Test Paper\n\nOriginal note.\n"
+    original_note = tagged("# My Test Paper\n\nOriginal note.\n")
     replacement_note = "# My Test Paper\n\nStale replacement.\n"
 
     first = subprocess.run(
@@ -490,7 +479,7 @@ def test_write_note_blocks_same_name_directory_for_a_different_source(
     vault.mkdir()
     env = os.environ.copy()
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
-    first_note = "# Shared Title\n\nFirst source.\n"
+    first_note = tagged("# Shared Title\n\nFirst source.\n", "FirstDomain")
     second_note = "# Shared Title\n\nSecond source.\n"
 
     first = subprocess.run(
@@ -501,10 +490,8 @@ def test_write_note_blocks_same_name_directory_for_a_different_source(
             str(vault),
             "--title",
             "Shared Title",
-            "--subdir",
-            "FirstDomain",
             *source_manifest_args(tmp_path, "a" * 64),
-            *formal_save_args(tmp_path, first_note),
+            *formal_save_args(tmp_path, first_note, domain="FirstDomain"),
         ],
         cwd=tmp_path,
         env=env,
@@ -526,12 +513,10 @@ def test_write_note_blocks_same_name_directory_for_a_different_source(
             str(vault),
             "--title",
             "Shared Title",
-            "--subdir",
-            "SecondDomain",
             "--language",
             "en",
             *source_manifest_args(tmp_path, "b" * 64),
-            *formal_save_args(tmp_path, second_note, "en"),
+            *formal_save_args(tmp_path, second_note, "en", domain="SecondDomain"),
         ],
         cwd=tmp_path,
         env=env,
@@ -563,10 +548,8 @@ def test_write_note_freezes_directory_name_for_the_same_source_bytes(tmp_path: P
             str(vault),
             "--title",
             "First Metadata Title",
-            "--subdir",
-            "FirstDomain",
             *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, chinese_note),
+            *formal_save_args(tmp_path, chinese_note, domain="FirstDomain"),
         ],
         cwd=tmp_path,
         env=env,
@@ -589,12 +572,10 @@ def test_write_note_freezes_directory_name_for_the_same_source_bytes(tmp_path: P
             str(vault),
             "--title",
             "Revised Metadata Title",
-            "--subdir",
-            "SecondDomain",
             "--language",
             "en",
             *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, english_note, "en"),
+            *formal_save_args(tmp_path, tagged(english_note, "ArchivedSources"), "en", domain="SecondDomain"),
         ],
         cwd=tmp_path,
         env=env,
@@ -624,10 +605,8 @@ def test_save_target_preflight_reuses_source_before_note_generation(tmp_path: Pa
             str(vault),
             "--title",
             "My Test Paper",
-            "--subdir",
-            "OriginalDomain",
             *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, chinese_note),
+            *formal_save_args(tmp_path, chinese_note, domain="OriginalDomain"),
         ],
         cwd=tmp_path,
         env=env,
@@ -646,8 +625,7 @@ def test_save_target_preflight_reuses_source_before_note_generation(tmp_path: Pa
             str(vault),
             "--title",
             "Changed Metadata Title",
-            "--subdir",
-            "MustNotBeUsed",
+            "--domain", "MustNotBeUsed", "--new-domain-reason", "Test fixture domain.",
             "--language",
             "en",
             *source_manifest_args(tmp_path),
@@ -925,7 +903,7 @@ def test_write_note_falls_back_to_workspace(tmp_path: Path) -> None:
             str(WRITE_SCRIPT),
             "--title",
             "Fallback Output Test",
-            *formal_save_args(tmp_path, note_text),
+            *formal_save_args(tmp_path, note_text, domain="机器学习"),
         ],
         cwd=tmp_path,
         env=env,
@@ -1037,8 +1015,8 @@ def test_write_insert_rejects_symlink_destination_outside_save_target(tmp_path: 
     result = subprocess.run(
         [
             sys.executable, str(WRITE_SCRIPT),
-            "--title", "Symlink Asset", "--subdir", "Benchmark",
-            *formal_save_args(tmp_path, note_text, decisions_path=decisions_path),
+            "--title", "Symlink Asset",
+            *formal_save_args(tmp_path, note_text, decisions_path=decisions_path, domain="Benchmark"),
         ],
         cwd=tmp_path, env=env, capture_output=True, text=True,
     )
@@ -1064,45 +1042,6 @@ def test_check_environment_reports_workspace_fallback(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     assert payload["workspace_fallback"]["available"] is True
     assert payload["workspace_fallback"]["workspace_output_dir"] == "DeepPaperNote_output"
-
-
-def test_write_note_in_vault_mode_does_not_duplicate_paper_slug(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    env = os.environ.copy()
-    env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
-    env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
-
-    note_text = "# My Test Paper\n\nVault write regression test.\n"
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(WRITE_SCRIPT),
-            "--vault",
-            str(vault),
-            "--title",
-            "My Test Paper",
-            "--subdir",
-            "心理健康/My_Test_Paper",
-            *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, note_text),
-        ],
-        cwd=tmp_path,
-        env=env,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    payload = json.loads(result.stdout)
-    note_path = Path(payload["note_path"])
-    assert note_path == (
-        vault
-        / "Research/Papers"
-        / "心理健康"
-        / "My_Test_Paper"
-        / "My_Test_Paper.zh-CN.md"
-    )
-    assert note_path.exists()
 
 
 def test_write_note_uses_ready_chinese_obsidian_configuration(
@@ -1137,10 +1076,8 @@ def test_write_note_uses_ready_chinese_obsidian_configuration(
             str(WRITE_SCRIPT),
             "--title",
             "配置驱动保存",
-            "--subdir",
-            "机器学习",
             *source_manifest_args(tmp_path),
-            *formal_save_args(tmp_path, note_text),
+            *formal_save_args(tmp_path, note_text, domain="机器学习"),
         ],
         cwd=tmp_path,
         env=env,
@@ -1230,7 +1167,7 @@ def test_write_note_rejects_legacy_lint_json_without_output_language_before_save
 def test_write_note_rejects_note_edited_after_final_lint_before_save(
     tmp_path: Path,
 ) -> None:
-    linted_note = "# Final Review Test\n\nLinted body.\n"
+    linted_note = tagged("# Final Review Test\n\nLinted body.\n")
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(
         json.dumps(
@@ -1248,7 +1185,8 @@ def test_write_note_rejects_note_edited_after_final_lint_before_save(
     env.pop("DEEPPAPERNOTE_OBSIDIAN_VAULT", None)
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "DeepPaperNote_output"
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
-    decisions_args = formal_save_args(tmp_path, linted_note, lint_path=lint_path)[2:]
+    save_args = formal_save_args(tmp_path, linted_note, lint_path=lint_path)
+    decisions_args = [*save_args[:4], *save_args[6:]]
     canonical_note_path(tmp_path, linted_note.replace("Linted", "Reviewed"))
 
     result = subprocess.run(
@@ -1386,7 +1324,8 @@ def test_write_note_requires_integrity_artifacts_before_save(tmp_path: Path) -> 
             "--title",
             "Missing Integrity Artifacts",
             "--content-file",
-            str(canonical_note_path(tmp_path, "# Missing Integrity Artifacts\n")),
+            str(canonical_note_path(tmp_path, tagged("# Missing Integrity Artifacts\n"))),
+            "--domain", TEST_DOMAIN, "--new-domain-reason", "Test fixture domain.",
             *source_manifest_args(tmp_path),
         ],
         cwd=tmp_path,

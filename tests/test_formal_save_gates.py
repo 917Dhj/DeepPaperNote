@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from formal_save_helpers import canonical_note_path, final_review_args
+from formal_save_helpers import canonical_note_path, final_review_args, tagged
 
 from write_obsidian_note import lint_failure_message
 
@@ -23,7 +23,8 @@ FINAL_GATES = (
     "passes_substantive_content",
     "passes_reference_hygiene_gate",
 )
-NOTE = "# Formal Save Gate\n\nThe current evidence supports this reading.\n"
+DOMAIN = "Formal_Save_Gate"
+NOTE = tagged("# Formal Save Gate\n\nThe current evidence supports this reading.\n", DOMAIN)
 
 
 def write_json(path: Path, value: object) -> None:
@@ -87,7 +88,7 @@ def run_save(
     command = [
         sys.executable, str(SCRIPTS / "write_obsidian_note.py"),
         "--title", "Formal Save Gate", "--language", "en", "--save-mode", mode,
-        "--subdir", "Papers/Formal Save Gate",
+        "--domain", DOMAIN, "--new-domain-reason", "Test fixture domain.",
     ]
     if mode == "obsidian":
         command += ["--vault", str(vault)]

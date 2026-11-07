@@ -2,11 +2,37 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import _final_quality
+
+
+TEST_DOMAIN = "Testing"
+
+
+def tagged(note_text: str, domain: str = TEST_DOMAIN) -> str:
+    """Give a note the one papers/<domain> tag Formal Save requires, unless it has a papers/ tag."""
+    tag = "papers/" + re.sub(r"\s+", "_", domain)
+    bom = "\ufeff" if note_text.startswith("\ufeff") else ""
+    body = note_text.removeprefix("\ufeff")
+    newline = "\r\n" if "\r\n" in body else "\n"
+    if body.startswith("---" + newline):
+        end = body.find(newline + "---", 3)
+        block = body[: end if end != -1 else len(body)]
+        if "papers/" in block:
+            return note_text
+        if re.search(r"^tags:[ \t]*$", block, flags=re.MULTILINE):
+            body = re.sub(
+                r"^tags:[ \t]*$", lambda m: f"{m.group(0)}{newline}  - {tag}", body,
+                count=1, flags=re.MULTILINE,
+            )
+        else:
+            body = body.replace("---" + newline, f"---{newline}tags:{newline}  - {tag}{newline}", 1)
+        return bom + body
+    return f"{bom}---{newline}tags:{newline}  - {tag}{newline}---{newline}{body}"
 
 
 def canonical_note_path(tmp_path: Path, note_text: str, language: str = "zh-CN") -> Path:
@@ -73,7 +99,18 @@ def formal_save_args(
     source_manifest_path: Path | None = None,
     plan_path: Path | None = None,
     content_path: Path | None = None,
+    domain: str | None = TEST_DOMAIN,
 ) -> list[str]:
+    """Formal Save arguments with passing gates.
+
+    With `domain`, the save chooses that domain, and a note this helper writes gets its
+    papers/ tag through `tagged`; compare saved notes against `tagged(note_text, domain)`.
+    """
+    domain_args: list[str] = []
+    if domain is not None:
+        domain_args = ["--domain", domain, "--new-domain-reason", "Test fixture domain."]
+        if content_path is None:
+            note_text = tagged(note_text, domain)
     plan_path = plan_path or tmp_path / f"save-plan.{output_language}.json"
     if not plan_path.exists():
         plan_path.write_text(json.dumps({
@@ -148,6 +185,7 @@ def formal_save_args(
         encoding="utf-8",
     )
     return [
+        *domain_args,
         "--lint-json", str(lint_path),
         "--figure-decisions", str(decisions_path),
         "--plan-file", str(plan_path),

@@ -50,7 +50,7 @@ Example bindings:
 
 Replace the example values with the actual files and resolved run context. The bindings file path is relative to the command's current directory unless absolute. Paths inside `artifacts`, and the `vault`, `target_directory`, and `workspace_root` context values, are relative to `--workdir` unless absolute. Machine artifact bindings can override the pipeline filenames for an existing run.
 
-The file requires `schema_version: 1`. Its optional `artifacts` and `context` objects have closed schemas. Unknown keys, duplicate JSON keys, and invalid types are rejected. Context accepts `paper_reference`, `output_language`, `save_mode`, `vault`, `papers_dir`, `target_directory`, `workspace_root`, `zotero_mode`, and `source_sha256`. Context supplies command arguments; it does not certify that a stage passed or approve an overwrite.
+The file requires `schema_version: 1`. Its optional `artifacts` and `context` objects have closed schemas. Unknown keys, duplicate JSON keys, and invalid types are rejected. Context accepts `paper_reference`, `output_language`, `save_mode`, `vault`, `papers_dir`, `target_directory`, `domain`, `new_domain_reason`, `workspace_root`, `zotero_mode`, and `source_sha256`. Context supplies command arguments; it does not certify that a stage passed or approve an overwrite.
 
 An omitted late artifact is reported as an unresolved selection. An explicitly selected missing file is reported as missing. Neither causes the query to choose another file. The quality journal is derived from the selected review path by replacing its suffix with `.state.json`, following `final-quality-review.md`; it cannot be redirected separately.
 

@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from formal_save_helpers import formal_save_args
+from formal_save_helpers import formal_save_args, tagged
 
 import pytest
 
@@ -124,7 +124,7 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     )
     assert not any(key in bundle for key in removed_bundle_keys)
 
-    note_text = "# 本地 PDF 语言完整性\n\n本笔记验证工件链可安全保存。\n"
+    note_text = tagged("# 本地 PDF 语言完整性\n\n本笔记验证工件链可安全保存。\n")
     lint_path = workdir / "paper_lint.json"
     lint_path.write_text(
         json.dumps(

@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from formal_save_helpers import formal_save_args
+from formal_save_helpers import formal_save_args, tagged
 
 import _final_quality
 import _user_notes
@@ -490,7 +490,7 @@ def test_obsidian_overwrite_preserves_user_notes_and_records_hashes(tmp_path: Pa
     assert blocked["user_notes"]["status"] == "present"
     assert blocked["user_notes"]["chars"] > 0
 
-    replacement = draft().replace("78.5%", "79.0%")
+    replacement = tagged(draft().replace("78.5%", "79.0%"))
     second = save_to_vault(
         tmp_path, vault, replacement,
         "--overwrite-existing-note", "--expected-existing-note-sha256", edited_sha,
@@ -514,8 +514,8 @@ def test_obsidian_overwrite_of_untouched_note_uses_fresh_guidance(tmp_path: Path
     vault.mkdir()
     first = save_to_vault(tmp_path, vault, draft())
     assert first.returncode == 0, first.stderr
-    original_sha = hashlib.sha256(draft().encode()).hexdigest()
-    replacement = draft().replace("78.5%", "79.0%")
+    original_sha = hashlib.sha256(tagged(draft()).encode()).hexdigest()
+    replacement = tagged(draft().replace("78.5%", "79.0%"))
     second = save_to_vault(
         tmp_path, vault, replacement,
         "--overwrite-existing-note", "--expected-existing-note-sha256", original_sha,

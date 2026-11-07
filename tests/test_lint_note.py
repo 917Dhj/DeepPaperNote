@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from formal_save_helpers import formal_save_args, reviewed_insert_fields
+from formal_save_helpers import formal_save_args, reviewed_insert_fields, tagged
 
 import lint_note
 from localization import note_schema
@@ -1602,7 +1602,7 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
     digest = hashlib.sha256(b"fake-png").hexdigest()
-    note_text = "# Figure Insert Paper\n\n![Figure 1](images/figure_1.png)\n*Fig. 1 caption.*\n"
+    note_text = tagged("# Figure Insert Paper\n\n![Figure 1](images/figure_1.png)\n*Fig. 1 caption.*\n", "Figure_Insert_Paper")
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
@@ -1645,13 +1645,11 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
             "Figure Insert Paper",
             "--filename",
             "Figure Insert Paper.md",
-            "--subdir",
-            "Research/Papers/Figure Insert Paper",
             "--vault",
             str(vault),
             "--output",
             str(output_path),
-            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path)),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path), domain="Figure_Insert_Paper"),
         ],
         check=True,
         capture_output=True,
@@ -1671,7 +1669,7 @@ def test_write_obsidian_note_rejects_stale_reviewed_insert_bytes(tmp_path) -> No
     source_image = tmp_path / "page_001_fig_figure_1.png"
     reviewed_digest = hashlib.sha256(b"reviewed").hexdigest()
     source_image.write_bytes(b"changed-after-review")
-    note_text = "# Stale Figure Review\n\n![Figure 1](images/figure_1.png)\n*Fig. 1 caption.*\n"
+    note_text = tagged("# Stale Figure Review\n\n![Figure 1](images/figure_1.png)\n*Fig. 1 caption.*\n")
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
@@ -1734,7 +1732,7 @@ def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> N
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
-    note_text = "# Figure Insert Paper\n\n正文没有引用图片。\n"
+    note_text = tagged("# Figure Insert Paper\n\n正文没有引用图片。\n")
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
@@ -1780,7 +1778,7 @@ def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) ->
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
-    note_text = "# Figure Insert Paper\n\n正文只提到 images/figure_1.png 这个路径。\n"
+    note_text = tagged("# Figure Insert Paper\n\n正文只提到 images/figure_1.png 这个路径。\n")
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
@@ -1826,7 +1824,7 @@ def test_write_obsidian_note_rejects_unsafe_insert_filename(tmp_path) -> None:
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
-    note_text = "# Figure Insert Paper\n\n![Figure 1](images/../escaped.png)\n*Fig. 1 caption.*\n"
+    note_text = tagged("# Figure Insert Paper\n\n![Figure 1](images/../escaped.png)\n*Fig. 1 caption.*\n")
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
@@ -1872,7 +1870,7 @@ def test_write_obsidian_note_requires_the_planned_vault_filename(tmp_path) -> No
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1_review.png"
     source_image.write_bytes(b"fake-png")
-    note_text = (
+    note_text = tagged(
         f"# Figure Insert Paper\n\n![Figure 1](images/{source_image.name})\n"
         "*Fig. 1 caption.*\n"
     )

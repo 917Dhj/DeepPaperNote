@@ -8,10 +8,11 @@ import sys
 from pathlib import Path
 
 import pytest
+from formal_save_helpers import TEST_DOMAIN, tagged
 from test_final_quality_review import plan_payload, review_payload
 
 WRITER = Path(__file__).resolve().parents[1] / "skills/deeppapernote/scripts/write_obsidian_note.py"
-NOTE = b"# Final Quality Gate\n\nRecorded states explain the measured improvement.\n"
+NOTE = tagged("# Final Quality Gate\n\nRecorded states explain the measured improvement.\n").encode()
 GATES = (
     "passes_basic_structure",
     "passes_style_gate",
@@ -136,7 +137,10 @@ def save(
 ) -> subprocess.CompletedProcess[str]:
     vault = tmp_path / "vault"
     vault.mkdir(exist_ok=True)
-    args = ["--language", "en", "--title", "Final Quality Gate", "--save-mode", mode]
+    args = [
+        "--language", "en", "--title", "Final Quality Gate", "--save-mode", mode,
+        "--domain", TEST_DOMAIN, "--new-domain-reason", "Test fixture domain.",
+    ]
     if mode == "obsidian":
         args += ["--vault", str(vault)]
     flags = {
@@ -231,14 +235,12 @@ def test_status_output_cannot_overwrite_the_reviewed_note(tmp_path: Path, mode: 
     assert record(tmp_path, paths).returncode == 0
     root = tmp_path / "saved" if mode == "workspace" else tmp_path / "vault/papers"
     filename = "note.md" if mode == "workspace" else "note.en.md"
-    target = root / "area/note" / filename
+    target = root / TEST_DOMAIN / "note" / filename
     result = save(
         tmp_path,
         paths,
         mode=mode,
         extra_args=[
-            "--subdir",
-            "area",
             "--filename",
             "note.md",
             "--papers-dir",
@@ -430,6 +432,10 @@ def test_preflight_does_not_require_final_reviews(tmp_path: Path) -> None:
             str(vault),
             "--title",
             "Preflight Quality",
+            "--domain",
+            TEST_DOMAIN,
+            "--new-domain-reason",
+            "Test fixture domain.",
             "--language",
             "en",
             "--source-manifest",

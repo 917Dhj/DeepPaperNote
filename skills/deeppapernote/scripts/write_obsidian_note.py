@@ -28,8 +28,14 @@ from _user_notes import (
     restore_generated_text,
     split_user_notes,
 )
+from _domain_routing import (
+    DomainChoiceError,
+    domain_overview,
+    domain_tag_issue,
+    resolve_domain_choice,
+    saved_domain,
+)
 from _note_paths import (
-    resolve_domain_subdir,
     resolve_note_asset_dir,
     resolve_note_output_mode,
     resolve_obsidian_note_path,
@@ -156,7 +162,14 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--vault", default="", help="Target Obsidian vault path.")
     p.add_argument("--save-mode", choices=("workspace", "obsidian"), default="")
     p.add_argument("--papers-dir", default="", help="Vault-relative paper directory.")
-    p.add_argument("--subdir", default="", help="Vault-relative subdirectory.")
+    p.add_argument(
+        "--domain", default="",
+        help="Domain folder the model chose for a new paper directory; see references/domain-routing.md.",
+    )
+    p.add_argument(
+        "--new-domain-reason", default="",
+        help="Why no existing domain fits; required when --domain names a new domain.",
+    )
     p.add_argument("--filename", default="", help="Explicit note filename.")
     p.add_argument("--asset-subdir", default="images", help="Asset folder name relative to the note directory.")
     p.add_argument("--target-directory", default="", help="Previously selected existing paper directory.")
@@ -534,13 +547,36 @@ def recorded_saved_note_sha256(registry: dict | None, source_sha256: str, output
     return str(note.get("note_sha256", ""))
 
 
+def choose_domain(args, config: dict, *, source_sha256: str, output_language: str) -> str:
+    try:
+        domain, args.new_domain = resolve_domain_choice(
+            config, args.domain, args.new_domain_reason
+        )
+    except DomainChoiceError as exc:
+        emit(
+            {
+                "status": "blocked",
+                "script": "write_obsidian_note.py",
+                "phase": "save_target_admission",
+                "conflict_code": exc.code,
+                "requires_user_confirmation": False,
+                "message": exc.message,
+                "domain_overview": domain_overview(config),
+                "source_sha256": source_sha256,
+                "output_language": output_language,
+            },
+            args.output,
+        )
+        raise SystemExit(2) from exc
+    return domain
+
+
 def resolve_obsidian_save_target(
     args: argparse.Namespace,
     config: dict,
     vault: Path,
     *,
     title: str,
-    abstract: str,
     source_sha256: str,
     output_language: str,
 ) -> tuple[Path, str, str, bool, str]:
@@ -576,8 +612,8 @@ def resolve_obsidian_save_target(
             )
             domain_routing_skipped = True
         else:
-            resolved_subdir = resolve_domain_subdir(
-                config, title=title, abstract=abstract, subdir=args.subdir
+            resolved_subdir = choose_domain(
+                args, config, source_sha256=source_sha256, output_language=output_language
             )
             target_path = resolve_obsidian_note_path(
                 config, title=title, subdir=resolved_subdir, filename=args.filename
@@ -831,8 +867,6 @@ def main() -> None:
     if not title:
         raise SystemExit("write_obsidian_note.py requires --title or metadata with a title.")
 
-    if args.preflight and output_mode != "obsidian":
-        raise SystemExit("--preflight requires Obsidian save mode.")
     source_manifest = require_source_manifest(args.source_manifest)
     args.archive_input = {**record, **source_manifest, "title": title}
     if not args.target_directory:
@@ -876,16 +910,15 @@ def main() -> None:
             config,
             root_path,
             title=title,
-            abstract=str(record.get("abstract", "")),
             source_sha256=str(source_manifest["source_sha256"]),
             output_language=output_language,
         )
     else:
-        resolved_subdir = resolve_domain_subdir(
+        resolved_subdir = choose_domain(
+            args,
             config,
-            title=title,
-            abstract=str(record.get("abstract", "")),
-            subdir=args.subdir,
+            source_sha256=str(source_manifest["source_sha256"]),
+            output_language=output_language,
         )
         target_path = resolve_obsidian_note_path(
             config,
@@ -894,7 +927,12 @@ def main() -> None:
             filename=args.filename,
         )
         require_safe_status_output(args, target_path)
+        args.admitted_asset_subdir = args.asset_subdir
 
+    domain = resolved_subdir or saved_domain(config, target_path)
+    new_domain = {"new_domain": getattr(args, "new_domain", False)}
+    if new_domain["new_domain"]:
+        new_domain["new_domain_reason"] = args.new_domain_reason.strip()
     if args.preflight:
         emit(
             {
@@ -903,6 +941,8 @@ def main() -> None:
                 "phase": "save_target_admission",
                 "admission": admission,
                 "domain_routing_skipped": domain_routing_skipped,
+                "domain": domain,
+                **new_domain,
                 "target_directory": str(target_path.parent),
                 "note_path": str(target_path),
                 "asset_subdir": args.admitted_asset_subdir,
@@ -994,6 +1034,9 @@ def main() -> None:
     except (OSError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
     require_reference_hygiene(note_text, "before save")
+    tag_issue = domain_tag_issue(note_text, domain)
+    if tag_issue:
+        raise SystemExit(tag_issue)
     try:
         state = load_quality_state(quality_state_path)
         require_recorded_pass(state, quality_review, quality_id, language=output_language)
@@ -1017,7 +1060,6 @@ def main() -> None:
                 config,
                 root_path,
                 title=title,
-                abstract=str(record.get("abstract", "")),
                 source_sha256=str(source_manifest["source_sha256"]),
                 output_language=output_language,
             )
@@ -1159,6 +1201,8 @@ def main() -> None:
             "title": title,
             "note_path": str(target_path),
             "subdir": resolved_subdir,
+            "domain": domain,
+            **new_domain,
             "images_dir": str(asset_dir),
             "materialized_figures": materialized_figures,
             "overwrote_existing_note": overwrote_existing_note,

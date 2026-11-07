@@ -1688,8 +1688,14 @@ def frontmatter_issues(text: str, plan_paper_type: str) -> list[str]:
     tags = fields.get("tags")
     tag_values = tags if isinstance(tags, list) else [tags] if isinstance(tags, str) else []
     prefix = contract["domain_tag_prefix"]
-    if not any(isinstance(tag, str) and tag.startswith(prefix) and len(tag) > len(prefix) for tag in tag_values):
+    domain_tags = [
+        tag for tag in tag_values
+        if isinstance(tag, str) and tag.startswith(prefix) and len(tag) > len(prefix)
+    ]
+    if not domain_tags:
         issues.append("frontmatter_domain_tag_missing")
+    elif len(domain_tags) > 1:
+        issues.append("frontmatter_domain_tag_multiple")
     paper_type = fields.get("paper_type")
     if "paper_type" in fields and plan_paper_type and paper_type != plan_paper_type:
         issues.append("frontmatter_paper_type_mismatch")

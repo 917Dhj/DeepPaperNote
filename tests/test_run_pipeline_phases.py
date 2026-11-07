@@ -462,6 +462,10 @@ def test_two_phases_run_through_a_real_admission(tmp_path: Path) -> None:
     run_script(
         str(WRITE_NOTE_SCRIPT),
         "--preflight",
+        "--domain",
+        "Testing",
+        "--new-domain-reason",
+        "Test fixture domain.",
         "--title",
         source["title"],
         "--source-manifest",
