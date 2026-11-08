@@ -97,7 +97,7 @@ npx skills update
 
 ## 👀 笔记长什么样
 
-<!-- 动画演示 GIF：素材阶段放入 -->
+![DeepPaperNote 生成的 Attention Is All You Need 精读笔记演示](./assets/demo-note.zh-CN.webp)
 
 每篇笔记分三部分：开头和结尾每篇都一样，中间的主体按论文类型变化。
 
@@ -120,12 +120,12 @@ npx skills update
 
 ```text
 <你的论文目录>/
-└── 计算机视觉/                ← 领域文件夹，优先沿用你已有的
-    └── Segment_Anything/
-        ├── Segment_Anything.zh-CN.md
+└── 自然语言处理/              ← 领域文件夹，优先沿用你已有的
+    └── Attention_Is_All_You_Need/
+        ├── Attention_Is_All_You_Need.zh-CN.md
         └── images/
-            ├── Figure_1.png
-            └── Table_2.png
+            ├── figure_1.png
+            └── table_2.png
 ```
 
 每篇笔记开头带着一组结构化属性，可以直接用 Obsidian Bases 建表、筛选，比如列出所有读过的 Benchmark 论文，或者这个月读过的全部论文：

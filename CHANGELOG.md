@@ -35,7 +35,7 @@ DeepPaperNote now reads each paper by its type, and every note joins your vault.
 - The final quality review is now a required gate: Formal Save refuses a note that has not passed it.
 - The agent now chooses each new paper's domain folder after reading what the existing domains hold, or the user's convention in `<Vault>/DeepPaperNote/domains.md`. It reuses an existing domain by default and creates a new one only with a stated reason, which the final report repeats. The keyword table `domain_rules.yaml` is removed.
 - A saved note carries exactly one `papers/<domain>` tag, and it must name the folder the note is saved in.
-- Images saved in the vault are named after their label in the paper, such as `Figure_1.png`.
+- Images saved in the vault are named after their label in the paper, such as `figure_1.png`.
 - When a glossary library shares the vault, DeepPaperNote suggests running `paper-glossary` on the paper after saving.
 - Regenerating a note replaces a re-cropped image of the same name instead of refusing the save.
 

@@ -22,6 +22,10 @@ CONTEXT.md
 .claude/
 docs/
 /assets/hero-concepts/
+# Local-only assets: README demo source and tools, and retired images.
+/assets/demo/
+/assets/usage-example.png
+/assets/hero-academic.svg
 evals/papers/
 
 # Requests a corpus replay could not answer; regenerated on every run.
