@@ -7,12 +7,10 @@
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
 [![主页](https://img.shields.io/badge/homepage-online-2563eb)](https://917dhj.github.io/DeepPaperNote/)
-[![状态](https://img.shields.io/badge/status-stable-16a34a)](https://github.com/917Dhj/DeepPaperNote)
 [![版本](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases)
 [![许可证](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
 [![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./skills/deeppapernote/SKILL.md)
 [![输出](https://img.shields.io/badge/output-Obsidian-16a34a)](./skills/deeppapernote/references/obsidian-format.md)
-[![更新日志](https://img.shields.io/badge/changelog-latest-0f766e)](./CHANGELOG.md)
 
 </div>
 
@@ -22,157 +20,173 @@
   <em>深读一篇论文，沉淀一页学术 Wiki。</em>
 </p>
 
-**你是否经常遇到这种情况：准备精读一篇重要论文时，最累的往往不是“看”，而是把已经理解的内容整理成以后还能真正使用的笔记？** 时间通常消耗在这些环节：
+**精读一篇重要论文，最累的往往不是“看”，而是把读懂的东西整理成以后还用得上的笔记。** 找原文、对照图表、搬运数据、理清方法主线，一篇笔记常常要花掉大半天。而读过的论文散落各处，彼此之间没有任何联系。
 
-- 在 PDF、Zotero、网页和笔记软件之间来回切换
-- 手动整理元数据、摘要、图表和方法主线
-- 明明已经读懂了一部分，却还要花很长时间把理解写成结构化笔记
-- 最后留下的仍然只是一篇“看起来完整，但以后未必还想回看”的笔记
+DeepPaperNote 是一个 Agent Skill，可以运行在 Claude Code、Codex 等任何支持 skill 的 Agent 里。把一篇论文交给它，它会读完全文，写成一篇图文并茂的精读笔记，存进你的 Obsidian 知识库，并连到你读过的其他论文上。**每读一篇，你的学术 Wiki 就长大一点。**
 
-DeepPaperNote 想解决的，就是这一层重复、机械、但又非常耗时的工作。它会接管材料收集、结构整理、图表定位和笔记成形这些环节，让你把精力留给论文真正值得思考的部分。
-
-换句话说，你可以把 DeepPaperNote 看作 **LLM 学术 Wiki 的单篇论文入口**：它每次把一篇论文读深，将研究问题、方法、证据、结果和图表沉淀为一页可供人阅读、也可被 Agent 继续使用的学术知识页面。Obsidian 负责承载、链接和长期积累这些页面，DeepPaperNote 则负责把论文可靠地送进去。
-
-DeepPaperNote 是一个专注于**一次精读一篇论文**的 Agent Skill。同一套核心 skill 可以运行在 Claude Code 和 Codex 上，它更关心那些真正区分“深度笔记”和“摘要改写”的问题：
-
-- 论文到底在解决什么问题？
-- 方法、系统或分析机制究竟是怎样工作的？
-- 关键公式、实验结论和图表语境是否被保留下来？
-- 最终结果能否沉淀成一篇适合长期积累的 Obsidian 笔记，而不是一次性摘要？
-
-> [!tip]
-> 如果你已经有自己的 Obsidian 或 Zotero 工作流，DeepPaperNote 会把最耗时、也最容易出错的取证、整理和成稿环节自动化。
+- 🚀 **一句话，一篇笔记**：不用学提示词，也不用配模板。说一句“给这篇论文生成深度笔记”，附上标题、DOI、arXiv ID 或 PDF，剩下的全部自动完成：找原文、读全文、提取图表、写笔记、存进知识库。第一次使用时只需回答两个问题：笔记用什么语言，存到哪里。
+- 🎓 **像领域专家一样读**：方法论文、Benchmark、综述和临床试验，该问的问题完全不同，DeepPaperNote 为 10 种论文类型各准备了一套专门的读法。从 CS/AI 到医学、生物、物理、心理、社科乃至人文，从新方法、系统、理论到 Benchmark、综述和临床试验，你的论文都可以交给它。这套读法参考了 50 多份审稿指南、报告规范和阅读方法，包括 NeurIPS、ICLR、ACL 的审稿标准，CONSORT、PRISMA 等医学与综述报告规范，Keshav 的三遍读法，以及开源的 AI 审稿项目和论文 skill，并在 34 篇横跨多个学科的真实论文上反复检验。
+- 🎯 **写得准，写得全**：笔记里的结论都能在原文找到出处，数字直接取自论文的正文和表格，每个主要实验都会写到。论文没有报告的内容，笔记会直说“论文没有报告”，不替作者脑补。保存前还有一轮独立审阅，检查有没有写错、漏写。如果只拿到摘要、读不到全文，它会停下来向你要原文，而不是硬写一篇。
+- 🖼️ **图、表、公式融进正文**：原文的插图和表格会被裁剪出来，放在正文讨论它的地方，紧挨着解读；关键公式用 LaTeX 写出，在 Obsidian 里直接渲染。读笔记时不用再回头翻 PDF。
+- 🧠 **越用越懂你的知识库**：新笔记会自动链接到库里的相关论文，归入你已有的领域文件夹，还带着可以用 Obsidian Bases 筛选查询的结构化属性。记录下你的研究方向（研究记忆）之后，每篇笔记的“阅读收获”会告诉你，这篇论文对你自己的研究有什么用。你读得越多、记忆越完整，它给出的关联和建议就越贴近你。
 
 ## 📰 最新动态
 
-- **[v2.3.0]** 🌐 新增完整英文笔记支持，从章节结构、图表标注到校验与 Formal Save，全流程保持英文一致。[版本说明](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.0)
-- **[2026-07-16]** 🧩 新增可选 companion skill [`paper-glossary`](./skills/paper-glossary/README.md)，用于构建可复用的 Obsidian 术语笔记。
-- **[2026-07-16]** 🔌 DeepPaperNote 现在以支持多个 Agent 的插件形式分发，并支持从仓库中选择多个 skill。[PR #12](https://github.com/917Dhj/DeepPaperNote/pull/12)
+- **[v3.0.0]** 🎓 笔记按论文类型来读：10 种论文类型各有专门的读法和笔记结构，图表先经过视觉审阅再放进笔记，保存前还有一道独立的质量审阅。[版本说明](https://github.com/917Dhj/DeepPaperNote/releases/tag/v3.0.0)
+- **[v3.0.0]** 🧠 每篇笔记都连进你的知识库：笔记新增“阅读收获”和“关联”两节，并带结构化属性；新增 [`research-memory`](./skills/research-memory/README.md) 和 [`organize-wiki`](./skills/organize-wiki/README.md) 两个 skill，让阅读收获贴合你的研究方向，让领域文件夹保持整齐。
+- **[v2.3.1]** 🔌 支持 [DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector)：在浏览器里收藏的论文，可以直接在同一个论文目录里生成笔记。[版本说明](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.1)
 
 这里只保留最近三条用户可感知的重要动态。完整历史请查看 [CHANGELOG](./CHANGELOG.md) 与 [GitHub Releases](https://github.com/917Dhj/DeepPaperNote/releases)。
 
 ## 🚀 快速开始
 
-### 1. 安装插件
+### 1. 安装
 
-**Claude Code** —— 通过插件市场安装：
+**Claude Code**：从插件市场安装
 
 ```bash
 claude plugin marketplace add 917Dhj/DeepPaperNote
-```
-
-```bash
 claude plugin install deeppapernote@deeppapernote
 ```
 
-**任意 Agent** —— 通过 skills CLI 安装：
+**Codex 及其他支持 skill 的 Agent**：用 skills CLI 安装
 
 ```bash
 npx skills add 917Dhj/DeepPaperNote
 ```
 
-两条路径安装的是同一组 skill。插件路径会一并装上 `deeppapernote`、`paper-glossary`、`research-memory` 与 `organize-wiki`；skills CLI 安装程序则让你选择需要安装的 skill，以及要安装到哪些 Agent。大多数用户可以先选择 `deeppapernote`；需要可复用术语笔记时，再选择 `paper-glossary`；希望阅读收获贴合自己的研究方向时，再选择 `research-memory`；想让 agent 帮你整理知识库的领域文件夹时，再选择 `organize-wiki`。
+插件方式会一次装上全部四个 skill。skills CLI 会让你选择装哪些 skill、装到哪些 Agent。只想先试试的话，装 `deeppapernote` 一个就够了，另外三个的用途见[下文](#-从论文到知识库)。
 
-### 2. 安装核心 PDF 依赖
+### 2. 安装 PDF 依赖
 
 ```bash
 python3 -m pip install PyMuPDF
 ```
 
-如果你使用 `uv`，请将 `PyMuPDF` 安装到 DeepPaperNote 实际使用的同一 Python 环境中：
+需要 Python 3.10 或更高版本。用 `uv` 的话，执行 `uv pip install PyMuPDF`，装到 DeepPaperNote 实际使用的那个 Python 环境里。
 
-```bash
-uv pip install PyMuPDF
-```
+### 3. 开始读论文
 
-DeepPaperNote 需要 Python 3.10 或更高版本。核心 PDF 抽取路径依赖 `PyMuPDF`。
-
-### 3. 把论文交给 Agent
-
-论文标题、DOI、URL、本地 PDF 都可以直接作为输入；也支持 arXiv ID，在具备兼容集成时还支持 Zotero 条目。
+对你的 Agent 说一句话，附上论文的标题、DOI、URL、arXiv ID 或本地 PDF：
 
 ```text
-给这篇论文生成深度笔记：<论文标题、DOI、URL、arXiv ID 或本地 PDF>
+给这篇论文生成深度笔记：<论文>
 把这篇论文整理成 Obsidian 笔记：<论文>
 ```
 
-## 🔌 从浏览器收藏论文
+也可以直接用斜杠命令 `/deeppapernote <论文>` 调用。
 
-浏览论文时，可以使用 [DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector) 将 PDF 直接收藏到你的 Obsidian 论文库。准备精读时，再把已收藏的 PDF 交给 DeepPaperNote，在同一论文目录中生成深度笔记，让原文与理解一起积累。不同版本的 PDF 可以拥有各自对应的笔记，已有笔记仍受保护。
+第一次使用时，它会问你两件事：笔记用中文还是英文，存到当前工作区还是你的 Obsidian 库。选好之后会记住，以后不再问。某一篇想换语言或换位置，直接在请求里说就行。环境变量等更多配置见[用户配置说明](./skills/deeppapernote/references/user-configuration.md)。
 
-Connector 是可选的浏览器扩展，目前支持 **macOS 上的 Chrome**，需要配合本地保存组件使用。你也可以继续直接向 DeepPaperNote 提供标题、DOI、URL 或本地 PDF。
+### 4. 更新到新版本
 
-**[了解 Connector 与安装方法 →](https://github.com/917Dhj/DeepPaperNote-Connector/blob/main/README.zh-CN.md)**
+**Claude Code**：
 
-## 🎯 为什么选择 DeepPaperNote？
+```bash
+claude plugin marketplace update deeppapernote
+claude plugin update deeppapernote@deeppapernote
+```
 
-![DeepPaperNote 使用示例](./assets/usage-example.png)
+更新后重启 Claude Code 生效。
 
-| 你可能正遇到…… | DeepPaperNote 会帮你…… |
+**skills CLI**：
+
+```bash
+npx skills update
+```
+
+## 👀 笔记长什么样
+
+<!-- 动画演示 GIF：素材阶段放入 -->
+
+每篇笔记分三部分：开头和结尾每篇都一样，中间的主体按论文类型变化。
+
+| 部分 | 包含的小节 |
 | --- | --- |
-| 📄 **论文读完了，但笔记还是一堆散乱片段** | 把研究问题、方法链路、核心实验和局限重新组织成一篇真正能够再次读懂的笔记 |
-| 🧠 **不想再收藏一篇“看起来很完整”的 AI 摘要** | 保留真正重要的公式、数字、图表语境和证据边界，让笔记承载真实理解 |
-| 🗂️ **论文越读越多，却始终没有形成自己的学术 Wiki** | 把每篇论文沉淀为可搜索、可链接、可长期复用的 Obsidian 知识页面，让你的学术 Wiki 逐篇生长 |
-| 📚 **Zotero 里已经有论文，不想重新下载和匹配** | 在可用时优先复用本地条目和附件，减少重复工作与论文错配 |
+| **开头** | 核心信息 · 原文摘要翻译 · 创新点 · 一句话总结 |
+| **主体** | 方法论文：背景与问题 → 现有方法的局限 → 核心思路与挑战 → 方法 → 实验证据 → 深度分析<br>Benchmark：评测缺口 → 任务与设计目标 → 构造流程与质量控制 → 评测框架 → 实验发现 → 它到底测到了什么<br>综述：范围与检索 → 分类体系 → 各方向要点 → 共识、分歧与空白<br>……共 10 种论文类型 |
+| **结尾** | 局限 · 阅读收获 · 关联 · 我的笔记 |
 
-## 🧩 Skills
+结尾的三节，是笔记和你的知识库发生联系的地方：
 
-DeepPaperNote 仍然是唯一主产品。仓库同时提供几个可选 companion skill；它们只使用 DeepPaperNote 已保存的笔记与论文材料，不会接管或重新运行论文精读流程。
+- **阅读收获**：分成“可迁移”和“下一步”两部分，写这篇论文有哪些思路能用到别的问题上，以及读完可以接着做什么。建立研究记忆之后，这部分会对照你自己的研究方向来写。
+- **关联**：链接到库里相关的论文笔记，并列出读懂这篇论文需要先了解的关键文献。
+- **我的笔记**：留给你自己写，重新生成笔记时原样保留。
 
-| Skill | 定位 | 什么时候使用 |
+<details>
+<summary><b>保存后，库里会多出什么</b></summary>
+
+每篇论文有自己的目录，插图和表格按原文编号命名：
+
+```text
+<你的论文目录>/
+└── 计算机视觉/                ← 领域文件夹，优先沿用你已有的
+    └── Segment_Anything/
+        ├── Segment_Anything.zh-CN.md
+        └── images/
+            ├── Figure_1.png
+            └── Table_2.png
+```
+
+每篇笔记开头带着一组结构化属性，可以直接用 Obsidian Bases 建表、筛选，比如列出所有读过的 Benchmark 论文，或者这个月读过的全部论文：
+
+```yaml
+paper_type: benchmark_or_dataset
+methods: [...]
+datasets: [...]
+tasks: [...]
+read_date: 2026-11-08
+```
+
+</details>
+
+## 🧩 从论文到知识库
+
+DeepPaperNote 负责把每一篇论文读透、存好。另外三个配套 skill 都是可选的，它们照看的是整个知识库。
+
+| Skill | 它为你做什么 | 怎么调用 |
 | --- | --- | --- |
-| [`deeppapernote`](./skills/deeppapernote/SKILL.md) | **核心产品 · 推荐安装** | 精读单篇论文，生成包含图表、关键结果与局限的结构化、证据充分的 Obsidian 笔记 |
-| [`paper-glossary`](./skills/paper-glossary/SKILL.md) | 可选 companion | 从已有论文材料中筛选术语，创建可复用的 Obsidian 术语笔记，并按需链接回论文笔记 |
-| [`research-memory`](./skills/research-memory/SKILL.md) | 可选 companion | 由 agent 结合你读过的论文向你提问，把你的研究方向记录在 Obsidian 里；DeepPaperNote 之后会据此写每篇笔记的"可迁移" |
-| [`organize-wiki`](./skills/organize-wiki/SKILL.md) | 可选 companion | 和 agent 一起商定知识库的领域分类，预览确认后再把放错的论文归位、修正标签；DeepPaperNote 之后按这份约定为新论文选择文件夹，上一次整理可以撤销 |
+| [`deeppapernote`](./skills/deeppapernote/SKILL.md) | **核心**。精读一篇论文，写成图文并茂的笔记存进知识库，并连到你读过的其他论文上。 | “给这篇论文生成深度笔记：<论文>”<br>或 `/deeppapernote` |
+| [`research-memory`](./skills/research-memory/README.md) | 为你维护一份研究记忆：记下你正在做的研究方向，并随着你读的论文持续跟进。有了它，DeepPaperNote 写“阅读收获”时会对照你的研究方向来写，下一篇笔记会更懂你。 | “建立我的研究记忆”<br>或 `/research-memory` |
+| [`organize-wiki`](./skills/organize-wiki/README.md) | 整理你的知识库：理清领域分类，把放错领域的论文归位，修正论文的领域标签。整理好的分类会成为 DeepPaperNote 之后归档新论文的依据。 | “整理我的知识库”<br>或 `/organize-wiki` |
+| [`paper-glossary`](./skills/paper-glossary/README.md) | 为你的知识库建一套术语表：把论文里的关键概念整理成可复用的术语笔记，并链接回论文正文。不同论文里出现的同一个术语，都指向同一篇术语笔记。 | “给这篇论文建术语笔记”<br>或 `/paper-glossary` |
 
-你不需要一次安装所有 skill。安装时选择适合自己工作流的部分即可。
+推荐的节奏：先用 DeepPaperNote 读上几篇论文；库里有了一些笔记后，建一份研究记忆；论文多起来、分类开始乱的时候，整理一次知识库。
 
-## ✅ 质量承诺
+## ✅ 值得信赖的笔记
 
-- 最终结果应该是一篇单篇论文深度笔记，而不是摘要改写。
-- 重要的方法、实验结果、图表和局限应该得到解释，而不只是被罗列出来。
-- 如果现有来源不足以支撑真正的深度精读，流程应该停止并要求更好的材料，而不是假装笔记已经完成。
-- 保存前由专门的 reviewer 核对冻结计划与正文，质量评审和可读性产物绑定最终草稿字节。质量评审未通过时，正文最多自动修订两轮。
+- **是精读，不是摘要**：每篇笔记都会回答它所属论文类型的全部核心问题，论文没有报告的地方，也会明确写出来。
+- **内容有据可查**：笔记里的结论和数字都来自论文原文，不编造、不脑补。
+- **读不到全文就不写**：只拿到摘要时，它会停下来向你要原文，不会交出一篇看似完整的笔记。
+- **每张图都看过**：图表放进笔记前，都要先经过视觉审阅，裁得不完整或和正文对不上的图不会放进去。
+- **保存前最后把关**：一轮独立审阅检查笔记有没有写错、漏写，不通过就先改好再保存。
+- **不动你已有的笔记**：已有笔记不会被悄悄覆盖；重新生成时，“我的笔记”一节原样保留。
 
-规范执行契约以 [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md) 为准。
-
-使用 `python skills/deeppapernote/scripts/run_state.py status --workdir <运行目录> --prefix <运行前缀>` 可以只读查询缺失或过期产物、当前门禁结果和下一步操作。[运行状态查询说明](./skills/deeppapernote/references/run-state.md)介绍了如何显式选择产物，以及哪些历史新鲜度无法从现有文件证明。运行产物默认放在 `~/.deeppapernote/runs/` 下按论文区分的目录中，不会自动清理。
-
-## 🗂️ 首次使用设置
-
-第一次把论文交给 Agent 时，DeepPaperNote 会引导你选择：
-
-- 默认使用英文还是简体中文生成笔记
-- 默认保存到当前 workspace 还是 Obsidian Vault
-
-确认后，这些偏好会保存在当前设备上，并自动用于后续论文。你仍然可以为某一次任务临时指定不同的语言或保存位置，而不改变默认偏好。
-
-DeepPaperNote 不会静默覆盖已有笔记，也不会在保存受阻时擅自切换保存位置。
-
-环境变量与 CLI 等高级配置请查看[用户配置说明](./skills/deeppapernote/references/user-configuration.md)。
+**这些不只是说说**：我们用 34 篇覆盖全部 10 种论文类型的真实论文做回归测试；在 6 篇样例论文上，用内部评分标准对改版前后的笔记做盲评，平均分从 73.6 提高到 84.2（满分 100）。
 
 ## 🔧 可选增强
 
-处理普通数字版 PDF 时，下面这些能力都不是必需项。
+不装这些，DeepPaperNote 也能正常读普通的电子版 PDF。下面几项按需添加：
 
-| 可选增强 | 能解决什么问题 |
-| --- | --- |
-| Zotero 集成 | 联网搜索前优先复用本地论文条目与 PDF 附件 |
-| Semantic Scholar API | 改善部分难以识别论文的元数据获取 |
-| OCR 工具 | 从扫描版或文本质量较差的 PDF 中恢复页面文字 |
+| 增强 | 它为你做什么 | 怎么开启 |
+| --- | --- | --- |
+| **[DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector/blob/main/README.zh-CN.md)** | 在浏览器里一键把论文收进 Obsidian 论文库，想精读时直接在同一目录生成笔记 | 安装浏览器扩展，目前支持 macOS 上的 Chrome |
+| **Zotero** | 论文已经在 Zotero 里的，直接用本地条目和 PDF，不用再搜、再下载 | 打开 Zotero 7，在“设置 → 高级”里勾选“允许此计算机上的其他应用程序与 Zotero 通讯”，之后自动生效 |
+| **Semantic Scholar API key** | 让较难识别的论文也能查准标题、作者、发表信息 | 设置环境变量 `SEMANTIC_SCHOLAR_API_KEY` |
+| **OCR** | 扫描版或文字质量差的 PDF，也能识别出正文 | 安装 Tesseract 和 `pytesseract` |
 
-### Zotero Local API
+需要哪一项，也可以直接让你的 Agent 检查当前环境，帮你配好。
 
-内置的只读 Zotero Local API 集成提供三种解析模式：
+## 🛠️ 排查问题
 
-- `auto`（默认）：优先使用唯一的本地条目，同时保留联网回退
-- `off`：跳过 Zotero 查询
-- `required`：只有 Zotero 唯一解析出目标论文时才继续
+遇到问题时，最省事的办法是直接问你的 Agent：
 
-本地匹配存在歧义时，流程会明确失败，而不是任意选择条目。Agent runtime 或 MCP 提供的兼容集成仍可作为可选替代路线。
+- **装好了却用不起来**：说“检查一下 DeepPaperNote 的运行环境”。它会告诉你缺了什么，包括 Python 和 PyMuPDF、Obsidian 的配置，以及 Zotero、OCR 等可选增强的状态。
+- **一篇笔记中途停下或没有保存**：说“看看这次 DeepPaperNote 运行到哪一步了”。它会告诉你卡在哪里、还缺什么、下一步该做什么。
 
-实际需要其中某项能力时，可以让 Agent 检查当前环境，并针对这台机器引导配置。
+运行时的中间文件存放在 `~/.deeppapernote/runs/` 下，每篇论文一个目录，不会自动清理。占空间的话，可以手动删除。
+
+还没解决的话，欢迎[提一个 Issue](https://github.com/917Dhj/DeepPaperNote/issues)。
 
 ## 🧭 致谢与灵感
 
@@ -180,10 +194,19 @@ DeepPaperNote 在工作流设计上受到了一些认真对待论文阅读、证
 
 - [heleninsights-dot/phd-deepread-workflow](https://github.com/heleninsights-dot/phd-deepread-workflow)
 - [juliye2025/evil-read-arxiv](https://github.com/juliye2025/evil-read-arxiv)
+- [HKUSTDial/Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills)
 
 ## 🤝 贡献说明
 
-请将 Pull Request 提交到 `develop`，而不是 `main`。可能影响最终笔记质量的改动，应使用 [`evals/regression-workflow-zh.md`](./evals/regression-workflow-zh.md) 与 [`evals/note-quality-rubric.md`](./evals/note-quality-rubric.md) 进行评估。
+请将 Pull Request 提交到 `develop`，而不是 `main`。提交前请在本地跑通测试和 lint：
+
+```bash
+python3 -m pip install -e '.[dev]'
+python3 -m pytest -q -n auto
+python3 -m ruff check skills tests
+```
+
+工作流以 [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md) 为准。可能影响笔记质量的改动，请按 [`evals/regression-workflow-zh.md`](./evals/regression-workflow-zh.md) 和 [`evals/note-quality-rubric.md`](./evals/note-quality-rubric.md) 做评估。
 
 ## Star History
 
