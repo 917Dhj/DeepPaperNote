@@ -97,7 +97,7 @@ npx skills update
 
 ## 👀 What a Note Looks Like
 
-<!-- Animated demo GIF: added in the assets phase -->
+![A DeepPaperNote deep-reading note for Attention Is All You Need](./assets/demo-note.en.webp)
 
 Every note has three parts: the opening and closing are the same for every paper, and the body in between follows the paper's type.
 
@@ -120,12 +120,12 @@ Each paper gets its own folder, and figures and tables are named after their lab
 
 ```text
 <your papers folder>/
-└── Computer Vision/           ← domain folder, reusing the ones you already have
-    └── Segment_Anything/
-        ├── Segment_Anything.en.md
+└── NLP/                       ← domain folder, reusing the ones you already have
+    └── Attention_Is_All_You_Need/
+        ├── Attention_Is_All_You_Need.en.md
         └── images/
-            ├── Figure_1.png
-            └── Table_2.png
+            ├── figure_1.png
+            └── table_2.png
 ```
 
 Each note opens with structured properties you can query and filter with Obsidian Bases, for example to list every benchmark paper you have read, or everything you read this month:
