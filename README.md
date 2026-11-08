@@ -7,12 +7,10 @@
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
 [![Homepage](https://img.shields.io/badge/homepage-online-2563eb)](https://917dhj.github.io/DeepPaperNote/)
-[![Status](https://img.shields.io/badge/status-stable-16a34a)](https://github.com/917Dhj/DeepPaperNote)
 [![Release](https://img.shields.io/github/v/release/917Dhj/DeepPaperNote?display_name=tag&color=0f766e)](https://github.com/917Dhj/DeepPaperNote/releases)
 [![License](https://img.shields.io/badge/license-MIT-c9a227)](./LICENSE)
 [![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%2B%20Codex-7c3aed)](./skills/deeppapernote/SKILL.md)
 [![Output](https://img.shields.io/badge/output-Obsidian-16a34a)](./skills/deeppapernote/references/obsidian-format.md)
-[![Changelog](https://img.shields.io/badge/changelog-latest-0f766e)](./CHANGELOG.md)
 
 </div>
 
@@ -22,157 +20,173 @@
   <em>Read one paper deeply. Add one durable page to your academic wiki.</em>
 </p>
 
-**You sit down to study an important paper. The hard part is not reading it—it is turning what you understood into a note you can still use later.** The time usually disappears into work like this:
+**When you study an important paper, the hard part is rarely the reading. It is turning what you understood into a note you can still use later.** Finding the source, matching figures to the text, copying numbers over, and tracing the method often take the better part of a day. And the papers you have read end up scattered, with nothing connecting one to another.
 
-- switching between the PDF, Zotero, web pages, and your note app
-- manually organizing metadata, the abstract, figures, and the method backbone
-- understanding part of the paper, then spending even longer turning that understanding into a coherent note
-- ending up with something that looks complete but is not a note you actually want to revisit
+DeepPaperNote is an agent skill that runs in Claude Code, Codex, and any other agent that supports skills. Hand it a paper, and it reads the full text, writes an illustrated deep-reading note, saves it into your Obsidian vault, and links it to the other papers you have read. **Every paper you read grows your academic wiki a little.**
 
-DeepPaperNote takes over that repetitive, mechanical, and surprisingly expensive layer of paper reading. It gathers the material, builds the structure, places figures in context, and shapes the final note so you can keep your attention on the paper's real ideas.
-
-In other words, you can think of DeepPaperNote as the **single-paper ingestion layer for an LLM-maintained academic wiki**: it reads one paper deeply and turns its research question, methods, evidence, results, and figures into a durable page that people can read and agents can reuse. Obsidian is where those pages live, connect, and grow; DeepPaperNote is how a paper reliably enters the wiki.
-
-DeepPaperNote is an agent skill for reading **one paper at a time**. The same core skill runs in Claude Code and Codex, and it focuses on the questions that distinguish a deep-reading note from an abstract rewrite:
-
-- What problem is the paper actually solving?
-- How does the method, system, or analytical mechanism really work?
-- Are the key formulas, experimental conclusions, and figure context preserved?
-- Will the result become a useful long-term Obsidian note rather than a disposable summary?
-
-> [!tip]
-> If you already use Obsidian or Zotero, DeepPaperNote automates the most time-consuming and error-prone parts of evidence gathering, organization, and note production.
+- 🚀 **One sentence, one note.** No prompts to learn and no templates to set up. Say "Generate a deep-reading note for this paper" with a title, DOI, arXiv ID, or PDF, and the rest happens on its own: finding the source, reading the full text, extracting figures, writing the note, and saving it into your vault. The first time, it asks you two things: which language to write in, and where to save.
+- 🎓 **Reads like a domain expert.** A method paper, a benchmark, a survey, and a clinical trial call for very different questions, so DeepPaperNote has a dedicated way of reading each of 10 paper types. From CS and AI to medicine, biology, physics, psychology, the social sciences, and the humanities, and from new methods, systems, and theory to benchmarks, surveys, and clinical trials, your papers can all go to DeepPaperNote. These readings draw on more than 50 reviewer guidelines, reporting standards, and reading methods, including the NeurIPS, ICLR, and ACL review criteria, reporting standards such as CONSORT and PRISMA, Keshav's three-pass method, and open-source AI reviewing projects and paper skills. They were tested again and again on 34 real papers from many disciplines.
+- 🎯 **Accurate and complete.** Every conclusion in the note traces back to the paper, numbers come straight from its text and tables, and every main experiment is covered. When the paper does not report something, the note says so plainly instead of guessing for the authors. Before saving, an independent review checks the note for errors and omissions. If only the abstract is available and the full text cannot be read, it stops and asks you for the paper rather than writing a note anyway.
+- 🖼️ **Figures, tables, and formulas in the text.** Figures and tables are cropped from the original PDF and placed where the text discusses them, right next to the explanation; key formulas are written in LaTeX and render directly in Obsidian. You no longer have to flip back to the PDF while reading the note.
+- 🧠 **A vault that knows you better the more you use it.** Each new note links to related papers already in your vault, goes into the domain folders you already use, and carries structured properties you can filter and query with Obsidian Bases. Once you record your research directions with research memory, each note's Takeaways tell you what the paper means for your own research. The more you read and the fuller your memory, the closer its connections and suggestions fit you.
 
 ## 📰 News
 
-- **[v2.3.0]** 🌐 Added complete English note support across note structure, figure callouts, validation, and Formal Save. [Release notes](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.0)
-- **[2026-07-16]** 🧩 Added [`paper-glossary`](./skills/paper-glossary/README.md), an optional companion skill for building reusable Obsidian terminology notes.
-- **[2026-07-16]** 🔌 DeepPaperNote is now distributed as a plugin for multiple agents, with support for selecting multiple skills from the repository. [PR #12](https://github.com/917Dhj/DeepPaperNote/pull/12)
+- **[v3.0.0]** 🎓 Notes read each paper by its type: 10 paper types each get their own way of reading and note structure, every figure is visually reviewed before it enters the note, and an independent quality review runs before saving. [Release notes](https://github.com/917Dhj/DeepPaperNote/releases/tag/v3.0.0)
+- **[v3.0.0]** 🧠 Every note joins your vault: notes gain Takeaways and Connections sections and carry structured properties, and two new skills, [`research-memory`](./skills/research-memory/README.md) and [`organize-wiki`](./skills/organize-wiki/README.md), tailor the takeaways to your research directions and keep your domain folders in order.
+- **[v2.3.1]** 🔌 Added support for [DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector): papers you save from your browser can get their notes in the same paper directory. [Release notes](https://github.com/917Dhj/DeepPaperNote/releases/tag/v2.3.1)
 
 News lists only the three most recent user-facing milestones. See the [changelog](./CHANGELOG.md) and [GitHub Releases](https://github.com/917Dhj/DeepPaperNote/releases) for the full history.
 
 ## 🚀 Quick Start
 
-### 1. Install the plugin
+### 1. Install
 
-**Claude Code** — install from the plugin marketplace:
+**Claude Code**: install from the plugin marketplace
 
 ```bash
 claude plugin marketplace add 917Dhj/DeepPaperNote
-```
-
-```bash
 claude plugin install deeppapernote@deeppapernote
 ```
 
-**Any agent** — install with the skills CLI:
+**Codex and other agents that support skills**: install with the skills CLI
 
 ```bash
 npx skills add 917Dhj/DeepPaperNote
 ```
 
-Both routes install the same skills. The plugin route brings `deeppapernote`, `paper-glossary`, `research-memory`, and `organize-wiki`; the skills CLI installer lets you choose which skills to install and which agents should receive them. For most users, start with `deeppapernote`; add `paper-glossary` if you want reusable terminology notes, `research-memory` if you want takeaways tailored to your own research, and `organize-wiki` if you want help keeping your library's domain folders in order.
+The plugin installs all four skills at once. The skills CLI lets you choose which skills to install and which agents receive them. To try it out, `deeppapernote` alone is enough; see [below](#-from-paper-to-wiki) for what the other three do.
 
-### 2. Install the core PDF dependency
+### 2. Install the PDF dependency
 
 ```bash
 python3 -m pip install PyMuPDF
 ```
 
-If you use `uv`, install `PyMuPDF` into the same Python environment that DeepPaperNote will use:
+Python 3.10 or newer is required. If you use `uv`, run `uv pip install PyMuPDF` in the Python environment DeepPaperNote will use.
 
-```bash
-uv pip install PyMuPDF
-```
+### 3. Read a paper
 
-DeepPaperNote requires Python 3.10 or newer. `PyMuPDF` powers the core PDF extraction path.
-
-### 3. Hand a paper to your agent
-
-A title, DOI, URL, arXiv ID, or local PDF all work. Zotero items are also supported when a compatible integration is available.
+Tell your agent in one sentence, with the paper's title, DOI, URL, arXiv ID, or local PDF:
 
 ```text
-Generate a deep-reading note for this paper: <title, DOI, URL, arXiv ID, or local PDF>
+Generate a deep-reading note for this paper: <paper>
 Turn this paper into an Obsidian note: <paper>
 ```
 
-## 🔌 Collect Papers from Your Browser
+You can also call it with the slash command `/deeppapernote <paper>`.
 
-Use [DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector) to save paper PDFs from your browser into your Obsidian paper library. When you are ready to read deeply, hand the saved PDF to DeepPaperNote and generate a note in the same paper directory, keeping the source and your understanding together. Different PDF versions can have their own corresponding notes; existing notes remain protected.
+The first time, it asks you two things: whether notes should be in English or Chinese, and whether to save them in the current workspace or your Obsidian vault. It remembers your answers and does not ask again. To use a different language or location for one paper, just say so in the request. For environment variables and other settings, see [User Configuration](./skills/deeppapernote/references/user-configuration.md).
 
-Connector is an optional browser extension, currently supporting **Chrome on macOS** with a local saving component. You can also continue giving DeepPaperNote a title, DOI, URL, or local PDF directly.
+### 4. Update to a new version
 
-**[Explore Connector and installation instructions →](https://github.com/917Dhj/DeepPaperNote-Connector)**
+**Claude Code**:
 
-## 🎯 Why DeepPaperNote?
+```bash
+claude plugin marketplace update deeppapernote
+claude plugin update deeppapernote@deeppapernote
+```
 
-![DeepPaperNote usage example](./assets/usage-example.png)
+Restart Claude Code to apply the update.
 
-| You may be dealing with... | DeepPaperNote helps by... |
+**skills CLI**:
+
+```bash
+npx skills update
+```
+
+## 👀 What a Note Looks Like
+
+<!-- Animated demo GIF: added in the assets phase -->
+
+Every note has three parts: the opening and closing are the same for every paper, and the body in between follows the paper's type.
+
+| Part | Sections |
 | --- | --- |
-| 📄 **You finished the paper, but your notes are still a pile of fragments** | Rebuilding the research question, method chain, central experiments, and limitations into one note you can actually read again |
-| 🧠 **You do not want another polished-looking AI summary** | Preserving the formulas, numbers, figure context, and evidence boundaries that make the paper worth understanding |
-| 🗂️ **You keep reading papers, but they never become your academic wiki** | Turning each paper into a searchable, linkable, reusable Obsidian knowledge page so your academic wiki grows one paper at a time |
-| 📚 **The paper is already in Zotero, and you do not want to match or download it again** | Preferring local records and attachments when available, reducing repeated work and paper mismatches |
+| **Opening** | Core Information · Abstract · Contributions · One-Sentence Summary |
+| **Body** | Method paper: Background and Problem → Limitations of Prior Work → Key Idea and Challenges → Method → Experimental Evidence → Deep Analysis<br>Benchmark: Evaluation Gap → Task and Design Goals → Construction and Quality Control → Evaluation Framework → Findings → What It Really Measures<br>Survey: Scope and Search → Taxonomy → Directions → Consensus, Disagreement, and Gaps<br>…10 paper types in all |
+| **Closing** | Limitations · Takeaways · Connections · My Notes |
 
-## 🧩 Skills
+The closing sections are where the note meets your vault:
 
-DeepPaperNote remains the main product. The repository also includes optional companion skills that work from DeepPaperNote's saved notes and artifacts without taking over or rerunning the paper-reading workflow.
+- **Takeaways**: Transferable Ideas and Next Steps, covering which of the paper's ideas carry over to other problems and what to do after reading it. Once you set up research memory, this part is written against your own research directions.
+- **Connections**: links to related paper notes in your vault, and the key prior work you need to understand this paper.
+- **My Notes**: yours to write in, and kept exactly as it is when the note is regenerated.
 
-| Skill | Role | When to use it |
+<details>
+<summary><b>What appears in your vault after saving</b></summary>
+
+Each paper gets its own folder, and figures and tables are named after their labels in the paper:
+
+```text
+<your papers folder>/
+└── Computer Vision/           ← domain folder, reusing the ones you already have
+    └── Segment_Anything/
+        ├── Segment_Anything.en.md
+        └── images/
+            ├── Figure_1.png
+            └── Table_2.png
+```
+
+Each note opens with structured properties you can query and filter with Obsidian Bases, for example to list every benchmark paper you have read, or everything you read this month:
+
+```yaml
+paper_type: benchmark_or_dataset
+methods: [...]
+datasets: [...]
+tasks: [...]
+read_date: 2026-11-08
+```
+
+</details>
+
+## 🧩 From Paper to Wiki
+
+DeepPaperNote reads each paper deeply and saves it well. The other three skills are optional companions that look after your vault as a whole.
+
+| Skill | What it does for you | How to call it |
 | --- | --- | --- |
-| [`deeppapernote`](./skills/deeppapernote/SKILL.md) | **Core product · recommended** | Read one paper deeply and produce a structured, evidence-based Obsidian note with figures, results, and limitations |
-| [`paper-glossary`](./skills/paper-glossary/SKILL.md) | Optional companion | Select terms from existing paper artifacts, create reusable Obsidian glossary notes, and optionally link them back to the paper note |
-| [`research-memory`](./skills/research-memory/SKILL.md) | Optional companion | Let the agent interview you, with evidence from the papers you have read, to record your research directions in Obsidian; DeepPaperNote then tailors each note's transferable ideas to them |
-| [`organize-wiki`](./skills/organize-wiki/SKILL.md) | Optional companion | Agree on your library's domain folders with the agent, then refile misplaced papers and fix their tags after a preview; DeepPaperNote follows the resulting convention when it files a new paper, and the last reorganization can be undone |
+| [`deeppapernote`](./skills/deeppapernote/SKILL.md) | **Core.** Deep-reads one paper and saves an illustrated note into your vault, linked to the other papers you have read. | "Generate a deep-reading note for this paper: <paper>"<br>or `/deeppapernote` |
+| [`research-memory`](./skills/research-memory/README.md) | Keeps a research memory for you: it records the research directions you are working on and follows them as you read. With it, DeepPaperNote writes each note's Takeaways against your directions, so the next note knows you better. | "Build my research memory"<br>or `/research-memory` |
+| [`organize-wiki`](./skills/organize-wiki/README.md) | Organizes your vault: it sorts out the domain categories, moves papers filed under the wrong domain, and fixes their domain tags. The categories it settles become what DeepPaperNote follows when it files new papers. | "Organize my paper library"<br>or `/organize-wiki` |
+| [`paper-glossary`](./skills/paper-glossary/README.md) | Builds a glossary for your vault: it turns a paper's key concepts into reusable term notes and links them back into the paper's text. The same term in different papers points to the same term note. | "Build glossary notes for this paper"<br>or `/paper-glossary` |
 
-You do not need to install every skill. Choose the ones that match your workflow during installation.
+A good rhythm: read a few papers with DeepPaperNote first; once your vault has some notes, build a research memory; when the papers pile up and the categories start to drift, organize the vault.
 
-## ✅ Quality Promise
+## ✅ Notes You Can Trust
 
-- The result should be a deep-reading note for one paper, not an abstract rewrite.
-- Important methods, experimental results, figures, and limitations should be explained rather than merely listed.
-- If the available source is not strong enough for a real deep read, the workflow should stop and ask for better material instead of pretending the note is complete.
-- Before saving, a dedicated reviewer checks the frozen plan against the note. Quality and readability artifacts bind to the final draft bytes, with at most two revisions driven by failed quality reviews.
+- **A deep read, not a summary.** Every note answers all the core questions of its paper type, and states plainly where the paper does not report something.
+- **Grounded in the paper.** Conclusions and numbers in the note come from the paper itself, with nothing invented or guessed.
+- **No full text, no note.** If only the abstract is available, it stops and asks you for the paper instead of handing over a note that only looks complete.
+- **Every figure is checked.** Each figure and table is visually reviewed before it enters the note; a crop that is incomplete or does not match the text stays out.
+- **A final check before saving.** An independent review checks the note for errors and omissions, and the note is fixed before it is saved.
+- **Your existing notes are safe.** An existing note is never silently overwritten, and regenerating a note keeps its My Notes section exactly as it is.
 
-The canonical execution contract lives in [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md).
-
-To inspect a run, use `python skills/deeppapernote/scripts/run_state.py status --workdir <run_directory> --prefix <run_prefix>`. This read-only command reports missing or stale artifacts, current gate results, and the next action. See [run inspection](./skills/deeppapernote/references/run-state.md) for explicit artifact selection and freshness limits. Run artifacts default to a per-paper directory under `~/.deeppapernote/runs/` and are not cleaned up automatically.
-
-## 🗂️ First-Run Preferences
-
-The first time you hand a paper to your Agent, DeepPaperNote helps you choose:
-
-- the default note language: English or Simplified Chinese
-- the default save target: the current workspace or your Obsidian Vault
-
-Once confirmed, these preferences are saved on your device and reused for future papers. You can still request a different language or save target for any individual run without changing your defaults.
-
-DeepPaperNote never silently overwrites an existing note or switches save destinations when a save is blocked.
-
-For advanced environment-variable and CLI configuration, see [User Configuration](./skills/deeppapernote/references/user-configuration.md).
+**More than words:** we run regression tests on 34 real papers covering all 10 paper types, and in a blind evaluation on 6 sample papers with our internal rubric, the average score rose from 73.6 to 84.2 (out of 100) after the type-specific redesign.
 
 ## 🔧 Optional Enhancements
 
-None of these are required for ordinary digital PDFs.
+DeepPaperNote reads ordinary digital PDFs without any of these. Add them as you need:
 
-| Enhancement | What it helps with |
-| --- | --- |
-| Zotero integration | Reuses local paper records and PDF attachments before searching online |
-| Semantic Scholar API | Improves metadata lookup for papers that are difficult to resolve |
-| OCR tooling | Recovers page text from scanned or low-quality PDFs |
+| Enhancement | What it does for you | How to turn it on |
+| --- | --- | --- |
+| **[DeepPaperNote Connector](https://github.com/917Dhj/DeepPaperNote-Connector)** | Saves a paper from your browser into your Obsidian paper library in one click, so its note can later be written in the same folder | Install the browser extension; it currently supports Chrome on macOS |
+| **Zotero** | Uses the item and PDF already in your Zotero library, with no searching or downloading again | In Zotero 7, open Settings → Advanced and check "Allow other applications on this computer to communicate with Zotero"; it is used automatically from then on |
+| **Semantic Scholar API key** | Finds the right title, authors, and venue even for papers that are hard to identify | Set the environment variable `SEMANTIC_SCHOLAR_API_KEY` |
+| **OCR** | Recovers the text of scanned or poor-quality PDFs | Install Tesseract and `pytesseract` |
 
-### Zotero Local API
+For any of these, you can also ask your agent to check your environment and set it up for you.
 
-The built-in, read-only Zotero Local API integration supports three resolution modes:
+## 🛠️ Troubleshooting
 
-- `auto` (default): prefer a unique local item and retain web fallback
-- `off`: skip Zotero lookup
-- `required`: stop unless Zotero uniquely resolves the reference
+When something goes wrong, the easiest fix is to ask your agent:
 
-An ambiguous local match always fails closed instead of selecting an arbitrary item. Compatible agent-runtime or MCP integrations remain optional alternatives.
+- **Installed, but it does not work**: say "Check DeepPaperNote's environment." It tells you what is missing, covering Python and PyMuPDF, your Obsidian settings, and optional enhancements such as Zotero and OCR.
+- **A note stopped partway or was not saved**: say "Where did this DeepPaperNote run stop?" It tells you where it got stuck, what is missing, and what to do next.
 
-When one of these capabilities is needed, ask your agent to inspect the current environment and guide the setup for that machine.
+Intermediate files are kept under `~/.deeppapernote/runs/`, one directory per paper, and are not cleaned up automatically. Delete them by hand if they take up too much space.
+
+If that does not solve it, please [open an issue](https://github.com/917Dhj/DeepPaperNote/issues).
 
 ## 🧭 Inspirations
 
@@ -180,10 +194,19 @@ DeepPaperNote was influenced by projects that take paper reading, evidence extra
 
 - [heleninsights-dot/phd-deepread-workflow](https://github.com/heleninsights-dot/phd-deepread-workflow)
 - [juliye2025/evil-read-arxiv](https://github.com/juliye2025/evil-read-arxiv)
+- [HKUSTDial/Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills)
 
 ## 🤝 Contributing
 
-Pull requests should target `develop`, not `main`. Changes that may affect final note quality should be evaluated with [`evals/regression-workflow.md`](./evals/regression-workflow.md) and [`evals/note-quality-rubric.md`](./evals/note-quality-rubric.md).
+Pull requests should target `develop`, not `main`. Before submitting, run the tests and lint locally:
+
+```bash
+python3 -m pip install -e '.[dev]'
+python3 -m pytest -q -n auto
+python3 -m ruff check skills tests
+```
+
+The workflow is defined in [`skills/deeppapernote/SKILL.md`](./skills/deeppapernote/SKILL.md). Changes that may affect note quality should be evaluated with [`evals/regression-workflow.md`](./evals/regression-workflow.md) and [`evals/note-quality-rubric.md`](./evals/note-quality-rubric.md).
 
 ## Star History
 
