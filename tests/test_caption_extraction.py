@@ -280,6 +280,53 @@ def test_footnote_mark_after_the_caption_sentence_is_not_caption_text(
     assert caption_item(find_caption_blocks(doc[0])[0])["caption"] == caption
 
 
+def caption_with_raised_parts(parts: list[tuple[str, bool]]) -> fitz.Document:
+    """Set one caption line from (text, raised) parts; raised parts are smaller and higher."""
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    x = 40.0
+    for text, raised in parts:
+        size = 7 if raised else 8.5
+        page.insert_text((x, 397 if raised else 400), text, fontsize=size, fontname="tiro")
+        x += fitz.get_text_length(text, fontname="tiro", fontsize=size)
+    page.insert_textbox(fitz.Rect(72, 460, 540, 760), BODY_TEXT, fontsize=10)
+    return doc
+
+
+@pytest.mark.parametrize(
+    ("parts", "caption"),
+    [
+        (
+            [("Table 2. Changes in anxiety (GAD-7", False), ("a", True),
+             ("), depression (ODSIS", False), ("b", True), (") by group.", False)],
+            "Changes in anxiety (GAD-7), depression (ODSIS) by group.",
+        ),
+        (
+            [("Table 1. Baseline PHQ-9", False), ("a,b", True), (" scores.", False)],
+            "Baseline PHQ-9 scores.",
+        ),
+        (
+            [("Figure 3. Hidden state h", False), ("l", True), (" at layer l.", False)],
+            "Hidden state hl at layer l.",
+        ),
+        (
+            [("Figure 4. Projection W", False), ("q", True), (" of the query.", False)],
+            "Projection Wq of the query.",
+        ),
+        (
+            [("Figure 5. Area of LAI", False), ("2", True), (" per plot.", False)],
+            "Area of LAI2 per plot.",
+        ),
+    ],
+)
+def test_footnote_mark_after_an_acronym_inside_a_caption_is_not_caption_text(
+    parts: list[tuple[str, bool]], caption: str
+) -> None:
+    doc = caption_with_raised_parts(parts)
+
+    assert caption_item(find_caption_blocks(doc[0])[0])["caption"] == caption
+
+
 def test_table_header_below_an_unfinished_caption_stays_out() -> None:
     doc = fitz.open()
     page = doc.new_page(width=595, height=791)

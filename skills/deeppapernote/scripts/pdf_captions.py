@@ -33,6 +33,7 @@ CAPTION_SENTENCE_ENDS = (".", "?", "!", "。", "？", "！")
 # PyMuPDF sets this span flag on raised text; footnote marks are short.
 SUPERSCRIPT_FLAG = 1
 MAX_FOOTNOTE_MARK_CHARS = 3
+FOOTNOTE_LETTERS_RE = re.compile(r"[a-z](?:,[a-z])*")
 
 # Used to decide whether a continuation line still belongs to the caption text
 # or has already entered the data body of a table.  A row of pure tabular data
@@ -135,12 +136,34 @@ def dominant_font_size(blocks: list[dict]) -> float:
     return sizes.most_common(1)[0][0] if sizes else 0.0
 
 
+def is_acronym_footnote_mark(span: dict, before: str) -> bool:
+    """Tell whether a span is a footnote mark raised right after an acronym.
+
+    A table caption can mark an abbreviation, as in "GAD-7a", for a note below the
+    table that spells it out. Only lowercase letters ("a" or "a,b") raised directly
+    after a token with two or more capitals count, so a raised variable such as the
+    "l" of "h" + "l" or a unit power stays caption text.
+    """
+    if not int(span.get("flags", 0)) & SUPERSCRIPT_FLAG:
+        return False
+    if not FOOTNOTE_LETTERS_RE.fullmatch(str(span.get("text", "")).strip()):
+        return False
+    token = re.search(r"[^\s(\[]+$", before)
+    return bool(token) and sum(char.isupper() for char in token.group()) >= 2
+
+
 def spans_text(spans: list[dict]) -> str:
-    """Join a line's spans, leaving out footnote marks raised after its last sentence.
+    """Join a line's spans, leaving out footnote marks.
 
     A table caption can end in a mark such as the "a" of "effects.a" that refers to a
-    note below the table. It is set as a superscript and is not part of the caption.
+    note below the table, or mark an acronym inside it, as in "GAD-7a". Both are set
+    as superscripts and are not part of the caption.
     """
+    spans = [
+        span
+        for index, span in enumerate(spans)
+        if not is_acronym_footnote_mark(span, "".join(str(s.get("text", "")) for s in spans[:index]))
+    ]
     texts = [str(span.get("text", "")) for span in spans]
     end = len(spans)
     mark_chars = 0
