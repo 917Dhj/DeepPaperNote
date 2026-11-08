@@ -294,7 +294,14 @@ def materialize_insert_decisions(
     decisions: dict,
     asset_subdir: str,
     created_paths: list[Path] | None = None,
+    replaced_images: list[dict] | None = None,
 ) -> list[dict]:
+    """Copy each inserted image into the paper's asset directory.
+
+    An existing image with other bytes is backed up and replaced; each
+    replacement is appended to ``replaced_images`` so the caller can restore it
+    on rollback and report the other notes that also embed it.
+    """
     asset_dir = target_path.parent / asset_subdir
     pending: list[tuple[Path, Path, str, dict]] = []
     planned_hashes: dict[Path, str] = {}
@@ -336,11 +343,6 @@ def materialize_insert_decisions(
                 f"Insert decisions assign different bytes to the same image: {filename}"
             )
         planned_hashes[dest_image] = current_sha256
-        if dest_image.is_file() and file_sha256(dest_image) != current_sha256:
-            raise SystemExit(
-                f"Refusing to save because an existing paper-local image has different bytes: "
-                f"{filename}"
-            )
         pending.append(
             (
                 source_image,
@@ -363,17 +365,42 @@ def materialize_insert_decisions(
         asset_dir.mkdir(parents=True, exist_ok=True)
     materialized: list[dict] = []
     for source_image, dest_image, current_sha256, record in pending:
-        if not dest_image.is_file():
-            if created_paths is not None:
-                created_paths.append(dest_image)
-            shutil.copy2(source_image, dest_image)
-            if file_sha256(dest_image) != current_sha256:
-                raise SystemExit(
-                    f"Materialized image bytes do not match the reviewed asset SHA-256: "
-                    f"{dest_image.name}"
-                )
+        if dest_image.is_file():
+            if file_sha256(dest_image) == current_sha256:
+                materialized.append(record)
+                continue
+            replacement = {
+                "path": dest_image,
+                "backup": backup_file(dest_image),
+                "relative_path": record["relative_markdown_path"],
+                "also_embedded_by": notes_embedding(
+                    target_path, record["relative_markdown_path"]
+                ),
+            }
+            if replaced_images is not None:
+                replaced_images.append(replacement)
+        elif created_paths is not None:
+            created_paths.append(dest_image)
+        shutil.copy2(source_image, dest_image)
+        if file_sha256(dest_image) != current_sha256:
+            raise SystemExit(
+                f"Materialized image bytes do not match the reviewed asset SHA-256: "
+                f"{dest_image.name}"
+            )
         materialized.append(record)
     return materialized
+
+
+def notes_embedding(target_path: Path, relative_image: str) -> list[str]:
+    """Name the other notes beside ``target_path`` that embed ``relative_image``."""
+    names = []
+    for note in sorted(target_path.parent.glob("*.md")):
+        if note.name == target_path.name or not note.is_file():
+            continue
+        text = note.read_text(encoding="utf-8", errors="replace")
+        if note_references_image_embed(text, relative_image):
+            names.append(note.name)
+    return names
 
 
 LINT_FAILURE_DETAIL_LIMIT = 20
@@ -1093,6 +1120,7 @@ def main() -> None:
         note_backup = None
         sidecar_backup = None
         created_assets: list[Path] = []
+        replaced_images: list[dict] = []
         note_attempted = False
         sidecar_attempted = False
         try:
@@ -1105,6 +1133,7 @@ def main() -> None:
                     figure_decisions,
                     asset_subdir,
                     created_assets,
+                    replaced_images,
                 )
                 if figure_decisions
                 else []
@@ -1181,6 +1210,8 @@ def main() -> None:
                 restore_file(target_path, note_backup)
             for created_asset in reversed(created_assets):
                 created_asset.unlink(missing_ok=True)
+            for replaced in reversed(replaced_images):
+                restore_file(replaced["path"], replaced["backup"])
             if not asset_directory_existed:
                 try:
                     asset_dir.rmdir()
@@ -1192,6 +1223,9 @@ def main() -> None:
                 note_backup.unlink(missing_ok=True)
             if sidecar_backup is not None:
                 sidecar_backup.unlink(missing_ok=True)
+            for replaced in replaced_images:
+                if replaced["backup"] is not None:
+                    replaced["backup"].unlink(missing_ok=True)
 
         payload = {
             "status": "ok",
@@ -1205,6 +1239,10 @@ def main() -> None:
             **new_domain,
             "images_dir": str(asset_dir),
             "materialized_figures": materialized_figures,
+            "replaced_images": [
+                {"file": item["relative_path"], "also_embedded_by": item["also_embedded_by"]}
+                for item in replaced_images
+            ],
             "overwrote_existing_note": overwrote_existing_note,
             "admission": admission,
             "domain_routing_skipped": domain_routing_skipped,

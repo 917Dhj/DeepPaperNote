@@ -129,16 +129,39 @@ def test_save_hashes_an_existing_image_once(tmp_path: Path, monkeypatch) -> None
     assert hashed.count(existing) == 1
 
 
-def test_save_still_refuses_a_different_existing_image(tmp_path: Path) -> None:
-    decision = insert_decision(figure_candidate(tmp_path))
+def replace_existing(tmp_path: Path) -> list[dict]:
     existing = tmp_path / "paper" / "images" / "figure.png"
-    existing.parent.mkdir(parents=True)
+    existing.parent.mkdir(parents=True, exist_ok=True)
     existing.write_bytes(b"other figure")
+    replaced: list[dict] = []
+    write_obsidian_note.materialize_insert_decisions(
+        NOTE_TEXT,
+        tmp_path / "paper" / "note.md",
+        {"decisions": [insert_decision(figure_candidate(tmp_path))]},
+        "images",
+        replaced_images=replaced,
+    )
+    assert existing.read_bytes() == b"figure"
+    return replaced
 
-    with pytest.raises(SystemExit, match="different bytes"):
-        materialize(tmp_path, decision)
 
-    assert existing.read_bytes() == b"other figure"
+def test_save_backs_up_a_different_existing_image_before_replacing_it(tmp_path: Path) -> None:
+    replaced = replace_existing(tmp_path)
+
+    assert [item["backup"].read_bytes() for item in replaced] == [b"other figure"]
+    assert replaced[0]["relative_path"] == "images/figure.png"
+
+
+def test_replacement_names_only_sibling_notes_that_embed_the_image(tmp_path: Path) -> None:
+    paper = tmp_path / "paper"
+    (paper / "nested").mkdir(parents=True)
+    for name in ("note.md", "note.en.md", "nested/other.md"):
+        (paper / name).write_text(NOTE_TEXT, encoding="utf-8")
+    (paper / "scratch.md").write_text("No figures here.\n", encoding="utf-8")
+
+    replaced = replace_existing(tmp_path)
+
+    assert replaced[0]["also_embedded_by"] == ["note.en.md"]
 
 
 def test_save_verifies_the_bytes_it_copies(tmp_path: Path, monkeypatch) -> None:

@@ -131,6 +131,7 @@ Final user report:
 - When `reader_research_direction` came from `research_memory`, say in one line that the transferable ideas followed the user's research memory.
 - When the save receipt's `glossary_followup.status` is `suggested`, suggest running paper-glossary on this paper and give its `source_manifest` and `note_path`; when `regenerated` is true, add that term links the glossary had added to the replaced note return only after that rerun. For any other status, say nothing about the glossary.
 - When the save replaced an existing note, report the save receipt's `user_notes.status`: `preserved` kept the user's My Notes; `untouched` found none to keep; `heading_missing` found no My Notes heading. Only when `user_notes.legacy_format` is true, add that the kept block predates the current note format and may be old model-written text the user can delete.
+- When a save receipt `replaced_images` entry lists other notes in `also_embedded_by`, say in one line that the new crop of that figure also shows in those notes.
 - Add overwrite actions, preference changes, or user-relevant warnings only when they occurred.
 
 ## References
