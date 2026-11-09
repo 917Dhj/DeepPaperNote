@@ -66,7 +66,6 @@ const richText = (text: string) =>
     .replace(/\s(\[[^\]]+\])$/, ' <span class="note-cite">$1</span>');
 const demoSrc = `${basePath}demos/deeppapernote-note-demo/index.html?lang=${demoLang}`;
 const releaseHref = "https://github.com/917Dhj/DeepPaperNote/releases/tag/v3.0.0";
-const starLocale = locale === "zh" ? "zh-CN" : "en";
 const copyCommandLabel = locale === "zh" ? "复制命令" : "Copy command";
 const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
 ---
@@ -270,7 +269,6 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
             class="star-pill-count"
             data-star-count
             data-star-fallback={content.starsFallback}
-            data-star-locale={starLocale}
           >
             {content.starsFallback}
           </span>
@@ -684,7 +682,6 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
         const repoUrl = "https://api.github.com/repos/917Dhj/DeepPaperNote";
         const starPill = starTarget.closest("[data-star-pill]");
         const fallbackLabel = starTarget.getAttribute("data-star-fallback") || "Stars";
-        const numberLocale = starTarget.getAttribute("data-star-locale") || "en";
         const ariaTemplate =
           starPill?.getAttribute("data-star-aria-template") || "{count} stars on GitHub";
 
@@ -693,7 +690,7 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
             return fallbackLabel;
           }
 
-          return new Intl.NumberFormat(numberLocale, {
+          return new Intl.NumberFormat("en", {
             maximumFractionDigits: 1,
             notation: "compact",
           })
