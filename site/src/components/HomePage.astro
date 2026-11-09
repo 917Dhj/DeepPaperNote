@@ -50,7 +50,22 @@ const localePaths = {
 const currentPath = localePaths[locale];
 const faviconHref = `${basePath}favicon.svg`;
 const demoLang = locale === "zh" ? "zh" : "en";
-const demoSrc = `${basePath}demos/deeppapernote-readme-demo/index.html?lang=${demoLang}&theme=dark`;
+const paperDims: Record<string, [number, number]> = {
+  "showcase/paper-figure-1.png": [924, 1412],
+  "showcase/paper-table-2.png": [1616, 716],
+  "showcase/paper-table-3.png": [1616, 1304],
+};
+const escapeHtml = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// Excerpt markup: **bold**, ==highlight== (the first one anchors the connector), `code`, trailing [citation].
+const richText = (text: string) =>
+  escapeHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/==(.+?)==/g, '<mark class="note-mark">$1</mark>')
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\s(\[[^\]]+\])$/, ' <span class="note-cite">$1</span>');
+const demoSrc = `${basePath}demos/deeppapernote-note-demo/index.html?lang=${demoLang}`;
+const releaseHref = "https://github.com/917Dhj/DeepPaperNote/releases/tag/v3.0.0";
 const starLocale = locale === "zh" ? "zh-CN" : "en";
 const copyCommandLabel = locale === "zh" ? "复制命令" : "Copy command";
 const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
@@ -173,8 +188,9 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
         <span>DeepPaperNote</span>
       </a>
       <nav class="nav-links" aria-label={content.navLabel}>
+        <a href="#features">{content.nav.features}</a>
         <a href="#showcase">{content.nav.showcase}</a>
-        <a href="#pipeline">{content.nav.pipeline}</a>
+        <a href="#wiki">{content.nav.wiki}</a>
         <a href="#install">{content.nav.install}</a>
       </nav>
       <div class="header-actions" aria-label={content.headerActionsLabel}>
@@ -266,8 +282,11 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
     <main>
       <section class="hero-section" aria-labelledby="hero-title">
         <div class="hero-content">
-          <h1 id="hero-title">{content.hero.title}</h1>
-          <p>{content.hero.body}</p>
+          <a class="hero-badge" href={releaseHref}>
+            <span class="hero-badge-dot" aria-hidden="true"></span>{content.hero.badge}<span aria-hidden="true">→</span>
+          </a>
+          <h1 id="hero-title">{content.hero.title.split(/(?<=，)/).map((part) => <span class="title-seg">{part}</span>)}</h1>
+          <p>{content.hero.body} <strong>{content.hero.bodyStrong}</strong></p>
           <div class="hero-actions" aria-label={content.hero.actionsLabel}>
             <a class="button button-primary" href="#install">{content.hero.install}</a>
             <a class="button button-on-dark github-link" href="https://github.com/917Dhj/DeepPaperNote">
@@ -284,8 +303,26 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
             src={demoSrc}
             title={content.hero.demoTitle}
             loading="eager"
-            data-demo-frame
           ></iframe>
+        </div>
+      </section>
+
+      <section class="showcase-section" id="features" aria-labelledby="features-title">
+        <div class="section-heading">
+          <h2 id="features-title">{content.features.title}</h2>
+          <p>{content.features.body}</p>
+        </div>
+
+        <div class="showcase-grid features-grid">
+          {
+            content.features.cards.map((card) => (
+              <article class:list={["feature-card", card.className]}>
+                <span class="tag">{card.tag}</span>
+                <h3>{card.title}</h3>
+                <p>{card.body}</p>
+              </article>
+            ))
+          }
         </div>
       </section>
 
@@ -295,134 +332,158 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
           <p>{content.showcase.body}</p>
         </div>
 
-        <div class="showcase-grid">
+        <div class="pairs">
           {
-            content.showcase.cards.map((card) => (
-              <article class:list={["feature-card", card.className]}>
-                <span class="tag">{card.tag}</span>
-                <h3>{card.title}</h3>
-                <p>{card.body}</p>
+            content.showcase.pairs.map((pair) => {
+              const [x0, y0, x1, y1] = pair.paper.box;
+              const dims = paperDims[pair.paper.src];
+              return (
+                <article class="pair">
+                  <h3 class="pair-title">{pair.title}</h3>
+                  <div class="pair-grid" data-pair>
+                    <figure class="paper-card">
+                      <div class="paper-sheet">
+                        <div class="paper-frame">
+                        <img
+                          src={`${basePath}${pair.paper.src}`}
+                          alt={pair.paper.alt}
+                          width={dims?.[0]}
+                          height={dims?.[1]}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        <span
+                          class="paper-box"
+                          data-pair-from
+                          style={`left:${x0}%;top:${y0}%;width:${x1 - x0}%;height:${y1 - y0}%`}
+                        ></span>
+                        </div>
+                      </div>
+                      <figcaption>{pair.paper.caption}</figcaption>
+                    </figure>
+                    <div class="note-card">
+                      <div class="note-card-bar">
+                        <span class="note-card-label">{content.showcase.noteLabel}</span>
+                        <span class="note-card-path">{pair.note.path}</span>
+                      </div>
+                      <div class="note-card-body">
+                        {
+                          pair.note.blocks.map((block) =>
+                            block.kind === "table" ? (
+                              <table class="note-table">
+                                <thead>
+                                  <tr>
+                                    {block.headers.map((header, col) => (
+                                      <th class:list={{ num: block.numeric.includes(col) }}>{header}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {block.rows.map((row, rowIndex) => (
+                                    <tr class:list={{ "is-hl": rowIndex === block.highlight }}>
+                                      {row.map((cell, col) => (
+                                        <td class:list={{ num: block.numeric.includes(col) }} set:html={richText(cell)} />
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <p class:list={["note-text", { "note-caption": block.kind === "caption" }]} set:html={richText(block.text)} />
+                            ),
+                          )
+                        }
+                      </div>
+                    </div>
+                    <svg class="pair-link" aria-hidden="true" focusable="false">
+                      <path pathLength="1" />
+                      <circle r="4" />
+                    </svg>
+                  </div>
+                </article>
+              );
+            })
+          }
+        </div>
+      </section>
+
+      <section class="showcase-section wiki-section" id="wiki" aria-labelledby="wiki-title">
+        <div class="section-heading">
+          <h2 id="wiki-title">{content.wiki.title}</h2>
+          <p>{content.wiki.body}</p>
+        </div>
+
+        <div class="wiki-grid">
+          {
+            content.wiki.skills.map((skill, index) => (
+              <article class:list={["skill-card", { "skill-core": index === 0 }]}>
+                <h3 class="skill-name">
+                  <code>{skill.name}</code>
+                  {index === 0 && <span class="skill-core-label">{content.wiki.coreLabel}</span>}
+                </h3>
+                <p class="skill-body">{skill.body}</p>
+                {index === 0 && <pre class="skill-tree"><code>{content.wiki.coreTree}</code></pre>}
+                <p class="skill-call">
+                  <code class="skill-command">/{skill.name}</code>
+                  <span class="skill-phrase">“{skill.phrase}”</span>
+                </p>
               </article>
             ))
           }
         </div>
 
-        <div class="note-showcase">
-          <div class="note-outline" aria-label={content.showcase.noteOutlineLabel}>
-            <p class="panel-label">{content.showcase.noteOutlinePanel}</p>
-            <h3>{content.showcase.noteOutlineTitle}</h3>
-            <ul>
-              {
-                content.showcase.noteOutlineItems.map((item, index) => (
-                  <li>
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    {item}
-                  </li>
-                ))
-              }
-            </ul>
-          </div>
-          <div class="note-body-preview visual-evidence-panel">
-            <p class="panel-label">{content.showcase.visualPanel}</p>
-            <h3>{content.showcase.visualTitle}</h3>
-            <p class="visual-evidence-copy">{content.showcase.visualBody}</p>
-            <div class="visual-artifact" aria-label={content.showcase.visualArtifactLabel}>
-              <div class="artifact-header">
-                <span class="artifact-title">{content.showcase.artifactTitle}</span>
-                <span class="artifact-chip">{content.showcase.artifactChip}</span>
-              </div>
-              <div class="figure-mini-map" aria-label={content.showcase.figureMapLabel}>
-                <div class="model-stage input-stage">
-                  <span class="stage-label">{content.showcase.stages.input}</span>
-                  <span class="token-row" aria-hidden="true">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </span>
-                </div>
-                <div class="model-stage compact-stage">
-                  <span class="stage-label">{content.showcase.stages.embedding}</span>
-                </div>
-                <div class="attention-block">
-                  <span class="stage-label">{content.showcase.stages.attention}</span>
-                  <span class="attention-heads" aria-hidden="true">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </span>
-                  <span class="residual-label">{content.showcase.stages.residual}</span>
-                </div>
-                <div class="model-stage compact-stage">
-                  <span class="stage-label">{content.showcase.stages.feedForward}</span>
-                </div>
-                <div class="model-stage output-stage">
-                  <span class="stage-label">{content.showcase.stages.output}</span>
-                  <span class="state-stack" aria-hidden="true">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </span>
-                </div>
-              </div>
-              <div class="formula-strip" aria-label={content.showcase.formulaLabel}>
-                <span>Attention(Q, K, V)</span>
-                <span>= softmax(QK<sup>T</sup> / &radic;d<sub>k</sub>)V</span>
-              </div>
-              <table class="evidence-table" aria-label={content.showcase.tableLabel}>
-                <thead>
-                  <tr>
-                    {content.showcase.tableHeaders.map((header) => <th>{header}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {
-                    content.showcase.tableRows.map((row) => (
-                      <tr>
-                        {row.map((cell) => <td>{cell}</td>)}
-                      </tr>
-                    ))
-                  }
-                </tbody>
-              </table>
-            </div>
-          </div>
+        <div class="rhythm" aria-label={content.wiki.rhythmLabel}>
+          <span class="rhythm-line" aria-hidden="true"></span>
+          <ol>
+            {content.wiki.rhythm.map((step) => <li>{step}</li>)}
+          </ol>
         </div>
-      </section>
-
-      <section class="pipeline-section" id="pipeline" aria-labelledby="pipeline-title">
-        <div class="section-heading">
-          <h2 id="pipeline-title">{content.pipeline.title}</h2>
-          <p>{content.pipeline.body}</p>
-        </div>
-        <ol class="pipeline-steps">
-          {
-            content.pipeline.steps.map((step) => (
-              <li>
-                <strong>{step.title}</strong>
-                <span>{step.body}</span>
-              </li>
-            ))
-          }
-        </ol>
       </section>
 
       <section class="install-section" id="install" aria-labelledby="install-title">
-        <div>
+        <div class="install-copy">
           <h2 id="install-title">{content.install.title}</h2>
           <p>{content.install.body}</p>
+          <a class="install-update" href={content.install.updateHref}>{content.install.updateLabel}</a>
         </div>
         <div class="terminal-card" aria-label={content.install.commandsLabel}>
+          <div class="terminal-tabs" role="tablist" aria-label={content.install.commandsLabel}>
+            {
+              content.install.tabs.map((tab, index) => (
+                <button
+                  class="terminal-tab"
+                  type="button"
+                  role="tab"
+                  id={`install-tab-${tab.id}`}
+                  aria-selected={index === 0 ? "true" : "false"}
+                  aria-controls={`install-panel-${tab.id}`}
+                  tabindex={index === 0 ? 0 : -1}
+                  data-install-tab={tab.id}
+                >
+                  {tab.label}
+                </button>
+              ))
+            }
+          </div>
           {
-            content.install.commands.map((command) => (
-              <div class="terminal-command">
-                <code>{command}</code>
+            content.install.tabs.map((tab, index) => (
+              <div
+                class="terminal-step"
+                role="tabpanel"
+                id={`install-panel-${tab.id}`}
+                aria-labelledby={`install-tab-${tab.id}`}
+                data-install-panel={tab.id}
+                hidden={index !== 0}
+              >
+                <p class="terminal-comment">{tab.comment}</p>
+                <div class="terminal-command">
+                <code>{tab.command}</code>
                 <button
                   class="copy-command-button"
                   type="button"
                   aria-label={copyCommandLabel}
                   title={copyCommandLabel}
-                  data-copy-command={command}
+                  data-copy-command={tab.command}
                   data-copy-label={copyCommandLabel}
                   data-copied-label={copiedCommandLabel}
                 >
@@ -444,6 +505,44 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
                     <path d="M20 6 9 17l-5-5"></path>
                   </svg>
                 </button>
+              </div>
+              </div>
+            ))
+          }
+          {
+            content.install.steps.map((step) => (
+              <div class="terminal-step">
+                <p class="terminal-comment">{step.comment}</p>
+              <div class="terminal-command">
+                <code>{step.command}</code>
+                <button
+                  class="copy-command-button"
+                  type="button"
+                  aria-label={copyCommandLabel}
+                  title={copyCommandLabel}
+                  data-copy-command={step.command}
+                  data-copy-label={copyCommandLabel}
+                  data-copied-label={copiedCommandLabel}
+                >
+                  <svg
+                    class="copy-command-icon copy-command-icon-copy"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <svg
+                    class="copy-command-icon copy-command-icon-check"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d="M20 6 9 17l-5-5"></path>
+                  </svg>
+                </button>
+              </div>
               </div>
             ))
           }
@@ -475,6 +574,108 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
       </div>
     </footer>
     <script>
+      const revealSelector =
+        ".section-heading, .feature-card, .pair-title, .paper-card, .note-card, .skill-card, .install-section, .closing-note";
+      const supportsScrollTimeline = CSS.supports("animation-timeline: view()");
+      const allowsMotion = window.matchMedia("(prefers-reduced-motion: no-preference)").matches;
+
+      if (!supportsScrollTimeline && allowsMotion && "IntersectionObserver" in window) {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("is-revealed");
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          { rootMargin: "0px 0px -12% 0px" },
+        );
+
+        document.querySelectorAll(revealSelector).forEach((element) => {
+          if (element.getBoundingClientRect().top < window.innerHeight * 0.88) {
+            return;
+          }
+          element.classList.add("reveal-pending");
+          observer.observe(element);
+        });
+      }
+
+      const drawPairLinks = () => {
+        const wide = window.matchMedia("(min-width: 1024px)").matches;
+        document.querySelectorAll("[data-pair]").forEach((grid) => {
+          const svg = grid.querySelector(".pair-link");
+          const path = svg?.querySelector("path");
+          const dot = svg?.querySelector("circle");
+          const from = grid.querySelector("[data-pair-from]");
+          const mark = grid.querySelector(".note-mark");
+          const card = grid.querySelector(".note-card");
+          if (!svg || !path || !dot || !from || !mark || !card) return;
+          svg.toggleAttribute("hidden", !wide);
+          if (!wide) return;
+          // Layout offsets, not client rects, so scroll-linked transforms never skew the endpoints.
+          const offset = (element) => {
+            let x = 0;
+            let y = 0;
+            for (let node = element; node && node !== grid; node = node.offsetParent) {
+              x += node.offsetLeft;
+              y += node.offsetTop;
+            }
+            return { x, y };
+          };
+          const box = offset(from);
+          const markAt = offset(mark);
+          const fx = box.x + from.offsetWidth;
+          const fy = box.y + from.offsetHeight / 2;
+          const tx = offset(card).x - 8;
+          // Aim at the first line of the highlight, even when it wraps.
+          const lineHeight = parseFloat(getComputedStyle(mark).lineHeight) || mark.offsetHeight;
+          const ty = markAt.y + Math.min(mark.offsetHeight, lineHeight) / 2;
+          const bend = Math.max(48, (tx - fx) * 0.5);
+          svg.setAttribute("viewBox", `0 0 ${grid.offsetWidth} ${grid.offsetHeight}`);
+          path.setAttribute("d", `M ${fx} ${fy} C ${fx + bend} ${fy}, ${tx - bend} ${ty}, ${tx} ${ty}`);
+          dot.setAttribute("cx", String(tx));
+          dot.setAttribute("cy", String(ty));
+        });
+      };
+
+      drawPairLinks();
+      window.addEventListener("resize", drawPairLinks);
+      if ("ResizeObserver" in window) {
+        const pairObserver = new ResizeObserver(() => drawPairLinks());
+        document.querySelectorAll("[data-pair]").forEach((grid) => pairObserver.observe(grid));
+      }
+      window.addEventListener("load", drawPairLinks);
+      document.fonts?.ready.then(drawPairLinks);
+
+      const installTabs = [...document.querySelectorAll("[data-install-tab]")];
+      const selectInstallTab = (tab, focus = false) => {
+        installTabs.forEach((other) => {
+          const active = other === tab;
+          other.setAttribute("aria-selected", String(active));
+          other.tabIndex = active ? 0 : -1;
+          const panel = document.querySelector(`[data-install-panel="${other.dataset.installTab}"]`);
+          if (panel) {
+            panel.hidden = !active;
+            if (active) {
+              panel.classList.remove("is-entering");
+              void panel.offsetWidth;
+              panel.classList.add("is-entering");
+            }
+          }
+        });
+        if (focus) tab.focus();
+      };
+      installTabs.forEach((tab, index) => {
+        tab.addEventListener("click", () => selectInstallTab(tab));
+        tab.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+          event.preventDefault();
+          const step = event.key === "ArrowRight" ? 1 : -1;
+          selectInstallTab(installTabs[(index + step + installTabs.length) % installTabs.length], true);
+        });
+      });
+
       const starTarget = document.querySelector("[data-star-count]");
 
       if (starTarget) {
