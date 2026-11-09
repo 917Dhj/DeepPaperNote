@@ -26,6 +26,8 @@ docs/
 /assets/demo/
 /assets/usage-example.png
 /assets/hero-academic.svg
+# Social-post video exports of the demo.
+/assets/*.mp4
 evals/papers/
 
 # Requests a corpus replay could not answer; regenerated on every run.
