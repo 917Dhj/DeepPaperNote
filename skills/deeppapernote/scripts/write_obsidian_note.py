@@ -9,24 +9,50 @@ import json
 import os
 import re
 import shutil
-import sys
 import tempfile
 from contextlib import nullcontext
 from pathlib import Path
 
+from _final_quality import (
+    advance_state,
+    canonical_note_text,
+    require_recorded_pass,
+    strict_json_loads,
+    validate_quality,
+    validate_readability,
+)
+from _frontmatter import FrontmatterError, parse_frontmatter
+from _user_notes import (
+    inspect_existing_user_notes,
+    merge_user_notes,
+    restore_generated_text,
+    split_user_notes,
+)
+from _domain_routing import (
+    DomainChoiceError,
+    domain_overview,
+    domain_tag_issue,
+    resolve_domain_choice,
+    saved_domain,
+)
+from _note_paths import (
+    resolve_note_asset_dir,
+    resolve_note_output_mode,
+    resolve_obsidian_note_path,
+)
 from common import (
     emit,
     ensure_parent,
     file_sha256,
+    json_input_sha256,
     maybe_load_json_record,
-    resolve_domain_subdir,
-    resolve_note_asset_dir,
-    resolve_note_output_mode,
-    resolve_obsidian_note_path,
     runtime_config,
 )
+from lint_grounding import validate_figure_decisions
 from lint_note import inspect_reference_hygiene
 from localization import normalize_output_language, require_artifact_output_language
+from glossary_terms import frontmatter_links_outside_glossary, glossary_followup
+from vault_connections import generated_wikilinks, unresolved_wikilinks
 from paper_archive import (
     ArchiveError,
     admit_directory,
@@ -113,16 +139,37 @@ def parser() -> argparse.ArgumentParser:
         help="Required Figure/Table Decisions JSON for Formal Save.",
     )
     p.add_argument(
+        "--grounding-lint-json",
+        default="",
+        help="Required Grounding Lint JSON for Formal Save.",
+    )
+    p.add_argument("--plan-file", default="", help="Required Note Plan JSON file for Formal Save.")
+    p.add_argument("--final-quality-review", default="", help="Required Final Quality Review JSON.")
+    p.add_argument(
+        "--final-readability-review", default="", help="Required Final Readability Review JSON.",
+    )
+    p.add_argument(
+        "--record-final-quality-review", action="store_true",
+        help="Validate and record a quality review without accessing a save target.",
+    )
+    p.add_argument(
         "--source-manifest",
         default="",
-        help="Required Source Manifest JSON for Obsidian Save Target Admission.",
+        help="Required Source Manifest JSON for Formal Save and Obsidian Save Target Admission.",
     )
     p.add_argument("--title", default="", help="Explicit title override.")
     p.add_argument("--output", default="", help="JSON status output path.")
     p.add_argument("--vault", default="", help="Target Obsidian vault path.")
     p.add_argument("--save-mode", choices=("workspace", "obsidian"), default="")
     p.add_argument("--papers-dir", default="", help="Vault-relative paper directory.")
-    p.add_argument("--subdir", default="", help="Vault-relative subdirectory.")
+    p.add_argument(
+        "--domain", default="",
+        help="Domain folder the model chose for a new paper directory; see references/domain-routing.md.",
+    )
+    p.add_argument(
+        "--new-domain-reason", default="",
+        help="Why no existing domain fits; required when --domain names a new domain.",
+    )
     p.add_argument("--filename", default="", help="Explicit note filename.")
     p.add_argument("--asset-subdir", default="images", help="Asset folder name relative to the note directory.")
     p.add_argument("--target-directory", default="", help="Previously selected existing paper directory.")
@@ -157,17 +204,57 @@ def insert_decisions(decisions: dict) -> list[dict]:
     ]
 
 
-def safe_image_filename(filename: str, source_image: Path) -> str:
-    candidate = filename.strip() or source_image.name
+def safe_image_filename(filename: str, label: str) -> str:
+    candidate = filename.strip()
+    if not candidate:
+        raise SystemExit(
+            f"Insert decision for {label} has no vault_image_filename; "
+            "rerun plan_figure_table_decisions.py."
+        )
     if (
-        not candidate
-        or candidate in {".", ".."}
+        candidate in {".", ".."}
         or "/" in candidate
         or "\\" in candidate
         or Path(candidate).is_absolute()
     ):
         raise SystemExit(f"Unsafe figure image filename in insert decision: {candidate}")
     return candidate
+
+
+def require_resolvable_links(
+    note_text: str, output_language: str, output_mode: str, root_path: Path, config: dict
+) -> None:
+    """Every generated `[[link]]` must open a vault note; workspace notes carry none.
+
+    My Notes is the user's, so links there are never checked.
+    """
+    split = split_user_notes(note_text, output_language)
+    generated = split[0] if split is not None else note_text
+    if output_mode != "obsidian":
+        links = generated_wikilinks(generated)
+        if links:
+            raise SystemExit(
+                "Workspace mode is not connected to a vault, so the note must not contain "
+                f"[[links]]: {', '.join(links)}"
+            )
+        return
+    missing = unresolved_wikilinks(generated, root_path)
+    if missing:
+        raise SystemExit(
+            "These [[links]] do not match any file in the Obsidian vault; link only to "
+            f"connection candidates or listed glossary terms: {', '.join(missing)}"
+        )
+    outside, status = frontmatter_links_outside_glossary(generated, config)
+    if outside:
+        reason = (
+            "they are not notes in the paper-glossary terms directory"
+            if status == "ok"
+            else f"no paper-glossary library shares this vault ({status})"
+        )
+        raise SystemExit(
+            "Frontmatter [[links]] may only name glossary terms listed in the bundle's "
+            f"glossary_terms, but {reason}: {', '.join(outside)}"
+        )
 
 
 def embed_target_matches(target: str, expected_relative: str) -> bool:
@@ -207,7 +294,14 @@ def materialize_insert_decisions(
     decisions: dict,
     asset_subdir: str,
     created_paths: list[Path] | None = None,
+    replaced_images: list[dict] | None = None,
 ) -> list[dict]:
+    """Copy each inserted image into the paper's asset directory.
+
+    An existing image with other bytes is backed up and replaced; each
+    replacement is appended to ``replaced_images`` so the caller can restore it
+    on rollback and report the other notes that also embed it.
+    """
     asset_dir = target_path.parent / asset_subdir
     pending: list[tuple[Path, Path, str, dict]] = []
     planned_hashes: dict[Path, str] = {}
@@ -223,15 +317,16 @@ def materialize_insert_decisions(
             not isinstance(review, dict)
             or str(review.get("status", "")).strip() != "pass"
             or str(review.get("reviewed_asset_sha256", "")).strip() != current_sha256
-            or str(item.get("source_image_sha256", "")).strip() != current_sha256
         ):
             label = item.get("source_id") or item.get("label") or item.get("item_id") or "unknown"
             raise SystemExit(
                 f"Insert decision for {label} does not match its reviewed asset SHA-256."
             )
+        # The vault name is fixed at planning time from the label; a crop
+        # repair replaces the source image but never this name.
         filename = safe_image_filename(
-            str(item.get("source_image_filename", "")),
-            source_image,
+            str(item.get("vault_image_filename", "")),
+            str(item.get("source_id") or item.get("label") or item.get("item_id") or "unknown"),
         )
         expected_relative = f"{asset_subdir}/{filename}"
         if not note_references_image_embed(note_text, expected_relative):
@@ -248,11 +343,6 @@ def materialize_insert_decisions(
                 f"Insert decisions assign different bytes to the same image: {filename}"
             )
         planned_hashes[dest_image] = current_sha256
-        if dest_image.is_file() and file_sha256(dest_image) != current_sha256:
-            raise SystemExit(
-                f"Refusing to save because an existing paper-local image has different bytes: "
-                f"{filename}"
-            )
         pending.append(
             (
                 source_image,
@@ -276,15 +366,22 @@ def materialize_insert_decisions(
     materialized: list[dict] = []
     for source_image, dest_image, current_sha256, record in pending:
         if dest_image.is_file():
-            if file_sha256(dest_image) != current_sha256:
-                raise SystemExit(
-                    f"Refusing to save because an existing paper-local image has different bytes: "
-                    f"{dest_image.name}"
-                )
-        elif source_image.resolve() != dest_image.resolve():
-            if created_paths is not None:
-                created_paths.append(dest_image)
-            shutil.copy2(source_image, dest_image)
+            if file_sha256(dest_image) == current_sha256:
+                materialized.append(record)
+                continue
+            replacement = {
+                "path": dest_image,
+                "backup": backup_file(dest_image),
+                "relative_path": record["relative_markdown_path"],
+                "also_embedded_by": notes_embedding(
+                    target_path, record["relative_markdown_path"]
+                ),
+            }
+            if replaced_images is not None:
+                replaced_images.append(replacement)
+        elif created_paths is not None:
+            created_paths.append(dest_image)
+        shutil.copy2(source_image, dest_image)
         if file_sha256(dest_image) != current_sha256:
             raise SystemExit(
                 f"Materialized image bytes do not match the reviewed asset SHA-256: "
@@ -294,11 +391,32 @@ def materialize_insert_decisions(
     return materialized
 
 
+def notes_embedding(target_path: Path, relative_image: str) -> list[str]:
+    """Name the other notes beside ``target_path`` that embed ``relative_image``."""
+    names = []
+    for note in sorted(target_path.parent.glob("*.md")):
+        if note.name == target_path.name or not note.is_file():
+            continue
+        text = note.read_text(encoding="utf-8", errors="replace")
+        if note_references_image_embed(text, relative_image):
+            names.append(note.name)
+    return names
+
+
+LINT_FAILURE_DETAIL_LIMIT = 20
+
+
+def lint_issue_text(issue: object) -> str:
+    if not isinstance(issue, dict):
+        return str(issue)
+    text = str(issue.get("reason") or issue.get("line") or issue.get("snippet") or issue)
+    line_number = issue.get("line_number")
+    return f"{text} (line {line_number})" if line_number else text
+
+
 def lint_failure_message(lint: dict, gate: str, lint_path: str) -> str:
     detail_parts: list[str] = []
-    for warning in lint.get("warnings", []) or []:
-        if warning:
-            detail_parts.append(str(warning))
+    reported: set[str] = set()
     for issue_key in (
         "core_info_structure_issues",
         "figure_structure_issues",
@@ -311,31 +429,58 @@ def lint_failure_message(lint: dict, gate: str, lint_path: str) -> str:
         "math_render_issues",
         "reference_hygiene_issues",
     ):
-        issues = lint.get(issue_key, []) or []
-        if not issues:
-            continue
-        first = issues[0]
-        if isinstance(first, dict):
-            reason = first.get("reason") or first.get("line") or first.get("snippet") or first
-            detail_parts.append(f"{issue_key}: {reason}")
-        else:
-            detail_parts.append(f"{issue_key}: {first}")
-    details = "; ".join(detail_parts[:4])
+        for issue in lint.get(issue_key, []) or []:
+            text = lint_issue_text(issue)
+            part = f"{issue_key}: {text}"
+            if part not in detail_parts:
+                detail_parts.append(part)
+            reported.add(text)
+            if isinstance(issue, dict) and issue.get("reason"):
+                reported.add(str(issue["reason"]))
+    # Lint also copies some issue reasons into warnings; list only the rest.
+    for warning in lint.get("warnings", []) or []:
+        if warning and str(warning) not in reported and str(warning) not in detail_parts:
+            detail_parts.append(str(warning))
+    shown = detail_parts[:LINT_FAILURE_DETAIL_LIMIT]
+    details = "; ".join(shown)
+    if len(detail_parts) > len(shown):
+        details += f"; and {len(detail_parts) - len(shown)} more"
     suffix = f" Details: {details}." if details else ""
     return f"write_obsidian_note.py refused to write note because {gate} gate failed.{suffix} See lint JSON: {lint_path}"
 
 
 def require_lint_gate(lint: dict, key: str, gate: str, lint_path: str) -> None:
-    if not lint.get(key, False):
+    if lint.get(key) is not True:
         raise SystemExit(lint_failure_message(lint, gate, lint_path))
+
+
+def require_lint_report(path_value: str, producer: str, name: str, language: str) -> dict:
+    if not path_value:
+        raise SystemExit(f"Formal Save requires {name} with output_language.")
+    try:
+        report = json.loads(Path(path_value).expanduser().read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"Expected {name} JSON object: {path_value}") from exc
+    if not isinstance(report, dict):
+        raise SystemExit(f"Expected {name} JSON object: {path_value}")
+    if report.get("script") != producer or report.get("status") != "ok":
+        raise SystemExit(f"{name} requires a successful {producer} producer artifact.")
+    try:
+        require_artifact_output_language(report, name, language)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    return report
 
 
 def require_source_manifest(path_value: str) -> dict:
     if not path_value:
         raise SystemExit(
-            "Obsidian Save Target Admission requires a Source Manifest with source_sha256."
+            "Formal Save or Obsidian Save Target Admission requires a Source Manifest with source_sha256."
         )
-    manifest = maybe_load_json_record(path_value)
+    try:
+        manifest = maybe_load_json_record(path_value)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise SystemExit(f"Expected successful Source Manifest JSON: {path_value}") from exc
     if manifest is None or str(manifest.get("status", "")).strip() != "ok":
         raise SystemExit(f"Expected successful Source Manifest JSON: {path_value}")
     source_sha256 = str(manifest.get("source_sha256", "")).strip().lower()
@@ -361,6 +506,11 @@ def block_directory_conflict(
     source_sha256: str,
     output_language: str,
 ) -> None:
+    if args.output and any(
+        Path(args.output).expanduser().resolve().is_relative_to(directory.resolve())
+        for directory in target_directories
+    ):
+        raise SystemExit("JSON status output must stay outside conflicting paper directories.")
     payload = {
         "status": "blocked",
         "script": "write_obsidian_note.py",
@@ -392,6 +542,8 @@ def block_note_conflict(
             "target_directory": str(target_path.parent),
             "existing_note_path": str(target_path),
             "existing_note_sha256": file_sha256(target_path),
+            "user_notes": existing_user_notes(target_path, output_language),
+            "existing_read_date": existing_read_date(target_path),
             "source_sha256": source_sha256,
             "output_language": output_language,
         },
@@ -400,13 +552,58 @@ def block_note_conflict(
     raise SystemExit(2)
 
 
+def existing_read_date(target_path: Path) -> str:
+    """The first-read date recorded in a note that would be replaced, or an empty string."""
+    try:
+        fields = parse_frontmatter(target_path.read_bytes().decode("utf-8", errors="replace"))
+    except FrontmatterError:
+        return ""
+    value = (fields or {}).get("read_date", "")
+    return value if isinstance(value, str) else ""
+
+
+def existing_user_notes(target_path: Path, output_language: str) -> dict:
+    """Summarize the user's My Notes in a note that would be replaced."""
+    text = target_path.read_bytes().decode("utf-8", errors="replace")
+    return inspect_existing_user_notes(text, output_language)
+
+
+def recorded_saved_note_sha256(registry: dict | None, source_sha256: str, output_language: str) -> str:
+    source = ((registry or {}).get("sources") or {}).get(source_sha256) or {}
+    note = (source.get("notes") or {}).get(output_language) or {}
+    return str(note.get("note_sha256", ""))
+
+
+def choose_domain(args, config: dict, *, source_sha256: str, output_language: str) -> str:
+    try:
+        domain, args.new_domain = resolve_domain_choice(
+            config, args.domain, args.new_domain_reason
+        )
+    except DomainChoiceError as exc:
+        emit(
+            {
+                "status": "blocked",
+                "script": "write_obsidian_note.py",
+                "phase": "save_target_admission",
+                "conflict_code": exc.code,
+                "requires_user_confirmation": False,
+                "message": exc.message,
+                "domain_overview": domain_overview(config),
+                "source_sha256": source_sha256,
+                "output_language": output_language,
+            },
+            args.output,
+        )
+        raise SystemExit(2) from exc
+    return domain
+
+
 def resolve_obsidian_save_target(
     args: argparse.Namespace,
     config: dict,
     vault: Path,
     *,
     title: str,
-    abstract: str,
     source_sha256: str,
     output_language: str,
 ) -> tuple[Path, str, str, bool, str]:
@@ -442,8 +639,8 @@ def resolve_obsidian_save_target(
             )
             domain_routing_skipped = True
         else:
-            resolved_subdir = resolve_domain_subdir(
-                config, title=title, abstract=abstract, subdir=args.subdir
+            resolved_subdir = choose_domain(
+                args, config, source_sha256=source_sha256, output_language=output_language
             )
             target_path = resolve_obsidian_note_path(
                 config, title=title, subdir=resolved_subdir, filename=args.filename
@@ -466,6 +663,7 @@ def resolve_obsidian_save_target(
             output_language=output_language,
         )
 
+    require_safe_status_output(args, target_path)
     approved_existing_note_sha256 = ""
     if target_path.is_file():
         existing_note_sha256 = file_sha256(target_path)
@@ -515,6 +713,7 @@ def write_paper_directory_sidecar(
     source_sha256: str,
     output_language: str,
     note_sha256: str,
+    generated_note_sha256: str = "",
     registry: dict | None = None,
 ) -> Path:
     sidecar_path = target_path.parent / PAPER_DIRECTORY_SIDECAR
@@ -528,7 +727,11 @@ def write_paper_directory_sidecar(
         )
     )
     source = register_source(payload, source_sha256, {})
-    source["notes"][output_language] = {"filename": target_path.name, "note_sha256": note_sha256}
+    source["notes"][output_language] = {
+        "filename": target_path.name,
+        "note_sha256": note_sha256,
+        "generated_note_sha256": generated_note_sha256 or note_sha256,
+    }
     write_record(target_path.parent, payload)
     ensure_sidecar_hidden(sidecar_path)
     return sidecar_path
@@ -576,8 +779,97 @@ def restore_file(path: Path, backup_path: Path | None) -> None:
         os.replace(backup_path, path)
 
 
+def require_safe_status_output(args, target_path: Path | None = None) -> None:
+    if not args.output:
+        return
+    protected = {
+        Path(value).expanduser().resolve()
+        for value in (
+            args.content_file, args.plan_file, args.final_quality_review,
+            args.final_readability_review, args.lint_json, args.grounding_lint_json,
+            args.source_manifest, args.figure_decisions,
+        )
+        if value
+    }
+    if args.final_quality_review:
+        protected.add(
+            Path(args.final_quality_review).expanduser().resolve().with_suffix(".state.json")
+        )
+    output_path = Path(args.output).expanduser().resolve()
+    if output_path in protected or (
+        target_path is not None and output_path.is_relative_to(target_path.parent.resolve())
+    ):
+        raise SystemExit(
+            "JSON status output must stay outside the paper directory and protected review inputs."
+        )
+
+
+def read_quality_inputs(
+    args, language: str, *, lint_note_sha256: str | None = None,
+) -> tuple[str, str, dict, str, Path]:
+    for value, name in (
+        (args.content_file, "--content-file"), (args.plan_file, "--plan-file"),
+        (args.final_quality_review, "--final-quality-review"),
+    ):
+        if not value:
+            raise ValueError(f"Final Quality Gate requires explicit {name}.")
+    raw_note = Path(args.content_file).expanduser().read_bytes()
+    note_text = canonical_note_text(raw_note)
+    note_sha256 = hashlib.sha256(raw_note).hexdigest()
+    if lint_note_sha256 is not None and lint_note_sha256 != note_sha256:
+        raise ValueError(
+            "write_obsidian_note.py refused to write note because the final note "
+            "changed after Final Note Lint; rerun lint under the same output_language."
+        )
+    raw_plan = Path(args.plan_file).expanduser().read_bytes()
+    plan = json.loads(raw_plan.decode("utf-8-sig"))
+    review_path = Path(args.final_quality_review).expanduser().resolve()
+    review = strict_json_loads(review_path.read_text(encoding="utf-8-sig"))
+    review_id = validate_quality(
+        review, note_sha256=note_sha256, plan_sha256=hashlib.sha256(raw_plan).hexdigest(),
+        plan=plan, language=language,
+    )
+    return note_text, note_sha256, review, review_id, review_path.with_suffix(".state.json")
+
+
+def load_quality_state(path: Path) -> dict | None:
+    return strict_json_loads(path.read_text(encoding="utf-8-sig")) if path.exists() else None
+
+
+def record_final_quality_review(args) -> None:
+    if not args.language:
+        raise SystemExit("Recording Final Quality Review requires explicit --language.")
+    try:
+        language = normalize_output_language(args.language)
+        _, _, review, review_id, state_path = read_quality_inputs(args, language)
+        require_safe_status_output(args)
+        previous = load_quality_state(state_path)
+        state = advance_state(previous, review, review_id, language=language)
+        if state != previous:
+            atomic_write_note(state_path, json.dumps(state, ensure_ascii=False, indent=2) + "\n")
+    except (OSError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    revision_allowed = bool(state["pending_note_sha256"]) and state["revisions_used"] < 2
+    emit({
+        "status": "ok" if review["verdict"] == "pass" else "revision_required",
+        "script": "write_obsidian_note.py", "phase": "final_quality_review",
+        "output_language": language, "verdict": review["verdict"],
+        "revisions_used": state["revisions_used"],
+        "revisions_remaining": 2 - state["revisions_used"],
+        "revision_allowed": revision_allowed, "review_state_path": str(state_path),
+    }, args.output)
+    if review["verdict"] == "fail":
+        raise SystemExit(1)
+
+
 def main() -> None:
     args = parser().parse_args()
+    if args.record_final_quality_review:
+        if args.preflight:
+            raise SystemExit("--preflight and --record-final-quality-review cannot be combined.")
+        record_final_quality_review(args)
+        return
+    require_safe_status_output(args)
     config = runtime_config(
         cli_overrides={
             "output_language": args.language,
@@ -592,13 +884,17 @@ def main() -> None:
     output_mode, root_path = resolve_note_output_mode(config)
 
     record = maybe_load_json_record(args.input) or {}
-    title = args.title or str(record.get("title", "")).strip()
+    title = (
+        args.title
+        or str(
+            (record.get("work_level_identity", {}) or {}).get("title")
+            or record.get("title", "")
+        ).strip()
+    )
     if not title:
         raise SystemExit("write_obsidian_note.py requires --title or metadata with a title.")
 
-    source_manifest = (
-        require_source_manifest(args.source_manifest) if output_mode == "obsidian" else {}
-    )
+    source_manifest = require_source_manifest(args.source_manifest)
     args.archive_input = {**record, **source_manifest, "title": title}
     if not args.target_directory:
         args.target_directory = (source_manifest.get("archive_source") or {}).get(
@@ -641,18 +937,15 @@ def main() -> None:
             config,
             root_path,
             title=title,
-            abstract=str(record.get("abstract", "")),
             source_sha256=str(source_manifest["source_sha256"]),
             output_language=output_language,
         )
     else:
-        if args.preflight:
-            raise SystemExit("--preflight requires Obsidian save mode.")
-        resolved_subdir = resolve_domain_subdir(
+        resolved_subdir = choose_domain(
+            args,
             config,
-            title=title,
-            abstract=str(record.get("abstract", "")),
-            subdir=args.subdir,
+            source_sha256=str(source_manifest["source_sha256"]),
+            output_language=output_language,
         )
         target_path = resolve_obsidian_note_path(
             config,
@@ -660,7 +953,13 @@ def main() -> None:
             subdir=resolved_subdir,
             filename=args.filename,
         )
+        require_safe_status_output(args, target_path)
+        args.admitted_asset_subdir = args.asset_subdir
 
+    domain = resolved_subdir or saved_domain(config, target_path)
+    new_domain = {"new_domain": getattr(args, "new_domain", False)}
+    if new_domain["new_domain"]:
+        new_domain["new_domain_reason"] = args.new_domain_reason.strip()
     if args.preflight:
         emit(
             {
@@ -669,41 +968,61 @@ def main() -> None:
                 "phase": "save_target_admission",
                 "admission": admission,
                 "domain_routing_skipped": domain_routing_skipped,
+                "domain": domain,
+                **new_domain,
                 "target_directory": str(target_path.parent),
                 "note_path": str(target_path),
                 "asset_subdir": args.admitted_asset_subdir,
                 "source_sha256": str(source_manifest["source_sha256"]),
                 "output_language": output_language,
+                **(
+                    {
+                        "user_notes": existing_user_notes(target_path, output_language),
+                        "existing_read_date": existing_read_date(target_path),
+                    }
+                    if target_path.is_file()
+                    else {}
+                ),
             },
             args.output,
         )
         return
 
-    if not args.lint_json:
-        raise SystemExit("Formal Save requires Final Note Lint with output_language.")
+    lint = require_lint_report(args.lint_json, "lint_note.py", "Final Note Lint", output_language)
     lint_path = str(Path(args.lint_json).expanduser().resolve())
-    # utf-8-sig tolerates a BOM in the lint JSON (e.g. produced/edited on
-    # Windows) that would otherwise crash json.loads before any gate check.
-    lint = json.loads(Path(lint_path).read_text(encoding="utf-8-sig"))
+    for key, gate in (
+        ("passes_basic_structure", "basic structure"),
+        ("passes_style_gate", "style"),
+        ("passes_math_gate", "math"),
+        ("passes_figure_gate", "figure"),
+        ("passes_plan_gate", "plan"),
+        ("passes_substantive_content", "substantive content"),
+        ("passes_reference_hygiene_gate", "reference hygiene"),
+    ):
+        require_lint_gate(lint, key, gate, lint_path)
+    grounding = require_lint_report(
+        args.grounding_lint_json, "lint_grounding.py", "Grounding Lint", output_language,
+    )
+    require_lint_gate(grounding, "passes_grounding", "grounding", args.grounding_lint_json)
+    if not args.plan_file or not Path(args.plan_file).expanduser().is_file():
+        raise SystemExit("Formal Save requires an existing Note Plan JSON file via --plan-file.")
     try:
-        require_artifact_output_language(lint, "lint artifact", output_language)
+        note_plan = maybe_load_json_record(args.plan_file)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise SystemExit(f"Expected Note Plan JSON object: {args.plan_file}") from exc
+    if note_plan is None:
+        raise SystemExit(f"Expected Note Plan JSON object: {args.plan_file}")
+    try:
+        require_artifact_output_language(note_plan, "Note Plan", output_language)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
-    require_lint_gate(lint, "passes_basic_structure", "basic structure", lint_path)
-    require_lint_gate(lint, "passes_style_gate", "style", lint_path)
-    require_lint_gate(lint, "passes_math_gate", "math", lint_path)
-    if "passes_figure_gate" in lint and not lint.get("passes_figure_gate", False):
-        raise SystemExit(lint_failure_message(lint, "figure", lint_path))
-    if "passes_plan_gate" in lint and not lint.get("passes_plan_gate", False):
-        raise SystemExit(lint_failure_message(lint, "plan", lint_path))
-    if "passes_substantive_content" in lint and not lint.get("passes_substantive_content", False):
-        raise SystemExit(lint_failure_message(lint, "substantive content", lint_path))
-    if "passes_reference_hygiene_gate" in lint and not lint.get("passes_reference_hygiene_gate", False):
-        raise SystemExit(lint_failure_message(lint, "reference hygiene", lint_path))
 
     if not args.figure_decisions:
         raise SystemExit("Formal Save requires Figure/Table Decisions with output_language.")
-    figure_decisions = maybe_load_json_record(args.figure_decisions)
+    try:
+        figure_decisions = maybe_load_json_record(args.figure_decisions)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise SystemExit(f"Expected JSON object for --figure-decisions: {args.figure_decisions}") from exc
     if figure_decisions is None:
         raise SystemExit(f"Expected JSON object for --figure-decisions: {args.figure_decisions}")
     try:
@@ -715,27 +1034,48 @@ def main() -> None:
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
 
-    if args.content_file:
-        # utf-8-sig strips a leading BOM so it is never written into the saved
-        # note (a leading BOM breaks Obsidian frontmatter / the H1 title).
-        note_text = Path(args.content_file).expanduser().resolve().read_text(encoding="utf-8-sig")
-    elif args.content:
-        note_text = args.content
-    elif args.stdin:
-        note_text = sys.stdin.read()
-    else:
-        raise SystemExit("write_obsidian_note.py requires --content-file, --content, or --stdin.")
-    note_text = note_text.replace("\r\n", "\n")
+    for report, field, value, name in (
+        (lint, "note_plan_sha256", args.plan_file, "Final Note Lint Note Plan"),
+        (grounding, "note_plan_sha256", args.plan_file, "Grounding Lint Note Plan"),
+        (grounding, "source_manifest_sha256", args.source_manifest, "Grounding Lint Source Manifest"),
+        (grounding, "figure_decisions_sha256", args.figure_decisions, "Grounding Lint Figure/Table Decisions"),
+    ):
+        current_sha256 = json_input_sha256(value)
+        if not current_sha256 or report.get(field) != current_sha256:
+            raise SystemExit(f"{name} SHA-256 does not match current input; rerun lint.")
+    figure_issues = [
+        item
+        for item in validate_figure_decisions(source_manifest, figure_decisions, args.source_manifest)
+        if item.get("severity", "error") == "error"
+    ]
+    if figure_issues:
+        raise SystemExit(f"Figure/Table Decisions validation failed: {json.dumps(figure_issues)}")
+
     lint_note_sha256 = str(lint.get("note_sha256", "")).strip()
     if not lint_note_sha256:
         raise SystemExit("lint artifact requires note_sha256.")
-    note_sha256 = hashlib.sha256(note_text.encode("utf-8")).hexdigest()
-    if lint_note_sha256 != note_sha256:
-        raise SystemExit(
-            "write_obsidian_note.py refused to write note because the final note "
-            "changed after Final Note Lint; rerun lint under the same output_language."
-        )
+    try:
+        (
+            note_text, note_sha256, quality_review, quality_id, quality_state_path,
+        ) = read_quality_inputs(args, output_language, lint_note_sha256=lint_note_sha256)
+    except (OSError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
     require_reference_hygiene(note_text, "before save")
+    tag_issue = domain_tag_issue(note_text, domain)
+    if tag_issue:
+        raise SystemExit(tag_issue)
+    try:
+        state = load_quality_state(quality_state_path)
+        require_recorded_pass(state, quality_review, quality_id, language=output_language)
+        if not args.final_readability_review:
+            raise ValueError("Formal Save requires --final-readability-review.")
+        readability = strict_json_loads(
+            Path(args.final_readability_review).expanduser().read_text(encoding="utf-8-sig")
+        )
+        validate_readability(readability, note_sha256=note_sha256, language=output_language)
+    except (OSError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    require_resolvable_links(note_text, output_language, output_mode, root_path, config)
 
     with archive_lock(root_path) if output_mode == "obsidian" else nullcontext():
         if pdf_path and file_sha256(pdf_path) != source_manifest["source_sha256"]:
@@ -747,7 +1087,6 @@ def main() -> None:
                 config,
                 root_path,
                 title=title,
-                abstract=str(record.get("abstract", "")),
                 source_sha256=str(source_manifest["source_sha256"]),
                 output_language=output_language,
             )
@@ -781,6 +1120,7 @@ def main() -> None:
         note_backup = None
         sidecar_backup = None
         created_assets: list[Path] = []
+        replaced_images: list[dict] = []
         note_attempted = False
         sidecar_attempted = False
         try:
@@ -793,6 +1133,7 @@ def main() -> None:
                     figure_decisions,
                     asset_subdir,
                     created_assets,
+                    replaced_images,
                 )
                 if figure_decisions
                 else []
@@ -808,10 +1149,40 @@ def main() -> None:
                     source_sha256=str(source_manifest["source_sha256"]),
                     output_language=output_language,
                 )
+            existing_text = None
+            if target_path.is_file():
+                try:
+                    existing_text = target_path.read_bytes().decode("utf-8")
+                except UnicodeDecodeError as exc:
+                    raise SystemExit(
+                        "The existing note is not UTF-8, so its My Notes section cannot be kept."
+                    ) from exc
+            try:
+                saved_text, user_notes = merge_user_notes(
+                    note_text,
+                    existing_text,
+                    output_language,
+                    recorded_saved_sha256=recorded_saved_note_sha256(
+                        getattr(args, "archive_registry", None),
+                        str(source_manifest["source_sha256"]),
+                        output_language,
+                    ) if output_mode == "obsidian" else "",
+                )
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+            saved_note_sha256 = hashlib.sha256(saved_text.encode("utf-8")).hexdigest()
             note_attempted = True
-            atomic_write_note(target_path, note_text)
+            atomic_write_note(target_path, saved_text)
+            written_text = target_path.read_text(encoding="utf-8")
+            if (
+                file_sha256(target_path) != saved_note_sha256
+                or hashlib.sha256(
+                    restore_generated_text(written_text, note_text, output_language).encode("utf-8")
+                ).hexdigest() != note_sha256
+            ):
+                raise SystemExit("Saved note SHA-256 does not match the reviewed final draft.")
             require_reference_hygiene(
-                target_path.read_text(encoding="utf-8"),
+                restore_generated_text(written_text, note_text, output_language),
                 "after save",
             )
             asset_dir.mkdir(parents=True, exist_ok=True)
@@ -823,7 +1194,8 @@ def main() -> None:
                     title=title,
                     source_sha256=str(source_manifest["source_sha256"]),
                     output_language=output_language,
-                    note_sha256=note_sha256,
+                    note_sha256=saved_note_sha256,
+                    generated_note_sha256=note_sha256,
                     registry=args.archive_registry,
                 )
         except BaseException:
@@ -838,6 +1210,8 @@ def main() -> None:
                 restore_file(target_path, note_backup)
             for created_asset in reversed(created_assets):
                 created_asset.unlink(missing_ok=True)
+            for replaced in reversed(replaced_images):
+                restore_file(replaced["path"], replaced["backup"])
             if not asset_directory_existed:
                 try:
                     asset_dir.rmdir()
@@ -849,6 +1223,9 @@ def main() -> None:
                 note_backup.unlink(missing_ok=True)
             if sidecar_backup is not None:
                 sidecar_backup.unlink(missing_ok=True)
+            for replaced in replaced_images:
+                if replaced["backup"] is not None:
+                    replaced["backup"].unlink(missing_ok=True)
 
         payload = {
             "status": "ok",
@@ -858,17 +1235,43 @@ def main() -> None:
             "title": title,
             "note_path": str(target_path),
             "subdir": resolved_subdir,
+            "domain": domain,
+            **new_domain,
             "images_dir": str(asset_dir),
             "materialized_figures": materialized_figures,
+            "replaced_images": [
+                {"file": item["relative_path"], "also_embedded_by": item["also_embedded_by"]}
+                for item in replaced_images
+            ],
             "overwrote_existing_note": overwrote_existing_note,
             "admission": admission,
             "domain_routing_skipped": domain_routing_skipped,
+            "final_quality_review": "pass",
+            "final_readability_review": "pass",
+            "reviewed_note_sha256": note_sha256,
+            "saved_note_sha256": saved_note_sha256,
+            "user_notes": {
+                "status": user_notes["status"],
+                "chars": user_notes["chars"],
+                "sha256": user_notes["user_notes_sha256"],
+                "legacy_format": user_notes["legacy_format"],
+            },
         }
         if sidecar_path is not None:
             payload["sidecar_path"] = str(sidecar_path)
             payload["source_sha256"] = str(source_manifest["source_sha256"])
         payload["output_mode"] = output_mode
         payload["base_output_root"] = str(root_path)
+        payload["glossary_followup"] = glossary_followup(
+            config,
+            source_manifest=(
+                str(Path(args.source_manifest).expanduser().resolve())
+                if Path(args.source_manifest).expanduser().is_file()
+                else ""
+            ),
+            note_path=str(target_path),
+            regenerated=overwrote_existing_note,
+        )
         if config.get("obsidian_vault"):
             payload["vault"] = str(Path(config["obsidian_vault"]).expanduser().resolve())
         emit(payload, args.output)

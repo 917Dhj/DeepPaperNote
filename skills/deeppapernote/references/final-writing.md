@@ -21,8 +21,9 @@ Include at least:
 - `aliases`: a short English name, acronym, or stable title alias useful for wikilinks
 - `date`: when publication date or year is known
 - `doi` or `arxiv_id`: when available
+- `paper_type`, `methods`, `datasets`, `tasks`, and `read_date`, always, as `obsidian-format.md` describes
 
-Do not invent placeholder metadata values. Omit unavailable fields instead.
+Do not invent placeholder metadata values. Omit unavailable optional fields instead; the five fields above are always present, with an empty list `[]` when a list has nothing central to name.
 
 Near the beginning of the note, include:
 - `## 核心信息`
@@ -58,29 +59,48 @@ It should usually:
 - explain what new capability, mechanism, or evaluation angle it enables
 - avoid generic praise such as `the paper is novel` without locating the novelty
 
+## Takeaways and My Notes
+
+The note ends with `阅读收获`, then `关联`, then `我的笔记`. `writing_contract.takeaways_contract`, `writing_contract.connections_contract`, and `writing_contract.my_notes_contract` carry the exact headings, limits, and guidance text. Write `关联` from `note_plan.connections` and `note_plan.key_prior_work` as described in `references/obsidian-format.md`.
+
+`阅读收获` answers "what do I do with this paper". It holds exactly two `###` subsections, each with one or two list items. Keep each item to one or two sentences; Final Note Lint warns when an item exceeds `takeaways_contract.max_item_chars` non-space characters.
+- `### 可迁移` comes from `note_plan.reuse_takeaways`. Each item names the paper's concrete mechanism or practice, where it would transfer, and the precondition for the transfer to hold.
+- `### 下一步` comes from `note_plan.followup_questions`. Each item is a follow-up question or experiment specific to this paper. At least one item tests the paper's own claims or evidence rather than only a transfer setting. A doubt belongs here only together with the experiment that would test it; plain criticism stays in the analysis sections and `局限`. A recommended next paper must already appear in `关联`; never invent a title.
+
+The user's research direction comes from the request, recorded verbatim in `note_plan.reader_research_direction`. When the request states none, it comes from the user's research memory: copy the bundle's `research_memory.suggested_reader_research_direction` when `research_memory.status` is `ok`. A direction from the request always wins. Write `### 可迁移` against the direction:
+1. Whenever a credible transfer exists, at least one item connects to the user's direction.
+2. Each such item names the paper's mechanism, the user's problem it would transfer to, and the precondition.
+3. Start every item that connects to the user's direction with `takeaways_contract.judgment_marker` (`判断：` in `zh-CN`, `Judgment:` in `en`), keeping the judgment separate from the paper's facts. Final Note Lint fails when a direction is stated and no transferable item carries the marker.
+4. When no credible transfer exists, say plainly that the paper bears little on the user's current direction, then give one general item. Never force a connection.
+
+With no direction from either source, leave `reader_research_direction` as an empty string and write general takeaways.
+
+`我的笔记` belongs to the user. It is the last section, and in the draft it holds exactly the standard guidance line and nothing else. Formal Save keeps the user's own `我的笔记` block from the note it replaces.
+
 ## Writer Persona
 
-Default to a high-bar technical reader and writer persona:
-- you are a top-tier AI researcher and algorithm engineer
-- you are preparing an internal replication-oriented reading note for your lab
-- you are not writing a science-pop summary
-- you should assume the reader is comfortable with Python, PyTorch, training loops, evaluation protocols, and ablation logic
+You are a senior colleague explaining the paper to a smart researcher from an adjacent field. The reader reads papers for a living but does not know this paper's subfield: its jargon, its standard baselines, or why its problem is hard. The note should leave that reader able to retell the paper's story, judge how far its evidence goes, and decide what to take from it.
 
-For technical or method papers, write as if the note may later be used for:
-- implementation planning
-- reproduction
-- comparison against later papers
-- deciding whether the method is actually novel or just well-packaged
+Technical depth follows the paper type. Method, system, and theory notes keep the equations, settings, and implementation details a researcher would need to reuse or check the work. Benchmark, empirical, survey, qualitative, and argument notes spend that depth on construction, measurement, design, and reasoning instead, and carry no equations beyond what `formula_rules` allows.
+
+## Readable Prose
+
+- **Story first.** The middle sections follow `note_plan.storyline` in order. Each section picks up the thread the previous one left, so a reader skimming only the first sentence of every paragraph still gets the paper's argument. A paragraph that serves no part of the story is cut.
+- **Conclusion first.** Each paragraph opens with its point, then gives the evidence, numbers, and caveats behind it.
+- **One point per paragraph.** Split a paragraph that argues two things.
+- **Explain terms on first use.** The first time a term, acronym, or model name appears, add one plain sentence or a short parenthetical on what it is or does, for example `PPR`（个性化 PageRank：从与查询相关的节点出发、沿图随机游走打分的检索方法）. Keep an established English name rather than translating it word for word (write `Personalized PageRank` or `PPR`, never 个性化网页排名).
+- **Numbers that carry conclusions.** Keep in the prose only the numbers a conclusion rests on; the other results move into a table with one sentence saying what the table shows, and stay in the note. Tables are welcome wherever they make a comparison, a set of steps, or a checklist clearer.
+- **Complete results.** Every main experiment the paper reports appears in the note: each workload, dataset family, and ablation, with its setting. The same holds for what the paper enumerates as its findings (theorems and their corollaries, numbered observations, design patterns, recommendations, themes): list them all, in a table when the list is long.
+- **Plain register.** Prefer ordinary words to field jargon when both say the same thing; keep jargon where it is the precise name.
 
 ## Writing Priorities
 
 1. explain the paper rather than quote it
-2. distinguish research problem from task definition
-3. explain the method or analysis flow in your own words
-4. choose the most meaningful results rather than repeating every number
+2. tell the paper's story in the order the middle sections give it
+3. answer every core question of the paper type, or say plainly that the paper does not report it
+4. cover every main result, leading with the ones the conclusions rest on
 5. say what the paper does not prove
-6. keep the note readable weeks later
-7. make the technical core understandable enough for an engineer to re-explain it
+6. keep the note readable weeks later by someone outside the subfield
 
 ## What Scripts Should Not Try To Fully Replace
 
@@ -151,31 +171,7 @@ It should use meaningful `###` subheadings where they improve technical clarity.
 
 Draft only from a note plan that has already passed grounding. Use its paper type, evidence-backed claims, boundaries, limiting results, mechanism-result links, comparisons, reusable takeaways, and follow-up questions as writing commitments rather than reopening the planning contract here.
 
-Examples:
-- `### 数据来源`
-- `### 任务定义`
-- `### 中间特征抽取`
-- `### 训练细节`
-- `### 哪些结果最重要`
-- `### 哪些地方容易被误读`
-
-For technical papers, also strongly consider subsections such as:
-- `### 机制流程`
-- `### 训练目标`
-- `### 推理与采样链路`
-- `### 关键实现细节`
-- `### 复杂度与扩展性`
-- `### 消融到底说明了什么`
-
-For method, framework, and system papers, prefer an explicit `### 机制流程` subsection instead of hiding the execution chain inside generic prose.
-That subsection should usually be a 3 to 4 step numbered list covering:
-- what the Input is
-- what the main intermediate transformations are
-- what the Output is
-- what the training or inference loop is actually doing
-- do not rely on a damaged Algorithm block to carry this explanation for you
-- do not let the steps collapse into module-name listing; each step should describe an operation
-- if a high-confidence pipeline or architecture figure matches this execution chain, place it in `### 机制流程`
+Write the middle sections of `contracts_by_paper_type[paper_type]` in order. Answer each core question in its home section from `note_plan.core_answers`; a `not_reported` answer becomes a plain sentence such as "论文没有报告 X". When the type has a workflow, write its subsection as `paper-types.md` shows: an overview chain, then the step table mirroring `note_plan.workflow`, then any matching pipeline or framework figure. Inside sections, add `###` subsections where they help, for example `### 为什么结果成立` or `### 哪些地方容易被误读`.
 
 ## Formula Rule
 
@@ -193,7 +189,7 @@ Use formulas sparingly and purposefully:
 - each formula should help explain the method
 - do not dump many formulas just to look technical
 - if the source extraction is noisy, prefer reconstructing a small, stable core formula rather than copying broken math verbatim
-- after each retained formula, add one sentence explaining what it corresponds to in engineering or code terms
+- after each retained formula, add one plain sentence saying what it means
 - do not only translate variable names; explain the concrete operation, loss term, update rule, or control effect
 - formulas in the final Markdown should be written as directly renderable Obsidian/MathJax math, not as JSON-style escaped strings
 - do not double-escape TeX commands such as `\\tau`, `\\frac`, `\\bar`, `\\begin`, or `\\end` when the final note should contain `\tau`, `\frac`, `\bar`, `\begin`, or `\end`
@@ -227,7 +223,7 @@ Use `figure-placement.md` for semantic placement, identity matching, and visual-
 
 ## Final Self-Review
 
-Before outputting the final Markdown, first run `final_quality_review` and explicitly check:
+Before handing the draft to `final_quality_review`, the author must explicitly check:
 - does the note reconstruct the central evidence chain rather than only restating claims?
 - does it separate what the evidence actually proves from what the paper has not proven?
 - does it map mechanisms, protocols, constructs, data decisions, or study design choices to the result pattern they explain?
@@ -235,18 +231,22 @@ Before outputting the final Markdown, first run `final_quality_review` and expli
 - does it explain the paper's own Discussion/Limitations claims mechanistically when those sections exist?
 - are the planned `claim_boundaries`, `negative_or_limiting_results`, `mechanism_result_map`, `comparative_positioning`, `reuse_takeaways`, and `followup_questions` reflected in the final prose?
 - does the note contain concrete numbers, dimensions, complexity terms, or formulas when the paper clearly depends on them?
-- can a reader familiar with Python and deep learning frameworks follow the core method from this note alone?
+- can a researcher from an adjacent field retell the paper's story from the first sentences of its paragraphs, and is every term explained where it first appears?
 - does the method section explain the mechanism rather than only summarize the claim?
-- if this is a method/system/framework paper, does `方法主线` explicitly contain `### 机制流程` with a 3 to 4 step numbered list?
+- does every core question of the paper type have an answer, or a plain not-reported sentence, in its home section?
+- if the type has a workflow, does its subsection hold an overview chain and a step table that match `note_plan.workflow`?
 - if the raw source reports negative or unstable ablation settings, did the note include at least one of them?
 - if the raw source does not clearly report such settings, did the note avoid inventing failed or unstable cases?
 - does the note contain at least one honest limitation and one paper-specific insight?
+- does `阅读收获` give paper-specific takeaways rather than restating the limitations, and does `我的笔记` hold only the standard guidance?
 - are there any suspicious mid-sentence line breaks left in the prose?
 - if the note includes LaTeX formulas, did you quickly check that the final Markdown uses directly renderable TeX rather than double-escaped commands or broken math delimiters?
 
-If `final_quality_review` finds missing evidence-chain coverage, missing mechanism-to-result explanation, missing comparative positioning, missing boundary judgment, missing negative/limiting result discussion, or generic reusable takeaways or follow-up questions, return to the source artifacts and revise the note before saving.
+If the author's self-review finds missing evidence-chain coverage, missing mechanism-to-result explanation, missing comparative positioning, missing boundary judgment, missing negative/limiting result discussion, or generic reusable takeaways or follow-up questions, return to the source artifacts and revise the note before saving.
 
-After `final_quality_review`, run `final_readability_review`.
+Use `final-quality-review.md` for the dedicated review, strict artifacts, and revision protocol. These broader writing checks remain required; the V1 save gate records its four plan-coverage checks separately.
+
+After a recorded passing `final_quality_review`, run `final_readability_review` and retain its receipt for the final draft bytes.
 This review is a language-and-expression pass, not a second evidence-judgment pass:
 - improve fluency and readability
 - remove stiff translations
@@ -256,4 +256,6 @@ This review is a language-and-expression pass, not a second evidence-judgment pa
 - do not invent new facts, numbers, comparisons, or failure cases during this pass
 - do not use polish as an excuse to flatten the note into a safer but shallower summary
 
-If the answer to the first four quality-review questions is `no`, the draft is still too shallow and should be revised before save.
+Any readability edit requires fresh lint, a new full quality review, and a final readability reread and receipt for the resulting version.
+
+If the answer to the first four self-review questions is `no`, the draft is still too shallow and should be revised before save.

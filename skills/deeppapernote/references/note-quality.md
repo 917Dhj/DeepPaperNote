@@ -7,13 +7,14 @@ The note is high quality only if it satisfies most of the checks below.
 ## Minimum Bar
 
 - It is not a paraphrase of the abstract.
-- It distinguishes `research problem` from `task definition`.
+- It answers every core question of its paper type, or says plainly that the paper does not report it.
 - It explains how the method or analysis actually works.
-- It reports the most meaningful results, not only the prettiest numbers.
+- It reports every main result, not only the prettiest numbers.
 - It includes at least one real limitation.
 - It includes an explicit judgment about the paper's actual contribution.
 - It includes at least one paper-specific technical subsection rather than only broad top-level sections.
 - For method-heavy papers, it explains enough mechanism detail that an engineer could re-explain the pipeline without reopening the PDF.
+- A researcher from an adjacent field can follow it: the middle sections tell one story, paragraphs lead with their point, and every term is explained where it first appears.
 
 ## Structural Checks
 
@@ -22,20 +23,13 @@ The note should usually include:
 - `原文摘要翻译`
 - `创新点`
 - `一句话总结`
-- `研究问题`
-- `数据与任务定义`
-- `方法主线`
-- `关键结果`
-- `深度分析`
+- the middle sections of its paper type, in order (`contracts_by_paper_type[paper_type].middle_sections`; see `paper-types.md`)
 - `局限`
+- `阅读收获`
+- `关联`
 - `我的笔记`
-- `引用`
 
-For non-trivial papers, it should usually also include multiple `###` subheadings inside:
-- `数据与任务定义`
-- `方法主线`
-- `关键结果`
-- `深度分析`
+For non-trivial papers, it should usually also include multiple `###` subheadings inside the middle sections, and the workflow subsection when the paper type has one.
 
 Before the final note is written, the run should already have an inspectable, grounded plan whose analytical commitments are paper-specific.
 
@@ -52,15 +46,20 @@ Bad sign:
 - The note identifies where labels, supervision, or evaluation may be weak.
 - The note explains why the paper matters to later reading or research reuse.
 - The note surfaces one paper-specific insight, not just generic praise.
+- `阅读收获` names a concrete mechanism to reuse, where it applies, and under which precondition, plus a follow-up question or experiment specific to this paper.
 
 ### Bad signs
 
 - It only repeats the introduction and abstract.
 - It lists model names without explaining the pipeline.
+- It uses a term or acronym before saying what it is, or translates an established English name word for word.
+- Its sections read as separate fact dumps with no thread from one to the next.
 - It copies metrics without noting the evaluation setting.
 - It says the paper is innovative without locating the innovation.
 - It has no dedicated `创新点` section and leaves the paper's novelty scattered across the note.
 - It uses generic limitations such as "future work can use more data" and nothing more specific.
+- `阅读收获` repeats the limitations, or offers takeaways that would fit any paper.
+- The model writes its own content into `我的笔记`; that section belongs to the user and holds only the standard guidance in a generated draft.
 - It flattens a technically rich paper into only `##` headings with no internal structure.
 
 ## Quality Gate

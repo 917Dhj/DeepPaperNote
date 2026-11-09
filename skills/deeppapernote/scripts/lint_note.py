@@ -7,16 +7,31 @@ import argparse
 import hashlib
 import json
 import re
+from datetime import date
 from pathlib import Path
 
 from contracts import (
     NOTE_PLAN_FIELD_TYPES,
     NOTE_PLAN_REQUIRED_FIELDS,
-    NOTE_REQUIRED_SECTIONS,
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
     required_field_value_error,
+    connection_plan_issues,
+    note_required_sections,
+    storyline_plan_issues,
+    takeaway_plan_issues,
+    type_plan_issues,
+    weak_evidence_question_ids,
 )
+from type_profiles import (
+    NOT_REPORTED_PHRASE,
+    PROFILES,
+    WEAK_EVIDENCE_CALLOUT,
+    middle_sections,
+    section_name,
+    sections_with,
+)
+from _frontmatter import FrontmatterError, parse_frontmatter
 from localization import (
     normalize_output_language,
     note_schema,
@@ -26,28 +41,57 @@ from localization import (
 ACTIVE_LANGUAGE = "zh-CN"
 SCHEMA: dict = {}
 SECTIONS: dict[str, str] = {}
-REQUIRED_SECTIONS: tuple[str, ...] = NOTE_REQUIRED_SECTIONS
+REQUIRED_SECTIONS: tuple[str, ...] = ()
+PAPER_TYPE = ""
+MIDDLE_SECTIONS: tuple[str, ...] = ()
+RESULTS_SECTIONS: tuple[str, ...] = ()
+NUMBER_SECTIONS: tuple[str, ...] = ()
 CORE_INFO_FIELDS: list[str] = []
 CORE_INFO_FIELD_INDEX: dict[str, int] = {}
 CORE_INFO_FIELD_ALIASES: dict[str, str] = {}
 FIGURE_TARGET_SECTIONS: set[str] = set()
 FIGURE_LABELS: dict[str, str] = {}
-MECHANISM_FLOW_HEADING = "机制流程"
+TAKEAWAY_SUBSECTIONS: tuple[str, ...] = ()
+TAKEAWAY_JUDGMENT_MARKER = ""
+TAKEAWAY_MAX_ITEM_CHARS = 0
+MY_NOTES_GUIDANCE = ""
+CONNECTION_SUBSECTIONS: dict[str, str] = {}
+CONNECTION_RELATION_LABELS: dict[str, str] = {}
+CONNECTION_EMPTY_STATEMENTS: tuple[str, ...] = ()
 
 def configure_output_language(language: str | None = None) -> str:
     global ACTIVE_LANGUAGE, SCHEMA, SECTIONS, REQUIRED_SECTIONS, CORE_INFO_FIELDS
-    global CORE_INFO_FIELD_INDEX, CORE_INFO_FIELD_ALIASES, FIGURE_TARGET_SECTIONS, FIGURE_LABELS, MECHANISM_FLOW_HEADING
+    global CORE_INFO_FIELD_INDEX, CORE_INFO_FIELD_ALIASES, FIGURE_LABELS
+    global TAKEAWAY_SUBSECTIONS, TAKEAWAY_JUDGMENT_MARKER, TAKEAWAY_MAX_ITEM_CHARS, MY_NOTES_GUIDANCE
+    global CONNECTION_SUBSECTIONS, CONNECTION_RELATION_LABELS, CONNECTION_EMPTY_STATEMENTS
     ACTIVE_LANGUAGE = normalize_output_language(language)
     SCHEMA = note_schema(ACTIVE_LANGUAGE)
     SECTIONS = dict(SCHEMA["sections"])
-    REQUIRED_SECTIONS = tuple(SECTIONS.values())
     CORE_INFO_FIELDS = list(SCHEMA["core_info_fields"])
     CORE_INFO_FIELD_INDEX = {field: idx for idx, field in enumerate(CORE_INFO_FIELDS)}
     CORE_INFO_FIELD_ALIASES = dict(SCHEMA.get("core_info_aliases", {}))
-    FIGURE_TARGET_SECTIONS = {SECTIONS[key] for key in ("research_questions", "data_and_task", "method", "key_results", "deep_analysis", "limitations", "my_notes")}
     FIGURE_LABELS = dict(SCHEMA["figure_labels"])
-    MECHANISM_FLOW_HEADING = str(SCHEMA["mechanism_flow"])
+    TAKEAWAY_SUBSECTIONS = tuple(SCHEMA["takeaways_subsections"].values())
+    TAKEAWAY_JUDGMENT_MARKER = str(SCHEMA["takeaways_judgment_marker"])
+    TAKEAWAY_MAX_ITEM_CHARS = int(SCHEMA["takeaways_max_item_chars"])
+    MY_NOTES_GUIDANCE = str(SCHEMA["my_notes_guidance"])
+    CONNECTION_SUBSECTIONS = dict(SCHEMA["connections_subsections"])
+    CONNECTION_RELATION_LABELS = dict(SCHEMA["connections_relation_labels"])
+    CONNECTION_EMPTY_STATEMENTS = tuple(SCHEMA["connections_empty_statements"].values())
+    configure_paper_type(PAPER_TYPE)
     return ACTIVE_LANGUAGE
+
+
+def configure_paper_type(paper_type: str) -> str:
+    """Set the note's section list from its paper type; an unknown type leaves no middle."""
+    global PAPER_TYPE, REQUIRED_SECTIONS, MIDDLE_SECTIONS, RESULTS_SECTIONS, NUMBER_SECTIONS, FIGURE_TARGET_SECTIONS
+    PAPER_TYPE = paper_type if paper_type in PROFILES else ""
+    MIDDLE_SECTIONS = middle_sections(PAPER_TYPE, ACTIVE_LANGUAGE)
+    REQUIRED_SECTIONS = note_required_sections(ACTIVE_LANGUAGE, PAPER_TYPE)
+    RESULTS_SECTIONS = sections_with(PAPER_TYPE, "results", ACTIVE_LANGUAGE)
+    NUMBER_SECTIONS = sections_with(PAPER_TYPE, "expects_numbers", ACTIVE_LANGUAGE)
+    FIGURE_TARGET_SECTIONS = {*MIDDLE_SECTIONS, SECTIONS["limitations"]} if SECTIONS else set()
+    return PAPER_TYPE
 
 def section(key: str) -> str:
     return SECTIONS[key]
@@ -203,14 +247,30 @@ ENGLISH_METADATA_SOURCE_SPAN_PATTERNS = (
     re.compile(r"`[^`\n]+`"),
     re.compile(r"\[[^\]\n]+\]\([^)\n]+\)"),
 )
+# Body wikilinks are left to paper-glossary, so only an HTTP link can carry a CJK name.
 ENGLISH_CJK_ENTITY_LINK_RE = re.compile(
     r"\[[^\]\n]*[\u4e00-\u9fff][^\]\n]*\]\(https?://[^)\n]+\)"
-    r"|\[\[[^\]\n]*[\u4e00-\u9fff][^\]\n]*\]\]"
 )
 ENGLISH_CJK_MATH_LABEL_RE = re.compile(
     r"\\operatorname\{(?:输入|输出|损失|状态|动作|奖励|标签|样本|预测|目标)\}"
 )
 ENGLISH_MATH_SPAN_RE = re.compile(r"\$\$[^$\n]+\$\$|\$[^$\n]+\$")
+CHINESE_PROSE_MATH_SPAN_RE = re.compile(r"\$\$[^$\n]+\$\$|\$[^$\n]+\$|\\\([^\n]+?\\\)")
+CHINESE_PROSE_CODE_SPAN_RE = re.compile(r"`([^`\n]+)`")
+CHINESE_PROSE_WIKILINK_RE = re.compile(r"!?\[\[[^\]\n]+\]\]")
+CHINESE_PROSE_CITATION_RE = re.compile(
+    r"\[\d+(?:\s*[,–-]\s*\d+)*\]"
+    r"|\([A-Z][^()\n]*?\bet al\.,?\s*\d{4}[a-z]?\)"
+)
+# A run is ASCII text that CJK characters and CJK punctuation do not interrupt.
+ENGLISH_RUN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 \t.,'’/%+-]*")
+ENGLISH_WORD_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9.-]*\b")
+# An untranslated clause, as opposed to a list of names, joins words with function words.
+MIXED_LANGUAGE_MIN_RUN_WORDS = 4
+# Bare English words scattered through one line read as code-switching even without a clause.
+MIXED_LANGUAGE_MIN_BARE_WORDS = 7
+# Backticks keep proper nouns out of the count; a span this rich in function words is prose.
+BACKTICKED_PROSE_MIN_FUNCTION_WORDS = 3
 
 RUNTIME_ARTIFACT_REFERENCE_PATTERNS = [
     re.compile(
@@ -276,7 +336,7 @@ def inspect_note_plan(
         return True, ["planning_artifact_invalid_json"]
 
     if not isinstance(plan, dict):
-        return True, ["planning_required_fields_invalid"]
+        return True, ["planning_artifact_not_object"]
 
     issues: list[str] = []
     try:
@@ -290,9 +350,10 @@ def inspect_note_plan(
     missing_fields = [field for field in NOTE_PLAN_REQUIRED_FIELDS if field not in plan]
     if missing_fields:
         issues.append("planning_required_fields_missing")
+        issues.extend(f"planning_{field}_missing" for field in missing_fields)
 
     required_checks = WRITING_CONTRACT_RULES["note_plan_required_field_checks"]
-    has_invalid_fields = False
+    invalid_fields: list[str] = []
     for field in NOTE_PLAN_REQUIRED_FIELDS:
         if field not in plan:
             continue
@@ -300,15 +361,40 @@ def inspect_note_plan(
             plan[field], NOTE_PLAN_FIELD_TYPES[field], required_checks
         )
         if validation_error == "invalid":
-            has_invalid_fields = True
+            invalid_fields.append(field)
         elif validation_error == "empty":
             issues.append(f"planning_{field}_empty")
     if isinstance(plan.get("paper_type"), str) and plan["paper_type"].strip():
         if plan["paper_type"].strip() not in PAPER_TYPE_VALUES:
             issues.append("planning_paper_type_invalid")
-    if has_invalid_fields:
+    if invalid_fields:
         issues.append("planning_required_fields_invalid")
+        issues.extend(
+            f"planning_{field}_invalid: expected {NOTE_PLAN_FIELD_TYPES[field]}"
+            for field in invalid_fields
+        )
     issues.extend(inspect_central_claims_plan(plan.get("central_claims")))
+    plan_codes = {
+        "note_plan_takeaway_item_count_invalid": "count_invalid",
+        "note_plan_takeaway_item_invalid": "item_invalid",
+        "note_plan_takeaway_item_too_thin": "item_too_thin",
+        "note_plan_reader_research_direction_invalid": "invalid",
+        "note_plan_key_prior_work_count_invalid": "count_invalid",
+        "note_plan_key_prior_work_item_invalid": "item_invalid",
+        "note_plan_connections_invalid": "invalid",
+        "note_plan_connections_count_invalid": "count_invalid",
+        "note_plan_connection_item_invalid": "item_invalid",
+        "note_plan_connection_relation_invalid": "relation_invalid",
+        "note_plan_connection_duplicate": "duplicate",
+    }
+    for item in [*takeaway_plan_issues(plan), *connection_plan_issues(plan)]:
+        code = f"planning_{item['field']}_{plan_codes[item['code']]}"
+        if code not in issues:
+            issues.append(code)
+    for item in [*type_plan_issues(plan, output_language), *storyline_plan_issues(plan)]:
+        code = "planning_" + item["code"].removeprefix("note_plan_")
+        if code not in issues:
+            issues.append(code)
 
     return True, issues
 
@@ -403,60 +489,6 @@ def inspect_reference_hygiene(text: str) -> list[dict[str, object]]:
                     }
                 )
     return issues
-
-
-METHOD_PAPER_SIGNAL_KEYWORDS = [
-    "模型",
-    "框架",
-    "系统",
-    "模块",
-    "编码器",
-    "解码器",
-    "预融合",
-    "attention",
-    "encoder",
-    "decoder",
-    "pipeline",
-    "framework",
-    "model",
-    "system",
-    "module",
-]
-
-MECHANISM_IO_TOKENS = [
-    "输入",
-    "输出",
-    "送入",
-    "送到",
-    "生成",
-    "得到",
-    "input",
-    "output",
-    "produces",
-    "returns",
-]
-
-MECHANISM_ACTION_TOKENS = [
-    "融合",
-    "投影",
-    "压缩",
-    "对齐",
-    "池化",
-    "提取",
-    "编码",
-    "解码",
-    "拼接",
-    "查询",
-    "更新",
-    "align",
-    "compute",
-    "estimate",
-    "extract",
-    "encode",
-    "decode",
-    "update",
-    "aggregate",
-]
 
 
 ENGLISH_FUNCTION_WORDS = {
@@ -604,6 +636,44 @@ def subsection_name_for_line(lines: list[str], line_index: int) -> str:
     return current_subsection
 
 
+def english_function_word_hits(words: list[str]) -> list[str]:
+    return [word for word in words if word.lower() in ENGLISH_FUNCTION_WORDS]
+
+
+def chinese_prose_without_exempt_spans(line: str) -> str:
+    def code_span(match: re.Match[str]) -> str:
+        content = match.group(1)
+        hits = english_function_word_hits(ENGLISH_WORD_RE.findall(content))
+        return content if len(hits) >= BACKTICKED_PROSE_MIN_FUNCTION_WORDS else " "
+
+    checked = CHINESE_PROSE_CODE_SPAN_RE.sub(code_span, line)
+    checked = CHINESE_PROSE_MATH_SPAN_RE.sub(" ", checked)
+    checked = CHINESE_PROSE_WIKILINK_RE.sub(" ", checked)
+    return CHINESE_PROSE_CITATION_RE.sub(" ", checked)
+
+
+def chinese_prose_english_issue(line: str) -> dict[str, object] | None:
+    checked = chinese_prose_without_exempt_spans(line)
+    for match in ENGLISH_RUN_RE.finditer(checked):
+        words = ENGLISH_WORD_RE.findall(match.group(0))
+        hits = english_function_word_hits(words)
+        if len(words) >= MIXED_LANGUAGE_MIN_RUN_WORDS and hits:
+            return {
+                "signal": "english_clause",
+                "english_run": " ".join(match.group(0).split()).rstrip(".,"),
+                "english_word_count": len(words),
+                "function_word_hits": hits[:6],
+            }
+    words = ENGLISH_WORD_RE.findall(checked)
+    if len(words) >= MIXED_LANGUAGE_MIN_BARE_WORDS:
+        return {
+            "signal": "scattered_english_words",
+            "english_words": words[:12],
+            "english_word_count": len(words),
+        }
+    return None
+
+
 def mixed_language_issues(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
     lines = text.splitlines()
@@ -619,14 +689,16 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
             fence_start = None
     for idx, line in enumerate(lines, start=1):
         stripped = line.strip()
+        if idx in fenced_code_lines:
+            continue
         if ACTIVE_LANGUAGE == "en":
-            if idx in fenced_code_lines:
-                continue
             checked = stripped
             section_name = section_name_for_line(lines, idx - 1)
-            if section_name in {section("core_information"), section("references")}:
+            if section_name in {section("core_information"), section("connections")}:
                 for pattern in ENGLISH_METADATA_SOURCE_SPAN_PATTERNS:
                     checked = pattern.sub("", checked)
+            if section_name == section("connections"):
+                checked = WIKILINK_SPAN_RE.sub("", checked)
             if stripped.startswith(f"*{FIGURE_LABELS['original_caption']}"):
                 checked = ENGLISH_METADATA_SOURCE_SPAN_PATTERNS[0].sub("", checked)
             checked = ENGLISH_CJK_ENTITY_LINK_RE.sub("", checked)
@@ -641,25 +713,13 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
         if is_exempt_line(line):
             continue
         section_name = section_name_for_line(lines, idx - 1)
-        subsection_name = subsection_name_for_line(lines, idx - 1)
-        if section_name in {section("core_information"), section("references")}:
+        if section_name in {section("core_information"), section("connections")}:
             continue
         if not re.search(r"[\u4e00-\u9fff]", stripped):
             continue
-        english_words = re.findall(r"\b[A-Za-z][A-Za-z0-9.-]*\b", stripped)
-        if len(english_words) < 4:
-            continue
-        function_hits = [word for word in english_words if word.lower() in ENGLISH_FUNCTION_WORDS]
-        if not function_hits and len(english_words) < 7:
-            continue
-        issues.append(
-            {
-                "line_number": idx,
-                "line": stripped,
-                "english_word_count": len(english_words),
-                "function_word_hits": function_hits[:6],
-            }
-        )
+        english_issue = chinese_prose_english_issue(stripped)
+        if english_issue is not None:
+            issues.append({"line_number": idx, "line": stripped, **english_issue})
     return issues
 
 
@@ -857,7 +917,9 @@ def figure_callout_placement_issues(text: str) -> list[dict[str, object]]:
 
         if current_subsection and current_subsection in location:
             continue
-        target_sections = [section for section in FIGURE_TARGET_SECTIONS if section in location]
+        matched = [section for section in FIGURE_TARGET_SECTIONS if section in location]
+        # "方法" is inside "现有方法的局限"; keep only the most specific names the location gives.
+        target_sections = [name for name in matched if not any(name != other and name in other for other in matched)]
         if target_sections and current_section not in target_sections:
             issues.append(
                 {
@@ -1493,33 +1555,17 @@ def is_honest_missing_declaration(text: str) -> bool:
     return len(normalized) >= 30
 
 
-def has_reference_entry(text: str) -> bool:
-    normalized = normalize_lint_whitespace(text)
-    if re.search(r"10\.\d{4,9}/\S+", normalized):
-        return True
-    if re.search(r"\barXiv[:：]?\s*\d{4}\.\d{4,5}", normalized, flags=re.IGNORECASE):
-        return True
-    if re.search(r"\[\[[^\]]+\]\]", normalized):
-        return True
-    if re.search(r"\[[0-9]+\]", normalized):
-        return True
-    if re.search(r"\b[A-Z][A-Za-z-]+ et al\.?\s*,?\s*(?:19|20)\d{2}\b", normalized):
-        return True
-    if re.search(r"\b[A-Z][A-Za-z-]+(?:\s+(?:and|&|et al\.?|[A-Z][A-Za-z-]+))*\s*\((?:19|20)\d{2}\)", normalized):
-        return True
-    if re.search(r"(?:19|20)\d{2}.*(?:DOI|doi|会议|期刊|arXiv)", normalized):
-        return True
-    return False
-
-
 def inspect_substantive_content(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
+    my_notes_heading = section("my_notes")
     for section_heading in REQUIRED_SECTIONS:
+        if section_heading == my_notes_heading:
+            continue  # user-owned: generated drafts carry only the standard guidance
         body = section_body(text, section_heading)
         content = normalized_section_content(body)
         if is_placeholder_like(content):
             issues.append(issue(section_heading, "section_empty_shell", "error", content or section_heading))
-        if section_heading not in {section("key_results"), section("references")} and is_honest_missing_declaration(content):
+        if section_heading not in {*RESULTS_SECTIONS, section("connections")} and is_honest_missing_declaration(content):
             issues.append(issue(section_heading, "section_honest_missing_not_allowed", "error", content))
 
     contributions_heading = section("contributions")
@@ -1531,37 +1577,15 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
     elif len(innovation_units) < 2:
         issues.append(issue(contributions_heading, "innovation_too_few_specific_points", "warning", innovation_content))
 
-    key_results_heading = section("key_results")
-    key_results = section_body(text, key_results_heading)
-    key_results_content = normalized_section_content(key_results)
-    if is_honest_missing_declaration(key_results_content):
-        issues.append(
-            issue(
-                key_results_heading,
-                "key_results_honest_missing_not_allowed",
-                "error",
-                key_results_content,
-            )
-        )
-    elif not meaningful_units(key_results, GENERIC_KEY_RESULT_PATTERNS):
-        issues.append(issue(key_results_heading, "key_results_empty_shell", "error", key_results_content))
-    elif not has_number_token(key_results_content):
-        issues.append(
-            issue(
-                key_results_heading,
-                "key_results_quantitative_result_missing",
-                "warning",
-                key_results_content,
-            )
-        )
-
-    references_heading = section("references")
-    references = section_body(text, references_heading)
-    references_content = normalized_section_content(references)
-    if is_honest_missing_declaration(references_content):
-        issues.append(issue(references_heading, "references_unavailable_declared", "warning", references_content))
-    elif is_placeholder_like(references_content) or not has_reference_entry(references_content):
-        issues.append(issue(references_heading, "references_placeholder", "error", references_content))
+    for results_heading in RESULTS_SECTIONS:
+        results_body = section_body(text, results_heading)
+        results_content = normalized_section_content(results_body)
+        if is_honest_missing_declaration(results_content):
+            issues.append(issue(results_heading, "key_results_honest_missing_not_allowed", "error", results_content))
+        elif not meaningful_units(results_body, GENERIC_KEY_RESULT_PATTERNS):
+            issues.append(issue(results_heading, "key_results_empty_shell", "error", results_content))
+        elif results_heading in NUMBER_SECTIONS and not has_number_token(results_content):
+            issues.append(issue(results_heading, "key_results_quantitative_result_missing", "warning", results_content))
 
     limitations_heading = section("limitations")
     limitations = section_body(text, limitations_heading)
@@ -1569,11 +1593,17 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
     if not meaningful_units(limitations, GENERIC_LIMITATION_PATTERNS):
         issues.append(issue(limitations_heading, "limitations_empty_shell", "error", limitations_content))
 
-    for section_heading in (section("method"), section("deep_analysis")):
+    for section_heading in MIDDLE_SECTIONS:
+        if section_heading in RESULTS_SECTIONS:
+            continue
         body = section_body(text, section_heading)
         content = normalized_section_content(body)
         if not meaningful_units(body):
             issues.append(issue(section_heading, "section_empty_shell", "error", content or section_heading))
+
+    issues.extend(inspect_takeaways(text))
+    issues.extend(body_wikilink_issues(text))
+    issues.extend(inspect_my_notes(text))
 
     deduped: list[dict[str, object]] = []
     seen: set[tuple[str, str, str]] = set()
@@ -1586,47 +1616,334 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
     return deduped
 
 
-def method_section_requires_mechanism_flow(text: str) -> bool:
-    body = section_body(text, section("method"))
-    if not body:
+LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+\S")
+LIST_ITEM_PREFIX_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+
+
+def inspect_takeaways(text: str) -> list[dict[str, object]]:
+    heading = section("takeaways")
+    if not section_body(text, heading):
+        return []
+    contract = WRITING_CONTRACT_RULES["takeaways_contract"]
+    issues: list[dict[str, object]] = []
+    for subsection in TAKEAWAY_SUBSECTIONS:
+        body = subsection_body(text, heading, subsection)
+        if not re.search(rf"^###\s+{re.escape(subsection)}\s*$", section_body(text, heading), flags=re.MULTILINE):
+            issues.append(issue(heading, "takeaways_subsection_missing", "error", subsection))
+            continue
+        items = takeaway_items(body)
+        if not contract["min_items"] <= len(items) <= contract["max_items"]:
+            issues.append(issue(heading, "takeaways_item_count_invalid", "error", f"{subsection}: {len(items)}"))
+        for item in items:
+            if sum(1 for ch in item if not ch.isspace()) > TAKEAWAY_MAX_ITEM_CHARS:
+                issues.append(issue(heading, "takeaways_item_too_long", "warning", item))
+    return issues
+
+
+def takeaway_items(body: str) -> list[str]:
+    return [LIST_ITEM_PREFIX_RE.sub("", line, count=1).strip() for line in body.splitlines() if LIST_ITEM_RE.match(line)]
+
+
+def inspect_takeaway_judgment(text: str, reader_research_direction: str) -> list[dict[str, object]]:
+    """With a stated research direction, at least one transferable idea must carry the judgment marker."""
+    if not reader_research_direction.strip():
+        return []
+    heading = section("takeaways")
+    transferable = TAKEAWAY_SUBSECTIONS[0]
+    items = takeaway_items(subsection_body(text, heading, transferable))
+    if any(item.lstrip("*_ ").startswith(TAKEAWAY_JUDGMENT_MARKER) for item in items):
+        return []
+    return [issue(heading, "takeaways_judgment_marker_missing", "error", transferable)]
+
+
+ISO_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def note_paper_type(text: str, plan: dict) -> str:
+    """The plan's paper_type, else the note's frontmatter paper_type."""
+    value = plan.get("paper_type")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    try:
+        fields = parse_frontmatter(text) or {}
+    except FrontmatterError:
+        return ""
+    value = fields.get("paper_type")
+    return value.strip() if isinstance(value, str) else ""
+
+
+def frontmatter_issues(text: str, plan_paper_type: str) -> list[str]:
+    """Check the Obsidian properties that research memory and connections rely on."""
+    contract = WRITING_CONTRACT_RULES["frontmatter_contract"]
+    try:
+        fields = parse_frontmatter(text)
+    except FrontmatterError:
+        return ["frontmatter_unparseable"]
+    if fields is None:
+        return ["frontmatter_missing"]
+    issues: list[str] = []
+    if any(field not in fields for field in contract["required_fields"]):
+        issues.append("frontmatter_field_missing")
+    tags = fields.get("tags")
+    tag_values = tags if isinstance(tags, list) else [tags] if isinstance(tags, str) else []
+    prefix = contract["domain_tag_prefix"]
+    domain_tags = [
+        tag for tag in tag_values
+        if isinstance(tag, str) and tag.startswith(prefix) and len(tag) > len(prefix)
+    ]
+    if not domain_tags:
+        issues.append("frontmatter_domain_tag_missing")
+    elif len(domain_tags) > 1:
+        issues.append("frontmatter_domain_tag_multiple")
+    paper_type = fields.get("paper_type")
+    if "paper_type" in fields and plan_paper_type and paper_type != plan_paper_type:
+        issues.append("frontmatter_paper_type_mismatch")
+    for field in contract["list_fields"]:
+        if field not in fields:
+            continue
+        value = fields[field]
+        if (
+            not isinstance(value, list)
+            or len(value) > contract["max_list_items"]
+            or any(not item.strip() for item in value)
+        ):
+            issues.append("frontmatter_list_field_invalid")
+            break
+    if "read_date" in fields and not valid_iso_day(fields["read_date"]):
+        issues.append("frontmatter_read_date_invalid")
+    return issues
+
+
+def valid_iso_day(value: object) -> bool:
+    if not isinstance(value, str) or not ISO_DAY_RE.match(value):
         return False
-    lower = body.lower()
-    keyword_hits = sum(1 for token in METHOD_PAPER_SIGNAL_KEYWORDS if token.lower() in lower)
-    has_formula = "$$" in body or bool(re.search(r"\$[^$\n]{4,}\$", body))
-    return has_formula or keyword_hits >= 2
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
 
 
-def mechanism_flow_warnings(text: str) -> list[str]:
-    warnings: list[str] = []
-    if ACTIVE_LANGUAGE == "en":
-        for heading in re.findall(r"^###\s+(.+?)\s*$", text, flags=re.MULTILINE):
-            if heading.casefold() == MECHANISM_FLOW_HEADING.casefold() and heading != MECHANISM_FLOW_HEADING:
-                warnings.append("mechanism_flow_heading_invalid")
-                break
-    if not method_section_requires_mechanism_flow(text):
-        return warnings
-    heading_pattern = rf"^###\s+{re.escape(MECHANISM_FLOW_HEADING)}\s*$"
-    if not re.search(heading_pattern, text, flags=re.MULTILINE):
-        warnings.append("mechanism_flow_subsection_missing")
-        return warnings
+def plan_paper_type(plan_path: Path | None) -> str:
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path else {}
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return ""
+    value = plan.get("paper_type", "") if isinstance(plan, dict) else ""
+    return value.strip() if isinstance(value, str) else ""
 
-    body = subsection_body(text, section("method"), MECHANISM_FLOW_HEADING)
+
+def plan_reader_research_direction(plan_path: Path | None) -> str:
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path else {}
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return ""
+    value = plan.get("reader_research_direction", "") if isinstance(plan, dict) else ""
+    return value if isinstance(value, str) else ""
+
+
+WIKILINK_SPAN_RE = re.compile(r"\[\[[^\[\]\n]*\]\]")
+CONNECTION_ENTRY_RES = {
+    "zh-CN": re.compile(r"^-\s+\[\[([^\[\]|#\n]+)\|([^\[\]\n]+)\]\]（([^（）]+)）：\s*\S.*$"),
+    "en": re.compile(r"^-\s+\[\[([^\[\]|#\n]+)\|([^\[\]\n]+)\]\]\s+\(([^()]+)\):\s+\S.*$"),
+}
+
+
+def load_plan(plan_path: Path | None) -> dict:
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path else {}
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+    return plan if isinstance(plan, dict) else {}
+
+
+def inspect_connections(text: str, plan: dict) -> list[dict[str, object]]:
+    """The Connections section mirrors the plan: same link targets, same relations."""
+    heading = section("connections")
+    body = section_body(text, heading)
     if not body:
-        warnings.append("mechanism_flow_subsection_empty")
-        return warnings
+        return []
+    contract = WRITING_CONTRACT_RULES["connections_contract"]
+    issues: list[dict[str, object]] = []
+    missing = [
+        name for name in CONNECTION_SUBSECTIONS.values()
+        if not re.search(rf"^###\s+{re.escape(name)}\s*$", body, flags=re.MULTILINE)
+    ]
+    for name in missing:
+        issues.append(issue(heading, "connections_subsection_missing", "error", name))
+    if missing:
+        return issues
 
-    step_lines = [line.strip() for line in body.splitlines() if re.match(r"^\d+\.\s+", line.strip())]
-    if not 3 <= len(step_lines) <= 4:
-        warnings.append("mechanism_flow_step_count_unexpected")
+    planned = {
+        item["target"]: item.get("relation", "")
+        for item in plan.get("connections") or []
+        if isinstance(item, dict) and isinstance(item.get("target"), str)
+    }
+    label_to_relation = {label: key for key, label in CONNECTION_RELATION_LABELS.items()}
+    in_vault = subsection_body(text, heading, CONNECTION_SUBSECTIONS["in_vault"])
+    lines = [line.strip() for line in in_vault.splitlines() if line.strip()]
+    entries = [line for line in lines if LIST_ITEM_RE.match(line)]
+    if not entries:
+        if " ".join(lines) not in CONNECTION_EMPTY_STATEMENTS:
+            issues.append(issue(heading, "connections_empty_statement_invalid", "error", " ".join(lines)))
+    else:
+        if len(entries) != len(lines):
+            issues.append(issue(heading, "connections_entry_invalid", "error", in_vault.strip()))
+        if len(entries) > contract["max_in_vault"]:
+            issues.append(issue(heading, "connections_count_invalid", "error", str(len(entries))))
+    written: dict[str, str] = {}
+    for entry in entries:
+        match = CONNECTION_ENTRY_RES[ACTIVE_LANGUAGE].match(entry)
+        if match is None:
+            issues.append(issue(heading, "connections_entry_invalid", "error", entry))
+            continue
+        target, _, label = match.groups()
+        relation = label_to_relation.get(label.strip())
+        if relation is None:
+            issues.append(issue(heading, "connections_relation_invalid", "error", entry))
+        elif target.strip() in planned and planned[target.strip()] != relation:
+            issues.append(issue(heading, "connections_relation_mismatch", "error", entry))
+        written[target.strip()] = label
+    if set(written) != set(planned) and not any(
+        item["reason"] == "connections_entry_invalid" for item in issues
+    ):
+        issues.append(
+            issue(heading, "connections_targets_mismatch_plan", "error",
+                  f"note: {sorted(written)}; plan: {sorted(planned)}")
+        )
 
-    step_text = " ".join(step_lines)
-    step_text_lower = step_text.lower()
-    has_io_signal = any(token.lower() in step_text_lower for token in MECHANISM_IO_TOKENS)
-    has_action_signal = any(token.lower() in step_text_lower for token in MECHANISM_ACTION_TOKENS)
-    if not (has_io_signal and has_action_signal):
-        warnings.append("mechanism_flow_too_abstract")
+    prior = subsection_body(text, heading, CONNECTION_SUBSECTIONS["key_prior_work"])
+    count = sum(1 for line in prior.splitlines() if LIST_ITEM_RE.match(line))
+    limits = contract["key_prior_work_items"]
+    if not limits["min"] <= count <= limits["max"]:
+        issues.append(issue(heading, "key_prior_work_count_invalid", "error", str(count)))
+    return issues
 
-    return warnings
+
+BODY_WIKILINK_RE = re.compile(r"(?<!!)\[\[[^\[\]\n]+\]\]")
+
+
+def body_wikilink_issues(text: str) -> list[dict[str, object]]:
+    """Only Connections links notes; term links in prose belong to paper-glossary."""
+    lines = text.splitlines()
+    start = 0
+    if lines and lines[0].strip() == "---":
+        closing = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+        start = closing + 1 if closing is not None else len(lines)
+    issues: list[dict[str, object]] = []
+    in_fence = False
+    current = ""
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            continue
+        heading = re.match(r"^##\s+(.+)$", stripped)
+        if heading and not in_fence:
+            current = heading.group(1).strip()
+            if current == section("my_notes"):
+                break  # user-owned to the end of the file
+            continue
+        if in_fence or current == section("connections"):
+            continue
+        if BODY_WIKILINK_RE.search(line):
+            issues.append(issue(current, "wikilink_outside_connections", "error", stripped))
+    return issues
+
+
+def inspect_my_notes(text: str) -> list[dict[str, object]]:
+    heading = section("my_notes")
+    pattern = rf"^##\s+{re.escape(heading)}\s*$"
+    match = re.search(pattern, text, flags=re.MULTILINE)
+    if not match:
+        return []
+    issues: list[dict[str, object]] = []
+    later_heading = re.search(r"^##\s+.+$", text[match.end():], flags=re.MULTILINE)
+    if later_heading:
+        issues.append(issue(heading, "my_notes_not_last", "error", later_heading.group(0)))
+    body = section_body(text, heading).strip()
+    if body != MY_NOTES_GUIDANCE:
+        issues.append(issue(heading, "my_notes_guidance_mismatch", "error", body))
+    return issues
+
+
+def _subsection_under(text: str, section_heading: str, subsection_heading: str) -> bool:
+    body = section_body(text, section_heading)
+    return bool(re.search(rf"^###\s+{re.escape(subsection_heading)}\s*$", body, flags=re.MULTILINE))
+
+
+def _table_blocks(body: str) -> list[list[list[str]]]:
+    """Markdown tables in body, each as rows of stripped cells (separator rows dropped)."""
+    tables: list[list[list[str]]] = []
+    current: list[list[str]] = []
+    for line in [*body.splitlines(), ""]:
+        stripped = line.strip()
+        if stripped.startswith("|") and stripped.endswith("|"):
+            cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+            if not all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells):
+                current.append(cells)
+        elif current:
+            tables.append(current)
+            current = []
+    return tables
+
+
+def inspect_workflow(text: str, plan: dict) -> list[dict[str, object]]:
+    """The workflow subsection mirrors note_plan `workflow`: an overview chain and a step table per flow."""
+    workflow = PROFILES.get(PAPER_TYPE, {}).get("workflow")
+    if not workflow:
+        return []
+    host = section_name(PAPER_TYPE, workflow["section"], ACTIVE_LANGUAGE)
+    heading = workflow["heading"][ACTIVE_LANGUAGE]
+    if not _subsection_under(text, host, heading):
+        return [issue(host, "workflow_subsection_missing", "error", heading)]
+    body = subsection_body(text, host, heading)
+    flows = plan.get("workflow") if isinstance(plan.get("workflow"), list) else []
+    if not flows:
+        if workflow["may_be_unreported"] and NOT_REPORTED_PHRASE[ACTIVE_LANGUAGE].casefold() in body.casefold():
+            return []
+        return [issue(heading, "workflow_unreported_statement_missing", "error", body.strip()[:120])]
+    issues: list[dict[str, object]] = []
+    tables = _table_blocks(body)
+    if len(tables) != len(flows):
+        issues.append(issue(heading, "workflow_table_count_mismatch", "error", f"{len(tables)} tables for {len(flows)} flows"))
+    expected_header = list(workflow["table_headers"][ACTIVE_LANGUAGE])
+    for flow, table in zip(flows, tables):
+        steps = flow.get("steps") if isinstance(flow, dict) else None
+        if table[0] != expected_header:
+            issues.append(issue(heading, "workflow_table_header_invalid", "error", " | ".join(table[0])))
+        if isinstance(steps, list) and len(table) - 1 != len(steps):
+            issues.append(issue(heading, "workflow_step_count_mismatch", "error", f"{len(table) - 1} rows for {len(steps)} steps"))
+    chains = [line for line in body.splitlines() if line.count("→") >= 2 and not line.strip().startswith("|")]
+    if len(chains) < len(flows):
+        issues.append(issue(heading, "workflow_overview_missing", "error", f"{len(chains)} overview lines for {len(flows)} flows"))
+    return issues
+
+
+def inspect_secondary_type(text: str, plan: dict) -> list[dict[str, object]]:
+    secondary = plan.get("secondary_type")
+    host = plan.get("secondary_host_section")
+    if not isinstance(secondary, str) or secondary not in PROFILES or secondary == PAPER_TYPE:
+        return []
+    heading = PROFILES[secondary]["secondary_heading"][ACTIVE_LANGUAGE]
+    if not isinstance(host, str) or not _subsection_under(text, host, heading):
+        return [issue(str(host or ""), "secondary_subsection_missing", "error", heading)]
+    return []
+
+
+def inspect_weak_evidence_callout(text: str, plan: dict) -> list[dict[str, object]]:
+    """The weak-evidence callout sits between the title and the first section, exactly when the plan calls for it."""
+    body = strip_frontmatter(text)
+    first_section = re.search(r"^##\s", body, flags=re.MULTILINE)
+    preamble = body[: first_section.start()] if first_section else body
+    callout = WEAK_EVIDENCE_CALLOUT[ACTIVE_LANGUAGE]
+    present = any(line.strip() == callout for line in preamble.splitlines())
+    unreported = weak_evidence_question_ids(plan) if PAPER_TYPE else []
+    if unreported and not present:
+        return [issue(SECTIONS.get("core_information", ""), "weak_evidence_callout_missing", "error", ", ".join(unreported))]
+    if present and not unreported:
+        return [issue(SECTIONS.get("core_information", ""), "weak_evidence_callout_unexpected", "error", callout)]
+    return []
 
 
 def strip_frontmatter(text: str) -> str:
@@ -1639,7 +1956,7 @@ def strip_frontmatter(text: str) -> str:
 
 
 def main() -> None:
-    from common import emit, runtime_config
+    from common import emit, json_input_sha256, runtime_config
 
     args = parser().parse_args()
     config = runtime_config(cli_overrides={"output_language": args.language})
@@ -1651,7 +1968,6 @@ def main() -> None:
     text = path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
     body_text = strip_frontmatter(text)
     headers = extract_headers(text)
-    missing_sections = find_missing_sections(text)
     warnings: list[str] = []
     mixed_issues = mixed_language_issues(text)
     mechanical_artifact_issues = mechanical_translation_artifact_issues(text)
@@ -1661,11 +1977,22 @@ def main() -> None:
     figure_issues = figure_structure_issues(text)
     core_info_issues = core_info_structure_issues(text)
     reference_hygiene_issues = inspect_reference_hygiene(text)
+    plan_path = resolve_note_plan_path(path, args.plan_file)
+    plan = load_plan(plan_path)
+    configure_paper_type(note_paper_type(text, plan))
+    missing_sections = find_missing_sections(text)
     substantive_issues = inspect_substantive_content(text)
-    planning_artifact_found, planning_artifact_issues = inspect_note_plan(
-        resolve_note_plan_path(path, args.plan_file),
-        output_language,
+    note_plan_sha256 = json_input_sha256(plan_path)
+    planning_artifact_found, planning_artifact_issues = inspect_note_plan(plan_path, output_language)
+    substantive_issues.extend(inspect_connections(text, plan))
+    substantive_issues.extend(inspect_workflow(text, plan))
+    substantive_issues.extend(inspect_secondary_type(text, plan))
+    substantive_issues.extend(inspect_weak_evidence_callout(text, plan))
+    substantive_issues.extend(
+        inspect_takeaway_judgment(text, plan_reader_research_direction(plan_path))
     )
+    frontmatter_problems = frontmatter_issues(text, plan_paper_type(plan_path))
+    warnings.extend(frontmatter_problems)
     warnings.extend(inspect_figure_callouts(text))
     for issue in figure_issues:
         reason = str(issue.get("reason", ""))
@@ -1684,7 +2011,8 @@ def main() -> None:
             warnings.append(reason)
     warnings.extend(front_matter_order_warnings(text))
     warnings.extend(english_top_level_section_warnings(text))
-    warnings.extend(mechanism_flow_warnings(text))
+    if not PAPER_TYPE:
+        warnings.append("paper_type_unknown")
     if not body_text.lstrip().startswith("# "):
         warnings.append("title_heading_missing")
     if "## " not in text:
@@ -1717,6 +2045,7 @@ def main() -> None:
         "paper_id": args.paper_id,
         "input_path": str(path),
         "note_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "note_plan_sha256": note_plan_sha256,
         "headers": headers,
         "missing_sections": missing_sections,
         "warnings": warnings,
@@ -1727,6 +2056,7 @@ def main() -> None:
         "math_render_issues": math_issues,
         "figure_structure_issues": figure_issues,
         "core_info_structure_issues": core_info_issues,
+        "frontmatter_issues": frontmatter_problems,
         "reference_hygiene_issues": reference_hygiene_issues,
         "substantive_content_issues": substantive_issues,
         "planning_artifact_found": planning_artifact_found,
@@ -1734,12 +2064,13 @@ def main() -> None:
         "passes_basic_structure": (
             not missing_sections
             and not core_info_issues
+            and not frontmatter_problems
             and not {
                 "title_heading_missing",
                 "no_level2_sections",
                 "front_matter_order_invalid",
                 "top_level_section_profile_invalid",
-                "mechanism_flow_heading_invalid",
+                "paper_type_unknown",
             }
             & set(warnings)
         ),

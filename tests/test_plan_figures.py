@@ -38,7 +38,6 @@ def test_matching_figure_asset_is_candidate_and_keeps_placeholder_mode() -> None
                 "page_text": "Figure 1. System overview.",
             }
         ],
-        image_assets=[],
         figure_assets=figure_assets,
     )
 
@@ -76,7 +75,6 @@ def test_other_caption_label_does_not_promote_combined_crop_to_candidate() -> No
                 "page_text": "The architecture of vLLM is shown in Fig. 4. Figure 4. vLLM system overview. Figure 5. PagedAttention algorithm.",
             }
         ],
-        image_assets=[],
         figure_assets=[
             {
                 "page_number": 5,
@@ -117,7 +115,6 @@ def test_figure_only_page_is_candidate_and_exposes_figure_assets() -> None:
                 "page_text": "Figure 2. Ablation result.",
             }
         ],
-        image_assets=[],
         figure_assets=[
             {
                 "page_number": 4,
@@ -138,7 +135,7 @@ def test_figure_only_page_is_candidate_and_exposes_figure_assets() -> None:
 
     candidate = planned[0]["candidate_pages"][0]
     assert candidate["page_number"] == 4
-    assert candidate["images"] == []
+    assert "images" not in candidate
     assert candidate["figure_assets"] == [
         {
             "filename": "page_004_fig_figure_2.png",
@@ -203,7 +200,7 @@ def test_system_result_figure_is_prioritized_even_with_dataset_word() -> None:
     )
 
     assert items[0]["kind"] == "main_result"
-    assert items[0]["section"] == "关键结果"
+    assert items[0]["section"] == "结果节"
     assert items[0]["priority"] == 2
 
 
@@ -222,7 +219,7 @@ def test_parallel_generation_result_figure_is_prioritized() -> None:
     )
 
     assert items[0]["kind"] == "main_result"
-    assert items[0]["section"] == "关键结果"
+    assert items[0]["section"] == "结果节"
     assert items[0]["priority"] == 2
 
 
@@ -241,7 +238,7 @@ def test_result_claim_with_architecture_word_stays_result() -> None:
     )
 
     assert items[0]["kind"] == "main_result"
-    assert items[0]["section"] == "关键结果"
+    assert items[0]["section"] == "结果节"
     assert items[0]["priority"] == 2
 
 
@@ -260,7 +257,7 @@ def test_prisma_flow_diagram_is_data_overview() -> None:
     )
 
     assert items[0]["kind"] == "data_or_task_overview"
-    assert items[0]["section"] == "数据与任务定义"
+    assert items[0]["section"] == "流程小节"
     assert items[0]["priority"] == 2
 
 
@@ -284,10 +281,10 @@ def test_method_detail_figures_are_kept_as_method_placeholders() -> None:
 
     by_id = {item["id"]: item for item in items}
     assert by_id["Figure 5"]["kind"] == "method_detail"
-    assert by_id["Figure 5"]["section"] == "方法主线"
+    assert by_id["Figure 5"]["section"] == "方法或设计节"
     assert by_id["Figure 5"]["priority"] == 2
     assert by_id["Figure 6"]["kind"] == "method_detail"
-    assert by_id["Figure 6"]["section"] == "方法主线"
+    assert by_id["Figure 6"]["section"] == "方法或设计节"
     assert by_id["Figure 6"]["priority"] == 2
 
 
@@ -338,6 +335,90 @@ def test_limit_keeps_high_priority_result_figures_beyond_supporting_cap() -> Non
     assert len(items) == 3
 
 
+def test_figure_plan_ranks_main_figures_above_extended_data() -> None:
+    extended = [
+        {"id": f"Extended Data Fig {idx}", "caption": f"Auxiliary illustration {idx}."}
+        for idx in range(1, 11)
+    ]
+    extended[0]["caption"] = "Accuracy comparison across cell lines."
+    main = [
+        {"id": f"Fig {idx}", "caption": f"Auxiliary illustration {idx}."} for idx in range(1, 6)
+    ]
+    items = build_figure_items({"figure_captions": extended + main, "table_captions": []}, limit=6)
+
+    assert [item["id"] for item in items] == [
+        "Fig 1",
+        "Fig 2",
+        "Fig 3",
+        "Fig 4",
+        "Fig 5",
+        "Extended Data Fig 1",
+    ]
+
+
+def test_figure_plan_ranks_appendix_labels_below_main_labels() -> None:
+    items = build_figure_items(
+        {
+            "figure_captions": [
+                {"id": "Fig. S1", "caption": "Auxiliary illustration."},
+                {"id": "Figure A1", "caption": "Auxiliary illustration."},
+                {"id": "Figure 1", "caption": "Auxiliary illustration."},
+            ],
+            "table_captions": [],
+        },
+        limit=1,
+    )
+
+    assert [item["id"] for item in items] == ["Figure 1"]
+
+
+def test_figure_plan_orders_labels_by_number() -> None:
+    figures = [
+        {"id": f"Figure {idx}", "caption": f"Auxiliary illustration {idx}."}
+        for idx in range(1, 15)
+    ]
+    items = build_figure_items({"figure_captions": figures, "table_captions": []}, limit=12)
+
+    assert [item["id"] for item in items] == [f"Figure {idx}" for idx in range(1, 13)]
+
+
+def test_figure_plan_keeps_figures_when_tables_fill_the_limit() -> None:
+    tables = [
+        {"id": f"Table {idx}", "caption": f"Error rates on split {idx}."} for idx in range(1, 16)
+    ]
+    figures = [
+        {"id": f"Figure {idx}", "caption": f"Auxiliary illustration {idx}."}
+        for idx in range(1, 8)
+    ]
+    items = build_figure_items({"figure_captions": figures, "table_captions": tables}, limit=12)
+
+    ids = [item["id"] for item in items]
+    assert ids[-4:] == ["Figure 1", "Figure 2", "Figure 3", "Figure 4"]
+    assert len(ids) == 19
+
+
+def test_figure_plan_without_a_limit_keeps_every_item() -> None:
+    figures = [
+        {"id": f"Extended Data Fig {idx}", "caption": f"Auxiliary illustration {idx}."}
+        for idx in range(1, 4)
+    ]
+    items = build_figure_items({"figure_captions": figures, "table_captions": []}, limit=0)
+
+    assert len(items) == 3
+
+
+def test_figure_plan_treats_cjk_tables_as_tables() -> None:
+    items = build_figure_items(
+        {
+            "figure_captions": [],
+            "table_captions": [{"id": "表 1", "caption": "土壤样品的元素含量"}],
+        }
+    )
+
+    assert items[0]["kind"] == "table_result"
+    assert items[0]["priority"] == 2
+
+
 def test_label_normalization_matches_appendix_figure_spellings() -> None:
     assert _normalize_label_for_match("Fig. S1") == "fig s1"
     assert _normalize_label_for_match("Figure A2") == "fig a2"
@@ -369,7 +450,6 @@ def test_extended_data_figure_asset_matches_figure_spelling() -> None:
                 "page_text": "Extended Data Fig. 1. Extra examples.",
             }
         ],
-        image_assets=[],
         figure_assets=[
             {
                 "page_number": 8,
@@ -388,7 +468,7 @@ def test_extended_data_figure_asset_matches_figure_spelling() -> None:
     assert planned[0]["candidate_pages"][0]["page_number"] == 8
 
 
-def test_legacy_image_assets_still_populate_candidate_page_images() -> None:
+def test_embedded_image_count_alone_makes_a_page_a_candidate() -> None:
     planned = attach_candidate_images(
         [
             {
@@ -405,28 +485,13 @@ def test_legacy_image_assets_still_populate_candidate_page_images() -> None:
                 "page_text": "Figure 3. Training setup.",
             }
         ],
-        image_assets=[
-            {
-                "page_number": 5,
-                "filename": "page_005_img_001.png",
-                "path": "/tmp/images/page_005_img_001.png",
-                "width": 400,
-                "height": 300,
-                "size_bytes": 1024,
-            }
-        ],
         figure_assets=[],
     )
 
-    assert planned[0]["candidate_pages"][0]["images"] == [
-        {
-            "filename": "page_005_img_001.png",
-            "path": "/tmp/images/page_005_img_001.png",
-            "width": 400,
-            "height": 300,
-            "size_bytes": 1024,
-        }
-    ]
+    candidate = planned[0]["candidate_pages"][0]
+    assert candidate["page_number"] == 5
+    assert candidate["figure_assets"] == []
+    assert "images" not in candidate
 
 
 def test_no_match_does_not_fall_back_to_page_order() -> None:
@@ -445,16 +510,6 @@ def test_no_match_does_not_fall_back_to_page_order() -> None:
                 "figure_count": 0,
                 "page_text": "This page discusses assumptions and baseline setup details.",
                 "text_preview": "This page discusses assumptions and baseline setup details.",
-            }
-        ],
-        image_assets=[
-            {
-                "page_number": 7,
-                "filename": "page_007_img_001.png",
-                "path": "/tmp/images/page_007_img_001.png",
-                "width": 400,
-                "height": 300,
-                "size_bytes": 1024,
             }
         ],
         figure_assets=[],
@@ -483,7 +538,6 @@ def test_missing_quality_signals_need_visual_check_and_keep_placeholder_mode() -
                 "page_text": "Figure 4. Overview.",
             }
         ],
-        image_assets=[],
         figure_assets=[
             {
                 "page_number": 6,

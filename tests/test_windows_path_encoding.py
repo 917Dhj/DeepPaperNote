@@ -17,13 +17,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-import citation_links
+from formal_save_helpers import formal_save_args, reviewed_insert_fields, tagged
+
 import common
 import lint_grounding
 import lint_note
 import plan_figure_table_decisions
+import vault_connections
 import write_obsidian_note
-from common import load_json_file, resolve_obsidian_note_path
+from common import load_json_file
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts"
@@ -92,27 +94,7 @@ def test_shell_config_value_strips_bom(tmp_path: Path, monkeypatch) -> None:
     assert common.shell_config_value("DEEPPAPERNOTE_OBSIDIAN_VAULT") == "/home/u/vault"
 
 
-def test_load_domain_rules_strips_bom(tmp_path: Path, monkeypatch) -> None:
-    rules_yaml = (
-        "domains:\n"
-        "  - label: 测试专用域ZZZ\n"
-        "    aliases:\n"
-        "      - zzztestalias\n"
-        "    keywords:\n"
-        "      - zzztestkeyword\n"
-    )
-    path = tmp_path / "domain_rules.yaml"
-    path.write_bytes(BOM.encode("utf-8") + rules_yaml.encode("utf-8"))
-    monkeypatch.setattr(common, "DOMAIN_RULES_PATH", path)
-    rules = common.load_domain_rules()
-    labels = [d.get("label") for d in rules.get("domains", [])]
-    # If the BOM were not stripped, the top-level `domains:` key would be
-    # "﻿domains", the section would be skipped, and load_domain_rules would
-    # silently fall back to the built-in defaults (which lack this label).
-    assert "测试专用域ZZZ" in labels
-
-
-def test_citation_index_includes_bom_prefixed_note(tmp_path: Path) -> None:
+def test_connection_recall_includes_bom_prefixed_note(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     papers = vault / "Research" / "Papers"
     papers.mkdir(parents=True)
@@ -121,11 +103,12 @@ def test_citation_index_includes_bom_prefixed_note(tmp_path: Path) -> None:
         + "---\naliases:\n  - Attention Is All You Need\n---\n# Transformer\n".encode("utf-8")
     )
     candidates = [{"display_text": "Vaswani et al. (2017). Attention Is All You Need."}]
-    resolved = citation_links.resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
+    result = vault_connections.connection_candidates(
+        {"obsidian_vault": str(vault), "papers_dir": "Research/Papers"}, candidates, "", "zh-CN"
+    )
     # A BOM before "---" used to break the frontmatter check, dropping the note
     # from the index so the wiki-link never resolved.
-    assert resolved[0]["match_status"] == "vault_match"
-    assert resolved[0]["vault_target"] == "attention_transformer"
+    assert [item["target"] for item in result["cited"]] == ["attention_transformer"]
 
 
 # --------------------------------------------------------------------------- #
@@ -143,25 +126,6 @@ def test_strip_frontmatter_handles_crlf() -> None:
 # --------------------------------------------------------------------------- #
 # Path separators                                                              #
 # --------------------------------------------------------------------------- #
-def test_resolve_obsidian_note_path_no_double_papers_prefix(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    config = {
-        "obsidian_vault": str(vault),
-        "papers_dir": "Research/Papers",
-        "workspace_output_dir": "DeepPaperNote_output",
-    }
-    path = resolve_obsidian_note_path(
-        config,
-        title="Some Paper",
-        subdir="Research/Papers/大模型/Some_Paper",
-    )
-    # The papers_dir prefix must appear exactly once (the pre-fix code compared
-    # str(Path(subdir)) — backslashes on Windows — and duplicated the prefix).
-    assert path.relative_to(vault).parts.count("Research") == 1
-    assert path == vault / "Research/Papers" / "大模型" / "Some_Paper" / "Some_Paper.md"
-
-
 def test_source_image_filename_handles_backslash_path() -> None:
     plan_item = {
         "figure_asset_candidate": {
@@ -225,14 +189,13 @@ def test_lint_note_detects_title_in_bom_crlf_note(tmp_path: Path) -> None:
     assert "title_heading_missing" not in payload["warnings"]
 
 
-def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
+def test_write_obsidian_note_saves_bom_draft_after_pre_review_normalization(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
     content_file = tmp_path / "note.md"
-    content_file.write_bytes(
-        BOM.encode("utf-8") + "# 标题\n\n正文内容。\n".encode("utf-8")
-    )
-    canonical_note_text = "# 标题\n\n正文内容。\n"
+    canonical_note_text = tagged("# 标题\n\n正文内容。\n")
+    content_file.write_bytes(BOM.encode("utf-8") + canonical_note_text.encode("utf-8"))
+    content_file.write_bytes(content_file.read_text(encoding="utf-8-sig").encode("utf-8"))
     lint_path, decisions_path = _formal_save_artifacts(tmp_path, canonical_note_text)
     result = subprocess.run(
         [
@@ -240,10 +203,11 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
             str(SCRIPTS / "write_obsidian_note.py"),
             "--title", "BOM Content Test",
             "--vault", str(vault),
-            "--content-file", str(content_file),
-            "--lint-json", str(lint_path),
-            "--figure-decisions", str(decisions_path),
-            "--source-manifest", str(_source_manifest(tmp_path)),
+            *formal_save_args(
+                tmp_path, canonical_note_text, lint_path=lint_path,
+                decisions_path=decisions_path, source_manifest_path=_source_manifest(tmp_path),
+                content_path=content_file,
+            ),
         ],
         cwd=tmp_path,
         env=_clean_env(),
@@ -256,20 +220,21 @@ def test_write_obsidian_note_strips_bom_from_saved_note(tmp_path: Path) -> None:
     # The BOM must not survive into the saved note (it breaks Obsidian
     # frontmatter / the H1 title).
     assert not saved.startswith(BOM)
-    assert saved.lstrip().startswith("# 标题")
+    assert saved.split("\n---\n", 1)[1].lstrip().startswith("# 标题")
     if os.name == "nt":
         sidecar = Path(payload["sidecar_path"])
         assert sidecar.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN
 
 
-def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
+def test_write_obsidian_note_saves_crlf_draft_after_pre_review_normalization(
     tmp_path: Path,
 ) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
     content_file = tmp_path / "note.md"
-    crlf_text = "# CRLF Note\r\n\r\n正文内容。\r\n"
+    crlf_text = tagged("# CRLF Note\r\n\r\n正文内容。\r\n")
     content_file.write_bytes(crlf_text.encode("utf-8"))
+    content_file.write_bytes(content_file.read_text(encoding="utf-8").encode("utf-8"))
     lint_output = tmp_path / "lint-from-script.json"
 
     subprocess.run(
@@ -298,10 +263,11 @@ def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
             str(SCRIPTS / "write_obsidian_note.py"),
             "--title", "CRLF Note",
             "--vault", str(vault),
-            "--content-file", str(content_file),
-            "--lint-json", str(lint_output),
-            "--figure-decisions", str(decisions_path),
-            "--source-manifest", str(_source_manifest(tmp_path)),
+            *formal_save_args(
+                tmp_path, crlf_text, lint_path=lint_output,
+                decisions_path=decisions_path, source_manifest_path=_source_manifest(tmp_path),
+                content_path=content_file,
+            ),
         ],
         cwd=tmp_path,
         env=_clean_env(),
@@ -314,26 +280,34 @@ def test_write_obsidian_note_accepts_unchanged_crlf_after_final_lint(
     assert b"\r\n" not in saved
 
 
-def test_materialize_figure_asset_embed_uses_forward_slashes(tmp_path: Path) -> None:
+def test_formal_save_image_embed_uses_forward_slashes(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
     source_image = tmp_path / "fig.png"
-    source_image.write_bytes(b"\x89PNG\r\n\x1a\n")  # header bytes are enough
+    source_image.write_bytes(b"\x89PNG\r\n\x1a\n")
+    note_text = tagged("# Embed Slash Test\n\n![Figure 1](images/fig.png)\n")
+    decisions_path = tmp_path / "insert-decisions.json"
+    decisions_path.write_text(json.dumps({
+        "output_language": "zh-CN",
+        "decisions": [{
+            "source_id": "Figure 1", "decision": "insert",
+            "source_image_path": str(source_image),
+            "source_image_filename": source_image.name,
+            "vault_image_filename": source_image.name,
+            **reviewed_insert_fields(source_image),
+        }],
+    }), encoding="utf-8")
     result = subprocess.run(
         [
-            sys.executable,
-            str(SCRIPTS / "materialize_figure_asset.py"),
-            "--title", "Embed Slash Test",
-            "--vault", str(vault),
-            "--source-image", str(source_image),
+            sys.executable, str(SCRIPTS / "write_obsidian_note.py"),
+            "--title", "Embed Slash Test", "--vault", str(vault),
+            *formal_save_args(tmp_path, note_text, decisions_path=decisions_path),
         ],
-        cwd=tmp_path,
-        env=_clean_env(),
-        capture_output=True,
-        text=True,
+        cwd=tmp_path, env=_clean_env(), capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
-    # str(Path) would embed backslashes on Windows and break the Markdown link.
-    assert "\\" not in payload["absolute_markdown_embed"]
-    assert "\\" not in payload["relative_markdown_embed"]
+    materialized = payload["materialized_figures"][0]
+    assert materialized["relative_markdown_path"] == "images/fig.png"
+    assert "\\" not in materialized["relative_markdown_path"]
+    assert Path(payload["note_path"]).read_text(encoding="utf-8") == note_text

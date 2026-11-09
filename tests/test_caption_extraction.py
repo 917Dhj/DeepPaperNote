@@ -1,0 +1,487 @@
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+from _pdf_text import caption_label_key, extract_caption_lines, normalize_caption_label
+from pdf_captions import caption_item, find_caption_blocks
+from plan_figure_table_decisions import matched_figure_asset
+from plan_figures import _match_figure_asset, classify_caption_kind
+from test_extract_pdf_assets_quality import EXTRACT_PDF_ASSETS_SCRIPT, write_fetch_input
+from test_extract_source_text import run_extract_source
+from test_paper_corpus import run_preparation
+
+fitz = pytest.importorskip("fitz")
+
+PROSE = "This paragraph is ordinary body text and it continues for a while without any label."
+REFERENCE_PADDING = " and the reference keeps going so that it outruns the real caption"
+
+
+def add_text(page, top: float, text: str, *, height: float = 60, **options: object) -> None:
+    page.insert_textbox(fitz.Rect(72, top, 540, top + height), text, fontsize=10, **options)
+
+
+def add_visual(page, top: float = 80, height: float = 120) -> None:
+    pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 400, 200), False)
+    pixmap.set_rect(pixmap.irect, (40, 120, 200))
+    page.insert_image(fitz.Rect(150, top, 450, top + height), pixmap=pixmap)
+
+
+def manifest_captions(tmp_path: Path, doc, *extra: str) -> dict:
+    pdf_path = tmp_path / "paper.pdf"
+    doc.save(pdf_path)
+    input_path = tmp_path / "fetch.json"
+    write_fetch_input(input_path, pdf_path, title="Caption Paper")
+    return run_extract_source(input_path, tmp_path / "paper_source_manifest.json", *extra)[
+        "captions"
+    ]
+
+
+def figure_assets(tmp_path: Path, doc) -> list[dict]:
+    pdf_path = tmp_path / "paper.pdf"
+    doc.save(pdf_path)
+    input_path = tmp_path / "fetch.json"
+    output_path = tmp_path / "assets.json"
+    write_fetch_input(input_path, pdf_path, title="Caption Paper")
+    subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_PDF_ASSETS_SCRIPT),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--assets-dir",
+            str(tmp_path / "assets"),
+        ],
+        check=True,
+    )
+    return json.loads(output_path.read_text(encoding="utf-8"))["figure_assets"]
+
+
+def test_wrapped_caption_is_complete_and_stops_at_the_next_paragraph(tmp_path: Path) -> None:
+    doc = fitz.open()
+    page = doc.new_page()
+    add_text(
+        page,
+        200,
+        "Figure 1: Accuracy of the proposed representa-\ntion on every benchmark dataset.",
+    )
+    add_text(page, 300, PROSE)
+    captions = manifest_captions(tmp_path, doc)
+    assert [(item["id"], item["caption"]) for item in captions["figures"]] == [
+        ("Figure 1", "Accuracy of the proposed representation on every benchmark dataset.")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("caption", "expected_id", "kind", "reference"),
+    [
+        ("Figure 4. Training curves.", "Figure 4", "figures", "Fig. 4. First, the result flips"),
+        ("Table 3: Zero-shot transfer.", "Table 3", "tables", "Table 3: recall at 50% precision"),
+        ("Figure 17: Mask similarity.", "Figure 17", "figures", "Fig. 17, we show three examples"),
+    ],
+)
+def test_reference_wrapped_inside_a_paragraph_loses_to_the_block_start_caption(
+    tmp_path: Path, caption: str, expected_id: str, kind: str, reference: str
+) -> None:
+    doc = fitz.open()
+    page = doc.new_page()
+    add_text(page, 100, f"{PROSE}\n{reference}{REFERENCE_PADDING}\n{PROSE}")
+    add_text(page, 300, caption)
+    captions = manifest_captions(tmp_path, doc)
+    assert [item["id"] for item in captions[kind]] == [expected_id]
+    assert captions[kind][0]["caption"] == caption.split(maxsplit=2)[2]
+
+
+def reference_before_caption_pages() -> fitz.Document:
+    doc = fitz.open()
+    first = doc.new_page()
+    add_visual(first)
+    add_text(first, 220, "Fig. 13 (left) plots the performance on cumulative data.\nMore prose.")
+    second = doc.new_page()
+    add_visual(second)
+    add_text(second, 220, "Figure 13: Ablation studies.")
+    return doc
+
+
+def test_paragraph_opening_reference_on_an_earlier_page_loses_to_the_caption(
+    tmp_path: Path,
+) -> None:
+    captions = manifest_captions(tmp_path, reference_before_caption_pages())
+    assert [(item["id"], item["caption"], item["page"]) for item in captions["figures"]] == [
+        ("Figure 13", "Ablation studies.", 2)
+    ]
+
+
+def test_weaker_reference_does_not_become_a_crop_anchor(tmp_path: Path) -> None:
+    assets = figure_assets(tmp_path, reference_before_caption_pages())
+    assert [(item["label"], item["page_number"]) for item in assets] == [("Figure 13", 2)]
+
+
+def test_reference_beyond_a_truncated_caption_is_still_rejected(tmp_path: Path) -> None:
+    captions = manifest_captions(tmp_path, reference_before_caption_pages(), "--max-pages", "1")
+    assert captions["figures"] == []
+
+
+def test_subpanel_prose_reference_is_not_a_caption(tmp_path: Path) -> None:
+    doc = fitz.open()
+    page = doc.new_page()
+    add_text(page, 100, "Figure 2: Accuracy overview.")
+    add_text(page, 200, "Fig 2c shows additional baselines and others in the same setting.")
+    captions = manifest_captions(tmp_path, doc)
+    assert [item["id"] for item in captions["figures"]] == ["Figure 2"]
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("Figure 1 Model overview", "Model overview"),
+        ("Fig. 1 | Model overview", "Model overview"),
+    ],
+)
+def test_title_and_journal_caption_styles_survive(tmp_path: Path, line: str, expected: str) -> None:
+    doc = fitz.open()
+    add_text(doc.new_page(), 100, line)
+    captions = manifest_captions(tmp_path, doc)
+    assert [item["caption"] for item in captions["figures"]] == [expected]
+
+
+def test_label_on_its_own_block_takes_the_following_text_caption(tmp_path: Path) -> None:
+    doc = fitz.open()
+    page = doc.new_page()
+    add_text(page, 100, "Figure 5")
+    add_text(page, 160, "Accuracy of every model.")
+    captions = manifest_captions(tmp_path, doc)
+    assert [item["caption"] for item in captions["figures"]] == ["Accuracy of every model."]
+
+
+def test_cjk_captions_use_layout_and_join_without_spaces(tmp_path: Path) -> None:
+    doc = fitz.open()
+    page = doc.new_page()
+    add_visual(page)
+    add_text(page, 220, "图 1：总体框架的第一行\n继续说明第二行。", fontname="china-s")
+    add_visual(page, top=340)
+    add_text(page, 480, "表 1 实验结果", fontname="china-s")
+    captions = manifest_captions(tmp_path, doc)
+    assert [(item["id"], item["caption"]) for item in captions["figures"]] == [
+        ("图 1", "总体框架的第一行继续说明第二行。")
+    ]
+    assert [(item["id"], item["caption"]) for item in captions["tables"]] == [("表 1", "实验结果")]
+    assets = figure_assets(tmp_path, doc)
+    assert [(item["label"], item["kind"]) for item in assets] == [
+        ("图 1", "figure"),
+        ("表 1", "table"),
+    ]
+
+
+def test_equally_strong_continued_captions_keep_every_page(tmp_path: Path) -> None:
+    doc = fitz.open()
+    for suffix in ("Results.", "Results (continued)."):
+        page = doc.new_page()
+        add_visual(page)
+        add_text(page, 220, f"Table 2: {suffix}")
+    captions = manifest_captions(tmp_path, doc)
+    assert [item["page"] for item in captions["tables"]] == [1, 2]
+    assert [item["page_number"] for item in figure_assets(tmp_path, doc)] == [1, 2]
+
+
+BODY_TEXT = " ".join(["The running text of the paper continues in this column."] * 14)
+
+
+def caption_columns(left: str, right: str, *, caption_size: float = 7.0) -> fitz.Document:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(fitz.Rect(40, 400, 296, 480), left, fontsize=caption_size)
+    page.insert_textbox(fitz.Rect(306, 400, 562, 480), right, fontsize=caption_size)
+    page.insert_textbox(fitz.Rect(40, 520, 296, 760), BODY_TEXT, fontsize=9)
+    page.insert_textbox(fitz.Rect(306, 520, 562, 760), BODY_TEXT, fontsize=9)
+    return doc
+
+
+def test_caption_continues_in_the_next_column() -> None:
+    doc = caption_columns(
+        "Fig. 1 | Structure prediction with a shared model. a, Prediction accuracy across "
+        "every class of biomolecular complexes in the benchmark set. Sampling",
+        "and ranking details are provided in the Methods.",
+    )
+    caption = find_caption_blocks(doc[0])[0]
+    ending = "Sampling and ranking details are provided in the Methods."
+
+    assert caption["line_text"].endswith(ending)
+    assert caption["bbox"][2] < 306
+
+
+def test_small_caption_continues_after_a_finished_sentence() -> None:
+    doc = caption_columns(
+        "Fig. 1 | Structure prediction with a shared model. a, Prediction accuracy across "
+        "every class of biomolecular complexes in the benchmark set.",
+        "Sampling and ranking details are provided in the Methods.",
+    )
+
+    assert find_caption_blocks(doc[0])[0]["line_text"].endswith("in the Methods.")
+
+
+def test_finished_caption_at_body_size_keeps_the_next_column_out() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    caption = "Figure 1: Model overview with every stage of the training pipeline shown in order."
+    page.insert_textbox(fitz.Rect(40, 400, 296, 440), caption, fontsize=9)
+    page.insert_textbox(fitz.Rect(306, 400, 562, 760), BODY_TEXT.lower(), fontsize=9)
+    page.insert_textbox(fitz.Rect(40, 460, 296, 760), BODY_TEXT, fontsize=9)
+
+    assert find_caption_blocks(page)[0]["line_text"] == caption
+
+
+def test_caption_continues_in_a_text_block_right_below() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(
+        fitz.Rect(108, 400, 504, 420), "Figure 4: Two stages. Stage 2 is trained", fontsize=9.2
+    )
+    page.insert_textbox(fitz.Rect(108, 414, 504, 434), "via next-scale prediction.", fontsize=8.9)
+    page.insert_textbox(fitz.Rect(108, 460, 504, 760), BODY_TEXT, fontsize=10)
+
+    assert find_caption_blocks(page)[0]["line_text"].endswith("trained via next-scale prediction.")
+
+
+def caption_with_superscript(text: str, superscript: str) -> fitz.Document:
+    """Set a caption line ending in a raised, smaller mark, as a footnote reference is set."""
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_text((72, 400), text, fontsize=8.5, fontname="tiro")
+    width = fitz.get_text_length(text, fontname="tiro", fontsize=8.5)
+    page.insert_text((72 + width, 397), superscript, fontsize=7, fontname="tiro")
+    page.insert_textbox(fitz.Rect(72, 460, 540, 760), BODY_TEXT, fontsize=10)
+    return doc
+
+
+@pytest.mark.parametrize(
+    ("text", "superscript", "caption"),
+    [
+        (
+            "Table 3. Effect sizes for intention-to-treat intervention effects.",
+            "a",
+            "Effect sizes for intention-to-treat intervention effects.",
+        ),
+        ("Table 3. Effect sizes by arm.", "*,†", "Effect sizes by arm."),
+        ("Figure 2. Leaf area per plant in cm", "2", "Leaf area per plant in cm2"),
+    ],
+)
+def test_footnote_mark_after_the_caption_sentence_is_not_caption_text(
+    text: str, superscript: str, caption: str
+) -> None:
+    doc = caption_with_superscript(text, superscript)
+
+    assert caption_item(find_caption_blocks(doc[0])[0])["caption"] == caption
+
+
+def caption_with_raised_parts(parts: list[tuple[str, bool]]) -> fitz.Document:
+    """Set one caption line from (text, raised) parts; raised parts are smaller and higher."""
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    x = 40.0
+    for text, raised in parts:
+        size = 7 if raised else 8.5
+        page.insert_text((x, 397 if raised else 400), text, fontsize=size, fontname="tiro")
+        x += fitz.get_text_length(text, fontname="tiro", fontsize=size)
+    page.insert_textbox(fitz.Rect(72, 460, 540, 760), BODY_TEXT, fontsize=10)
+    return doc
+
+
+@pytest.mark.parametrize(
+    ("parts", "caption"),
+    [
+        (
+            [("Table 2. Changes in anxiety (GAD-7", False), ("a", True),
+             ("), depression (ODSIS", False), ("b", True), (") by group.", False)],
+            "Changes in anxiety (GAD-7), depression (ODSIS) by group.",
+        ),
+        (
+            [("Table 1. Baseline PHQ-9", False), ("a,b", True), (" scores.", False)],
+            "Baseline PHQ-9 scores.",
+        ),
+        (
+            [("Figure 3. Hidden state h", False), ("l", True), (" at layer l.", False)],
+            "Hidden state hl at layer l.",
+        ),
+        (
+            [("Figure 4. Projection W", False), ("q", True), (" of the query.", False)],
+            "Projection Wq of the query.",
+        ),
+        (
+            [("Figure 5. Area of LAI", False), ("2", True), (" per plot.", False)],
+            "Area of LAI2 per plot.",
+        ),
+    ],
+)
+def test_footnote_mark_after_an_acronym_inside_a_caption_is_not_caption_text(
+    parts: list[tuple[str, bool]], caption: str
+) -> None:
+    doc = caption_with_raised_parts(parts)
+
+    assert caption_item(find_caption_blocks(doc[0])[0])["caption"] == caption
+
+
+def test_table_header_below_an_unfinished_caption_stays_out() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(fitz.Rect(108, 400, 504, 420), "Table 1: Results by method", fontsize=9)
+    page.insert_textbox(fitz.Rect(108, 414, 504, 434), "Method Accuracy Recall", fontsize=9)
+
+    assert find_caption_blocks(page)[0]["line_text"] == "Table 1: Results by method"
+
+
+def test_cjk_caption_keeps_its_english_translation_out() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    for top, text in ((400, "表１　检测仪参数"), (414, "Ｔａｂｌｅ　１　Ｄｅｔｅｃｔｏｒ")):
+        page.insert_textbox(
+            fitz.Rect(108, top, 504, top + 20), text, fontsize=9, fontname="china-s"
+        )
+    page.insert_textbox(fitz.Rect(108, 460, 504, 760), BODY_TEXT, fontsize=10)
+
+    assert find_caption_blocks(page)[0]["line_text"] == "表１　检测仪参数"
+
+
+def test_wrapped_reference_inside_a_caption_does_not_cut_it() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(
+        fitz.Rect(40, 400, 296, 480),
+        "Fig. 1 | Accuracy during training on the benchmark task, as illustrated in\n"
+        "Extended Data Table 1. The baseline is the average human score.",
+        fontsize=9,
+    )
+
+    captions = find_caption_blocks(page)
+
+    assert [caption["label"] for caption in captions] == ["Fig. 1"]
+    assert captions[0]["line_text"].endswith("the average human score.")
+
+
+@pytest.mark.parametrize(
+    ("previous", "line"),
+    [
+        ("the structures shown in", "Fig. 2a. This is particularly promising for discovery."),
+        ("with confidence (Fig. 4b and Extended Data", "Table 1. We use multiple seeds."),
+        ("the transcription start sites (Extended Data", "Fig. 5g,h), consistent with assembly."),
+        ("as reflected quantitatively in", "Table 3: recall at 50% precision is higher."),
+    ],
+)
+def test_reference_wrapped_after_a_connecting_word_is_not_a_caption(
+    previous: str, line: str
+) -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(fitz.Rect(40, 400, 296, 480), f"{previous}\n{line}", fontsize=9)
+
+    assert find_caption_blocks(page) == []
+
+
+def test_caption_after_figure_text_in_one_block_survives() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    page.insert_textbox(
+        fitz.Rect(40, 400, 296, 480),
+        "Y coefficients\nFigure 1. We model a generative prior on scene motion.",
+        fontsize=9,
+    )
+
+    assert [caption["label"] for caption in find_caption_blocks(page)] == ["Figure 1"]
+
+
+def test_justified_label_split_across_line_fragments_is_a_caption() -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=791)
+    for x, word in ((60, "Figure"), (100, "7:"), (130, "Human"), (175, "evaluation")):
+        page.insert_text((x, 400), word, fontsize=10)
+
+    captions = find_caption_blocks(page)
+
+    assert [caption["label"] for caption in captions] == ["Figure 7"]
+    assert captions[0]["line_text"].endswith("Human evaluation")
+
+
+def test_text_fallback_prefers_a_short_caption_over_a_lowercase_reference() -> None:
+    text = "Table 3: Zero-shot transfer.\nTable 3: recall at 50% precision is high at the cost"
+    assert extract_caption_lines(text, "table") == [
+        {"id": "Table 3", "caption": "Zero-shot transfer."}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("label", "caption", "kind"),
+    [
+        (
+            "Table 6",
+            "Classification error on the CIFAR-10 test set. All methods use data augmentation.",
+            "table_result",
+        ),
+        (
+            "Figure 4",
+            "Segment Anything Model overview. It outputs valid masks and confidence scores.",
+            "method_overview",
+        ),
+        (
+            "Figure 9",
+            "Point to mask evaluation on 23 datasets. (a) Per-dataset comparison with baselines.",
+            "main_result",
+        ),
+        (
+            "Figure 2",
+            "The Model. Our architecture divides the image into an even grid.",
+            "method_overview",
+        ),
+    ],
+)
+def test_full_captions_classify_by_their_title_sentence(
+    label: str, caption: str, kind: str
+) -> None:
+    assert classify_caption_kind(label, caption)[0] == kind
+
+
+@pytest.mark.parametrize(
+    ("label", "normalized"),
+    [("图１", "图 1"), ("图 １", "图 1"), ("表１２", "表 12"), ("图1", "图 1")],
+)
+def test_caption_labels_normalize_fullwidth_digits_and_spacing(label: str, normalized: str) -> None:
+    assert normalize_caption_label(label) == normalized
+    assert caption_label_key(label) == caption_label_key(normalized)
+
+
+@pytest.mark.parametrize(
+    ("caption_id", "asset_label"),
+    [
+        ("图 1", "图1"),
+        ("图 1", "图１"),
+        ("表 2", "表２"),
+        ("Fig 3", "Figure 3"),
+        ("Extended Data Fig 1", "Extended Data Fig. 1"),
+        ("Fig S1", "Fig. S1"),
+    ],
+)
+def test_figure_assets_match_their_normalized_caption_id(caption_id: str, asset_label: str) -> None:
+    asset = {"label": asset_label}
+    assert _match_figure_asset(caption_id, [asset]) == asset
+    assert matched_figure_asset({"figure_assets": [asset]}, caption_id) == asset
+
+
+@pytest.mark.parametrize(
+    ("line", "source_id"),
+    [("图1　便携式检测仪", "图 1"), ("图１　便携式检测仪", "图 1")],
+)
+def test_cjk_caption_crop_reaches_visual_review(tmp_path: Path, line: str, source_id: str) -> None:
+    doc = fitz.open()
+    page = doc.new_page()
+    add_text(page, 72, PROSE)
+    add_visual(page, top=160, height=240)
+    add_text(page, 420, line, fontname="china-s")
+    pdf_path = tmp_path / "paper.pdf"
+    doc.save(pdf_path)
+    run = run_preparation(pdf_path, tmp_path / "run", dict(os.environ))
+    assert run["decisions"] == {source_id: "review_pending"}

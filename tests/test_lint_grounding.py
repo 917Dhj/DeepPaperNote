@@ -8,7 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from contracts import PAPER_TYPE_CONTRACTS, WRITING_CONTRACT_RULES
+from contracts import WRITING_CONTRACT_RULES, paper_type_contracts
+
+PAPER_TYPE_CONTRACTS = paper_type_contracts("zh-CN")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LINT_GROUNDING_SCRIPT = PROJECT_ROOT / "skills" / "deeppapernote" / "scripts" / "lint_grounding.py"
@@ -118,8 +120,24 @@ def note_plan_with_sources(sources_by_section: dict[str, list[dict] | list[str]]
     ]
     return {
         "output_language": "zh-CN",
-        "paper_type": "AI_method",
+        "paper_type": "method",
         "paper_type_rationale": "method paper",
+        "positioning": "technique",
+        "survey_mode": "",
+        "secondary_type": "",
+        "secondary_host_section": "",
+        "core_answers": {
+            qid: {"answer": f"Answer for {qid}.", "evidence_refs": [{"section_id": "sec:method"}]}
+            for qid in (
+                "method.problem", "method.prior_gaps", "method.key_idea",
+                "method.claim_evidence", "method.comparison", "method.boundary_cost",
+            )
+        },
+        "workflow": [{"name": "repair", "steps": [
+            {"step": name, "input": "issue", "operation": f"{name} the repository", "output": "patch", "novel": index == 1}
+            for index, name in enumerate(("locate", "edit", "verify"))
+        ]}],
+        "storyline": "多步问答在工具失败后会悄悄累积错误。作者把每次工具调用写进可审计的状态机。消融显示收益来自状态日志而不是额外重试。所以这条思路适合需要审计链路的问答系统。",
         "dominant_domain": "AI",
         "must_cover": ["method"],
         "key_numbers": ["91.2"],
@@ -138,6 +156,8 @@ def note_plan_with_sources(sources_by_section: dict[str, list[dict] | list[str]]
         "comparative_positioning": ["The plan distinguishes the method from answer-only baselines."],
         "reuse_takeaways": ["Track evidence and repair steps separately."],
         "followup_questions": ["Check whether the mechanism still works with missing tool outputs."],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
         "section_plan": section_plan,
     }
 
@@ -145,10 +165,11 @@ def note_plan_with_sources(sources_by_section: dict[str, list[dict] | list[str]]
 def grounded_note_plan() -> dict:
     return note_plan_with_sources(
         {
-            "研究问题": [{"section_id": "sec:introduction"}],
-            "数据与任务定义": [{"pages": [2, 3]}],
-            "方法主线": [{"section_id": "sec:method"}],
-            "关键结果": [{"pages": [7, 9]}],
+            "背景与问题": [{"section_id": "sec:introduction"}],
+            "现有方法的局限": [{"pages": [2, 3]}],
+            "核心思路与挑战": [{"section_id": "sec:introduction"}],
+            "方法": [{"section_id": "sec:method"}],
+            "实验证据": [{"pages": [7, 9]}],
             "深度分析": [{"section_id": "sec:experiment"}],
             "局限": [{"pages": {"start": 10, "end": 12}}],
         }
@@ -188,6 +209,38 @@ def test_lint_grounding_accepts_section_id_or_page_range(tmp_path: Path) -> None
     assert [issue for issue in result["issues"] if issue.get("severity", "error") == "error"] == []
 
 
+def test_lint_grounding_records_exact_input_fingerprints(tmp_path: Path) -> None:
+    result = run_lint_grounding(tmp_path, grounded_note_plan(), source_manifest(), slim_bundle())
+
+    assert result["passes_grounding"] is True
+    for field, filename in (
+        ("note_plan_sha256", "note_plan.json"),
+        ("source_manifest_sha256", "source_manifest.json"),
+        ("figure_decisions_sha256", "figure_decisions.json"),
+    ):
+        assert result[field] == hashlib.sha256((tmp_path / filename).read_bytes()).hexdigest()
+
+
+def test_lint_grounding_fingerprints_inline_json_without_reserializing() -> None:
+    plan = ' {"output_language": "zh-CN"} '
+    source = '{"paper_id": "paper:inline"}\n'
+    decisions = '{"output_language": "zh-CN", "decisions": []}'
+    result = subprocess.run([
+        sys.executable, str(LINT_GROUNDING_SCRIPT),
+        "--note-plan", plan, "--source-manifest", source,
+        "--figure-decisions", decisions,
+    ], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    for field, value in (
+        ("note_plan_sha256", plan),
+        ("source_manifest_sha256", source),
+        ("figure_decisions_sha256", decisions),
+    ):
+        assert report[field] == hashlib.sha256(value.encode()).hexdigest()
+
+
 def test_lint_grounding_rejects_missing_section_id_and_invalid_page(tmp_path: Path) -> None:
     plan = grounded_note_plan()
     plan["section_plan"][0]["evidence_sources"] = [{"section_id": "sec:missing"}]
@@ -211,18 +264,6 @@ def test_lint_grounding_rejects_malformed_page_range_without_crashing(tmp_path: 
 
     assert result["passes_grounding"] is False
     assert "source_reference_missing_valid_section_or_pages" in codes
-
-
-def test_lint_grounding_rejects_old_evidence_references(tmp_path: Path) -> None:
-    plan = grounded_note_plan()
-    plan["section_plan"][2]["evidence_sources"] = ["synthesis_bundle.evidence.method_evidence"]
-
-    result = run_lint_grounding(tmp_path, plan, source_manifest(), slim_bundle())
-    codes = {issue["code"] for issue in result["issues"]}
-
-    assert result["passes_grounding"] is False
-    assert "old_bundle_reference" in codes
-    assert "note_plan_old_bundle_reference_present" in codes
 
 
 def test_lint_grounding_blocks_truncated_source_without_partial_acceptance(tmp_path: Path) -> None:
@@ -255,17 +296,6 @@ def test_lint_grounding_requires_contract_lookup_by_note_plan_paper_type(tmp_pat
 
     assert result["passes_grounding"] is False
     assert "bundle_contracts_by_paper_type_missing" in codes
-
-
-def test_lint_grounding_rejects_old_bundle_summary_field(tmp_path: Path) -> None:
-    bundle = slim_bundle()
-    bundle["summary"] = {"paper_type": "AI_method"}
-
-    result = run_lint_grounding(tmp_path, grounded_note_plan(), source_manifest(), bundle)
-    fields = {issue.get("field") for issue in result["issues"]}
-
-    assert result["passes_grounding"] is False
-    assert "summary" in fields
 
 
 @pytest.mark.parametrize("old_key", WRITING_CONTRACT_RULES["excluded_model_input_fields"])
@@ -935,3 +965,34 @@ def test_lint_grounding_rejects_insert_decision_without_source_image(
 
     assert result["passes_grounding"] is False
     assert "figure_insert_decision_missing_source_image" in codes
+
+
+def _main_result_decisions(*decisions: str) -> dict:
+    items = [{"source_id": "Figure 1", "decision": "insert", "plan_kind": "method_overview"}]
+    for index, decision in enumerate(decisions, 2):
+        items.append({
+            "source_id": f"Figure {index}",
+            "decision": decision,
+            "plan_kind": "main_result",
+            "skip_reason": f"reason {index}" if decision == "dropped" else "",
+        })
+    return {"decisions": items}
+
+
+def _codes(wrapper: dict) -> list[str]:
+    from lint_grounding import validate_figure_decisions
+
+    return [item["code"] for item in validate_figure_decisions({}, wrapper)]
+
+
+def test_dropping_every_main_result_figure_fails() -> None:
+    assert "figure_main_results_all_dropped" in _codes(_main_result_decisions("dropped", "dropped"))
+
+
+@pytest.mark.parametrize("kept", ["insert", "placeholder", "visual_defect"])
+def test_one_main_result_left_in_place_passes(kept: str) -> None:
+    assert "figure_main_results_all_dropped" not in _codes(_main_result_decisions("dropped", kept))
+
+
+def test_a_plan_without_main_results_needs_none() -> None:
+    assert "figure_main_results_all_dropped" not in _codes(_main_result_decisions())

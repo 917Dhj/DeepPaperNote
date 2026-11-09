@@ -7,13 +7,15 @@ import sys
 from pathlib import Path
 
 import pytest
+from formal_save_helpers import final_review_args
 from build_synthesis_bundle import compact_writing_contract
 from lint_grounding import validate_note_plan
 from localization import (
     normalize_output_language,
+    note_schema,
     require_artifact_output_language,
-    required_sections,
 )
+from contracts import note_required_sections
 from plan_figures import build_figure_items
 
 ENGLISH_SECTIONS = (
@@ -21,14 +23,16 @@ ENGLISH_SECTIONS = (
     "Abstract",
     "Contributions",
     "One-Sentence Summary",
-    "Research Question",
-    "Data and Task Definition",
+    "Background and Problem",
+    "Limitations of Prior Work",
+    "Key Idea and Challenges",
     "Method",
-    "Key Results",
+    "Experimental Evidence",
     "Deep Analysis",
     "Limitations",
-    "Research Notes",
-    "References",
+    "Takeaways",
+    "Connections",
+    "My Notes",
 )
 
 
@@ -40,6 +44,11 @@ aliases:
   - "Auditable Tool Use"
 date: 2024
 doi: 10.1234/example
+paper_type: method
+methods: [auditable tool-state tracking]
+datasets: []
+tasks: [multi-hop question answering]
+read_date: 2026-11-06
 ---
 
 # Auditable Tool Use
@@ -66,29 +75,36 @@ The paper develops an auditable state machine for multi-step question answering 
 
 An explicit tool-state record reduces error propagation in multi-step question answering.
 
-## Research Question
+## Background and Problem
 
 How can a multi-step question-answering system remain traceable when retrieval is incomplete, external tools fail, or intermediate results are misused?
 
-## Data and Task Definition
+## Limitations of Prior Work
 
-The input contains a question, candidate evidence, and available tools; the output contains an answer, a state trace, and a failure label when completion is unsupported.
+Answer-only systems cannot tell missing evidence apart from reasoning errors, and failed tool calls leave no inspectable record.
+
+## Key Idea and Challenges
+
+The key idea is to record every tool call in an auditable state machine; the challenge is that failure confidence must be consumed explicitly by later steps.
 
 ## Method
 
-### Mechanism Flow
+### Method Workflow
 
-1. **Input:** A question and candidate evidence. **Operation:** Extract relevant evidence. **Output:** A grounded initial state.
-2. **Input:** The current state and tool registry. **Operation:** Align the request with an available tool. **Output:** A planned call.
-3. **Input:** Tool output and confidence. **Operation:** Update or roll back the state. **Output:** An auditable execution record.
-4. **Input:** The final state. **Operation:** Decode an answer or refusal. **Output:** A response with provenance.
+Evidence selection → Tool planning → Answer decoding
+
+| Step | Input | What happens | Output | New in this paper |
+| --- | --- | --- | --- | --- |
+| Evidence selection | Question and candidate evidence | Extract relevant evidence | Grounded initial state | No |
+| Tool planning | Current state and tool registry | Align the request with a tool, update or roll back | Auditable execution record | Yes |
+| Answer decoding | Final state | Decode an answer or refusal | Response with provenance | Yes |
 
 > [!figure] Figure 1 System overview
 > Suggested location: Method
 > Why it matters: The figure shows how evidence and tool states move through the execution chain.
 > Current status: Placeholder retained; the extracted crop is incomplete and cannot be interpreted independently.
 
-## Key Results
+## Experimental Evidence
 
 Across three datasets, answer accuracy increased from 71.2% to 78.5%, while untraceable errors fell from 18% to 9%.
 
@@ -100,21 +116,53 @@ The important contribution is not only the score increase. Failed calls become i
 
 The evaluation covers English question-answering data and a narrow tool set, so it does not establish robustness for multimodal tools or high-latency services.
 
-## Research Notes
+## Takeaways
 
-The state-record design is reusable in evidence-first paper workflows because it separates missing source material from model interpretation failure.
+### Transferable Ideas
 
-## References
+- The state-record design is reusable in evidence-first paper workflows: it separates missing source material from model interpretation failure, provided each step reports a checkable outcome.
 
-- Smith et al. (2024). Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example
-"""
+### Next Steps
+
+- I suspect the state machine degrades with high-latency services; rerunning the main benchmark with injected timeouts would test this.
+
+## Connections
+
+### In Your Vault
+
+No related notes in your vault yet.
+
+### Key Prior Work
+
+- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering (baseline)
+- Yao et al. 2023. ReAct: Synergizing Reasoning and Acting in Language Models (method source)
+- Schick et al. 2023. Toolformer: Language Models Can Teach Themselves to Use Tools (method source)
+
+## My Notes
+
+""" + note_schema("en")["my_notes_guidance"] + "\n"
 
 
 def plan_payload() -> dict:
     return {
         "output_language": "en",
-        "paper_type": "AI_method",
+        "paper_type": "method",
         "paper_type_rationale": "The paper proposes and evaluates a model mechanism.",
+        "positioning": "technique",
+        "survey_mode": "",
+        "secondary_type": "",
+        "secondary_host_section": "",
+        "core_answers": {
+            qid: {"answer": f"Answer for {qid}.", "evidence_refs": [{"pages": [1]}]}
+            for qid in ("method.problem", "method.prior_gaps", "method.key_idea",
+                        "method.claim_evidence", "method.comparison", "method.boundary_cost")
+        },
+        "workflow": [{"name": "inference", "steps": [
+            {"step": "Evidence selection", "input": "Question and candidate evidence", "operation": "Extract relevant evidence", "output": "Grounded initial state", "novel": False},
+            {"step": "Tool planning", "input": "Current state and tool registry", "operation": "Align the request with a tool, update or roll back", "output": "Auditable execution record", "novel": True},
+            {"step": "Answer decoding", "input": "Final state", "operation": "Decode an answer or refusal", "output": "Response with provenance", "novel": True},
+        ]}],
+        "storyline": "Multi-step question answering silently accumulates errors after tool failures. The authors record every tool call in an auditable state machine. Ablations show the gain comes from the state log rather than extra retries.",
         "dominant_domain": "reasoning",
         "must_cover": ["Method"],
         "key_numbers": ["78.5%"],
@@ -129,8 +177,10 @@ def plan_payload() -> dict:
         "negative_or_limiting_results": ["Multimodal tools were not tested."],
         "mechanism_result_map": ["Rollback states explain fewer untraceable errors."],
         "comparative_positioning": ["Compared with answer-only baselines."],
-        "reuse_takeaways": ["Track failure state explicitly."],
-        "followup_questions": ["Test missing and delayed tool outputs."],
+        "reuse_takeaways": ["Track tool failure state explicitly so later steps can tell missing evidence apart."],
+        "followup_questions": ["Test whether the state log survives missing and delayed tool outputs."],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
         "section_plan": [{"section": "Method", "evidence_sources": [{"section_id": "sec:method"}]}],
     }
 
@@ -156,9 +206,11 @@ def test_artifact_language_requires_exact_supported_value() -> None:
 def test_english_contract_exposes_localized_schema() -> None:
     contract = compact_writing_contract("en")
     assert contract["language"] == "en"
-    assert tuple(contract["must_include_sections"]) == ENGLISH_SECTIONS
-    assert tuple(required_sections("en")) == ENGLISH_SECTIONS
-    assert contract["mechanism_flow_heading"] == "Mechanism Flow"
+    assert contract["section_order"]["head"] + contract["section_order"]["tail"] == [
+        *ENGLISH_SECTIONS[:4], *ENGLISH_SECTIONS[-4:]
+    ]
+    assert note_required_sections("en", "method") == ENGLISH_SECTIONS
+    assert contract["contracts_by_paper_type"]["method"]["workflow"]["heading"] == "Method Workflow"
     assert contract["core_info_fields"] == [
         "Title",
         "Translated title",
@@ -201,10 +253,11 @@ def test_english_grounding_accepts_english_section_plan() -> None:
             "evidence_sources": [{"section_id": "sec:method"}],
         }
         for section in (
-            "Research Question",
-            "Data and Task Definition",
+            "Background and Problem",
+            "Limitations of Prior Work",
+            "Key Idea and Challenges",
             "Method",
-            "Key Results",
+            "Experimental Evidence",
             "Deep Analysis",
             "Limitations",
         )
@@ -222,7 +275,7 @@ def test_english_figure_plan_uses_english_targets_and_reasons() -> None:
         {"figure_captions": [{"id": "Figure 1", "caption": "Overview of the system architecture."}]},
         language="en",
     )
-    assert items[0]["section"] == "Mechanism Flow"
+    assert items[0]["section"] == "workflow subsection"
     assert "visual" in items[0]["reason"].lower()
     assert not any("\u4e00" <= character <= "\u9fff" for character in json.dumps(items, ensure_ascii=False))
 
@@ -386,7 +439,7 @@ def test_english_lint_rejects_chinese_prose_disguised_as_bounded_span(
     ("original", "invalid"),
     [
         ("- Authors: Smith et al.", "- Author: Smith et al."),
-        ("### Mechanism Flow", "### mechanism flow"),
+        ("### Method Workflow", "### method workflow"),
     ],
 )
 def test_english_lint_requires_exact_labels_and_mechanism_heading(
@@ -413,7 +466,7 @@ def test_english_lint_requires_complete_top_level_heading_order(tmp_path: Path) 
     note_path = tmp_path / "paper.md"
     plan_path = tmp_path / "paper.plan.json"
     output_path = tmp_path / "lint.json"
-    note = english_note().replace("## Method", "## TEMP").replace("## Key Results", "## Method").replace("## TEMP", "## Key Results")
+    note = english_note().replace("## Method", "## TEMP").replace("## Experimental Evidence", "## Method").replace("## TEMP", "## Experimental Evidence")
     note_path.write_text(note, encoding="utf-8")
     plan_path.write_text(json.dumps(plan_payload()), encoding="utf-8")
     script = Path(__file__).resolve().parents[1] / "skills/deeppapernote/scripts/lint_note.py"
@@ -478,8 +531,21 @@ def test_english_local_pdf_pipeline_lints_and_formally_saves_note_with_images_di
     note_path = workdir / "paper.md"
     plan_path = workdir / "paper.plan.json"
     lint_path = workdir / "paper_lint.json"
-    note_path.write_text(english_note(), encoding="utf-8")
-    plan_path.write_text(json.dumps(plan_payload()), encoding="utf-8")
+    note_path.write_bytes(english_note().encode("utf-8"))
+    plan = plan_payload()
+    plan["section_plan"] = [
+        {
+            "section": section,
+            "focus": f"Explain how recorded tool states bound the auditable workflow's {section}.",
+            "evidence_sources": [{"pages": [1]}],
+        }
+        for section in (
+            "Background and Problem", "Limitations of Prior Work", "Key Idea and Challenges",
+            "Method", "Experimental Evidence", "Deep Analysis", "Limitations",
+        )
+    ]
+    plan["central_claims"][0]["supporting_evidence"] = [{"pages": [1]}]
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
     subprocess.run(
         [sys.executable, str(scripts / "lint_note.py"), "--language", "en", "--input", str(note_path), "--plan-file", str(plan_path), "--output", str(lint_path)],
         check=True,
@@ -487,13 +553,40 @@ def test_english_local_pdf_pipeline_lints_and_formally_saves_note_with_images_di
     lint = json.loads(lint_path.read_text(encoding="utf-8"))
     assert all(value is True for key, value in lint.items() if key.startswith("passes_"))
 
+    grounding_path = workdir / "paper_grounding.json"
+    subprocess.run(
+        [
+            sys.executable, str(scripts / "lint_grounding.py"), "--language", "en",
+            "--note-plan", str(plan_path),
+            "--source-manifest", str(workdir / "paper_source_manifest.json"),
+            "--figure-decisions", str(workdir / "paper_figure_table_decisions.json"),
+            "--bundle-json", str(workdir / "paper_bundle.json"),
+            "--output", str(grounding_path),
+        ],
+        check=True,
+    )
+    grounding = json.loads(grounding_path.read_text(encoding="utf-8"))
+    assert grounding["passes_grounding"] is True, grounding["issues"]
+    review_args = final_review_args(
+        workdir, english_note(), "en", plan_path=plan_path, content_path=note_path,
+    )
+
     save_root = tmp_path / "save"
     save_root.mkdir()
     env = os.environ.copy()
     env["DEEPPAPERNOTE_DISABLE_SHELL_CONFIG"] = "1"
     env["DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR"] = "saved"
     saved = subprocess.run(
-        [sys.executable, str(scripts / "write_obsidian_note.py"), "--language", "en", "--title", "English Local PDF", "--content-file", str(note_path), "--lint-json", str(lint_path), "--figure-decisions", str(workdir / "paper_figure_table_decisions.json")],
+        [
+            sys.executable, str(scripts / "write_obsidian_note.py"),
+            "--language", "en", "--title", "English Local PDF",
+            "--domain", "methods", "--new-domain-reason", "Test fixture domain.",
+            "--lint-json", str(lint_path),
+            "--figure-decisions", str(workdir / "paper_figure_table_decisions.json"),
+            "--source-manifest", str(workdir / "paper_source_manifest.json"),
+            "--plan-file", str(plan_path), "--grounding-lint-json", str(grounding_path),
+            *review_args,
+        ],
         cwd=save_root,
         env=env,
         check=True,

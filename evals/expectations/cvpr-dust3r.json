@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "pdf": "cvpr-dust3r.pdf",
+  "sha256": "400fea3f874aed6a9570a0651a701c2a3c635dcfbc2159348e04e83013a0099a",
+  "source": "arXiv:2312.14132v3 (CVPR 2024)",
+  "traits": [
+    "two-column",
+    "figure-period",
+    "full-width-figures",
+    "appendix"
+  ],
+  "readable": true,
+  "title": "DUSt3R: Geometric 3D Vision Made Easy",
+  "labels": [
+    "Figure 1",
+    "Figure 2",
+    "Figure 3",
+    "Figure 4",
+    "Figure 5",
+    "Figure 6",
+    "Figure 7",
+    "Figure 8",
+    "Figure 9",
+    "Table 1",
+    "Table 2",
+    "Table 3",
+    "Table 4",
+    "Table 5",
+    "Table 6",
+    "Table 7",
+    "Table 8"
+  ],
+  "captions": {
+    "Figure 2": {
+      "starts": "Architecture of the network F.",
+      "ends": "a simple regression loss (Eq. (4))"
+    },
+    "Table 3": {
+      "starts": "Multi-view depth evaluation with different settings",
+      "ends": "for each setting are in bold."
+    }
+  },
+  "review": [
+    "Figure 1",
+    "Figure 2",
+    "Table 1",
+    "Table 2",
+    "Table 3"
+  ],
+  "crops": {
+    "Table 1": {
+      "contains": [
+        "HLoc"
+      ],
+      "excludes": [
+        "DPT-BEiT"
+      ]
+    },
+    "Table 2": {
+      "contains": [
+        "DPT-BEiT"
+      ],
+      "excludes": [
+        "HLoc"
+      ]
+    },
+    "Table 3": {
+      "contains": [
+        "COLMAP Dense"
+      ],
+      "excludes": []
+    }
+  },
+  "same_visual": [],
+  "known_gaps": {}
+}

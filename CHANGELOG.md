@@ -12,9 +12,54 @@ Add an entry here when the project meaningfully changes for users, for example:
 
 ## Unreleased
 
+## v3.0.0
+
+DeepPaperNote now reads each paper by its type, and every note joins your vault.
+
 ### Added
 
+- **Reading by paper type.** Each paper is read as one of ten types: method, system, theory, position, benchmark or dataset, discovery empirical, human-subjects empirical, survey or review, qualitative empirical, and humanities argument. The type decides the note's middle sections, the core questions it must answer, and its workflow table. The questions draw on reviewer guidelines and reporting standards such as those of NeurIPS, ICLR, ACL, CONSORT, and PRISMA.
+- **Takeaways** follows Limitations, with Transferable Ideas and Next Steps.
+- **My Notes** now belongs to you: a new note holds only a guidance line, and regenerating the note keeps whatever you wrote there.
+- **Connections** replaces References. It links the note to related paper notes already in your vault, whether the paper cites them or not, and lists the key prior work instead of copying the bibliography.
+- **Structured frontmatter** on every note (`paper_type`, `methods`, `datasets`, `tasks`, `read_date`, and more). The keys stay in English in both languages, so one Obsidian Bases view can query every note.
+- `research-memory` is a new companion skill that keeps a note of your research directions. DeepPaperNote reads it to tailor each note's Takeaways to your research.
+- `organize-wiki` is a new companion skill that organizes the paper library with you. It agrees on the domain folders and writes them as `<Vault>/DeepPaperNote/domains.md`. After you confirm a preview, it moves misfiled paper folders, fixes `papers/` tags, and rewrites path links. Every reorganization is logged and the last one can be undone.
 - DeepPaperNote can now be installed as a Claude Code plugin from the repository's own marketplace, with `claude plugin marketplace add 917Dhj/DeepPaperNote`. The skills CLI (`npx skills add`) remains the agent-neutral route.
+- **Visual Review.** Every figure and table candidate is reviewed visually before it enters the note, and one that does not hold up is left out with a recorded reason.
+- `run_state.py status` reports a run's progress, missing artifacts, and next step, without changing anything.
+
+### Changed
+
+- Notes are written as one story for a reader from an adjacent field, and the final review checks that story along with the answers to the core questions.
+- The final quality review is now a required gate: Formal Save refuses a note that has not passed it.
+- The agent now chooses each new paper's domain folder after reading what the existing domains hold, or the user's convention in `<Vault>/DeepPaperNote/domains.md`. It reuses an existing domain by default and creates a new one only with a stated reason, which the final report repeats. The keyword table `domain_rules.yaml` is removed.
+- A saved note carries exactly one `papers/<domain>` tag, and it must name the folder the note is saved in.
+- Images saved in the vault are named after their label in the paper, such as `figure_1.png`.
+- When a glossary library shares the vault, DeepPaperNote suggests running `paper-glossary` on the paper after saving.
+- Regenerating a note replaces a re-cropped image of the same name instead of refusing the save.
+
+### Fixed
+
+- Figure and table extraction, now checked against a 34-paper regression corpus: captions are read from the page layout; crops stay in their column and keep every table row; bilingual table captions and figures printed under their caption crop correctly; footnote marks no longer end up in captions.
+- Title detection no longer mistakes a journal header or a split subtitle for the title, and keeps lead-ins such as `Position:`.
+- A PDF whose text cannot be read now stops the run instead of producing a note.
+- Script output no longer fails on Windows consoles with encodings such as cp1252.
+- `paper-glossary` now links terms written in backticks.
+- The Chinese style check no longer counts formulas and backticked names.
+
+### Upgrade notes
+
+- Notes saved by earlier versions keep their old structure until you regenerate them. When a regenerated note keeps an old 我的笔记 section, the save report says it may hold text the model wrote, so you can check it.
+- `domain_rules.yaml` is removed. To shape how papers are filed, use `organize-wiki`, which writes `<Vault>/DeepPaperNote/domains.md`.
+
+### Internal
+
+- The pipeline runs in separate acquire and prepare phases, `common.py` is split by responsibility, and CI runs ruff and the parallel test suite on Linux, macOS, and Windows.
+
+### Documentation
+
+- Rewrote both READMEs around what users get from DeepPaperNote.
 
 ## v2.3.1
 

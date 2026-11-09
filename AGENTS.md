@@ -52,6 +52,7 @@ The repository is layered as follows:
 - `skills/deeppapernote/scripts/` implements the deterministic pipeline and support utilities
 - `skills/deeppapernote/agents/openai.yaml` is the Codex adapter
 - `README.md` and `README.zh-CN.md` are user-facing documentation
+- `skills/paper-glossary/`, `skills/research-memory/`, and `skills/organize-wiki/` are standalone companion skills: standard library only, never importing DeepPaperNote code. Each one's `references/file-contract.md` defines the files it shares with DeepPaperNote, and `tests/test_research_memory_reader.py` and `tests/test_domain_routing.py` pin those shared formats
 
 ## Environment and Onboarding Boundary
 
@@ -65,14 +66,16 @@ Common commands for local validation and maintenance:
 
 - install the core runtime dependency with `python3 -m pip install PyMuPDF`
 - install the local development environment with `python3 -m pip install -e '.[dev]'`
-- run the test suite with `python3 -m pytest -q`
+- run the test suite, companion skills included, with `python3 -m pytest -q -n auto`
+- run the lint CI enforces with `python3 -m ruff check skills tests`
 - when checking environment-related problems, use `python3 skills/deeppapernote/scripts/check_environment.py`
+- after changing extraction or figure selection, run the local paper corpus with `python3 -m pytest -q -m corpus`, as described in `evals/paper-corpus.md`
 
 ## Verification Expectations
 
 When making meaningful changes:
 
-- run `python3 -m pytest -q`
+- run the test suite and the lint from Working Commands
 - confirm adapters remain aligned with `skills/deeppapernote/SKILL.md`
 - confirm no wrapper introduces a second conflicting workflow
 - confirm legacy public pseudo-commands are not reintroduced

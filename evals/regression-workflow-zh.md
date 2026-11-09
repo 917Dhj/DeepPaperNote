@@ -1,611 +1,224 @@
-# DeepPaperNote 回归测试工作流
+# DeepPaperNote 回归评估流程
 
-状态：v1
-读者：运行或审查 DeepPaperNote 评估实验的 Agent
-范围：面向真实论文的最终笔记质量回归测试
+状态：v3
+读者：运行或审阅 DeepPaperNote 评估实验的 agent
+范围：用真实论文检验一次改动，从冒烟运行到完整的笔记质量回归
 
-本文档定义整套实验流程：如何选择论文、运行 baseline 和 candidate、
-收集 artifacts、评估输出，以及判断一次修改是否带来了真实提升。
+本文是 `evals/regression-workflow.md` 的中文译文。两者不一致时以英文版为准，并修正本译文。
 
-质量评分标准见 `evals/note-quality-rubric.md`。Note Evaluator 的启动
-prompt 模板见 `evals/note-evaluator-prompt.md`。
+评分标准见 `evals/note-quality-rubric.md`（v3），笔记评估者的提示词模板见 `evals/note-evaluator-prompt.md`。Agent 提示词模板只保留英文版，见英文正本的 Agent Prompt Templates 一节。
+
+下文保留英文的术语（如 canonical identity、repair trace、wrong PDF）是产物名、场景名或判定值，与英文正本一一对应，不要翻译。
+
+## 选择层级
+
+| 层级 | 何时使用 | 能说明什么 |
+| --- | --- | --- |
+| 确定性 | 每个 Pull Request | `python3 -m pytest -q`；改动抽取或图表选择时加跑 `python3 -m pytest -q -m corpus`（见 `evals/paper-corpus.md`） |
+| 冒烟 | 改动 `SKILL.md`、某个 reference 或阶段顺序 | 工作流在真实论文上仍能跑完 |
+| 完整 | 想声称最终笔记变好了 | candidate 的笔记是否在超出运行间噪声的程度上优于 baseline |
+
+冒烟通过不能支撑任何质量结论。只有完整层级的实验才能得出 `real_improvement`。
 
 ## 核心原则
 
-回归实验比较的是受控条件下的原始生成结果。不要让同一个 Agent 既生成笔
-记又评价自己的输出。评估前不要手工修补、补写或润色生成笔记。
+- 实验在受控条件下比较原始生成结果。评估前任何人都不得修改、补全或润色笔记。
+- 生成笔记的 agent 不评估该笔记。
+- 评估者是盲评：它只看到笔记 A 和笔记 B，永远不知道哪篇来自 baseline。
+- 每组只跑一次不构成证据。生成过程有随机性，所以完整层级要测出两次 baseline 运行之间的噪声，只承认超过噪声的差异。
 
-一个有效实验需要保持这些变量稳定：
+## 受控变量
 
-- 论文集合
-- runner 工具和模型设置
-- 子 Codex CLI prompt 模板
-- 每次运行安装的 skill 版本
-- vault 布局
-- 输出 artifact 布局
-- 评估 rubric 版本
+同一实验的所有运行都要固定以下变量，并记录在 manifest 中：
 
-## 交接文档
+- **Baseline 与 candidate 提交。** Baseline 是被测改动的父提交：改动之前的那个提交；如果是 Pull Request，则是它与 `develop` 的 merge base。除非 `main` 恰好就是这个提交，否则不要用 `main` 作 baseline；`main` 可能落后 `develop` 很多次合并，会把这些合并的影响混进结果。
+- **宿主与模型。** 每个实验只用一个宿主，默认 Codex CLI，模型与推理设置保持一致。改动 `SKILL.md` 时，要在它面向的每个宿主上都跑冒烟层级。
+- **论文集与 PDF 字节。** 使用下文的固定论文集，运行前用 `evals/expectations/<paper>.json` 核对每个 PDF 的 SHA-256。
+- **输入模式与子会话提示词。** 见“子会话提示词”。
+- **运行配置。** 每次运行使用独立的配置文件，避免用户配置、shell profile 或此前的偏好混入。写入 `<RUN_DIR>/config.json`：
 
-每个 Agent 开始前都应读取上一阶段输出的文档，然后把自己的结果写成下一
-个 Agent 可读取的文档。prompt 中使用占位符，不写死本地路径。
+  ```json
+  {
+    "output_language": "<OUTPUT_LANGUAGE>",
+    "save_mode": "obsidian",
+    "obsidian_vault": "<TEMP_VAULT_PATH>",
+    "papers_dir": "Papers"
+  }
+  ```
 
-推荐交接链路：
+  除非实验另有说明，`<OUTPUT_LANGUAGE>` 取 `zh-CN`；`<TEMP_VAULT_PATH>` 是一个已存在的空目录的绝对路径。启动子会话时设置 `DEEPPAPERNOTE_CONFIG_PATH=<RUN_DIR>/config.json` 和 `DEEPPAPERNOTE_DISABLE_SHELL_CONFIG=1`，不设置其他任何 `DEEPPAPERNOTE_` 变量。
+
+- **隔离。** 每次运行有自己的运行目录和临时 vault。共用同一个已安装 skill 目录的运行不得并发。
+- **Rubric 版本。** 同一实验的所有评估使用同一版本的 rubric。
+
+## 论文集
+
+使用 `evals/papers/` 中的固定论文集。PDF 只在本地、被 Git 忽略；它们的哈希提交在 `evals/expectations/` 中。
+
+| 角色 | 论文 | 预期 `paper_type` | 压力点 |
+| --- | --- | --- | --- |
+| 主测 | `arxiv-sam` | `method` | 方法加数据集，图表密集，有附录，Visual Review 负担重 |
+| 主测 | `tacl-lost-middle` | `discovery_empirical` | 评测类论文，图多，结论受局限性约束 |
+| 主测 | `osdi-distserve` | `system` | 系统论文，含算法和对比表 |
+| 主测 | `arxiv-lvbench` | `benchmark_or_dataset` | benchmark 的构造与评测协议，结果表 |
+| 主测 | `arxiv-code-harness` | `survey_or_review` | 叙述性综述，102 页，分类体系与大量汇总表 |
+| 主测 | `arxiv-levels-agi` | `position` | 立场论文，无图，框架表 |
+| 类型冒烟 | `jmir-chatmind-rct` | `human_subjects_empirical` | 随机对照试验，期刊版式，图注在图上方 |
+| 类型冒烟 | `npj-genai-mental-health` | `qualitative_empirical` | 访谈研究，主题分析 |
+| 类型冒烟 | `eit-chatgpt-bullshit` | `humanities_argument` | 哲学论证，无图无表 |
+| 类型冒烟 | `arxiv-cot-expressivity` | `theory` | 定理与证明 |
+| 类型冒烟 | `arxiv-harness-engineering` | `discovery_empirical` | 对 11 个系统的源码研究，带论点；读起来像综述，83 页 |
+| 备用 | `ncomms-medsam` | `method` | 期刊版式，医学领域，通栏图注 |
+| 备用 | `arxiv-transformer` | `method` | 短篇机制论文 |
+| 备用 | `zh-aptamer-review` | `survey_or_review` | 中文综述 |
+
+预期 `paper_type` 是细心的读者会给出的类型，评估对的必答问题按它取。冒烟层级使用 `arxiv-transformer` 和 `arxiv-sam`；改动涉及论文类型或按类型的笔记结构时，还要跑类型冒烟论文，冒烟报告把每次运行选定的 `paper_type` 与预期类型并列记录。只有当某篇主测论文因与改动无关的原因无法启动时，才用备用论文替换，并记录原因。
+
+扩充论文集时，由 Paper Finder agent 挑选身份稳定、PDF 可读、技术深度足以写深读笔记，并且补上现有论文集缺少的压力点的论文：benchmark 或评测、方法或系统、附录密集、图表密集、局限性密集。新论文在被实验使用之前，先按 `evals/paper-corpus.md` 建立 `evals/expectations/` 条目。
+
+## 子会话提示词
+
+每次运行启动一个独立的子会话，只给一条提示词，此外什么都不给：不加额外约束、解释、源文件路径、agent 指令、模型说明、前缀或后缀。子会话不使用 `/goal`，下文的工作流 agent 使用。不要在同一个子会话里跑两篇论文。
+
+| 输入模式 | 用于 | 提示词 |
+| --- | --- | --- |
+| PDF（默认） | 所有笔记质量比较 | `给这篇论文生成一个深度笔记：<PDF_PATH>。笔记保存到<TEMP_VAULT_PATH>中。` |
+| 标题 | 改动 resolve、metadata、fetch 或身份逻辑时 | `给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。` |
+
+PDF 模式让两组拿到同样的字节，并跳过 Zotero 查找。标题模式端到端地覆盖获取流程，所以结果还取决于网络和 Zotero 是否在运行；两者都要记录。同一实验的两组使用同一种模式。记录每次运行的完整提示词。
+
+## 运行记录
+
+每个子会话结束后，运行者在该运行目录下保存：
+
+- 原始最终笔记，以及该运行写出的全部产物
+- 子会话提示词、日志和退出状态
+- `status-bindings.json`，按 `<SKILL_ROOT>/references/run-state.md` 的格式写明该运行的 admission、note plan、草稿、lint、审查和保存文件，以及运行上下文。这些文件没有固定文件名，不带 bindings 的状态查询会把这些阶段报为 `missing`，即使运行已经完成，`summary.saved_verified` 也是 false。子会话写了 bindings 文件、且其中的路径与 `<RUN_WORKDIR>` 中的文件一致时，直接沿用；否则根据这些文件和运行配置写一份。
+- `run_state.json`，即 `python3 <SKILL_ROOT>/scripts/run_state.py status --workdir <RUN_WORKDIR> --prefix <RUN_PREFIX> --bindings <RUN_DIR>/status-bindings.json` 的输出。它记录哪些阶段通过、过期产物、来源缺口，以及最终报告使用的 `summary`。子会话自行选择工作目录时，从其日志中的 `workdir=` 行取 `<RUN_WORKDIR>`。
+
+当 `run_state.json` 显示所有必需阶段都通过、`summary.saved_verified` 为真且 `summary.saved_sha256_match` 为真时，该运行算作**完成**。
+
+## 冒烟层级
+
+1. 在改动面向的每个宿主上，用 PDF 模式让 candidate 各跑一次两篇冒烟论文。
+2. 保留每次运行的运行记录。
+3. 一位审阅者（人或 agent）对照 rubric 的硬门槛 H1 到 H8 阅读每篇笔记。它不打分，也不做比较。
+4. 写出 `smoke-report.md`：逐次运行记录宿主、按 `run_state.json` 判断的完成情况、任何 `next_action` 或来源缺口，以及每个硬门槛的结果和一行证据。
+
+所有运行都完成且所有硬门槛都通过，冒烟层级才算通过。报告时只能说“工作流仍能跑完”，不能当作质量结论。
+
+## 完整层级
+
+### 角色
+
+每个角色可以是独立会话，也可以是隔离清楚的阶段：
+
+- **Baseline Runner：** 记录 baseline 身份，然后运行 baseline。不判断质量。
+- **Candidate Runner：** 在同一论文集上运行 candidate，然后构建盲评配对。不判断质量。
+- **Artifact Auditor：** 对照工作流契约检查每次运行。不评判文字。
+- **Note Evaluator：** 用 rubric 给盲评配对打分。永远看不到 manifest、分组或提交。
+- **Regression Judge：** 揭盲并给出判定。
+
+每个 agent 读取上一阶段的文档，写出自己的文档交给下一阶段。提示词使用占位符，不写本地路径：
 
 ```text
-paper-set.md
-  -> baseline-run-manifest.md
-  -> candidate-run-manifest.md
+baseline-run-manifest.md
+  -> candidate-run-manifest.md + evaluation-pairs.md + blinding-map.json（封存）
   -> artifact-audit-report.md
   -> note-evaluation-report.md
   -> regression-summary.md
 ```
 
-runner manifest 还应指向 run root 下的机器可读 artifacts。
+### 运行
 
-## Goal 模式与子 Runner Prompt
+每篇主测论文在每组各跑两次，每次都是新的子会话：六篇论文乘两组乘两次，共 24 次运行。运行目录使用中性编号，例如 `run-07`，让路径不暴露分组；编号与分组的对应关系记在 manifest 中。
 
-每个 workflow 阶段的 Agent 都应以 goal mode 启动。本文档中的每个 Agent
-Prompt Template 都以 `/goal` 开头。
+只有当提交、宿主、模型、论文集、输入模式、子会话提示词和运行配置全部一致时，才能复用此前的 baseline 运行。
 
-Baseline Runner 和 Candidate Runner 为每篇论文启动的独立 Codex CLI session
-是例外：这些子 session 不使用 `/goal`。
+### 盲评配对
 
-每篇论文必须用完全相同的单句 prompt 启动独立 Codex CLI，替换占位符后不
-得添加任何额外信息：
+所有运行记录完成后，Candidate Runner 为每篇论文构建三组配对：
 
-```text
-给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
-```
+| 配对 | 比较 | 用途 |
+| --- | --- | --- |
+| 噪声 | baseline 第 1 次与 baseline 第 2 次 | 同一版本两次运行相差多少 |
+| 比较 1 | baseline 第 1 次与 candidate 第 1 次 | |
+| 比较 2 | baseline 第 2 次与 candidate 第 2 次 | |
 
-不要给这个子 prompt 添加额外约束、解释、source path、agent instruction、
-model note 或前后缀。必须在 manifest 中记录实际使用的完整子 prompt。
+对每组配对，它随机决定哪次运行是 A，给配对一个中性编号，把所有配对一起打乱，然后写出：
 
-## 推荐 Agent 角色
+- `evaluation-pairs.md`：逐组记录编号、论文、论文预期的 `paper_type` 及其必答问题（按评分标准 Required Inputs 一节的要求），以及 A 和 B 各自的笔记、源证据和产物根目录
+- `blinding-map.json`：逐组记录配对类型，以及 A 和 B 分别对应哪次运行、哪一组。只有 Regression Judge 读取它。
 
-这些角色可以作为独立 session，也可以作为清晰隔离的阶段来执行。
+### 产物审计
 
-### Paper Finder Agent
+审计者从每次运行的 `run_state.json` 开始，记录阶段结果、过期产物和来源缺口。然后检查脚本判断不了的部分：
 
-选择测试论文。它只读搜索，不运行 DeepPaperNote。
+- 接受的身份与 PDF 中的论文一致：标题、作者和标识符
+- Visual Review 的决定合理：主方法图和主结果图没有被漏掉或丢弃，每个丢弃都给出编辑理由
+- 笔记中的嵌入与冻结的决定一致，插入的图片存在于论文本地的 `images/` 目录
+- 当 source manifest 记录了截断或部分阅读时，笔记中写明了这一点
+- Grounding Lint 为核心论断引用了有效的章节 ID 或页码范围
 
-### Baseline Runner Agent
+每次运行得到 `pass`、`partial`、`fail` 或 `unknown`：
 
-记录冻结的 baseline 身份，运行 baseline skill 版本，并写出 baseline 笔记
-和 artifacts。它不评估质量。
+- `pass`：所有必需阶段都通过，上述检查都成立。
+- `partial`：运行完成了，但来源、警告或 repair trace 的缺口降低了审计置信度。
+- `fail`：某个必需阶段失败、上述某项检查不成立，或身份证据相互矛盾或不安全。
+- `unknown`：必需产物缺失或无法读取，审计者无法判断。
 
-### Candidate Runner Agent
+标题模式的实验中，审计者还要用明确证据把获取身份的行为映射到这些结果：
 
-在完全相同的论文集合上运行 candidate skill 版本，并写出 candidate 笔记和
-artifacts。它不评估质量。
+- `pass`：resolve、metadata、fetch、canonical identity 和 repair trace 产物被一致地复用和消费；identity verdict 为 accepted 或 accepted-with-warnings；警告只涉及 metadata 或来源；Source Corpus 证据绑定到所选的 source manifestation。
+- `partial`：运行仍可评估，但非阻断性的来源、警告或 repair trace 证据不完整。
+- `fail`：身份证据相互矛盾或不安全；repair-exhausted failure 没有在下游消费前 fail closed；fetch 使用了过期或错误的身份；所选 PDF 或 source manifestation 不一致；或 repaired identity 缺少 trace。
+- `unknown`：必需的获取产物缺失或无法读取。
 
-### Artifact Auditor Agent
+只要运行中出现了 repaired identity、accepted-with-warnings identity、repair-exhausted failure 和 equivalent manifestation 场景，就逐项覆盖。
 
-检查 candidate run 是否遵守 Source Corpus、bundle、grounding、lint、
-figure/table 和保存契约。它不评价最终正文质量。
+产物改进不等于最终笔记改进。只有当证据表明获取身份的改进防止或修复了 wrong identity、wrong PDF、metadata contradiction、missing source evidence、broken path、citation damage 或类似的下游失败时，它才算 note-visible。否则它只支持 `architectural_improvement_only`。
 
-### Note Evaluator Agent
+### 笔记评估
 
-使用 `evals/note-quality-rubric.md` 比较 baseline note 和 candidate note。
-它不生成、不修补笔记。
+Note Evaluator 用 `evals/note-evaluator-prompt.md` 和 `evals/note-quality-rubric.md` 评估 `evaluation-pairs.md` 中的每组配对，一次一组，最好每组用一个新会话。它只读取这三个文件和配对中列出的路径，绝不读取 manifest、`blinding-map.json`、Git 历史或文件时间戳。它为每组配对写一份 rubric JSON 报告，汇总到 `note-evaluation-report.md`。
 
-### Regression Judge Agent
+### 回归判定
 
-综合 runner 状态、artifact audit 和 note evaluation，给出一次实验的总体判
-定。
+Regression Judge 读取以上所有文档，包括 `blinding-map.json`，并揭开每组配对。
 
-## 阶段 1：选择真实论文
+对每篇论文的每个 rubric 维度：
 
-先选论文，再运行 baseline 或 candidate。
+- **噪声幅度**是噪声配对中的分数差的绝对值。
+- 当 candidate 在两组比较配对中得分都更高，且每次提升都超过噪声幅度时，candidate 在该维度**改进**。
+- 当 candidate 在两组比较配对中得分都更低，且每次下降都超过噪声幅度时，candidate 在该维度**退化**。
+- 其余情况都算噪声。
 
-论文集合建议包含 4 篇主测试论文和 2 篇备用论文。第一轮应小到足以人工检
-查输出；流程稳定后再扩大固定测试集。
+每篇论文给出一个判定：
 
-### 选择标准
+- `hard_fail`：某篇 candidate 笔记未通过某个硬门槛，而同一配对中的 baseline 笔记通过了。
+- `regression`：candidate 在某个核心内容维度（D1 到 D4、D9 或 D10）退化，且没有任何维度改进。
+- `no_material_change`：所有差异都是噪声。
+- `partial_improvement`：candidate 改进了部分维度，但不包括 D1、D2、D9 或 D10，或同时在某个维度退化。
+- `real_improvement`：candidate 改进了 D1、D2、D9 或 D10，没有在 D4 退化，没有引入硬门槛失败，且评估者给出的理由把提升归于论文证据而非格式。
 
-优先选择具备以下条件的论文：
+实验的判定是 `hard_fail`、`regression`、`no_material_change`、`partial_improvement`、`real_improvement` 或 `architectural_improvement_only` 之一：
 
-- 有稳定身份信息，例如 DOI、arXiv ID、venue、年份或本地 PDF
-- 有可用全文或可靠 PDF 附件
-- 技术内容足够复杂，需要深度笔记
-- 如有旧笔记或 baseline 笔记更好
-- 覆盖不同压力点
+- 任一论文为 `hard_fail` 时，判定为 `hard_fail`。
+- 只有当六篇论文中至少四篇为 `real_improvement` 且没有任何一篇为 `regression` 时，才判定为 `real_improvement`。
+- 产物或契约改进了，但没有任何论文超过 `no_material_change` 时，判定为 `architectural_improvement_only`。
+- 其他情况，选最能概括各论文结果的判定，并写明理由。
 
-尽量覆盖这些论文类型：
+以下都不算真实改进：格式更好看；笔记更长但证据覆盖不变；章节更多但机制或结果解释没有更好；产物更干净但笔记没变；在一篇论文上提升、同时在另一篇上严重退化。
 
-- benchmark 或 evaluation paper
-- method、model 或 system paper
-- appendix-heavy paper
-- figure/table-heavy paper
-- Discussion 或 Limitations 对理解结论很重要的 paper
+对于获取身份的改动，分别记录两个字段：
 
-避免选择太短、只有摘要级内容、缺少可用来源，或身份信息难以稳定确认的论
-文。
+- `architectural_improvement_only`：candidate 改进了产物复用、来源、canonical identity、repair trace 或报告清晰度，但最终笔记没有可见的质量提升。
+- `final_note_visible_improvement`：candidate 防止或修复了在生成笔记或源证据中可见的 wrong identity、wrong PDF、metadata contradiction、missing source evidence、broken path、citation damage 或类似的下游失败。
 
-### 论文选择输出
+### 实验总结
 
-Paper Finder Agent 应输出一个 Markdown 报告，包含：
+`regression-summary.md` 记录实验编号、baseline 与 candidate 提交、宿主与模型、输入模式、论文集、运行配置、每次运行的完成与审计结果、噪声幅度、每篇论文的判定及起决定作用的维度、实验判定、能否声称优化成功，以及下一步建议。它要把以下情况分开写：机制有提升但笔记没提升；笔记有提升但产物退化；架构层面的获取改进与 note-visible 的获取改进；以及无法得出结论的实验。
 
-- 4 篇主测试论文
-- 2 篇备用论文
-- 每篇论文对应的测试压力点
-- 如下表格：
+## Agent 提示词模板
 
-```text
-Title | Type | Venue/Year | Note path | PDF or source evidence | Why it is a good test | What the change should help with | Risk
-```
-
-### Paper Finder Agent Prompt Template
-
-```text
-/goal
-
-目标：
-为 DeepPaperNote 回归测试选择一组可复用的真实论文。
-
-先读取：
-- <REPO_ROOT>/evals/regression-workflow-zh.md
-- 可选的历史论文选择文档：<PRIOR_SELECTION_DOC_OR_NONE>
-- 论文来源根目录或索引：<PAPER_SOURCE_ROOT>
-
-任务：
-- 找出 6 篇候选论文：4 篇主测试论文和 2 篇备用论文。
-- 优先选择身份信息稳定、有可用 PDF/source material、技术深度足够的论文。
-- 尽量覆盖 benchmark/evaluation、method/model/system、appendix-heavy、figure/table-heavy、limitations-heavy 压力点。
-- 不要运行 DeepPaperNote。
-- 不要修改笔记、PDF 或 vault。
-
-约束：
-- 只做 read-only 搜索。
-- 不要因为论文看起来有名就推荐；必须给出本地 note 或 source evidence。
-
-输出：
-- 将 Markdown 论文集报告写入 <PAPER_SET_DOC>。
-- 包含指定选择表格。
-- 标出 4 篇主测试论文和 2 篇备用论文。
-- 对每篇主测试论文写明预期压力点，以及这篇论文能暴露什么回归问题。
-```
-
-## 阶段 2：运行 Baseline Notes
-
-先跑 baseline，再跑 candidate。没有冻结 baseline，就只能说 candidate 看
-起来可接受，不能说它相对 baseline 有提升。
-
-Baseline Runner 负责 baseline manifest。生成笔记前，它必须记录：
-
-- baseline git ref 或 release tag
-- installed skill 来源
-- runner 工具
-- 模型设置
-- prompt 模板
-- 运行时间
-- paper-set 文档路径
-- run root 和 vault 布局
-- artifact 收集规则
-
-对每篇已选论文：
-
-1. 创建隔离 run directory。
-2. 创建或指定隔离 test vault。
-3. 安装或同步 baseline skill 版本。
-4. 为每篇论文启动一个独立 Codex CLI session，并使用规定的精确子 prompt。
-5. 保存原始最终笔记和所有 artifacts。
-6. 在 baseline manifest 中记录 present/missing artifacts。
-7. 生成后不要编辑笔记。
-
-单篇论文的子 Codex CLI prompt 必须严格等于：
-
-```text
-给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
-```
-
-runner 可以在这个子 prompt 之外控制 working directory、temp vault、已安装
-skill 版本、日志和 manifest 收集，但不得给子 prompt 添加任何额外文字。
-baseline 和 candidate 必须使用相同的子 prompt 模板。
-
-不要复用旧 baseline artifacts，除非它们使用了相同论文集合、runner 设置、
-子 Codex CLI prompt 模板和 artifact 收集规则。
-
-### Baseline Runner Agent Prompt Template
-
-```text
-/goal
-
-目标：
-使用冻结的 baseline DeepPaperNote 版本为已选论文集生成 baseline 笔记，并写出完整 baseline manifest。
-
-先读取：
-- <REPO_ROOT>/evals/regression-workflow-zh.md
-- 论文集报告：<PAPER_SET_DOC>
-- baseline ref 或 release 说明：<BASELINE_REF_DOC_OR_VALUE>
-
-任务：
-- 在运行任何论文前记录 baseline 身份。
-- 使用本 workflow 规定的单篇论文子 Codex CLI prompt 模板。
-- 对每篇主测试论文创建隔离 run directory 和 test vault。
-- 同步或安装 baseline skill 版本。
-- 为每篇主测试论文启动一个单独的、独立的 Codex CLI session。
-- 每个子 Codex CLI session 中只能使用这个 prompt，替换占位符后不得添加任何其他文字：`给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。`
-- 不要给子 Codex CLI prompt 添加任何额外信息。
-- 保存原始最终笔记、runner logs 和所有可用 artifacts。
-- 记录实际使用的完整子 prompt、temp vault path、run directory、final note path、logs、exit status、可用 artifacts 和缺失 artifacts。
-
-约束：
-- 本 workflow 阶段 Agent 使用 `/goal`；单篇论文的子 Codex CLI session 不使用 `/goal`。
-- 不要把多篇论文合并到同一个 Codex CLI session 中运行。
-- 不要评估笔记质量。
-- 不要修补或重写生成笔记。
-- 不要运行 candidate 代码。
-- 不要改变论文集。
-
-输出：
-- 写入 <BASELINE_MANIFEST_DOC>。
-- manifest 必须包含 baseline 身份、runner 设置、子 Codex CLI prompt 模板、每篇论文实际使用的完整子 prompt、每篇论文状态、最终笔记路径、artifact 路径、logs、exit status 和缺失 artifacts。
-- 如可行，同时在 <BASELINE_RUN_ROOT> 下写入或更新机器可读 manifest 数据。
-```
-
-## 阶段 3：运行 Candidate Notes
-
-candidate 在相同论文列表上、baseline 之后运行。
-
-对每篇已选论文：
-
-1. 使用相同论文身份输入。
-2. 使用相同 runner 工具和模型设置。
-3. 使用完全相同的子 Codex CLI prompt 模板。
-4. 使用隔离的 candidate run directory 和 test vault。
-5. 安装或同步 candidate skill 版本。
-6. 保存原始最终笔记和所有 artifacts。
-7. 在 candidate manifest 中记录 present/missing artifacts。
-8. 生成后不要编辑笔记。
-
-当 baseline runner 和 candidate runner 共享全局状态时，例如共享 installed
-skill 目录，不应并发运行。
-
-单篇论文的子 Codex CLI prompt 必须与 baseline 使用完全相同的模板：
-
-```text
-给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。
-```
-
-### Candidate Runner Agent Prompt Template
-
-```text
-/goal
-
-目标：
-在完全相同的论文集上运行 candidate DeepPaperNote 版本，并写出能和 baseline manifest 对齐的 candidate manifest。
-
-先读取：
-- <REPO_ROOT>/evals/regression-workflow-zh.md
-- 论文集报告：<PAPER_SET_DOC>
-- baseline manifest：<BASELINE_MANIFEST_DOC>
-- candidate ref 或变更说明：<CANDIDATE_REF_DOC_OR_VALUE>
-
-candidate与baseline版本定义：
-- baseline版本：<main>分支
-- candidate版本：<CANDIDATE BRANCH>分支
-
-任务：
-- 确认论文集和子 Codex CLI prompt 模板与 baseline manifest 一致。
-- 同步或安装 candidate skill 版本。
-- 对每篇主测试论文创建隔离 candidate run directory 和 test vault。
-- 为每篇主测试论文启动一个单独的、独立的 Codex CLI session。
-- 每个子 Codex CLI session 中只能使用这个 prompt，替换占位符后不得添加任何其他文字：`给这篇论文生成一个深度笔记：<PAPER_TITLE>。笔记保存到<TEMP_VAULT_PATH>中。`
-- 不要给子 Codex CLI prompt 添加任何额外信息。
-- 保存原始最终笔记、runner logs 和所有可用 artifacts。
-- 记录实际使用的完整子 prompt、temp vault path、run directory、final note path、logs、exit status、可用 artifacts 和缺失 artifacts。
-- 把每个 candidate output 映射到对应 baseline output。
-
-约束：
-- 单篇论文的子 Codex CLI session 不使用 `/goal`。
-- 不要把多篇论文合并到同一个 Codex CLI session 中运行。
-- 不要评估笔记质量。
-- 不要修补或重写生成笔记。
-- 不要重跑 baseline。
-- 除非 baseline manifest 无效，否则不要改变论文集。
-
-输出：
-- 写入 <CANDIDATE_MANIFEST_DOC>。
-- manifest 必须包含 candidate 身份、runner 设置、子 Codex CLI prompt 模板、每篇论文实际使用的完整子 prompt、每篇论文状态、最终笔记路径、artifact 路径、logs、exit status、缺失 artifacts 和 baseline/candidate 对应关系。
-- 如可行，同时在 <CANDIDATE_RUN_ROOT> 下写入或更新机器可读 manifest 数据。
-```
-
-## 阶段 4：Artifact Audit
-
-Artifact Auditor 判断运行是否遵守工作流契约。它不评价最终 prose 质量。
-
-auditor 应检查：
-
-- Source Corpus artifacts 是否存在且内部一致
-- `source_manifest.json` 和 `raw_sections.jsonl` 是否作为 canonical
-  text-derived reading input
-- 旧的 diagnostic derived views 是否又变成 model-facing writing inputs
-- acquisition resolve、metadata、fetch、Canonical Identity Artifact 和
-  Identity Repair Trace artifacts 是否存在，或是否被明确记录为缺失
-- canonical identity 的 provenance 是否指回预期的 resolve 和 metadata
-  artifacts
-- fetch 是否消费 canonical identity/source manifestation contract，而不是
-  重新使用松散的 resolve 或 metadata identity fields
-- repaired identity、accepted-with-warnings identity、repair-exhausted failure
-  和 equivalent manifestation 场景是否由 explicit identity verdict、warning、
-  failure class、equivalence 和 repair trace evidence 解释
-- truncation 或 partial reading 是否显式记录
-- grounding lint 是否使用有效 section IDs 或 page ranges
-- figure/table decisions 是否 fail closed
-- final save 行为是否保留必要文件和路径
-
-Artifact audit 结果：
-
-- `pass`
-- `partial`
-- `fail`
-- `unknown`
-
-acquisition identity behavior 也必须用 explicit evidence 映射到这些结果：
-
-- `pass`：resolve、metadata、fetch、canonical identity 和 repair trace
-  artifacts 被 consistent reuse/consume；identity verdict 是 accepted 或
-  accepted-with-warnings；warning 仅限 metadata/provenance；Source Corpus
-  evidence 绑定到 selected source manifestation。
-- `partial`：运行仍可进入 note evaluation，但非阻塞的 provenance、warning
-  或 repair trace evidence 不完整，导致 acquisition audit 置信度下降。
-- `fail`：identity evidence 矛盾或不安全；repair-exhausted failure 没有在
-  downstream consumption 前 fail closed；fetch 使用了 stale 或 wrong identity；
-  selected PDF/source manifestation 不一致；或 repaired identity 缺少 trace。
-- `unknown`：manifest 中缺少必要 acquisition artifacts，或 artifact 不可访问，
-  auditor 无法判断 identity contract 是否被遵守。
-
-artifact 改善不等同于最终笔记改善。当 artifacts 或契约改善，但最终笔记质量
-没有实质提升时，它只能支持 `architectural_improvement_only` 结论。
-
-acquisition identity improvement 只有在证据表明它 prevent/fix wrong identity、
-wrong PDF、metadata contradiction、missing source evidence、broken path、
-citation damage 或 comparable downstream failure 时，才能计入 final
-note-visible improvement。否则即使 acquisition architecture 更干净，也只能归入
-`architectural_improvement_only`。
-
-### Artifact Auditor Agent Prompt Template
-
-```text
-/goal
-
-目标：
-审查 baseline 和 candidate run 是否产出了完整、符合契约的 artifacts。
-
-先读取：
-- <REPO_ROOT>/evals/regression-workflow-zh.md
-- 论文集报告：<PAPER_SET_DOC>
-- baseline manifest：<BASELINE_MANIFEST_DOC>
-- candidate manifest：<CANDIDATE_MANIFEST_DOC>
-
-任务：
-- 检查两个 manifest 中列出的 artifacts。
-- 检查 Source Corpus、synthesis bundle、grounding、lint、figure/table 和 save artifacts。
-- 检查 acquisition resolve、metadata、fetch、canonical identity 和 repair trace artifacts。
-- 验证 canonical identity 和 repair trace evidence 是否被 consistent reuse/consume。
-- 用具体证据把 identity behavior 映射到 pass/partial/fail/unknown。
-- 当运行中出现 repaired identity、accepted-with-warnings identity、repair-exhausted failure 和 equivalent manifestation 场景时，逐项覆盖。
-- 记录 candidate artifacts 是否遵守预期契约。
-- 记录缺失或不一致 artifacts。
-- 区分 artifact 改善和最终笔记质量改善。
-
-约束：
-- 不要评价最终正文质量。
-- 不要编辑笔记或 artifacts。
-- 不要重跑 DeepPaperNote。
-- 不要仅凭 artifacts 存在就推断成功。
-
-输出：
-- 写入 <ARTIFACT_AUDIT_REPORT>。
-- 对每篇主测试论文给出 pass/partial/fail/unknown、证据路径、identity verdict evidence、source manifestation evidence、repair trace evidence 和风险。
-- 最后给出总体 artifact verdict，以及是否存在阻塞 note evaluation 的问题。
-```
-
-## 阶段 5：Note Evaluation
-
-Note Evaluator 使用 `evals/note-evaluator-prompt.md` 和
-`evals/note-quality-rubric.md`。
-
-对于每篇论文，evaluator 接收：
-
-- 论文身份信息
-- baseline final note
-- candidate final note
-- 可用 baseline artifacts
-- 可用 candidate artifacts
-- 可选 source evidence
-
-evaluator 必须：
-
-- 只比较原始笔记
-- 运行所有 hard gates
-- 给 8 个 rubric 维度打分
-- 为重要分差引用证据
-- 判断 candidate 是否优于 baseline
-- 输出 rubric JSON report
-
-evaluator 不得：
-
-- 重写笔记
-- 补写缺失章节
-- 重新运行 DeepPaperNote
-- 使用不同 rubric
-- 仅因为格式更干净就判定内容提升
-
-### Note Evaluator Agent Prompt Template
-
-```text
-/goal
-
-目标：
-评估 candidate 最终笔记是否比 baseline 最终笔记有实质提升。
-
-先读取：
-- <REPO_ROOT>/evals/regression-workflow-zh.md
-- <REPO_ROOT>/evals/note-quality-rubric.md
-- <REPO_ROOT>/evals/note-evaluator-prompt.md
-- 论文集报告：<PAPER_SET_DOC>
-- baseline manifest：<BASELINE_MANIFEST_DOC>
-- candidate manifest：<CANDIDATE_MANIFEST_DOC>
-- artifact audit report：<ARTIFACT_AUDIT_REPORT>
-
-任务：
-- 对每篇主测试论文，比较 raw baseline note 和 raw candidate note。
-- 使用固定 rubric 的 hard gates 和 scored dimensions。
-- 在可用时使用 source evidence 和 artifacts。
-- 当 source evidence 缺失时，把相关 evidence-grounded dimensions 标为较低置信度。
-- 标出内容提升、回归和平局。
-
-约束：
-- 不要重写或修补笔记。
-- 不要重跑 DeepPaperNote。
-- 除非 artifact 问题影响笔记质量，否则不要评价 artifact contract quality。
-- 不要因为格式更整洁就判定内容质量提升。
-
-输出：
-- 写入 <NOTE_EVALUATION_REPORT>。
-- 对每篇主测试论文包含 required rubric JSON。
-- 添加每篇论文的简短比较总结和最终 per-paper verdict。
-```
-
-## 阶段 6：Regression Judgment
-
-Regression Judge 综合：
-
-- 论文集报告
-- baseline manifest
-- candidate manifest
-- artifact audit report
-- note evaluation report
-- runner 失败或缺失 artifacts
-
-它给出实验级 verdict。
-
-### Verdict Values
-
-使用这些值：
-
-- `hard_fail`
-- `regression`
-- `no_material_change`
-- `partial_improvement`
-- `real_improvement`
-- `architectural_improvement_only`
-
-### 什么算 Real Improvement
-
-`real_improvement` 指 candidate 在最终笔记质量上实质优于 baseline，而不是只
-是更干净或结构更规整。
-
-要声称 `real_improvement`，candidate 通常应满足：
-
-- 通过 `evals/note-quality-rubric.md` 中所有已知 hard gates
-- 改善 Evidence Chain Coverage 或 Mechanism/Protocol Depth
-- 保持或改善 Claim Boundaries and Limitations
-- 避免 factual、grounding、figure/table、citation、path 或 readability
-  回归
-- 提升原因能绑定到论文证据，而不是只绑定到格式
-- 在大多数主测试论文上体现提升，而不是只挑中一篇成功案例
-
-### 什么不算 Real Improvement
-
-不要因为这些情况声称 real improvement：
-
-- 只是格式更漂亮
-- 笔记更长但 evidence coverage 没变强
-- 章节更多但 mechanism 或 result 解释没有变好
-- artifact contract 清理了，但最终笔记质量没变
-- 一篇论文提升，但其他论文出现严重回归
-- candidate note 触发严重 hard gate failure
-
-当 artifacts 或 contracts 改善，但最终笔记质量还没有实质变好时，使用
-`architectural_improvement_only`。
-
-对于 acquisition identity work，regression summary 必须分开记录两个字段：
-
-- `architectural_improvement_only`：candidate 改善了 artifact reuse、
-  provenance、canonical identity、repair trace 或 reporting clarity，但 final
-  notes 没有可见质量提升。
-- `final_note_visible_improvement`：candidate prevent/fix wrong identity、
-  wrong PDF、metadata contradiction、missing source evidence、broken path、
-  citation damage 或 comparable downstream failure，且这些问题会体现在生成笔记
-  或 source evidence 中。
-
-不要仅因为 resolve、metadata、fetch、canonical identity 或 repair trace artifacts
-更干净、更完整，就把 acquisition architecture improvement 升级为 final note
-quality improvement。
-
-## 最小首轮实验
-
-第一轮可复用回归测试建议：
-
-1. 选择 4 篇主测试论文和 2 篇备用论文。
-2. 运行一个 baseline 版本。
-3. 运行一个 candidate 版本。
-4. 对所有主测试论文做 artifact audit。
-5. 对所有主测试论文做 note evaluation。
-6. 生成一个实验总结。
-
-在 baseline/candidate 流程稳定前，不要加入另一个 runner 工具。
-
-## 最终实验总结
-
-Regression Judge 应产出：
-
-- experiment id
-- baseline version
-- candidate version
-- paper list
-- runner settings summary
-- artifact audit summary
-- note evaluation summary
-- per-paper verdicts
-- experiment-level verdict
-- 是否可以声称 optimization success
-- next recommended action
-
-总结应区分：
-
-- mechanism 改善但 note quality 没改善
-- note quality 改善但 artifacts 回归
-- architectural_improvement_only 与 final note-visible acquisition improvement
-- 单篇论文改善
-- 广泛真实改善
-- 失败或无法得出结论的实验
-
-### Regression Judge Agent Prompt Template
-
-```text
-/goal
-
-目标：
-判断本次回归实验是否支持声称 real improvement。
-
-先读取：
-- <REPO_ROOT>/evals/regression-workflow-zh.md
-- <REPO_ROOT>/evals/note-quality-rubric.md
-- 论文集报告：<PAPER_SET_DOC>
-- baseline manifest：<BASELINE_MANIFEST_DOC>
-- candidate manifest：<CANDIDATE_MANIFEST_DOC>
-- artifact audit report：<ARTIFACT_AUDIT_REPORT>
-- note evaluation report：<NOTE_EVALUATION_REPORT>
-
-任务：
-- 检查 runner success、artifact audit outcomes 和 note evaluation verdicts。
-- 检查 acquisition identity improvements 属于 architectural_improvement_only 还是 final note-visible。
-- 给出 per-paper verdict。
-- 给出一个 experiment-level verdict。
-- 判断是否可以声称 optimization success。
-- 标出 next recommended action。
-
-约束：
-- 不要重跑工具。
-- 不要编辑生成笔记。
-- 不要用平均分覆盖 hard-gate failures。
-- 不要因为 formatting-only gains 或单篇 cherry-picked paper 声称 real improvement。
-
-输出：
-- 写入 <REGRESSION_SUMMARY_DOC>。
-- 包含 experiment id、baseline version、candidate version、paper list、runner settings summary、artifact audit summary、note evaluation summary、per-paper verdicts、experiment-level verdict 和 next recommended action。
-```
+见英文正本 `evals/regression-workflow.md` 的 Agent Prompt Templates 一节。每个工作流 agent 都以 goal 模式启动，所以每个模板都以 `/goal` 开头。

@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from formal_save_helpers import formal_save_args, tagged
+
 import pytest
 
 try:
@@ -107,11 +109,22 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
     assert bundle["source_manifest"]["raw_sections_path"] == str(raw_sections_path.resolve())
     assert bundle["identity_contract"]["identity_verdict"] == "accepted"
     assert bundle["identity_contract"]["repair_trace_path"] == str(identity_trace_path.resolve())
-    assert bundle["figure_table_manifest"]["decisions"]
-    removed_bundle_keys = ("evidence", "candidate_chunks", "section_texts", "summary")
+    manifest = bundle["figure_table_manifest"]
+    assert manifest["decisions_path"] == str(decisions_path.resolve())
+    assert manifest["figures_path"] == str(figures_path.resolve())
+    assert manifest["assets_path"] == str((workdir / "paper_assets.json").resolve())
+    assert "decisions" not in manifest
+    removed_bundle_keys = (
+        "evidence",
+        "candidate_chunks",
+        "section_texts",
+        "summary",
+        "figure_plan",
+        "pdf_assets",
+    )
     assert not any(key in bundle for key in removed_bundle_keys)
 
-    note_text = "# 本地 PDF 语言完整性\n\n本笔记验证工件链可安全保存。\n"
+    note_text = tagged("# 本地 PDF 语言完整性\n\n本笔记验证工件链可安全保存。\n")
     lint_path = workdir / "paper_lint.json"
     lint_path.write_text(
         json.dumps(
@@ -136,12 +149,7 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
             str(WRITE_NOTE_SCRIPT),
             "--title",
             "本地 PDF 语言完整性",
-            "--content",
-            note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=source_manifest_path),
         ],
         cwd=save_cwd,
         env=env,
@@ -173,12 +181,7 @@ def test_run_pipeline_emits_manifest_raw_decisions_and_lightweight_bundle(tmp_pa
                 str(WRITE_NOTE_SCRIPT),
                 "--title",
                 "本地 PDF 语言失败",
-                "--content",
-                note_text,
-                "--lint-json",
-                str(lint_path),
-                "--figure-decisions",
-                str(invalid_path),
+                *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=invalid_path, source_manifest_path=source_manifest_path),
             ],
             cwd=failure_cwd,
             env=env,
@@ -445,3 +448,25 @@ def test_run_pipeline_forwards_required_zotero_mode_only_to_resolve(
 
     assert calls[0][calls[0].index("--zotero-mode") + 1] == "required"
     assert all("--zotero-mode" not in call for call in calls[1:])
+
+
+def test_blocked_step_stops_the_pipeline_without_a_traceback(monkeypatch) -> None:
+    def blocked(cmd: list[str], **kwargs: object) -> None:
+        raise subprocess.CalledProcessError(run_pipeline.BLOCKED_EXIT_CODE, cmd)
+
+    monkeypatch.setattr(run_pipeline.subprocess, "run", blocked)
+
+    with pytest.raises(SystemExit) as stopped:
+        run_pipeline.run_step(["step"], env={})
+
+    assert stopped.value.code == run_pipeline.BLOCKED_EXIT_CODE
+
+
+def test_failed_step_keeps_its_error(monkeypatch) -> None:
+    def failed(cmd: list[str], **kwargs: object) -> None:
+        raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(run_pipeline.subprocess, "run", failed)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        run_pipeline.run_step(["step"], env={})

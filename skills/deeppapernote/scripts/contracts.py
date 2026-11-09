@@ -3,42 +3,56 @@
 
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from typing import Any, TypedDict
 
-from localization import note_schema, normalize_output_language, required_sections
-
-NOTE_REQUIRED_SECTIONS: tuple[str, ...] = (
-    "核心信息",
-    "原文摘要翻译",
-    "创新点",
-    "一句话总结",
-    "研究问题",
-    "数据与任务定义",
-    "方法主线",
-    "关键结果",
-    "深度分析",
-    "局限",
-    "我的笔记",
-    "引用",
+from localization import note_schema, normalize_output_language
+from type_profiles import (
+    HEAD_SECTION_KEYS,
+    NOT_REPORTED_PHRASE,
+    PROFILES,
+    SECONDARY_QUESTION_LIMIT,
+    TAIL_SECTION_KEYS,
+    TYPE_KEYS,
+    WEAK_EVIDENCE_CALLOUT,
+    WORKFLOW_STEP_RANGE,
+    localized_profiles,
+    middle_sections,
+    question_ids,
+    required_question_ids,
 )
 
-def note_required_sections(language: str | None = None) -> tuple[str, ...]:
-    return required_sections(language)
+def note_required_sections(language: str | None = None, paper_type: str = "") -> tuple[str, ...]:
+    """Fixed head sections, the paper type's middle sections, then fixed tail sections."""
+    resolved = normalize_output_language(language)
+    sections = note_schema(resolved)["sections"]
+    return (
+        tuple(sections[key] for key in HEAD_SECTION_KEYS)
+        + middle_sections(paper_type, resolved)
+        + tuple(sections[key] for key in TAIL_SECTION_KEYS)
+    )
 
-PAPER_TYPE_VALUES: tuple[str, ...] = (
-    "AI_method",
-    "benchmark_or_dataset",
-    "clinical_or_psychology_empirical",
-    "humanities_or_social_science",
-    "survey_or_review",
-)
+
+def grounding_required_sections(language: str | None = None, paper_type: str = "") -> tuple[str, ...]:
+    """The sections whose plan entries must cite the source: the middle sections plus limitations."""
+    resolved = normalize_output_language(language)
+    return middle_sections(paper_type, resolved) + (note_schema(resolved)["sections"]["limitations"],)
+
+
+PAPER_TYPE_VALUES: tuple[str, ...] = TYPE_KEYS
 
 NOTE_PLAN_STRING_FIELDS: tuple[str, ...] = (
     "paper_type",
     "paper_type_rationale",
     "dominant_domain",
+    "storyline",
 )
+# The storyline is the paper's own story in a few sentences: problem, idea, evidence, so what.
+STORYLINE_SENTENCE_RANGE = (3, 5)
+# Periods inside these do not end a sentence.
+_NON_TERMINAL_ABBREVIATIONS = re.compile(r"\b(?:et al|e\.g|i\.e|vs|cf|Fig|Figs|Eq|Eqs|No|Sec|Tab)\.", re.IGNORECASE)
+_SENTENCE_END = re.compile(r"[。！？!?]+|\.(?=\s|$)")
 
 NOTE_PLAN_LIST_FIELDS: tuple[str, ...] = (
     "must_cover",
@@ -51,10 +65,24 @@ NOTE_PLAN_LIST_FIELDS: tuple[str, ...] = (
     "comparative_positioning",
     "reuse_takeaways",
     "followup_questions",
+    "key_prior_work",
     "section_plan",
 )
 
 NOTE_PLAN_REQUIRED_FIELDS: tuple[str, ...] = NOTE_PLAN_STRING_FIELDS + NOTE_PLAN_LIST_FIELDS
+# Optional fields stay in the template so the planner sees them, but an empty value is valid.
+NOTE_PLAN_OPTIONAL_STRING_FIELDS: tuple[str, ...] = ("reader_research_direction",)
+NOTE_PLAN_OPTIONAL_LIST_FIELDS: tuple[str, ...] = ("connections",)
+TAKEAWAY_PLAN_FIELDS: tuple[str, ...] = ("reuse_takeaways", "followup_questions")
+# Fields that depend on paper_type; type_plan_issues checks them against the type's profile.
+NOTE_PLAN_TYPE_FIELDS: dict[str, str] = {
+    "positioning": "string",
+    "survey_mode": "string",
+    "secondary_type": "string",
+    "secondary_host_section": "string",
+    "core_answers": "object",
+    "workflow": "array",
+}
 NOTE_PLAN_FIELD_TYPES: dict[str, str] = {
     **dict.fromkeys(NOTE_PLAN_STRING_FIELDS, "string"),
     **dict.fromkeys(NOTE_PLAN_LIST_FIELDS, "array"),
@@ -86,348 +114,14 @@ def required_field_value_error(
         return "empty" if checks["array"]["non_empty"] and not value else ""
     return "invalid"
 
-PAPER_TYPE_SECTION_PROFILES: dict[str, dict[str, dict[str, Any]]] = {
-    "AI_method": {
-        "section_semantics": {
-            "研究问题": "方法要解决的具体技术问题和现有方法短板。",
-            "数据与任务定义": "数据集、输入输出、评测任务和实验设置。",
-            "方法主线": "模型、算法、训练或推理机制。",
-            "关键结果": "主结果、强基线、消融和关键数字。",
-            "深度分析": "方法为什么有效、何处脆弱、复现和扩展代价。",
-        },
-        "recommended_subsections": {
-            "方法主线": ["机制流程", "模型结构", "训练目标", "推理与采样链路", "关键实现细节"],
-            "关键结果": ["主结果与强基线", "消融到底说明了什么", "失败或不稳定设置"],
-            "深度分析": ["为什么有效", "复杂度与扩展性", "复现注意点"],
-        },
-    },
-    "benchmark_or_dataset": {
-        "section_semantics": {
-            "研究问题": "这个 benchmark/dataset 想补足的评测或数据缺口。",
-            "数据与任务定义": "数据来源、任务拆分、标签/题目定义、样本范围。",
-            "方法主线": "数据构建、筛选、标注和评测协议，不写成模型 pipeline。",
-            "关键结果": "基线表现、难度分布、覆盖范围和偏差。",
-            "深度分析": "它真正测到了什么，以及不能代表什么。",
-        },
-        "recommended_subsections": {
-            "数据与任务定义": ["数据来源", "任务拆分", "标注/筛选协议"],
-            "方法主线": ["构建流程", "评测协议", "Baseline 设置"],
-            "关键结果": ["基线表现", "难度分布", "覆盖与偏差"],
-            "深度分析": ["benchmark 真正测到了什么", "适用边界"],
-        },
-    },
-    "clinical_or_psychology_empirical": {
-        "section_semantics": {
-            "研究问题": "临床、心理学或行为科学中的研究问题、假设或变量关系。",
-            "数据与任务定义": "样本来源、纳排标准、变量/量表、测量方式。",
-            "方法主线": "研究设计、分组、测量流程和统计分析路径。",
-            "关键结果": "主要效应、相关性、组间差异、不确定性或显著性。",
-            "深度分析": "结果解释、因果边界、临床/心理学意义和外推限制。",
-        },
-        "recommended_subsections": {
-            "数据与任务定义": ["样本与纳排标准", "变量与量表", "测量流程"],
-            "方法主线": ["研究设计", "分析模型", "主要比较"],
-            "关键结果": ["主要效应", "不确定性与显著性", "临床或心理学解释"],
-            "深度分析": ["因果解释边界", "外推限制"],
-        },
-    },
-    "humanities_or_social_science": {
-        "section_semantics": {
-            "研究问题": "作者要解释的社会、文化、历史、制度或理论问题。",
-            "数据与任务定义": "材料、案例、文本、访谈、档案或语料范围，不写成 ML task。",
-            "方法主线": "理论框架、概念区分和论证路径。",
-            "关键结果": "核心解释性发现、概念贡献或对既有观点的修正。",
-            "深度分析": "论证强度、材料边界、解释替代性和可迁移性。",
-        },
-        "recommended_subsections": {
-            "数据与任务定义": ["材料范围", "选择标准", "案例或语料边界"],
-            "方法主线": ["理论框架", "概念区分", "论证路径"],
-            "关键结果": ["核心解释性发现", "概念贡献"],
-            "深度分析": ["论证强度", "替代解释", "材料边界"],
-        },
-    },
-    "survey_or_review": {
-        "section_semantics": {
-            "研究问题": "综述试图整理的领域问题、争议或知识缺口。",
-            "数据与任务定义": "纳入文献范围、检索/筛选标准和综述对象。",
-            "方法主线": "分类体系、综述组织方式和证据综合逻辑，不写成单篇方法架构。",
-            "关键结果": "领域共识、分歧、趋势、代表性方向和开放问题。",
-            "深度分析": "综述覆盖的盲区、分类体系的解释力和未来研究机会。",
-        },
-        "recommended_subsections": {
-            "数据与任务定义": ["综述范围", "纳入/排除标准", "文献覆盖"],
-            "方法主线": ["分类体系", "方法谱系", "证据组织方式"],
-            "关键结果": ["代表性方向", "共识与分歧", "开放问题"],
-            "深度分析": ["分类体系的局限", "未覆盖区域", "后续研究机会"],
-        },
-    },
-}
-
-PAPER_TYPE_CONTRACTS: dict[str, dict[str, Any]] = {
-    "AI_method": {
-        "paper_type": "AI_method",
-        "reader_lens": "面向能复现方法机制的技术读者",
-        "section_focus": [
-            "问题设置",
-            "方法机制",
-            "训练/推理流程",
-            "关键公式",
-            "比较基线",
-            "消融与失败边界",
-        ],
-        "required_checks": ["需要说明机制流程、关键公式、实验设计、消融含义和失败边界。"],
-        "formula_rules": ["仅保留理解方法必需的 1 到 3 个关键公式，并解释其工程含义。"],
-        "avoid_rules": ["不要把非 AI_method 论文强行改写成模型架构。"],
-        "boundary_questions": [
-            "核心机制的收益由哪个实验或消融支撑，而不是只由主结果暗示？",
-            "哪些比较只能证明在当前数据、基线、算力或协议下有效，不能外推到通用场景？",
-            "论文是否给出失败、退化、不稳定或成本上升的证据；如果没有，结论边界是什么？",
-        ],
-        **PAPER_TYPE_SECTION_PROFILES["AI_method"],
-        "mechanism_flow_contract": {
-            "apply_when_paper_type_in": ["AI_method"],
-            "required_step_count": "3_to_4",
-            "required_step_fields": ["input", "operation", "output_destination"],
-        },
-    },
-    "benchmark_or_dataset": {
-        "paper_type": "benchmark_or_dataset",
-        "reader_lens": "面向要判断 benchmark/dataset 可用性和偏差边界的研究者",
-        "section_focus": [
-            "任务拆分",
-            "数据来源与构建流程",
-            "标注协议",
-            "评测指标",
-            "覆盖范围与偏差",
-            "样本统计与数据开放限制",
-        ],
-        "required_checks": [
-            "需要说明数据来源、构建/标注流程、评测指标、基线表现、样本统计、数据开放或隐私限制和适用边界。"
-        ],
-        "formula_rules": ["仅保留核心评测指标、采样规则或划分定义。"],
-        "avoid_rules": ["不要把数据构建流程写成模型 pipeline。"],
-        "boundary_questions": [
-            "这个 benchmark/dataset 实际测量的构念是什么，哪些能力只是间接近似？",
-            "任务、标签、采样、过滤或评测协议会引入哪些覆盖缺口或偏差？",
-            "基线结果证明了评测集有区分度，还是只证明某类模型适应该协议？",
-            "样本时长、语料长度、人口统计、类别分布、数据可访问性或隐私限制如何影响复现和外推？",
-        ],
-        **PAPER_TYPE_SECTION_PROFILES["benchmark_or_dataset"],
-    },
-    "clinical_or_psychology_empirical": {
-        "paper_type": "clinical_or_psychology_empirical",
-        "reader_lens": "面向关注临床/心理学样本、变量关系和外推边界的研究读者",
-        "section_focus": [
-            "样本来源",
-            "纳排标准",
-            "变量或量表",
-            "分析管线",
-            "效应量与不确定性",
-            "样本统计、伦理和数据可访问性",
-        ],
-        "required_checks": [
-            "需要区分相关、预测、组间差异和因果解释，说明样本统计、伦理/隐私约束与外推边界。"
-        ],
-        "formula_rules": ["仅保留核心统计模型、效应量、置信区间或量表定义。"],
-        "avoid_rules": ["不要把相关性、预测性能或组间差异写成未经证明的因果结论。"],
-        "boundary_questions": [
-            "样本来源、纳排标准、测量工具和标注流程如何限制外推？",
-            "结果支持相关、预测、组间差异还是因果解释；不要越过论文设计能证明的范围。",
-            "临床或心理学意义是否依赖未观测混杂、量表阈值、文本/语音缺失或场景约束？",
-            "样本构成、数据缺失、隐私限制或材料不可公开会怎样限制复现与再分析？",
-        ],
-        **PAPER_TYPE_SECTION_PROFILES["clinical_or_psychology_empirical"],
-    },
-    "humanities_or_social_science": {
-        "paper_type": "humanities_or_social_science",
-        "reader_lens": "面向关注理论框架、材料解释和论证结构的研究读者",
-        "section_focus": ["研究对象", "材料来源", "理论框架", "论证路径", "概念贡献", "解释边界"],
-        "required_checks": ["需要区分作者论证、材料证据、规范性判断和实验事实。"],
-        "formula_rules": ["通常不强行保留公式；仅保留核心形式化定义或编码规则。"],
-        "avoid_rules": ["不要把规范性判断、文本解释或案例分析写成实验事实。"],
-        "boundary_questions": [
-            "作者的解释依赖哪些材料、案例或理论前提？",
-            "是否存在同样能解释材料的替代解释，论文如何排除或没有排除？",
-            "哪些结论是概念贡献或规范性判断，而不是可直接当作经验事实？",
-        ],
-        **PAPER_TYPE_SECTION_PROFILES["humanities_or_social_science"],
-    },
-    "survey_or_review": {
-        "paper_type": "survey_or_review",
-        "reader_lens": "面向需要梳理综述脉络、分类体系和证据边界的研究读者",
-        "section_focus": [
-            "综述范围",
-            "纳入排除标准",
-            "主题分类",
-            "方法谱系",
-            "共识与分歧",
-            "开放问题",
-        ],
-        "required_checks": ["需要说明综述范围、文献选择、分类体系、共识分歧和开放问题。"],
-        "formula_rules": ["仅保留分类轴、纳入排除准则、证据汇总规则或 meta-analysis 统计量。"],
-        "avoid_rules": ["不要把综述中的代表性结论写成作者自己完成的单项实验结果。"],
-        "boundary_questions": [
-            "检索范围、纳入排除标准或分类轴会遗漏哪些研究路线？",
-            "综述给出的是领域共识、作者分类，还是尚未解决的分歧？",
-            "哪些趋势结论来自覆盖范围内的文献分布，不能直接当作技术成熟度判断？",
-        ],
-        **PAPER_TYPE_SECTION_PROFILES["survey_or_review"],
-    },
-}
-
-PAPER_TYPE_CONTRACTS_EN: dict[str, dict[str, Any]] = {
-    "AI_method": {
-        "paper_type": "AI_method",
-        "reader_lens": "A technical reader who may need to reproduce the method and its mechanism.",
-        "section_focus": ["problem setting", "method mechanism", "training or inference flow", "key equations", "strong baselines", "ablations and failure boundaries"],
-        "required_checks": ["Explain the mechanism flow, essential equations, experimental design, what the ablations establish, and the failure boundary."],
-        "formula_rules": ["Keep only the one to three equations needed to understand the method and explain their engineering meaning."],
-        "avoid_rules": ["Do not force a non-method paper into a model-architecture narrative."],
-        "boundary_questions": [
-            "Which experiment or ablation supports the claimed benefit of the core mechanism?",
-            "Which comparisons apply only under the reported data, baselines, compute, or protocol?",
-            "What evidence shows failure, degradation, instability, or rising cost; if none is reported, what remains unproven?",
-        ],
-        "section_semantics": {
-            "Research Question": "The specific technical problem and the shortcomings of existing methods.",
-            "Data and Task Definition": "Datasets, inputs and outputs, evaluation tasks, and experimental settings.",
-            "Method": "Model, algorithm, training, and inference mechanisms.",
-            "Key Results": "Main results, strong baselines, ablations, and decisive numbers.",
-            "Deep Analysis": "Why the method works, where it is fragile, and the cost of reproduction or extension.",
-        },
-        "recommended_subsections": {
-            "Method": ["Mechanism Flow", "Model Architecture", "Training Objective", "Inference and Sampling", "Implementation Details"],
-            "Key Results": ["Main Results and Strong Baselines", "What the Ablations Establish", "Failure or Unstable Settings"],
-            "Deep Analysis": ["Why It Works", "Complexity and Scalability", "Reproduction Notes"],
-        },
-        "mechanism_flow_contract": {"apply_when_paper_type_in": ["AI_method"], "required_step_count": "3_to_4", "required_step_fields": ["input", "operation", "output_destination"]},
-    },
-    "benchmark_or_dataset": {
-        "paper_type": "benchmark_or_dataset",
-        "reader_lens": "A researcher assessing whether a benchmark or dataset is useful and where it is biased.",
-        "section_focus": ["task decomposition", "data sources and construction", "annotation protocol", "evaluation metrics", "coverage and bias", "sample statistics and access limits"],
-        "required_checks": ["Explain sources, construction or annotation, metrics, baselines, sample statistics, access or privacy constraints, and applicability."],
-        "formula_rules": ["Keep only essential metrics, sampling rules, or split definitions."],
-        "avoid_rules": ["Do not describe data construction as a model pipeline."],
-        "boundary_questions": [
-            "What construct does the resource actually measure, and which capabilities are only proxies?",
-            "Which coverage gaps or biases follow from its tasks, labels, sampling, filtering, or evaluation protocol?",
-            "Do baseline results demonstrate discrimination, or only adaptation to this protocol?",
-            "How do sample composition, access, and privacy limits affect reproduction and generalization?",
-        ],
-        "section_semantics": {
-            "Research Question": "The evaluation or data gap the resource is designed to address.",
-            "Data and Task Definition": "Sources, task splits, labels, and sample scope.",
-            "Method": "Construction, filtering, annotation, and evaluation protocol—not a model pipeline.",
-            "Key Results": "Baseline performance, difficulty, coverage, and bias.",
-            "Deep Analysis": "What the resource measures and what it cannot represent.",
-        },
-        "recommended_subsections": {
-            "Data and Task Definition": ["Data Sources", "Task Splits", "Annotation and Filtering"],
-            "Method": ["Construction Process", "Evaluation Protocol", "Baseline Setup"],
-            "Key Results": ["Baseline Performance", "Difficulty Distribution", "Coverage and Bias"],
-            "Deep Analysis": ["What It Actually Measures", "Applicability Boundary"],
-        },
-    },
-    "clinical_or_psychology_empirical": {
-        "paper_type": "clinical_or_psychology_empirical",
-        "reader_lens": "A research reader focused on samples, variable relationships, uncertainty, and generalization.",
-        "section_focus": ["sample source", "inclusion and exclusion", "variables and instruments", "analysis pipeline", "effect sizes and uncertainty", "ethics, access, and generalization"],
-        "required_checks": ["Distinguish association, prediction, group difference, and causal interpretation; report sample, ethics, privacy, and generalization limits."],
-        "formula_rules": ["Keep only essential statistical models, effect sizes, intervals, or instrument definitions."],
-        "avoid_rules": ["Do not turn association, prediction, or group differences into unsupported causal claims."],
-        "boundary_questions": [
-            "How do recruitment, eligibility, measurement, and annotation constrain generalization?",
-            "Does the design support association, prediction, group difference, or causality?",
-            "Does the interpretation depend on unobserved confounding, thresholds, missingness, or setting?",
-            "How do sample composition, missing data, privacy, and unavailable materials constrain reproduction?",
-        ],
-        "section_semantics": {
-            "Research Question": "The clinical, psychological, or behavioral question, hypothesis, or variable relationship.",
-            "Data and Task Definition": "Recruitment, eligibility, variables, instruments, and measurement.",
-            "Method": "Study design, grouping, measurement flow, and statistical analysis.",
-            "Key Results": "Effects, associations, group differences, uncertainty, and significance.",
-            "Deep Analysis": "Interpretation, causal boundary, substantive meaning, and generalization limits.",
-        },
-        "recommended_subsections": {
-            "Data and Task Definition": ["Sample and Eligibility", "Variables and Instruments", "Measurement Process"],
-            "Method": ["Study Design", "Analysis Model", "Primary Comparisons"],
-            "Key Results": ["Primary Effects", "Uncertainty and Significance", "Clinical or Psychological Interpretation"],
-            "Deep Analysis": ["Causal Interpretation Boundary", "Generalization Limits"],
-        },
-    },
-    "humanities_or_social_science": {
-        "paper_type": "humanities_or_social_science",
-        "reader_lens": "A reader evaluating theoretical framing, material interpretation, and argument structure.",
-        "section_focus": ["object of study", "materials", "theoretical framework", "argument path", "conceptual contribution", "interpretive boundary"],
-        "required_checks": ["Distinguish the author's argument, material evidence, normative judgment, and empirical fact."],
-        "formula_rules": ["Do not force equations; retain only essential formal definitions or coding rules."],
-        "avoid_rules": ["Do not present normative judgment, textual interpretation, or case analysis as experimental fact."],
-        "boundary_questions": [
-            "Which materials, cases, or theoretical premises support the interpretation?",
-            "What alternative explanations fit the same material, and how are they addressed?",
-            "Which conclusions are conceptual or normative rather than directly empirical?",
-        ],
-        "section_semantics": {
-            "Research Question": "The social, cultural, historical, institutional, or theoretical problem.",
-            "Data and Task Definition": "Materials, cases, texts, interviews, archives, or corpus scope—not an ML task.",
-            "Method": "Theoretical framework, conceptual distinctions, and argument path.",
-            "Key Results": "Interpretive findings, conceptual contribution, or revision of prior views.",
-            "Deep Analysis": "Argument strength, material limits, alternative explanations, and transferability.",
-        },
-        "recommended_subsections": {
-            "Data and Task Definition": ["Material Scope", "Selection Criteria", "Case or Corpus Boundary"],
-            "Method": ["Theoretical Framework", "Conceptual Distinctions", "Argument Path"],
-            "Key Results": ["Core Interpretive Findings", "Conceptual Contribution"],
-            "Deep Analysis": ["Argument Strength", "Alternative Explanations", "Material Boundary"],
-        },
-    },
-    "survey_or_review": {
-        "paper_type": "survey_or_review",
-        "reader_lens": "A reader mapping a literature, taxonomy, evidence boundary, and open questions.",
-        "section_focus": ["review scope", "inclusion and exclusion", "taxonomy", "method families", "consensus and disagreement", "open questions"],
-        "required_checks": ["Explain scope, study selection, taxonomy, consensus, disagreement, and open questions."],
-        "formula_rules": ["Keep only classification axes, eligibility rules, evidence-synthesis rules, or meta-analytic statistics."],
-        "avoid_rules": ["Do not present findings summarized from the literature as a new experiment by the review authors."],
-        "boundary_questions": [
-            "Which research routes may be missed by the search scope, eligibility criteria, or taxonomy?",
-            "Which statements reflect consensus, author-defined categories, or unresolved disagreement?",
-            "Which trends are artifacts of the covered literature and cannot establish technical maturity?",
-        ],
-        "section_semantics": {
-            "Research Question": "The field problem, controversy, or knowledge gap organized by the review.",
-            "Data and Task Definition": "Literature scope, search and screening criteria, and review objects.",
-            "Method": "Taxonomy, review organization, and evidence-synthesis logic—not a single method architecture.",
-            "Key Results": "Consensus, disagreement, trends, representative directions, and open questions.",
-            "Deep Analysis": "Coverage blind spots, explanatory power of the taxonomy, and future opportunities.",
-        },
-        "recommended_subsections": {
-            "Data and Task Definition": ["Review Scope", "Inclusion and Exclusion", "Literature Coverage"],
-            "Method": ["Taxonomy", "Method Families", "Evidence Organization"],
-            "Key Results": ["Representative Directions", "Consensus and Disagreement", "Open Questions"],
-            "Deep Analysis": ["Taxonomy Limits", "Uncovered Areas", "Future Research Opportunities"],
-        },
-    },
-}
-
-
 def paper_type_contracts(language: str | None = None) -> dict[str, dict[str, Any]]:
-    return deepcopy(PAPER_TYPE_CONTRACTS_EN if normalize_output_language(language) == "en" else PAPER_TYPE_CONTRACTS)
+    return localized_profiles(normalize_output_language(language))
 
 WRITING_CONTRACT_RULES: dict[str, Any] = {
-    "required_sections": NOTE_REQUIRED_SECTIONS,
     "paper_type_values": PAPER_TYPE_VALUES,
     "note_plan_required_fields": NOTE_PLAN_REQUIRED_FIELDS,
     "note_plan_field_types": NOTE_PLAN_FIELD_TYPES,
     "note_plan_required_field_checks": REQUIRED_FIELD_CHECKS,
-    "grounding_required_sections": (
-        "研究问题",
-        "数据与任务定义",
-        "方法主线",
-        "关键结果",
-        "深度分析",
-        "局限",
-    ),
     "allowed_grounding_reference_forms": ("section_id", "pages"),
     "excluded_model_input_fields": (
         "evidence",
@@ -467,6 +161,7 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
         "placeholder",
         "low_priority",
         "visual_defect",
+        "dropped",
         "skip",
     ),
     "usable_insert_candidate": {
@@ -500,7 +195,7 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
             "repair_attempts",
             "revised_bbox",
         ),
-        "review_status_values": ("pending", "pass", "fail", "repair_requested"),
+        "review_status_values": ("pending", "pass", "fail", "repair_requested", "dropped"),
         "repair_limit": 1,
         "asset_sha256_bound": True,
         "caption_free_visual_body_required": True,
@@ -541,6 +236,52 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
             "summarize this section",
         ),
     },
+    "frontmatter_contract": {
+        "required_fields": ("paper_type", "methods", "datasets", "tasks", "read_date"),
+        "list_fields": ("methods", "datasets", "tasks"),
+        "max_list_items": 5,
+        "domain_tag_prefix": "papers/",
+        "read_date_format": "YYYY-MM-DD",
+        "paper_type_source": "note_plan.paper_type",
+        # A list value naming a listed glossary term is written as that term's link.
+        "term_link_source": "glossary_terms",
+        "term_link_fields": ("methods", "datasets", "tasks"),
+    },
+    "connections_contract": {
+        "plan_fields": ("connections", "key_prior_work"),
+        "connection_fields": ("target", "relation", "reason"),
+        "key_prior_work_fields": ("work", "role"),
+        "relations": (
+            "baseline", "extends", "extended_by", "conflicting_findings",
+            "same_task", "same_benchmark", "shared_method",
+        ),
+        "max_in_vault": 8,
+        "key_prior_work_items": {"min": 3, "max": 5},
+        "candidate_source": "connection_candidates",
+        "followup_papers_must_appear_in_connections": True,
+    },
+    "takeaways_contract": {
+        "plan_fields": TAKEAWAY_PLAN_FIELDS,
+        "min_items": 1,
+        "max_items": 2,
+        "min_item_chars": 20,
+        "reader_context_field": "reader_research_direction",
+        # Used when the request names no direction: the user's confirmed research memory.
+        "reader_context_fallback": "research_memory.suggested_reader_research_direction",
+    },
+    "storyline_contract": {
+        "plan_field": "storyline",
+        "sentences": STORYLINE_SENTENCE_RANGE,
+        "role": "writing_outline_and_review_basis_not_note_text",
+    },
+    "type_structure_contract": {
+        "plan_fields": tuple(NOTE_PLAN_TYPE_FIELDS),
+        "middle_sections_source": "contracts_by_paper_type[note_plan.paper_type].middle_sections",
+        "core_answer_forms": ({"answer": "string", "evidence_refs": "array"}, {"not_reported": True, "reason": "string"}),
+        "secondary_question_limit": SECONDARY_QUESTION_LIMIT,
+        "workflow_step_range": WORKFLOW_STEP_RANGE,
+        "weak_evidence_rule": "more_than_half_of_primary_core_questions_not_reported",
+    },
     "analysis_coverage_contract": {
         "central_claim_fields": tuple(CENTRAL_CLAIM_FIELD_TYPES),
         "central_claim_field_types": CENTRAL_CLAIM_FIELD_TYPES,
@@ -554,16 +295,6 @@ WRITING_CONTRACT_RULES: dict[str, Any] = {
             "reuse_takeaways",
             "followup_questions",
         ),
-        "final_quality_review_checks": (
-            "central_claims_are_supported_by_raw_sections_or_pages",
-            "key_experimental_settings_and_numbers_are_present",
-            "mechanisms_or_protocol_choices_are_mapped_to_results",
-            "comparisons_explain_positioning_against_alternatives",
-            "discussion_or_limitation_claims_are_explained_mechanistically",
-            "proven_claims_are_separated_from_unproven_or_unvalidated_claims",
-            "research_or_engineering_takeaways_are_specific_and_reusable",
-            "followup_questions_are_specific_to_replication_or_extension",
-        ),
     },
 }
 
@@ -572,14 +303,245 @@ def writing_contract_rules(language: str | None = None) -> dict[str, Any]:
     schema = note_schema(resolved)
     rules = deepcopy(WRITING_CONTRACT_RULES)
     rules["language"] = resolved
-    rules["required_sections"] = tuple(schema["sections"].values())
-    rules["grounding_required_sections"] = tuple(schema["sections"][key] for key in ("research_questions", "data_and_task", "method", "key_results", "deep_analysis", "limitations"))
+    rules["fixed_head_sections"] = tuple(schema["sections"][key] for key in HEAD_SECTION_KEYS)
+    rules["fixed_tail_sections"] = tuple(schema["sections"][key] for key in TAIL_SECTION_KEYS)
+    rules["limitations_section"] = schema["sections"]["limitations"]
+    rules["weak_evidence_callout"] = WEAK_EVIDENCE_CALLOUT[resolved]
+    rules["not_reported_phrase"] = NOT_REPORTED_PHRASE[resolved]
     rules["core_info_fields"] = tuple(schema["core_info_fields"])
     rules["figure_labels"] = dict(schema["figure_labels"])
-    rules["mechanism_flow_heading"] = schema["mechanism_flow"]
+    rules["takeaways_contract"]["section"] = schema["sections"]["takeaways"]
+    rules["takeaways_contract"]["subsections"] = tuple(schema["takeaways_subsections"].values())
+    rules["takeaways_contract"]["judgment_marker"] = schema["takeaways_judgment_marker"]
+    rules["takeaways_contract"]["max_item_chars"] = schema["takeaways_max_item_chars"]
+    connections = rules["connections_contract"]
+    connections["section"] = schema["sections"]["connections"]
+    connections["subsections"] = tuple(schema["connections_subsections"].values())
+    connections["relation_labels"] = {
+        key: schema["connections_relation_labels"][key] for key in connections["relations"]
+    }
+    connections["empty_statements"] = dict(schema["connections_empty_statements"])
+    connections["in_vault_entry_format"] = (
+        "- [[target|标题]]（关系）：理由" if resolved == "zh-CN" else "- [[target|Title]] (relation): reason"
+    )
+    connections["key_prior_work_entry_format"] = (
+        "- 作者 年份. 标题（角色）" if resolved == "zh-CN" else "- Author Year. Title (role)"
+    )
+    rules["my_notes_contract"] = {
+        "section": schema["sections"]["my_notes"],
+        "guidance": schema["my_notes_guidance"],
+        "position": "last",
+        "user_owned": True,
+    }
     if schema.get("abstract_contract"):
         rules["abstract_contract"] = deepcopy(schema["abstract_contract"])
     return rules
+
+
+def compact_text_length(value: str) -> int:
+    return sum(1 for ch in value if not ch.isspace())
+
+
+def takeaway_plan_issues(note_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Check the plan fields that feed the Takeaways section and the optional reader context."""
+    contract = WRITING_CONTRACT_RULES["takeaways_contract"]
+    generic = WRITING_CONTRACT_RULES["note_plan_depth_requirements"]["generic_focus_phrases"]
+    issues: list[dict[str, Any]] = []
+    for field in contract["plan_fields"]:
+        items = note_plan.get(field)
+        if not isinstance(items, list) or not items:
+            continue  # missing or empty lists are reported by the required-field checks
+        if not contract["min_items"] <= len(items) <= contract["max_items"]:
+            issues.append({"code": "note_plan_takeaway_item_count_invalid", "field": field, "count": len(items)})
+        for index, item in enumerate(items):
+            if not isinstance(item, str):
+                issues.append({"code": "note_plan_takeaway_item_invalid", "field": field, "index": index})
+                continue
+            lowered = " ".join(item.split()).lower()
+            if compact_text_length(item) < contract["min_item_chars"] or any(
+                phrase in lowered for phrase in generic
+            ):
+                issues.append({"code": "note_plan_takeaway_item_too_thin", "field": field, "index": index})
+    reader_field = contract["reader_context_field"]
+    if reader_field in note_plan and not isinstance(note_plan[reader_field], str):
+        issues.append({"code": "note_plan_reader_research_direction_invalid", "field": reader_field})
+    return issues
+
+
+def storyline_sentence_count(text: str) -> int:
+    cleaned = _NON_TERMINAL_ABBREVIATIONS.sub("", text)
+    return sum(1 for part in _SENTENCE_END.split(cleaned) if part.strip())
+
+
+def storyline_plan_issues(note_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """The storyline is 3 to 5 sentences (an empty one is reported as a missing required field)."""
+    value = note_plan.get("storyline")
+    if not isinstance(value, str) or not value.strip():
+        return []
+    low, high = STORYLINE_SENTENCE_RANGE
+    count = storyline_sentence_count(value)
+    if not low <= count <= high:
+        return [{"code": "note_plan_storyline_sentence_count_invalid", "field": "storyline", "count": count}]
+    return []
+
+
+def _text(value: Any) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def core_answer_form(value: Any) -> str:
+    """`answer`, `not_reported`, or `invalid` for one core_answers entry."""
+    if not isinstance(value, dict):
+        return "invalid"
+    if set(value) == {"answer", "evidence_refs"} and _text(value["answer"]) and isinstance(value["evidence_refs"], list) and value["evidence_refs"]:
+        return "answer"
+    if set(value) == {"not_reported", "reason"} and value["not_reported"] is True and _text(value["reason"]):
+        return "not_reported"
+    return "invalid"
+
+
+def weak_evidence_question_ids(note_plan: dict[str, Any]) -> list[str]:
+    """The primary type's unreported questions, when they are more than half of its questions."""
+    paper_type = _text(note_plan.get("paper_type"))
+    answers = note_plan.get("core_answers")
+    ids = question_ids(paper_type)
+    if not ids or not isinstance(answers, dict):
+        return []
+    unreported = [qid for qid in ids if core_answer_form(answers.get(qid)) == "not_reported"]
+    return unreported if len(unreported) * 2 > len(ids) else []
+
+
+def type_plan_issues(note_plan: dict[str, Any], language: str | None = None) -> list[dict[str, Any]]:
+    """Check the type-dependent plan fields against the paper type's profile (shape only)."""
+    resolved = normalize_output_language(language)
+    paper_type = _text(note_plan.get("paper_type"))
+    found = PROFILES.get(paper_type)
+    if found is None:
+        return []  # an unknown paper_type is reported by the paper_type check
+    issues: list[dict[str, Any]] = []
+    enums = found.get("plan_enums", {})
+    for field in ("positioning", "survey_mode"):
+        value = note_plan.get(field, "")
+        if field in enums:
+            if value not in enums[field]:
+                issues.append({"code": f"note_plan_{field}_invalid", "field": field, "allowed": list(enums[field])})
+        elif value not in ("", None):
+            issues.append({"code": f"note_plan_{field}_not_applicable", "field": field})
+
+    secondary = _text(note_plan.get("secondary_type"))
+    host = _text(note_plan.get("secondary_host_section"))
+    if secondary:
+        if secondary not in PROFILES or secondary == paper_type:
+            issues.append({"code": "note_plan_secondary_type_invalid", "field": "secondary_type"})
+            secondary = ""
+        elif host not in middle_sections(paper_type, resolved):
+            issues.append({"code": "note_plan_secondary_host_section_invalid", "field": "secondary_host_section"})
+    elif host:
+        issues.append({"code": "note_plan_secondary_host_section_not_applicable", "field": "secondary_host_section"})
+
+    answers = note_plan.get("core_answers")
+    required = required_question_ids(paper_type, secondary)
+    if not isinstance(answers, dict):
+        issues.append({"code": "note_plan_core_answers_invalid", "field": "core_answers"})
+    else:
+        for qid in required:
+            if qid not in answers:
+                issues.append({"code": "note_plan_core_answer_missing", "field": "core_answers", "question": qid})
+            elif core_answer_form(answers[qid]) == "invalid":
+                issues.append({"code": "note_plan_core_answer_invalid", "field": "core_answers", "question": qid})
+        for qid in sorted(set(answers) - set(required)):
+            issues.append({"code": "note_plan_core_answer_unexpected", "field": "core_answers", "question": qid})
+
+    issues.extend(_workflow_plan_issues(note_plan.get("workflow", []), found["workflow"]))
+    return issues
+
+
+def _workflow_plan_issues(flows: Any, contract: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(flows, list):
+        return [{"code": "note_plan_workflow_invalid", "field": "workflow"}]
+    if contract is None:
+        return [{"code": "note_plan_workflow_not_applicable", "field": "workflow"}] if flows else []
+    if not flows:
+        return [] if contract["may_be_unreported"] else [{"code": "note_plan_workflow_missing", "field": "workflow"}]
+    issues: list[dict[str, Any]] = []
+    low, high = WORKFLOW_STEP_RANGE
+    for index, flow in enumerate(flows):
+        steps = flow.get("steps") if isinstance(flow, dict) else None
+        if not isinstance(flow, dict) or not _text(flow.get("name")) or not isinstance(steps, list):
+            issues.append({"code": "note_plan_workflow_flow_invalid", "field": "workflow", "index": index})
+            continue
+        if not low <= len(steps) <= high:
+            issues.append({"code": "note_plan_workflow_step_count_invalid", "field": "workflow", "index": index, "count": len(steps)})
+        for step_index, step in enumerate(steps):
+            if not _workflow_step_valid(step, contract["step_fields"]):
+                issues.append({"code": "note_plan_workflow_step_invalid", "field": "workflow", "index": index, "step": step_index})
+    return issues
+
+
+def _workflow_step_valid(step: Any, fields: tuple[str, ...]) -> bool:
+    if not isinstance(step, dict) or set(step) != set(fields):
+        return False
+    return all(
+        isinstance(step[field], bool) if field == "novel" else bool(_text(step[field]))
+        for field in fields
+    )
+
+
+def connection_plan_issues(note_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Check the plan fields that feed the Connections section (shape only, not targets)."""
+    contract = WRITING_CONTRACT_RULES["connections_contract"]
+    issues: list[dict[str, Any]] = []
+    prior = note_plan.get("key_prior_work")
+    if isinstance(prior, list) and prior:
+        limits = contract["key_prior_work_items"]
+        if not limits["min"] <= len(prior) <= limits["max"]:
+            issues.append({"code": "note_plan_key_prior_work_count_invalid", "field": "key_prior_work", "count": len(prior)})
+        for index, item in enumerate(prior):
+            if not _filled_object(item, contract["key_prior_work_fields"]):
+                issues.append({"code": "note_plan_key_prior_work_item_invalid", "field": "key_prior_work", "index": index})
+    if "connections" not in note_plan:
+        return issues
+    connections = note_plan["connections"]
+    if not isinstance(connections, list):
+        return issues + [{"code": "note_plan_connections_invalid", "field": "connections"}]
+    if len(connections) > contract["max_in_vault"]:
+        issues.append({"code": "note_plan_connections_count_invalid", "field": "connections", "count": len(connections)})
+    seen: set[str] = set()
+    for index, item in enumerate(connections):
+        if not _filled_object(item, contract["connection_fields"]):
+            issues.append({"code": "note_plan_connection_item_invalid", "field": "connections", "index": index})
+            continue
+        if item["relation"] not in contract["relations"]:
+            issues.append({"code": "note_plan_connection_relation_invalid", "field": "connections", "index": index})
+        if item["target"] in seen:
+            issues.append({"code": "note_plan_connection_duplicate", "field": "connections", "index": index})
+        seen.add(item["target"])
+    return issues
+
+
+def connection_target_issues(note_plan: dict[str, Any], bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every planned connection must link to a note the bundle recalled."""
+    connections = note_plan.get("connections")
+    if not isinstance(connections, list) or not connections:
+        return []
+    recalled = bundle.get("connection_candidates")
+    known: set[str] = set()
+    if isinstance(recalled, dict):
+        for group in ("cited", "related"):
+            for candidate in recalled.get(group) or []:
+                if isinstance(candidate, dict) and isinstance(candidate.get("target"), str):
+                    known.add(candidate["target"])
+    return [
+        {"code": "note_plan_connection_target_unknown", "field": "connections", "index": index, "target": item["target"]}
+        for index, item in enumerate(connections)
+        if isinstance(item, dict) and isinstance(item.get("target"), str) and item["target"] not in known
+    ]
+
+
+def _filled_object(item: object, fields: tuple[str, ...]) -> bool:
+    return isinstance(item, dict) and set(item) == set(fields) and all(
+        isinstance(item[field], str) and item[field].strip() for field in fields
+    )
 
 
 class MetadataRecord(TypedDict, total=False):
@@ -753,9 +715,7 @@ class SynthesisBundle(TypedDict, total=False):
     source_manifest: dict[str, Any]
     source_index: dict[str, Any]
     references: dict[str, Any]
-    figure_plan: dict[str, Any]
     figure_table_manifest: dict[str, Any]
-    pdf_assets: dict[str, Any]
     writing_contract: dict[str, Any]
 
 
@@ -818,8 +778,6 @@ def empty_synthesis_bundle() -> SynthesisBundle:
         source_manifest={},
         source_index={},
         references={},
-        figure_plan={},
         figure_table_manifest={},
-        pdf_assets={},
         writing_contract={},
     )

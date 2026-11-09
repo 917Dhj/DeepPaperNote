@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Best-effort reference extraction and Obsidian note matching helpers."""
+"""Best-effort reference extraction and the matching helpers vault_connections uses."""
 
 from __future__ import annotations
 
@@ -7,10 +7,25 @@ import re
 from pathlib import Path
 from typing import Any
 
-from common import configured_obsidian_vault, extract_arxiv_id, extract_doi, fitz, normalize_whitespace
+from _identity import extract_arxiv_id, extract_doi
+from common import fitz, normalize_whitespace
 
 
-NUMBERED_REF_RE = re.compile(r"^(?:\[(\d{1,4})\]|(\d{1,4})\.)\s+(.+)$")
+# Up to three digits: a four-digit "2023." opening an author-year line is a year, not a number.
+NUMBERED_REF_RE = re.compile(r"^(?:\[(\d{1,3})\]|(\d{1,3})\.)\s+(.+)$")
+MAX_ENTRY_CHARS = 1500
+REFERENCE_HEADINGS = {"references", "bibliography", "参考文献"}
+APPENDIX_HEADING_RE = re.compile(
+    r"^(?:appendix|appendices|supplementary|supplemental|附录)\b|^A\.?$", flags=re.IGNORECASE
+)
+# "A. Object Detection Baselines": no commas or digits, so "K. He, X. Zhang" never matches.
+LETTERED_APPENDIX_RE = re.compile(r"^A\.\s+[A-Z][a-z]+(?:\s+[A-Za-z][a-z\-]*){1,6}$")
+URL_END_RE = re.compile(r"https?://\S+$")
+# "Surname, ...", "A B and C", or a single author "First Last. 2020".
+AUTHOR_START_RE = re.compile(
+    r"^[A-Z\u00C0-\u024F][\w'’.\-]*(?:\s+[A-Z\u00C0-\u024F][\w'’.\-]*){0,3}"
+    r"(?:,|\s+and\s|\.\s+(?:19|20)\d{2})"
+)
 YEAR_RE = re.compile(r"\b(?:19|20)\d{2}[a-z]?\b", flags=re.IGNORECASE)
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*", flags=re.DOTALL)
 FRONTMATTER_KEY_RE = re.compile(r"^([A-Za-z_][\w-]*)\s*:\s*(.*)$")
@@ -40,6 +55,7 @@ def _display_text(raw_text: str, *, max_chars: int = 320) -> str:
 
 
 def _reference_lines_from_pdf(pdf_path: Path, references_start_page: int, max_pages: int) -> list[tuple[str, int]]:
+    """Lines from the References heading up to the first appendix heading."""
     if fitz is None or references_start_page < 1 or max_pages < 1:
         return []
     doc = fitz.open(pdf_path)
@@ -49,11 +65,18 @@ def _reference_lines_from_pdf(pdf_path: Path, references_start_page: int, max_pa
         lines: list[tuple[str, int]] = []
         for page_index in range(start_index, stop_index):
             page_number = page_index + 1
-            for raw_line in doc[page_index].get_text("text").splitlines():
-                line = normalize_whitespace(raw_line)
-                if not line:
-                    continue
-                if line.lower() in {"references", "bibliography", "参考文献"}:
+            page_lines = [
+                line for raw in doc[page_index].get_text("text").splitlines()
+                if (line := normalize_whitespace(raw))
+            ]
+            if page_index == start_index:
+                headings = [i for i, line in enumerate(page_lines) if line.lower() in REFERENCE_HEADINGS]
+                if headings:
+                    page_lines = page_lines[headings[0] + 1:]
+            for line in page_lines:
+                if APPENDIX_HEADING_RE.match(line) or LETTERED_APPENDIX_RE.match(line):
+                    return lines
+                if line.lower() in REFERENCE_HEADINGS:
                     continue
                 lines.append((line, page_number))
         return lines
@@ -88,6 +111,22 @@ def _group_numbered_references(lines: list[tuple[str, int]]) -> list[tuple[str, 
     return [(normalize_whitespace(" ".join(parts)), page_number) for parts, page_number in grouped]
 
 
+def _group_author_year_references(lines: list[tuple[str, int]]) -> list[tuple[str, int]]:
+    """Split an unnumbered bibliography where a finished entry meets an author list."""
+    grouped: list[tuple[list[str], int]] = []
+    for line, page_number in lines:
+        current = grouped[-1][0] if grouped else []
+        last = current[-1].rstrip() if current else ""
+        finished = bool(current) and (last.endswith((".", ")")) or bool(URL_END_RE.search(last))) and bool(
+            YEAR_RE.search(" ".join(current))
+        )
+        if not current or (finished and AUTHOR_START_RE.match(line)):
+            grouped.append(([line], page_number))
+        else:
+            current.append(line)
+    return [(normalize_whitespace(" ".join(parts)), page_number) for parts, page_number in grouped]
+
+
 def _fallback_year_lines(lines: list[tuple[str, int]]) -> list[tuple[str, int]]:
     return [(line, page_number) for line, page_number in lines if YEAR_RE.search(line)]
 
@@ -111,9 +150,16 @@ def extract_reference_candidates_from_pdf(
     except Exception:
         return []
 
-    references = _group_numbered_references(lines)
-    if not references:
-        references = _fallback_year_lines(lines)
+    if lines and NUMBERED_REF_RE.match(lines[0][0]):
+        # An oversized entry swallowed page debris such as an appendix table.
+        references = [
+            (text, page) for text, page in _group_numbered_references(lines)
+            if len(text) <= MAX_ENTRY_CHARS
+        ]
+    else:
+        references = _group_author_year_references(lines)
+        if any(len(text) > MAX_ENTRY_CHARS for text, _ in references):
+            references = _fallback_year_lines(lines)  # entry boundaries were not found
 
     candidates: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -228,32 +274,6 @@ def _safe_text_key(value: str) -> str:
     return key
 
 
-def _dedupe_values(values: list[str]) -> list[str]:
-    seen: set[str] = set()
-    deduped: list[str] = []
-    for value in values:
-        cleaned = normalize_whitespace(value)
-        if not cleaned:
-            continue
-        folded = cleaned.casefold()
-        if folded in seen:
-            continue
-        seen.add(folded)
-        deduped.append(cleaned)
-    return deduped
-
-
-def _note_text_keys(note: dict[str, Any]) -> list[str]:
-    values = [
-        str(note.get("stem", "")),
-        str(note.get("frontmatter_title", "")),
-        str(note.get("h1_title", "")),
-    ]
-    values.extend(str(alias) for alias in note.get("aliases", []) or [])
-    keys = [_safe_text_key(value) for value in values]
-    return _dedupe_values([key for key in keys if key])
-
-
 def _candidate_doi(candidate: dict[str, Any], candidate_text: str) -> str:
     return _normalize_doi(str(candidate.get("doi", "")) or candidate_text)
 
@@ -282,168 +302,3 @@ def _contains_key(raw_text: str, key: str) -> bool:
     if re.search(r"[\w]", needle):
         return bool(re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", raw_key))
     return needle in raw_key
-
-
-def _note_wikilink(target: str, display_text: str) -> str:
-    display = normalize_whitespace(display_text)
-    if display:
-        return f"[[{target}|{display}]]"
-    return f"[[{target}]]"
-
-
-def build_vault_note_index(config: dict[str, Any]) -> dict[str, Any]:
-    """Build a limited note index under the configured papers directory."""
-    try:
-        vault_path = configured_obsidian_vault(config)
-    except Exception:
-        return {"status": "vault_unavailable", "notes": []}
-    if vault_path is None:
-        return {"status": "vault_unavailable", "notes": []}
-
-    papers_dir = str(config.get("papers_dir", "Research/Papers")).strip() or "Research/Papers"
-    base_dir = (vault_path / Path(papers_dir)).resolve()
-    try:
-        base_dir.relative_to(vault_path)
-    except ValueError:
-        return {"status": "vault_unavailable", "notes": []}
-    if not base_dir.exists() or not base_dir.is_dir():
-        return {"status": "vault_unavailable", "notes": []}
-
-    notes: list[dict[str, Any]] = []
-    for path in sorted(base_dir.glob("**/*.md")):
-        try:
-            relative_path = path.relative_to(vault_path)
-        except ValueError:
-            continue
-        try:
-            # utf-8-sig strips a leading BOM; without it a BOM-prefixed note
-            # fails the frontmatter check and is silently dropped from the
-            # index, so wiki-links to it never resolve.
-            text = path.read_text(encoding="utf-8-sig", errors="ignore")[:4096]
-        except OSError:
-            text = ""
-        frontmatter = _frontmatter_fields(text)
-        if frontmatter is None:
-            continue
-        aliases = frontmatter.get("aliases", [])
-        doi = normalize_whitespace(str(frontmatter.get("doi", "")))
-        arxiv_id = normalize_whitespace(
-            str(frontmatter.get("arxiv_id", "") or frontmatter.get("arxiv", ""))
-        )
-        normalized_arxiv_ids = {
-            _normalize_arxiv_id(value)
-            for value in [arxiv_id, doi]
-            if _normalize_arxiv_id(value)
-        }
-        notes.append(
-            {
-                "stem": path.stem,
-                "aliases": aliases if isinstance(aliases, list) else [],
-                "frontmatter_title": normalize_whitespace(str(frontmatter.get("title", ""))),
-                "h1_title": _h1_title(text),
-                "doi": doi,
-                "doi_norm": _normalize_doi(doi) if doi else "",
-                "arxiv_id": arxiv_id,
-                "arxiv_ids": sorted(normalized_arxiv_ids),
-                "text_keys": [],
-                "vault_target": path.stem,
-                "vault_relative_path": str(relative_path),
-            }
-        )
-        notes[-1]["text_keys"] = _note_text_keys(notes[-1])
-    return {"status": "ok", "notes": notes}
-
-
-def resolve_reference_links(candidates: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
-    """Attach exact Obsidian wikilink matches to extracted reference candidates."""
-    index = build_vault_note_index(config)
-    if index.get("status") != "ok":
-        return [
-            {
-                **candidate,
-                "wikilink": "",
-                "vault_target": "",
-                "match_status": "vault_unavailable",
-                "match_reason": "none",
-            }
-            for candidate in candidates
-            if isinstance(candidate, dict)
-        ]
-
-    notes = [note for note in index.get("notes", []) if isinstance(note, dict)]
-
-    matched: list[dict[str, Any]] = []
-    for candidate in candidates:
-        if not isinstance(candidate, dict):
-            continue
-        raw_text = str(candidate.get("raw_text", "") or candidate.get("display_text", ""))
-        display_text = normalize_whitespace(str(candidate.get("display_text", ""))) or raw_text
-        candidate_text = normalize_whitespace(f"{raw_text} {display_text}")
-        resolved = dict(candidate)
-        resolved.setdefault("match_status", "no_vault_match")
-        resolved.setdefault("match_reason", "none")
-        resolved.setdefault("wikilink", "")
-        resolved.setdefault("vault_target", "")
-
-        priority_matches: list[tuple[str, list[dict[str, Any]]]] = []
-        doi = _candidate_doi(candidate, candidate_text)
-        if doi:
-            priority_matches.append(
-                ("doi", [note for note in notes if doi and doi == str(note.get("doi_norm", ""))])
-            )
-        arxiv_ids = _candidate_arxiv_ids(candidate, candidate_text)
-        if arxiv_ids:
-            priority_matches.append(
-                (
-                    "arxiv_id",
-                    [
-                        note
-                        for note in notes
-                        if arxiv_ids.intersection(set(note.get("arxiv_ids", []) or []))
-                    ],
-                )
-            )
-        priority_matches.append(
-            (
-                "basename_or_title_or_alias",
-                [
-                    note
-                    for note in notes
-                    if any(
-                        _contains_key(candidate_text, key)
-                        for key in note.get("text_keys", []) or []
-                    )
-                ],
-            )
-        )
-
-        for reason, matches in priority_matches:
-            if not matches:
-                continue
-            if len(matches) == 1:
-                target = normalize_whitespace(str(matches[0].get("vault_target", "")))
-                resolved["wikilink"] = _note_wikilink(target, display_text)
-                resolved["vault_target"] = target
-                resolved["match_status"] = "vault_match"
-                resolved["match_reason"] = reason
-            else:
-                resolved["wikilink"] = ""
-                resolved["vault_target"] = ""
-                resolved["match_status"] = "ambiguous_match"
-                resolved["match_reason"] = reason
-                resolved["match_candidates"] = [
-                    {
-                        "wikilink": _note_wikilink(
-                            normalize_whitespace(str(note.get("vault_target", ""))),
-                            display_text,
-                        ),
-                        "vault_target": normalize_whitespace(str(note.get("vault_target", ""))),
-                        "match_status": "vault_match",
-                        "match_reason": reason,
-                    }
-                    for note in matches
-                ]
-            break
-
-        matched.append(resolved)
-    return matched

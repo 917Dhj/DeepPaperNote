@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-import citation_links
 import build_synthesis_bundle
-from citation_links import extract_reference_candidates_from_pdf, resolve_reference_links
+import citation_links
+import vault_connections
+from citation_links import extract_reference_candidates_from_pdf
 
 
 class FakePdfPage:
@@ -87,222 +89,242 @@ def test_extract_reference_candidates_from_pdf_parses_references_section(
     ]
 
 
-def test_resolve_reference_links_matches_vault_stem_title_and_alias(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    papers.mkdir(parents=True)
-    (papers / "bert_pretraining.md").write_text(
-        "---\naliases: []\n---\n# BERT Pretraining\n",
-        encoding="utf-8",
+def test_extracts_author_year_bibliography_between_heading_and_appendix(tmp_path: Path, monkeypatch) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    fake_doc = FakePdfDoc(
+        [
+            "\n".join([
+                "Limitations",
+                "As recent studies have shown (Razeghi et al., 2022), tail phenomena matter.",
+                "References",
+                "Massih-Reza Amini, Vasilii Feofanov, Loic Pauletto,",
+                "Emilie Devijver, and Yury Maximov. 2022. Self-",
+                "training: A survey. arXiv preprint arXiv:2202.12040.",
+                "Hyung Won Chung, Le Hou, Shayne Longpre, Barret",
+                "Zoph, Yi Tay, William Fedus, Eric Li, Xuezhi Wang,",
+                "Mostafa Dehghani, Siddhartha Brahma, et al. 2022.",
+                "Scaling instruction-finetuned language models.",
+                "arXiv preprint arXiv:2210.11416.",
+            ]),
+            "\n".join([
+                "Timo Schick and Hinrich Schütze. 2021. Generating",
+                "datasets with pretrained language models. In Con-",
+                "ference on Empirical Methods in Natural Language",
+                "Processing (EMNLP).",
+                "Kevin Lin. 2020. A single author paper. In ACL.",
+            ]),
+            "\n".join([
+                "Supplemental Material",
+                "A",
+                "Implementation Details",
+                "1. Write the seed tasks.",
+                "2. Sample 2022. Generate new instructions.",
+            ]),
+        ]
     )
+    monkeypatch.setattr(citation_links, "fitz", FakeFitz(fake_doc))
+
+    candidates = extract_reference_candidates_from_pdf(
+        pdf_path, references_start_page=1, max_pages=30, max_items=400
+    )
+
+    assert [item["display_text"][:40] for item in candidates] == [
+        "Massih-Reza Amini, Vasilii Feofanov, Loi",
+        "Hyung Won Chung, Le Hou, Shayne Longpre,",
+        "Timo Schick and Hinrich Schütze. 2021. G",
+        "Kevin Lin. 2020. A single author paper. ",
+    ]
+    assert candidates[0]["arxiv_id"].endswith("2202.12040")
+    assert candidates[2]["page_hint"] == "p. 2"
+
+
+def test_lines_starting_with_a_year_are_not_numbered_references(tmp_path: Path, monkeypatch) -> None:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    fake_doc = FakePdfDoc(["\n".join([
+        "References",
+        "Ana Smith, Bo Li, and Cy Wu.",
+        "2023. A paper whose year starts the line. In ACL.",
+        "Dan Brown and Eve Stone. 2021. Another paper. In EMNLP.",
+        "Fay Green, Gus Hall, and Hal King. 2020. Third paper. In NAACL.",
+    ])])
+    monkeypatch.setattr(citation_links, "fitz", FakeFitz(fake_doc))
+
+    candidates = extract_reference_candidates_from_pdf(pdf_path, references_start_page=1)
+
+    assert [item["display_text"][:12] for item in candidates] == ["Ana Smith, B", "Dan Brown an", "Fay Green, G"]
+
+
+def extract_pages(tmp_path: Path, monkeypatch, pages: list[list[str]]) -> list[str]:
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(citation_links, "fitz", FakeFitz(FakePdfDoc(["\n".join(page) for page in pages])))
+    return [
+        item["display_text"]
+        for item in extract_reference_candidates_from_pdf(pdf_path, 1, max_pages=30, max_items=400)
+    ]
+
+
+def test_lettered_appendix_heading_ends_a_numbered_bibliography(tmp_path: Path, monkeypatch) -> None:
+    texts = extract_pages(tmp_path, monkeypatch, [
+        ["References", "[1] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning. In CVPR, 2016.",
+         "[2] A. Vaswani and N. Shazeer. Attention is all you need. In NeurIPS, 2017."],
+        ["A. Object Detection Baselines", "In this section we use Faster R-CNN [32] as the detector.",
+         "[32] and a Fast R-CNN detection network [7] share features."],
+    ])
+    assert texts == [
+        "K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning. In CVPR, 2016.",
+        "A. Vaswani and N. Shazeer. Attention is all you need. In NeurIPS, 2017.",
+    ]
+
+
+def test_oversized_numbered_entry_is_dropped(tmp_path: Path, monkeypatch) -> None:
+    table_debris = [f"Hyperparameter row {i} value {i}e-4 with more table text here" for i in range(40)]
+    texts = extract_pages(tmp_path, monkeypatch, [
+        ["References", "[1] A. Chang, T. Funkhouser, L. Guibas, P. Hanrahan, Q. Huang, Z. Li,", *table_debris,
+         "[2] M. Fischler and R. Bolles. Random sample consensus. Commun. ACM, 1981."],
+    ])
+    assert texts == ["M. Fischler and R. Bolles. Random sample consensus. Commun. ACM, 1981."]
+
+
+def test_author_year_entry_ending_in_a_url_is_split(tmp_path: Path, monkeypatch) -> None:
+    texts = extract_pages(tmp_path, monkeypatch, [[
+        "References",
+        "Sebastien Bonopera, Jerome Esnault, and George Drettakis. 2020. sibr: A System for",
+        "Image Based Rendering. https://gitlab.inria.fr/sibr/sibr_core",
+        "Mario Botsch, Alexander Hornung, and Leif Kobbelt. 2005. High-quality surface",
+        "splatting on today's GPUs. In Point-Based Graphics.",
+        "Gaurav Chaurasia and George Drettakis. 2013. Depth synthesis. ACM TOG 32, 3 (2013).",
+    ]])
+    assert [text[:14] for text in texts] == ["Sebastien Bono", "Mario Botsch, ", "Gaurav Chauras"]
+
+
+def recall(vault: Path, references: list[dict], full_text: str = "") -> dict:
+    return vault_connections.connection_candidates(
+        {"obsidian_vault": str(vault), "papers_dir": "Research/Papers"},
+        references,
+        full_text,
+        "zh-CN",
+    )
+
+
+def cited_targets(vault: Path, references: list[dict]) -> list[tuple[str, str]]:
+    return [(item["target"], item["match_reason"]) for item in recall(vault, references)["cited"]]
+
+
+def papers_dir(tmp_path: Path) -> Path:
+    papers = tmp_path / "vault" / "Research" / "Papers"
+    papers.mkdir(parents=True)
+    return papers
+
+
+def test_cited_recall_matches_vault_stem_title_and_alias(tmp_path: Path) -> None:
+    papers = papers_dir(tmp_path)
+    (papers / "bert_pretraining.md").write_text("---\naliases: []\n---\n# BERT Pretraining\n", encoding="utf-8")
     (papers / "attention_transformer.md").write_text(
         "---\naliases:\n  - Attention Is All You Need\n  - Transformer\n---\n# Transformer\n",
         encoding="utf-8",
     )
-    candidates = [
-        {"display_text": "Devlin et al. (2019). BERT Pretraining.", "source": "pdf_references"},
-        {"display_text": "Vaswani et al. (2017). Attention Is All You Need.", "source": "pdf_references"},
+    references = [
+        {"display_text": "Devlin et al. (2019). BERT Pretraining."},
+        {"display_text": "Vaswani et al. (2017). Attention Is All You Need."},
     ]
-
-    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
-
-    assert [item["wikilink"] for item in resolved] == [
-        "[[bert_pretraining|Devlin et al. (2019). BERT Pretraining.]]",
-        "[[attention_transformer|Vaswani et al. (2017). Attention Is All You Need.]]",
-    ]
-    assert [item["vault_target"] for item in resolved] == ["bert_pretraining", "attention_transformer"]
-    assert [item["match_status"] for item in resolved] == ["vault_match", "vault_match"]
-    assert [item["match_reason"] for item in resolved] == [
-        "basename_or_title_or_alias",
-        "basename_or_title_or_alias",
+    assert cited_targets(tmp_path / "vault", references) == [
+        ("bert_pretraining", "title_or_alias"),
+        ("attention_transformer", "title_or_alias"),
     ]
 
 
-def test_resolve_reference_links_indexes_only_yaml_frontmatter_notes(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    papers.mkdir(parents=True)
-    (papers / "attention_without_frontmatter.md").write_text(
-        "# Attention Is All You Need\n",
-        encoding="utf-8",
-    )
-    candidates = [{"display_text": "Vaswani et al. (2017). Attention Is All You Need."}]
-
-    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
-
-    assert resolved[0]["match_status"] == "no_vault_match"
-    assert resolved[0]["match_reason"] == "none"
-    assert resolved[0]["wikilink"] == ""
-    assert resolved[0]["vault_target"] == ""
+def test_cited_recall_indexes_only_frontmatter_notes(tmp_path: Path) -> None:
+    papers = papers_dir(tmp_path)
+    (papers / "attention_without_frontmatter.md").write_text("# Attention Is All You Need\n", encoding="utf-8")
+    assert cited_targets(tmp_path / "vault", [{"display_text": "Vaswani et al. (2017). Attention Is All You Need."}]) == []
 
 
-def test_resolve_reference_links_prioritizes_doi_over_text(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    papers.mkdir(parents=True)
-    (papers / "doi_target.md").write_text(
-        "---\ndoi: 10.5555/example.doi\naliases: []\n---\n# DOI Target\n",
-        encoding="utf-8",
-    )
+def test_cited_recall_prioritizes_doi_over_text(tmp_path: Path) -> None:
+    papers = papers_dir(tmp_path)
+    (papers / "doi_target.md").write_text("---\ndoi: 10.5555/example.doi\n---\n# DOI Target\n", encoding="utf-8")
     (papers / "text_target.md").write_text(
-        "---\naliases:\n  - Confusing Text Match\n---\n# Text Target\n",
-        encoding="utf-8",
+        "---\naliases:\n  - Confusing Text Match\n---\n# Text Target\n", encoding="utf-8"
     )
-    candidates = [
-        {
-            "display_text": "Confusing Text Match. doi:10.5555/example.doi",
-            "doi": "10.5555/example.doi",
-        }
-    ]
-
-    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
-
-    assert resolved[0]["match_status"] == "vault_match"
-    assert resolved[0]["match_reason"] == "doi"
-    assert resolved[0]["vault_target"] == "doi_target"
-    assert resolved[0]["wikilink"] == "[[doi_target|Confusing Text Match. doi:10.5555/example.doi]]"
+    references = [{"display_text": "Confusing Text Match. doi:10.5555/example.doi", "doi": "10.5555/example.doi"}]
+    assert cited_targets(tmp_path / "vault", references) == [("doi_target", "doi")]
 
 
-def test_resolve_reference_links_matches_arxiv_from_note_doi(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    papers.mkdir(parents=True)
+def test_cited_recall_matches_arxiv_from_note_doi(tmp_path: Path) -> None:
+    papers = papers_dir(tmp_path)
     (papers / "arxiv_doi_note.md").write_text(
-        "---\ndoi: 10.48550/arXiv.2406.11161\naliases: []\n---\n# Arxiv DOI Note\n",
-        encoding="utf-8",
+        "---\ndoi: 10.48550/arXiv.2406.11161\n---\n# Arxiv DOI Note\n", encoding="utf-8"
     )
-    candidates = [{"display_text": "Some paper. arXiv:2406.11161"}]
-
-    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
-
-    assert resolved[0]["match_status"] == "vault_match"
-    assert resolved[0]["match_reason"] == "arxiv_id"
-    assert resolved[0]["vault_target"] == "arxiv_doi_note"
+    references = [{"display_text": "Some paper. arXiv:2406.11161"}]
+    assert cited_targets(tmp_path / "vault", references) == [("arxiv_doi_note", "arxiv_id")]
 
 
-def test_resolve_reference_links_reports_ambiguous_text_match(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    papers.mkdir(parents=True)
+def test_cited_recall_drops_ambiguous_text_match(tmp_path: Path) -> None:
+    papers = papers_dir(tmp_path)
     (papers / "first_transformer.md").write_text(
-        "---\ntitle: Shared Transformer Paper\naliases: []\n---\n# First\n",
-        encoding="utf-8",
+        "---\ntitle: Shared Transformer Paper\n---\n# First\n", encoding="utf-8"
     )
     (papers / "second_transformer.md").write_text(
-        "---\naliases:\n  - Shared Transformer Paper\n---\n# Second\n",
-        encoding="utf-8",
+        "---\naliases:\n  - Shared Transformer Paper\n---\n# Second\n", encoding="utf-8"
     )
-    candidates = [{"display_text": "A citation to Shared Transformer Paper."}]
-
-    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
-
-    assert resolved[0]["match_status"] == "ambiguous_match"
-    assert resolved[0]["match_reason"] == "basename_or_title_or_alias"
-    assert resolved[0]["wikilink"] == ""
-    assert resolved[0]["vault_target"] == ""
-    assert [item["vault_target"] for item in resolved[0]["match_candidates"]] == [
-        "first_transformer",
-        "second_transformer",
-    ]
+    assert cited_targets(tmp_path / "vault", [{"display_text": "A citation to Shared Transformer Paper."}]) == []
 
 
-def test_resolve_reference_links_reports_ambiguous_doi_match(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    papers.mkdir(parents=True)
-    (papers / "first_doi_note.md").write_text(
-        "---\ndoi: 10.5555/duplicate\naliases: []\n---\n# First DOI Note\n",
-        encoding="utf-8",
-    )
-    (papers / "second_doi_note.md").write_text(
-        "---\ndoi: 10.5555/duplicate\naliases: []\n---\n# Second DOI Note\n",
-        encoding="utf-8",
-    )
-    candidates = [{"display_text": "Duplicate DOI reference.", "doi": "10.5555/duplicate"}]
-
-    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
-
-    assert resolved[0]["match_status"] == "ambiguous_match"
-    assert resolved[0]["match_reason"] == "doi"
-    assert resolved[0]["wikilink"] == ""
-    assert resolved[0]["vault_target"] == ""
-    assert [item["vault_target"] for item in resolved[0]["match_candidates"]] == [
-        "first_doi_note",
-        "second_doi_note",
-    ]
-
-
-def test_resolve_reference_links_ignores_short_acronym_aliases(tmp_path: Path) -> None:
-    vault = tmp_path / "vault"
-    papers = vault / "Research" / "Papers"
-    papers.mkdir(parents=True)
+def test_cited_recall_ignores_short_acronym_aliases(tmp_path: Path) -> None:
+    papers = papers_dir(tmp_path)
     (papers / "retrieval_augmented_generation.md").write_text(
         "---\naliases:\n  - RAG\n  - GSPO\n  - LoRA\n---\n# Retrieval Augmented Generation\n",
         encoding="utf-8",
     )
-    candidates = [
+    references = [
         {"display_text": "RAG improves answers."},
         {"display_text": "GSPO is cited here."},
         {"display_text": "LoRA is cited here."},
     ]
-
-    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
-
-    assert [item["match_status"] for item in resolved] == ["no_vault_match"] * 3
-    assert [item["wikilink"] for item in resolved] == [""] * 3
+    assert cited_targets(tmp_path / "vault", references) == []
 
 
-def test_resolve_reference_links_uses_plain_text_when_no_vault_match(tmp_path: Path) -> None:
+def test_recall_without_a_vault_is_workspace_mode() -> None:
+    result = vault_connections.connection_candidates(
+        {"obsidian_vault": ""}, [{"display_text": "Attention Is All You Need."}], "", "zh-CN"
+    )
+    assert result == {"status": "workspace", "cited": [], "related": []}
+
+
+def bundle_for(monkeypatch, tmp_path: Path, references: list[dict], *, admission: str = "") -> dict:
     vault = tmp_path / "vault"
-    (vault / "Research" / "Papers").mkdir(parents=True)
-    candidates = [{"display_text": "Unknown Future Paper.", "source": "pdf_references"}]
-
-    resolved = resolve_reference_links(candidates, {"obsidian_vault": str(vault)})
-
-    assert resolved[0]["match_status"] == "no_vault_match"
-    assert resolved[0]["match_reason"] == "none"
-    assert resolved[0]["wikilink"] == ""
-    assert resolved[0]["vault_target"] == ""
-
-
-def test_resolve_reference_links_reports_no_vault_without_guessing_wikilinks() -> None:
-    candidates = [{"display_text": "Attention Is All You Need.", "source": "pdf_references"}]
-
-    resolved = resolve_reference_links(candidates, {"obsidian_vault": ""})
-
-    assert resolved[0]["match_status"] == "vault_unavailable"
-    assert resolved[0]["match_reason"] == "none"
-    assert resolved[0]["wikilink"] == ""
-    assert resolved[0]["vault_target"] == ""
-
-
-def test_bundle_exposes_reference_candidates_under_references(monkeypatch) -> None:
     monkeypatch.setattr(
         build_synthesis_bundle,
         "runtime_config",
         lambda **_kwargs: {
             "output_language": "zh-CN",
-            "obsidian_vault": "",
+            "save_mode": "obsidian",
+            "obsidian_vault": str(vault),
             "papers_dir": "Research/Papers",
         },
     )
-
-    synthesis = build_synthesis_bundle.bundle(
+    # The full text also holds the bibliography; recall must read only the body.
+    full_text = tmp_path / "full_text.md"
+    full_text.write_text("We evaluate on SuperNI.\n\nReferences\nDeng 2009. ImageNet.", encoding="utf-8")
+    raw_sections = tmp_path / "raw_sections.jsonl"
+    raw_sections.write_text(
+        "\n".join(json.dumps(record) for record in [
+            {"record_type": "section", "kind": "experiment", "text": "We evaluate on SuperNI."},
+            {"record_type": "section", "kind": "references", "text": "Deng 2009. ImageNet."},
+        ]),
+        encoding="utf-8",
+    )
+    return build_synthesis_bundle.bundle(
         metadata={"title": "Citation Paper"},
-        evidence_wrapper={
-            "evidence_pack": {
-                "reference_candidates": [
-                    {
-                        "raw_text": "[1] Vaswani et al. (2017). Attention Is All You Need.",
-                        "display_text": "Vaswani et al. (2017). Attention Is All You Need.",
-                    }
-                ]
-            }
-        },
+        evidence_wrapper={"evidence_pack": {"reference_candidates": references}},
         figures_wrapper={"output_language": "zh-CN", "figure_plan": {}},
         assets_wrapper={},
         figure_decisions_wrapper={"output_language": "zh-CN", "decisions": []},
         source_manifest={
+            "full_text_md_path": str(full_text),
+            "raw_sections_path": str(raw_sections),
             "identity_contract": {
                 "artifact_type": "canonical_identity",
                 "schema_version": 2,
@@ -310,50 +332,53 @@ def test_bundle_exposes_reference_candidates_under_references(monkeypatch) -> No
                 "identity_verdict": "accepted",
                 "work_level_identity": {"title": "Citation Paper"},
                 "accepted_metadata": {"title": "Citation Paper"},
-            }
+            },
         },
+        own_directory=admission,
     )
 
-    candidates = synthesis["references"]["candidates"]
-    assert len(candidates) == 1
-    assert candidates[0]["display_text"] == "Vaswani et al. (2017). Attention Is All You Need."
-    assert candidates[0]["match_status"] == "vault_unavailable"
-    assert candidates[0]["wikilink"] == ""
 
-
-def test_bundle_reuses_cli_language_configuration_for_reference_resolution(monkeypatch) -> None:
-    def configured_runtime(*, cli_overrides):
-        assert cli_overrides == {"output_language": "en"}
-        return {
-            "output_language": "en",
-            "obsidian_vault": "",
-            "papers_dir": "Research/Papers",
-        }
-
-    monkeypatch.setattr(build_synthesis_bundle, "runtime_config", configured_runtime)
-
-    synthesis = build_synthesis_bundle.bundle(
-        metadata={"title": "Citation Paper"},
-        evidence_wrapper={
-            "evidence_pack": {
-                "reference_candidates": [{"display_text": "Unknown Paper."}]
-            }
-        },
-        figures_wrapper={"output_language": "en", "figure_plan": {}},
-        assets_wrapper={},
-        figure_decisions_wrapper={"output_language": "en", "decisions": []},
-        source_manifest={
-            "identity_contract": {
-                "artifact_type": "canonical_identity",
-                "schema_version": 2,
-                "paper_id": "paper:citation-test",
-                "identity_verdict": "accepted",
-                "work_level_identity": {"title": "Citation Paper"},
-                "accepted_metadata": {"title": "Citation Paper"},
-            }
-        },
-        output_language="en",
+def test_bundle_exposes_connection_candidates_and_no_bibliography(monkeypatch, tmp_path: Path) -> None:
+    papers = papers_dir(tmp_path)
+    (papers / "AI" / "Transformer").mkdir(parents=True)
+    (papers / "AI" / "Transformer" / "Transformer.zh-CN.md").write_text(
+        "---\naliases: [Attention Is All You Need]\n---\n# Transformer\n", encoding="utf-8"
     )
+    (papers / "AI" / "SuperNI").mkdir(parents=True)
+    (papers / "AI" / "SuperNI" / "SuperNI.zh-CN.md").write_text(
+        "---\ndatasets: [SuperNI]\n---\n# SuperNI\n", encoding="utf-8"
+    )
+    synthesis = bundle_for(
+        monkeypatch, tmp_path,
+        [{"raw_text": "[1] Vaswani et al. (2017). Attention Is All You Need.",
+          "display_text": "Vaswani et al. (2017). Attention Is All You Need."}],
+    )
+    assert "references" not in synthesis
+    recalled = synthesis["connection_candidates"]
+    assert recalled["status"] == "ok"
+    assert [item["target"] for item in recalled["cited"]] == ["Transformer.zh-CN"]
+    assert [item["target"] for item in recalled["related"]] == ["SuperNI.zh-CN"]
 
-    assert synthesis["writing_contract"]["language"] == "en"
-    assert synthesis["references"]["candidates"][0]["match_status"] == "vault_unavailable"
+
+def test_related_recall_ignores_names_found_only_in_the_bibliography(monkeypatch, tmp_path: Path) -> None:
+    papers = papers_dir(tmp_path)
+    (papers / "AI" / "ViT").mkdir(parents=True)
+    (papers / "AI" / "ViT" / "ViT.en.md").write_text("---\ndatasets: [ImageNet]\n---\n# ViT\n", encoding="utf-8")
+    synthesis = bundle_for(monkeypatch, tmp_path, [])
+    assert synthesis["connection_candidates"]["related"] == []
+
+
+def test_bundle_excludes_the_admitted_paper_directory(monkeypatch, tmp_path: Path) -> None:
+    papers = papers_dir(tmp_path)
+    own = papers / "AI" / "Citation_Paper"
+    own.mkdir(parents=True)
+    (own / "Citation_Paper.en.md").write_text("---\ndatasets: [SuperNI]\n---\n# Citation Paper\n", encoding="utf-8")
+    synthesis = bundle_for(monkeypatch, tmp_path, [], admission=str(own))
+    assert synthesis["connection_candidates"]["related"] == []
+
+
+def test_admitted_target_directory_reads_the_preflight_payload(tmp_path: Path) -> None:
+    admission = tmp_path / "admission.json"
+    admission.write_text('{"status": "ok", "target_directory": "/vault/Papers/AI/X"}', encoding="utf-8")
+    assert build_synthesis_bundle.admitted_target_directory(str(admission)) == "/vault/Papers/AI/X"
+    assert build_synthesis_bundle.admitted_target_directory("") == ""

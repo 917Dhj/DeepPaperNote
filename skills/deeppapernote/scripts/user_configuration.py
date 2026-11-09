@@ -442,7 +442,7 @@ def main() -> None:
         result = exc.result
     except ConfigurationWriteError as exc:
         result = _blocked_result(user_config_path(), "write_failed", str(exc))
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(json.dumps(result, indent=2))  # ASCII, readable under any console encoding
     if result["state"] != "ready":
         raise SystemExit(2)
 

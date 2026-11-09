@@ -1,0 +1,4 @@
+interface:
+  display_name: "Organize Wiki"
+  short_description: "Organize my paper library's domain folders with me, then refile and retag papers."
+  default_prompt: "Use $organize-wiki to organize my paper library: read my vault, agree on the domain convention with me in short rounds, propose moves and tag fixes, show the preview, and apply only what I confirm."

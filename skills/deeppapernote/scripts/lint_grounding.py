@@ -8,10 +8,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+from _pdf_text import caption_label_key
 from common import (
-    caption_label_key,
     emit,
     file_sha256,
+    json_input_sha256,
     maybe_load_json_record,
     normalize_whitespace,
 )
@@ -21,7 +22,13 @@ from contracts import (
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
     required_field_value_error,
-    writing_contract_rules,
+    connection_plan_issues,
+    connection_target_issues,
+    core_answer_form,
+    grounding_required_sections,
+    storyline_plan_issues,
+    takeaway_plan_issues,
+    type_plan_issues,
 )
 from localization import normalize_output_language, require_artifact_output_language
 from source_corpus import SourceCorpusLoadError, load_source_corpus
@@ -72,6 +79,12 @@ def visual_review_is_valid(review: Any) -> bool:
     if status == "pending":
         return not reviewed_sha256 and not failure_reason
     if status == "pass":
+        return bool(
+            reviewed_sha256
+            and not failure_reason
+            and not review["omitted_scientific_elements"]
+        )
+    if status == "dropped":
         return bool(
             reviewed_sha256
             and not failure_reason
@@ -162,11 +175,17 @@ def final_visual_failure_is_valid(item: dict[str, Any]) -> bool:
     return bool(
         failure_reason in allowed
         and current_sha256
-        and normalize_whitespace(str(item.get("source_image_sha256", "")))
-        == current_sha256
         and normalize_whitespace(str(review.get("reviewed_asset_sha256", "")))
         == current_sha256
     )
+
+
+def drop_reason_is_valid(reason: Any) -> bool:
+    """A drop records why the note skips the item, so it cannot name a visual failure."""
+    text = normalize_whitespace(str(reason or "")).lower()
+    contract = WRITING_CONTRACT_RULES["visual_review_contract"]
+    failures = {*contract["terminal_failure_reasons"], *contract["repairable_failure_reasons"]}
+    return bool(text) and text not in failures
 
 
 def parser() -> argparse.ArgumentParser:
@@ -408,7 +427,7 @@ def validate_note_plan(
 
     valid_ids = source_section_ids(source_manifest)
     max_page = total_pages(source_manifest)
-    required_sections = set(writing_contract_rules(language)["grounding_required_sections"])
+    required_sections = set(grounding_required_sections(language, paper_type))
     grounded_sections: set[str] = set()
     section_plan = note_plan.get("section_plan", [])
     if not isinstance(section_plan, list):
@@ -440,10 +459,36 @@ def validate_note_plan(
         issues.append(issue("section_plan_required_section_missing", section=section_name))
 
     issues.extend(validate_central_claims(note_plan, valid_ids, max_page))
+    issues.extend(validate_core_answer_sources(note_plan, valid_ids, max_page))
+    for item in [
+        *takeaway_plan_issues(note_plan),
+        *connection_plan_issues(note_plan),
+        *type_plan_issues(note_plan, language),
+        *storyline_plan_issues(note_plan),
+    ]:
+        code = item.pop("code")
+        issues.append(issue(code, **item))
 
     if contains_old_reference(note_plan):
         issues.append(issue("note_plan_old_bundle_reference_present"))
 
+    return issues
+
+
+def validate_core_answer_sources(
+    note_plan: dict[str, Any], valid_ids: set[str], max_page: int
+) -> list[dict[str, Any]]:
+    """An answered core question cites the source like a section_plan entry does."""
+    answers = note_plan.get("core_answers")
+    if not isinstance(answers, dict):
+        return []
+    issues: list[dict[str, Any]] = []
+    for qid, value in answers.items():
+        if core_answer_form(value) != "answer":
+            continue
+        for source in value["evidence_refs"]:
+            for code in source_grounding_errors(source, valid_ids, max_page):
+                issues.append(issue(code, question=qid, source=source))
     return issues
 
 
@@ -496,6 +541,9 @@ def validate_bundle_contract(
     if not bundle:
         return []
     issues: list[dict[str, Any]] = []
+    for item in connection_target_issues(note_plan, bundle):
+        code = item.pop("code")
+        issues.append(issue(code, **item))
     for old_key in WRITING_CONTRACT_RULES["excluded_model_input_fields"]:
         if old_key in bundle:
             issues.append(issue("bundle_old_model_input_field_present", field=old_key))
@@ -583,7 +631,8 @@ def validate_figure_decisions(
                     source_id=item.get("source_id") or item.get("label") or "",
                 )
             )
-        if decision == "insert":
+        reviewed_status = {"insert": "pass", "dropped": "dropped"}.get(decision)
+        if reviewed_status:
             source_path = normalize_whitespace(str(item.get("source_image_path", "")))
             current_sha256 = file_sha256(source_path)
             review = item.get("visual_review", {})
@@ -601,21 +650,11 @@ def validate_figure_decisions(
                         source_id=item.get("source_id") or item.get("label") or "",
                     )
                 )
-            reviewed_sha256 = (
-                normalize_whitespace(str(review.get("reviewed_asset_sha256", "")))
-                if isinstance(review, dict)
-                else ""
-            )
-            recorded_sha256 = normalize_whitespace(
-                str(item.get("source_image_sha256", ""))
-            )
-            if (
-                not isinstance(review, dict)
-                or not visual_review_is_valid(review)
-                or normalize_whitespace(str(review.get("status", ""))) != "pass"
+            if isinstance(review, dict) and (
+                normalize_whitespace(str(review.get("status", ""))) != reviewed_status
                 or not current_sha256
-                or reviewed_sha256 != current_sha256
-                or recorded_sha256 != current_sha256
+                or normalize_whitespace(str(review.get("reviewed_asset_sha256", "")))
+                != current_sha256
             ):
                 issues.append(
                     issue(
@@ -623,6 +662,13 @@ def validate_figure_decisions(
                         source_id=item.get("source_id") or item.get("label") or "",
                     )
                 )
+        if decision == "dropped" and not drop_reason_is_valid(item.get("skip_reason")):
+            issues.append(
+                issue(
+                    "figure_visual_review_drop_reason_invalid",
+                    source_id=item.get("source_id") or item.get("label") or "",
+                )
+            )
         is_required_insert_candidate = (
             normalize_whitespace(str(item.get("kind", ""))) in insertable_kinds
             and normalize_whitespace(str(item.get("visual_quality_status", "")))
@@ -631,7 +677,7 @@ def validate_figure_decisions(
         )
         if (
             is_required_insert_candidate
-            and decision not in {"insert", "review_pending"}
+            and decision not in {"insert", "review_pending", "dropped"}
             and not final_visual_failure_is_valid(item)
         ):
             skip_reason = normalize_whitespace(str(item.get("skip_reason", "")))
@@ -642,6 +688,20 @@ def validate_figure_decisions(
                     skip_reason=skip_reason,
                 )
             )
+    main_results = [
+        item for item in decisions
+        if isinstance(item, dict) and normalize_whitespace(str(item.get("plan_kind", ""))) == "main_result"
+    ]
+    if main_results and all(
+        normalize_whitespace(str(item.get("decision", ""))) == "dropped" for item in main_results
+    ):
+        # A drop is an editorial choice per item; dropping every main result removes the paper's evidence.
+        issues.append(
+            issue(
+                "figure_main_results_all_dropped",
+                source_ids=[item.get("source_id") or item.get("label") or "" for item in main_results],
+            )
+        )
     return issues
 
 
@@ -653,6 +713,11 @@ def main() -> None:
     source_manifest = load_record(args.source_manifest)
     bundle = load_record(args.bundle_json) if args.bundle_json else {}
     decisions = load_record(args.figure_decisions)
+    input_hashes = {
+        "note_plan_sha256": json_input_sha256(args.note_plan),
+        "source_manifest_sha256": json_input_sha256(args.source_manifest),
+        "figure_decisions_sha256": json_input_sha256(args.figure_decisions),
+    }
 
     language = normalize_output_language(
         runtime_config(cli_overrides={"output_language": args.language})["output_language"]
@@ -683,6 +748,7 @@ def main() -> None:
         "script": "lint_grounding.py",
         "paper_id": source_manifest.get("paper_id", note_plan.get("paper_id", "")),
         "output_language": language,
+        **input_hashes,
         "issues": issues,
         "warnings": [item for item in issues if item.get("severity") == "warning"],
         "passes_grounding": not error_issues,

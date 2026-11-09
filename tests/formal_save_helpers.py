@@ -1,0 +1,229 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+import _final_quality
+
+
+TEST_DOMAIN = "Testing"
+
+
+def tagged(note_text: str, domain: str = TEST_DOMAIN) -> str:
+    """Give a note the one papers/<domain> tag Formal Save requires, unless it has a papers/ tag."""
+    tag = "papers/" + re.sub(r"\s+", "_", domain)
+    bom = "\ufeff" if note_text.startswith("\ufeff") else ""
+    body = note_text.removeprefix("\ufeff")
+    newline = "\r\n" if "\r\n" in body else "\n"
+    if body.startswith("---" + newline):
+        end = body.find(newline + "---", 3)
+        block = body[: end if end != -1 else len(body)]
+        if "papers/" in block:
+            return note_text
+        if re.search(r"^tags:[ \t]*$", block, flags=re.MULTILINE):
+            body = re.sub(
+                r"^tags:[ \t]*$", lambda m: f"{m.group(0)}{newline}  - {tag}", body,
+                count=1, flags=re.MULTILINE,
+            )
+        else:
+            body = body.replace("---" + newline, f"---{newline}tags:{newline}  - {tag}{newline}", 1)
+        return bom + body
+    return f"{bom}---{newline}tags:{newline}  - {tag}{newline}---{newline}{body}"
+
+
+def canonical_note_path(tmp_path: Path, note_text: str, language: str = "zh-CN") -> Path:
+    path = tmp_path / f"review-note.{language}.md"
+    path.write_bytes(
+        note_text.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n").encode()
+    )
+    return path
+
+
+def final_review_args(
+    tmp_path: Path,
+    note_text: str,
+    output_language: str,
+    *,
+    plan_path: Path,
+    content_path: Path | None = None,
+) -> list[str]:
+    if content_path is None:
+        content_path = canonical_note_path(tmp_path, note_text, output_language)
+    note_hash = hashlib.sha256(content_path.read_bytes()).hexdigest()
+    quality_path = tmp_path / f"quality-review.{output_language}.json"
+    quality_path.write_text(json.dumps({
+        "schema_version": _final_quality.QUALITY_REVIEW_SCHEMA_VERSION,
+        "output_language": output_language,
+        "verdict": "pass",
+        "reviewed_note_sha256": note_hash,
+        "reviewed_plan_sha256": hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+        "checks": dict.fromkeys(_final_quality.QUALITY_CHECKS, True),
+        "blocking_findings": [],
+    }), encoding="utf-8")
+    readability_path = tmp_path / f"readability-review.{output_language}.json"
+    readability_path.write_text(json.dumps({
+        "schema_version": 1,
+        "output_language": output_language,
+        "verdict": "pass",
+        "reviewed_note_sha256": note_hash,
+    }), encoding="utf-8")
+    writer = (
+        Path(__file__).resolve().parents[1]
+        / "skills/deeppapernote/scripts/write_obsidian_note.py"
+    )
+    result = subprocess.run([
+        sys.executable, str(writer), "--record-final-quality-review",
+        "--language", output_language,
+        "--content-file", str(content_path), "--plan-file", str(plan_path),
+        "--final-quality-review", str(quality_path),
+    ], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return [
+        "--content-file", str(content_path),
+        "--final-quality-review", str(quality_path),
+        "--final-readability-review", str(readability_path),
+    ]
+
+
+def formal_save_args(
+    tmp_path: Path,
+    note_text: str,
+    output_language: str = "zh-CN",
+    *,
+    lint_path: Path | None = None,
+    decisions_path: Path | None = None,
+    source_manifest_path: Path | None = None,
+    plan_path: Path | None = None,
+    content_path: Path | None = None,
+    domain: str | None = TEST_DOMAIN,
+) -> list[str]:
+    """Formal Save arguments with passing gates.
+
+    With `domain`, the save chooses that domain, and a note this helper writes gets its
+    papers/ tag through `tagged`; compare saved notes against `tagged(note_text, domain)`.
+    """
+    domain_args: list[str] = []
+    if domain is not None:
+        domain_args = ["--domain", domain, "--new-domain-reason", "Test fixture domain."]
+        if content_path is None:
+            note_text = tagged(note_text, domain)
+    plan_path = plan_path or tmp_path / f"save-plan.{output_language}.json"
+    if not plan_path.exists():
+        plan_path.write_text(json.dumps({
+            "output_language": output_language,
+            "central_claims": [{
+                "claim": "The reported evidence supports this reading.",
+                "what_it_does_not_prove": "It does not establish broader validity.",
+            }],
+            "mechanism_result_map": ["The described mechanism explains the reported result."],
+            "claim_boundaries": ["The conclusion is limited to the reported evidence."],
+            "reuse_takeaways": ["Reuse the reported mechanism where its stated preconditions hold."],
+            "followup_questions": ["Test whether the result survives outside the reported setting."],
+            "connections": [],
+            "key_prior_work": [
+                {"work": "Author A 2020. Prior work one", "role": "baseline"},
+                {"work": "Author B 2021. Prior work two", "role": "backbone"},
+                {"work": "Author C 2022. Prior work three", "role": "data source"},
+            ],
+            "storyline": "The paper takes on one problem. It answers with one mechanism. The evidence supports that mechanism in the reported setting.",
+            "core_answers": {"method.problem": {"answer": "The reported problem.", "evidence_refs": [{"pages": [1]}]}},
+        }), encoding="utf-8")
+    source_manifest_path = source_manifest_path or tmp_path / "source-manifest.json"
+    if not source_manifest_path.exists():
+        source_manifest_path.write_text(
+            json.dumps({"status": "ok", "paper_id": "paper:test", "source_sha256": "a" * 64}),
+            encoding="utf-8",
+        )
+    if decisions_path is None:
+        decisions_path = tmp_path / "figure-decisions.json"
+        decisions_path.write_text(
+            json.dumps({"output_language": output_language, "decisions": []}), encoding="utf-8"
+        )
+    new_lint = lint_path is None or not lint_path.exists()
+    lint = (
+        json.loads(lint_path.read_text(encoding="utf-8-sig"))
+        if lint_path is not None and lint_path.exists()
+        else {}
+    )
+    lint_path = lint_path or tmp_path / "passing-lint.json"
+    for key, value in {
+        "status": "ok",
+        "script": "lint_note.py",
+        **({"output_language": output_language} if new_lint else {}),
+        "note_sha256": hashlib.sha256(
+            note_text.removeprefix("\ufeff").replace("\r\n", "\n").encode("utf-8")
+        ).hexdigest(),
+        "passes_basic_structure": True,
+        "passes_style_gate": True,
+        "passes_math_gate": True,
+        "passes_figure_gate": True,
+        "passes_plan_gate": True,
+        "passes_substantive_content": True,
+        "passes_reference_hygiene_gate": True,
+    }.items():
+        lint.setdefault(key, value)
+    plan_hash = hashlib.sha256(plan_path.read_bytes()).hexdigest()
+    lint["note_plan_sha256"] = plan_hash
+    lint_path.write_text(json.dumps(lint), encoding="utf-8")
+    grounding_path = tmp_path / "passing-grounding.json"
+    grounding_path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "script": "lint_grounding.py",
+                "output_language": output_language,
+                "passes_grounding": True,
+                "note_plan_sha256": plan_hash,
+                "source_manifest_sha256": hashlib.sha256(source_manifest_path.read_bytes()).hexdigest(),
+                "figure_decisions_sha256": hashlib.sha256(decisions_path.read_bytes()).hexdigest(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    return [
+        *domain_args,
+        "--lint-json", str(lint_path),
+        "--figure-decisions", str(decisions_path),
+        "--plan-file", str(plan_path),
+        "--grounding-lint-json", str(grounding_path),
+        "--source-manifest", str(source_manifest_path),
+        *final_review_args(
+            tmp_path, note_text, output_language,
+            plan_path=plan_path, content_path=content_path,
+        ),
+    ]
+
+
+def reviewed_insert_fields(source_image: Path) -> dict:
+    digest = hashlib.sha256(source_image.read_bytes()).hexdigest()
+    preview = source_image.with_name(f"{source_image.stem}-preview.png")
+    preview.write_bytes(b"page-preview")
+    source_pdf = source_image.with_name(f"{source_image.stem}-source.pdf")
+    source_pdf.write_bytes(b"source-pdf")
+    return {
+        "source_image_sha256": digest,
+        "review_evidence": {
+            "candidate_path": str(source_image),
+            "page_preview_path": str(preview),
+            "source_pdf_path": str(source_pdf),
+            "source_page": 1,
+            "caption": "Architecture",
+            "bbox_pt": [10.0, 20.0, 190.0, 220.0],
+            "normalized_bbox": [0.05, 0.05, 0.95, 0.55],
+            "render_dpi": 300,
+        },
+        "visual_review": {
+            "status": "pass",
+            "reviewed_asset_sha256": digest,
+            "preserved_scientific_elements": ["complete figure"],
+            "omitted_scientific_elements": [],
+            "notes": "Caption-free visual body.",
+            "failure_reason": "",
+            "repair_attempts": 0,
+            "revised_bbox": [],
+        },
+    }

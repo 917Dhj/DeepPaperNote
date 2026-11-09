@@ -31,15 +31,12 @@ from glossary_contracts import (
 )
 from glossary_library import (
     CONCEPT_FIELDS,
-    _decode_frontmatter_scalar,
     _normalized_key,
     add_missing_concept_fields,
     build_alias_index as _library_build_alias_index,
     inspect_selected_terms,
     note_state,
     obsidian_safe_link_stem,
-    read_frontmatter_aliases as _read_frontmatter_aliases,
-    read_heading_name as _read_heading_name,
 )
 
 ILLEGAL_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')

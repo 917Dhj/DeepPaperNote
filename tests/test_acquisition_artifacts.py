@@ -4,9 +4,10 @@ import json
 import sys
 from pathlib import Path
 
+import _identity
+import _metadata_sources
 import build_identity_contract
 import collect_metadata
-import common
 import extract_evidence
 import extract_pdf_assets
 import extract_source_text
@@ -208,6 +209,134 @@ def test_build_identity_contract_repairs_noisy_first_page_title(
     assert trace["repair_attempts"] == []
 
 
+def test_build_identity_contract_replaces_challengeable_first_page_title_with_provider_observation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf_path = tmp_path / "sam.pdf"
+    identity, trace = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload={
+            "status": "ok",
+            "script": "resolve_paper.py",
+            "paper_id": "arxiv:2304.02643",
+            "source_type": "local_pdf",
+            "source_url": str(pdf_path),
+            "local_pdf_path": str(pdf_path),
+            "title": "Meta AI Research, FAIR",
+            "local_pdf_title_source": "first_page_title_used",
+            "arxiv_id": "2304.02643",
+            "metadata_sources": ["local_pdf"],
+        },
+        metadata_payload={
+            "status": "ok",
+            "script": "collect_metadata.py",
+            "paper_id": "arxiv:2304.02643",
+            "source_type": "local_pdf",
+            "source_url": str(pdf_path),
+            "local_pdf_path": str(pdf_path),
+            "title": "Meta AI Research, FAIR",
+            "arxiv_id": "2304.02643",
+            "metadata_sources": ["local_pdf", "arxiv"],
+            "identity_observations": [
+                {
+                    "provider": "arxiv",
+                    "retrieved_by": {"kind": "arxiv_id", "value": "2304.02643"},
+                    "relation": {"kind": "shared_identifier", "value": "arxiv:2304.02643"},
+                    "record": {
+                        "source": "arxiv",
+                        "source_type": "arxiv",
+                        "arxiv_id": "2304.02643",
+                        "title": "Segment Anything",
+                        "authors": ["Alexander Kirillov"],
+                        "year": "2023",
+                    },
+                }
+            ],
+        },
+    )
+
+    assert identity["identity_verdict"] == "accepted"
+    assert identity["work_level_identity"]["title"] == "Segment Anything"
+    assert identity["accepted_metadata"]["title"] == "Segment Anything"
+    assert identity["field_provenance"]["title"]["provider"] == "arxiv"
+    assert len(trace["repair_attempts"]) == 1
+    attempt = trace["repair_attempts"][0]
+    assert attempt["action"] == "replace_challengeable_identity_anchor"
+    assert attempt["status"] == "accepted"
+    assert (
+        attempt["replacement_reason"]
+        == "challengeable_first_page_title_replaced_by_stronger_identity_evidence"
+    )
+    assert attempt["rejected_candidate_identity"]["title"] == "Meta AI Research, FAIR"
+    assert attempt["accepted_correction"]["title"] == "Segment Anything"
+
+
+@pytest.mark.parametrize(
+    "title_source",
+    ["first_page_title_used", "local_pdf_stem_used", "pdf_metadata_title_used"],
+)
+def test_build_identity_contract_preserves_corrected_title_across_provider_observations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    title_source: str,
+) -> None:
+    pdf_path = tmp_path / "sam.pdf"
+    resolved = _identity.apply_identity_confidence(
+        {
+            "status": "ok",
+            "script": "resolve_paper.py",
+            "paper_id": "arxiv:2304.02643",
+            "source_type": "local_pdf",
+            "source_url": str(pdf_path),
+            "local_pdf_path": str(pdf_path),
+            "title": "Meta AI Research, FAIR",
+            "local_pdf_title_source": title_source,
+            "local_pdf_artifact_title": title_source == "local_pdf_stem_used",
+            "arxiv_id": "2304.02643",
+            "metadata_sources": ["local_pdf"],
+        }
+    )
+    observations = [
+        {
+            "provider": provider,
+            "retrieved_by": {"kind": "arxiv_id", "value": "2304.02643"},
+            "record": {"arxiv_id": "2304.02643", "title": title},
+        }
+        for provider, title in [
+            ("arxiv", "Segment Anything"),
+            ("semantic_scholar", "Segment Anything (SAM)"),
+            ("openalex", "Segment Anything: A Foundation Model"),
+        ]
+    ]
+    identity, trace = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload=resolved,
+        metadata_payload={
+            **resolved,
+            "script": "collect_metadata.py",
+            "identity_observations": observations,
+        },
+    )
+
+    assert identity["identity_verdict"] == "accepted"
+    assert identity["work_level_identity"]["title"] == "Segment Anything"
+    assert identity["accepted_metadata"]["title"] == "Segment Anything"
+    assert identity["field_provenance"]["title"]["provider"] == "arxiv"
+    assert len(identity["accepted_observations"]) == 3
+    assert identity["diagnostics"]["identity_confidence_reasons"] == ["arxiv_id_present"]
+    assert identity["source_manifestation"]["title"] == "Meta AI Research, FAIR"
+    assert resolved["local_pdf_title_source"] == title_source
+    assert title_source in resolved["identity_confidence_reasons"]
+    assert len(trace["repair_attempts"]) == 1
+    attempt = trace["repair_attempts"][0]
+    assert attempt["action"] == "replace_challengeable_identity_anchor"
+    assert attempt["rejected_candidate_identity"]["title"] == "Meta AI Research, FAIR"
+    assert attempt["accepted_correction"]["title"] == "Segment Anything"
+
+
 def test_build_identity_contract_repairs_filename_only_title_with_arxiv(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -394,7 +523,7 @@ def test_build_identity_contract_rejects_conflicting_same_title_provider_observa
     assert attempt["status"] == "rejected"
     assert attempt["rejected_candidate_identity"]["doi"] == "10.9999/conflicting"
     assert attempt["accepted_correction"]["doi"] == "10.1234/trusted"
-    downstream_summary = common.canonical_identity_summary(identity)
+    downstream_summary = _identity.canonical_identity_summary(identity)
     assert downstream_summary["schema_version"] == 2
     assert "accepted_observations" not in downstream_summary
     assert "rejected_observations" not in downstream_summary
@@ -1455,7 +1584,7 @@ def test_collect_metadata_preserves_provider_result_as_identity_observation(
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        common,
+        _metadata_sources,
         "fetch_crossref_by_doi",
         lambda doi: {
             "source_type": "crossref",
@@ -1466,11 +1595,11 @@ def test_collect_metadata_preserves_provider_result_as_identity_observation(
             "metadata_sources": ["crossref"],
         },
     )
-    monkeypatch.setattr(common, "fetch_openalex_by_doi", lambda doi: None)
-    monkeypatch.setattr(common, "search_semantic_scholar", lambda query, limit=5: [])
-    monkeypatch.setattr(common, "search_crossref_by_title", lambda title, limit=5: [])
-    monkeypatch.setattr(common, "search_openalex_by_title", lambda title, limit=5: [])
-    monkeypatch.setattr(common, "safe_fetch_arxiv_entries", lambda **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "fetch_openalex_by_doi", lambda doi: None)
+    monkeypatch.setattr(_metadata_sources, "search_semantic_scholar", lambda query, limit=5: [])
+    monkeypatch.setattr(_metadata_sources, "search_crossref_by_title", lambda title, limit=5: [])
+    monkeypatch.setattr(_metadata_sources, "search_openalex_by_title", lambda title, limit=5: [])
+    monkeypatch.setattr(_metadata_sources, "safe_fetch_arxiv_entries", lambda **kwargs: [])
     monkeypatch.setattr(
         sys,
         "argv",
@@ -1518,11 +1647,11 @@ def test_exact_swe_bench_title_admits_one_unique_arxiv_match(
         "title": title,
         "metadata_sources": ["title_query"],
     }
-    monkeypatch.setattr(common, "search_semantic_scholar", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "search_openalex_by_title", lambda *args, **kwargs: [])
-    monkeypatch.setattr(common, "search_crossref_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_semantic_scholar", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_openalex_by_title", lambda *args, **kwargs: [])
+    monkeypatch.setattr(_metadata_sources, "search_crossref_by_title", lambda *args, **kwargs: [])
     monkeypatch.setattr(
-        common,
+        _metadata_sources,
         "safe_fetch_arxiv_entries",
         lambda **kwargs: [
             {
@@ -1537,7 +1666,7 @@ def test_exact_swe_bench_title_admits_one_unique_arxiv_match(
         ],
     )
 
-    observations = common.collect_metadata_observations(resolve_payload)
+    observations = _metadata_sources.collect_metadata_observations(resolve_payload)
     identity, _ = build_identity_from_payloads(
         tmp_path,
         monkeypatch,
@@ -1554,6 +1683,134 @@ def test_exact_swe_bench_title_admits_one_unique_arxiv_match(
     assert identity["accepted_observations"][0]["reason"] == (
         "unique_exact_arxiv_title"
     )
+
+
+AGI_ARXIV_TITLE = "Levels of AGI for Operationalizing Progress on the Path to AGI"
+
+
+def prefixed_title_payloads(
+    *,
+    title: str,
+    title_source: str,
+    first_page_title: str,
+    observation: dict,
+) -> tuple[dict, dict]:
+    """Return a local PDF's resolve record and its metadata with one provider observation."""
+    resolve_payload = {
+        "status": "ok",
+        "script": "resolve_paper.py",
+        "paper_id": "arxiv:2311.02462",
+        "source_type": "local_pdf",
+        "source_url": "/papers/levels-agi.pdf",
+        "local_pdf_path": "/papers/levels-agi.pdf",
+        "title": title,
+        "local_pdf_title_source": title_source,
+        "arxiv_id": "2311.02462",
+        "metadata_sources": ["local_pdf"],
+    }
+    if first_page_title:
+        resolve_payload["local_pdf_first_page_title"] = first_page_title
+    metadata_payload = {
+        **resolve_payload,
+        "script": "collect_metadata.py",
+        "identity_observations": [
+            {
+                "provider": observation["source"],
+                "retrieved_by": {"kind": "arxiv_id", "value": "2311.02462"},
+                "record": observation,
+            }
+        ],
+    }
+    return resolve_payload, metadata_payload
+
+
+ARXIV_AGI_RECORD = {
+    "source": "arxiv",
+    "source_type": "arxiv",
+    "source_url": "http://arxiv.org/abs/2311.02462v5",
+    "arxiv_id": "2311.02462",
+    "title": AGI_ARXIV_TITLE,
+    "venue": "Proceedings of ICML 2024",
+    "authors": ["Meredith Ringel Morris"],
+    "year": "2023",
+}
+
+
+@pytest.mark.parametrize(
+    ("title", "title_source", "first_page_title"),
+    [
+        (AGI_ARXIV_TITLE, "pdf_metadata_title_used", f"Position: {AGI_ARXIV_TITLE}"),
+        (f"Position: {AGI_ARXIV_TITLE}", "first_page_title_used", ""),
+    ],
+)
+def test_pdf_title_keeps_a_prefix_the_arxiv_title_lacks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    title: str,
+    title_source: str,
+    first_page_title: str,
+) -> None:
+    resolve_payload, metadata_payload = prefixed_title_payloads(
+        title=title,
+        title_source=title_source,
+        first_page_title=first_page_title,
+        observation=ARXIV_AGI_RECORD,
+    )
+
+    identity, _ = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload=resolve_payload,
+        metadata_payload=metadata_payload,
+    )
+
+    assert identity["identity_verdict"] == "accepted"
+    assert identity["work_level_identity"]["title"] == f"Position: {AGI_ARXIV_TITLE}"
+    assert identity["work_level_identity"]["arxiv_id"] == "2311.02462"
+
+
+@pytest.mark.parametrize(
+    ("first_page_title", "observation"),
+    [
+        # A published record's title is the version of record.
+        (
+            f"Position: {AGI_ARXIV_TITLE}",
+            {
+                "source": "crossref",
+                "source_type": "crossref",
+                "arxiv_id": "2311.02462",
+                "doi": "10.5555/icml.2024.agi",
+                "title": AGI_ARXIV_TITLE,
+                "venue": "International Conference on Machine Learning",
+            },
+        ),
+        # A long lead-in is a header or venue line joined to the title, not a prefix.
+        (f"Proceedings of the Forty First Conference: {AGI_ARXIV_TITLE}", ARXIV_AGI_RECORD),
+        (f"Position: {AGI_ARXIV_TITLE} and Beyond", ARXIV_AGI_RECORD),
+        ("Position: A Different Paper Entirely", ARXIV_AGI_RECORD),
+    ],
+)
+def test_provider_title_wins_unless_the_pdf_only_adds_a_short_prefix(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    first_page_title: str,
+    observation: dict,
+) -> None:
+    resolve_payload, metadata_payload = prefixed_title_payloads(
+        title=AGI_ARXIV_TITLE.upper(),
+        title_source="pdf_metadata_title_used",
+        first_page_title=first_page_title,
+        observation=observation,
+    )
+
+    identity, _ = build_identity_from_payloads(
+        tmp_path,
+        monkeypatch,
+        resolve_payload=resolve_payload,
+        metadata_payload=metadata_payload,
+    )
+
+    assert identity["work_level_identity"]["title"] == AGI_ARXIV_TITLE
 
 
 @pytest.mark.parametrize(

@@ -36,13 +36,13 @@ def parser() -> argparse.ArgumentParser:
 
 
 def _emit(payload: dict[str, Any], output: str) -> None:
-    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     if output:
         target = Path(output).expanduser()
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text, encoding="utf-8")
+        target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     else:
-        print(text, end="")
+        # ASCII JSON reads back under any console encoding, such as cp1252 on Windows.
+        print(json.dumps(payload, indent=2))
 
 
 def main() -> None:

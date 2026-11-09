@@ -80,7 +80,7 @@ def _load_manifest(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise SourceCorpusLoadError(f"source manifest not found: {path}")
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as exc:
         raise SourceCorpusLoadError(f"source manifest is invalid JSON: {path}") from exc
     if not isinstance(data, dict):

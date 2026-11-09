@@ -23,8 +23,12 @@ from glossary_config import load_config, resolve_terms_dir, validate_article
 from glossary_library import _normalized_key, build_alias_index
 
 
+# Everything from the first of these headings to the end is never linked: the
+# bibliography, a connections section that already links related papers, and a
+# user-owned notes block.
 REFERENCE_HEADING_RE = re.compile(
-    r"^[ \t]{0,3}#{1,6}[ \t]+(?:references|bibliography|参考文献)[ \t]*\r?$",
+    r"^[ \t]{0,3}#{1,6}[ \t]+"
+    r"(?:references|bibliography|参考文献|引用|关联|connections|我的笔记|my notes)[ \t]*\r?$",
     re.IGNORECASE | re.MULTILINE,
 )
 
@@ -646,7 +650,26 @@ def _wiki_link_context(
     return spans, targets
 
 
-def _protected_context(text: str) -> tuple[list[tuple[int, int]], set[str]]:
+def _code_span_content(text: str, start: int, end: int) -> str:
+    """The content of an inline code span, with CommonMark's one-space padding removed."""
+    delimiter = 0
+    while start + delimiter < end and text[start + delimiter] == "`":
+        delimiter += 1
+    content = text[start + delimiter : end - delimiter]
+    if len(content) >= 2 and content[0] == " " and content[-1] == " " and content.strip(" "):
+        content = content[1:-1]
+    return content
+
+
+def _protected_context(
+    text: str,
+) -> tuple[list[tuple[int, int]], set[str], list[tuple[int, int, str]]]:
+    """Protected spans, existing wiki-link targets, and linkable inline code.
+
+    Inline code is protected, except that a span outside every other protected
+    region is returned with its content so a span that is exactly a selected
+    form can be linked whole.
+    """
     spans = _fenced_code_spans(text)
     frontmatter = _frontmatter_span(text)
     if frontmatter:
@@ -654,29 +677,35 @@ def _protected_context(text: str) -> tuple[list[tuple[int, int]], set[str]]:
     spans = _merge_spans(spans)
 
     spans = _merge_spans([*spans, *_indented_code_spans(text, spans)])
-    spans = _merge_spans([*spans, *_inline_code_spans(text, spans)])
-    spans = _merge_spans([*spans, *_markdown_autolink_spans(text, spans)])
-    spans = _merge_spans([*spans, *_html_spans(text, spans)])
-    spans = _merge_spans([*spans, *_markdown_link_spans(text, spans)])
-    spans = _merge_spans([*spans, *_markdown_reference_spans(text, spans)])
+    others = list(spans)
+    inline_code = _inline_code_spans(text, spans)
+    spans = _merge_spans([*spans, *inline_code])
+
+    def protect(new_spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        others.extend(new_spans)
+        return _merge_spans([*spans, *new_spans])
+
+    spans = protect(_markdown_autolink_spans(text, spans))
+    spans = protect(_html_spans(text, spans))
+    spans = protect(_markdown_link_spans(text, spans))
+    spans = protect(_markdown_reference_spans(text, spans))
     wiki_spans, targets = _wiki_link_context(text, spans)
-    spans = _merge_spans([*spans, *wiki_spans])
+    spans = protect(wiki_spans)
     high_priority_spans = spans
 
-    headings = _heading_spans(text, spans)
-    spans = _merge_spans([*spans, *headings])
+    spans = protect(_heading_spans(text, spans))
     html_tags = [
         match.span()
         for match in re.finditer(r"<[^>\r\n]+>", text)
         if not _offset_in_spans(match.start(), spans)
     ]
-    spans = _merge_spans([*spans, *html_tags])
+    spans = protect(html_tags)
     urls = [
         match.span()
         for match in re.finditer(r"https?://[^\s<>\]\)]+", text)
         if not _offset_in_spans(match.start(), spans)
     ]
-    spans = _merge_spans([*spans, *urls])
+    spans = protect(urls)
     references = next(
         (
             match
@@ -686,13 +715,25 @@ def _protected_context(text: str) -> tuple[list[tuple[int, int]], set[str]]:
         None,
     )
     if references:
-        spans.append((references.start(), len(text)))
-    return _merge_spans(spans), targets
+        spans = protect([(references.start(), len(text))])
+    linkable_code = [
+        (start, end, _code_span_content(text, start, end))
+        for start, end in inline_code
+        if not _overlaps(start, end, others)
+    ]
+    return _merge_spans(spans), targets, linkable_code
 
 
 def protected_spans(text: str) -> list[tuple[int, int]]:
-    spans, _ = _protected_context(text)
+    spans, _, _ = _protected_context(text)
     return spans
+
+
+def _code_matches(
+    form: str, linkable_code: list[tuple[int, int, str]]
+) -> list[tuple[int, int, str]]:
+    pattern = re.compile(re.escape(form), re.IGNORECASE)
+    return [item for item in linkable_code if pattern.fullmatch(item[2])]
 
 
 def _overlaps(start: int, end: int, spans: list[tuple[int, int]]) -> bool:
@@ -759,7 +800,7 @@ def link_article_terms(
 
     had_bom = original.startswith(b"\xef\xbb\xbf")
     text = original[3 if had_bom else 0 :].decode("utf-8")
-    protected, targets = _protected_context(text)
+    protected, targets, linkable_code = _protected_context(text)
     normalized = _normalized_mappings(mappings)
     planned: list[tuple[int, int, str]] = []
     planned_targets: set[str] = set()
@@ -779,21 +820,33 @@ def link_article_terms(
             continue
         matched = None
         for form in sorted(mapping["forms"], key=len, reverse=True):
-            for candidate in term_pattern(form).finditer(text):
-                if _overlaps(candidate.start(), candidate.end(), protected):
-                    continue
-                if _overlaps(candidate.start(), candidate.end(), [(start, end) for start, end, _ in planned]):
-                    continue
-                matched = candidate
-                break
+            # Prose matches and inline code that is exactly this form compete in document order.
+            candidates = sorted(
+                [
+                    *(
+                        (found.start(), found.end(), found.group(0))
+                        for found in term_pattern(form).finditer(text)
+                        if not _overlaps(found.start(), found.end(), protected)
+                    ),
+                    *_code_matches(form, linkable_code),
+                ]
+            )
+            matched = next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if not _overlaps(candidate[0], candidate[1], [(start, end) for start, end, _ in planned])
+                ),
+                None,
+            )
             if matched is not None:
                 break
         if matched is None:
             statuses[index] = "not_found"
             continue
-        surface = matched.group(0)
+        start, end, surface = matched
         replacement = f"[[{link_stem}]]" if surface == link_stem else f"[[{link_stem}|{surface}]]"
-        planned.append((matched.start(), matched.end(), replacement))
+        planned.append((start, end, replacement))
         planned_targets.add(target_key)
         statuses[index] = "linked"
 

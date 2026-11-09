@@ -7,20 +7,26 @@ import argparse
 from copy import deepcopy
 from pathlib import Path
 
-from citation_links import resolve_reference_links
+from _final_quality import QUALITY_CHECKS, QUALITY_REVIEW_SCHEMA_VERSION
+from _identity import canonical_identity_acceptance_error
 from common import (
-    canonical_identity_acceptance_error,
     maybe_load_json_record,
     normalize_whitespace,
     runtime_config,
 )
 from contracts import (
+    NOTE_PLAN_TYPE_FIELDS,
+    NOTE_PLAN_OPTIONAL_LIST_FIELDS,
+    NOTE_PLAN_OPTIONAL_STRING_FIELDS,
     NOTE_PLAN_REQUIRED_FIELDS,
     PAPER_TYPE_VALUES,
     paper_type_contracts,
     writing_contract_rules,
 )
 from localization import normalize_output_language, require_artifact_output_language
+from glossary_terms import body_text_from_raw_sections, glossary_terms
+from research_memory import read_research_memory
+from vault_connections import connection_candidates
 
 
 def parser() -> argparse.ArgumentParser:
@@ -36,6 +42,11 @@ def parser() -> argparse.ArgumentParser:
         help="Figure/table decision JSON path or string.",
     )
     p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
+    p.add_argument(
+        "--admission",
+        default="",
+        help="Save Target Admission JSON; its directory is excluded from connection recall.",
+    )
     p.add_argument("--output", default="", help="Output JSON path.")
     return p
 
@@ -44,51 +55,27 @@ def load_record(value: str) -> dict:
     return maybe_load_json_record(value) or {}
 
 
-def sanitize_reference_candidates(
-    evidence_pack: dict, config: dict, *, limit: int = 20
-) -> list[dict]:
-    candidates = evidence_pack.get("reference_candidates", []) or []
-    if not isinstance(candidates, list):
-        return []
-    try:
-        matched_candidates = resolve_reference_links(candidates[:limit], config)
-    except Exception:
-        matched_candidates = [
-            {
-                **candidate,
-                "wikilink": "",
-                "vault_target": "",
-                "match_status": "vault_unavailable",
-                "match_reason": "none",
-            }
-            for candidate in candidates[:limit]
-            if isinstance(candidate, dict)
-        ]
+def admitted_target_directory(value: str) -> str:
+    """The admitted note directory, so the paper never recalls its own notes."""
+    admission = load_record(value) if value else {}
+    return str(admission.get("target_directory", "") or "") if isinstance(admission, dict) else ""
 
-    sanitized: list[dict] = []
-    for item in matched_candidates:
-        if not isinstance(item, dict):
-            continue
-        raw_text = normalize_whitespace(str(item.get("raw_text", "")))
-        display_text = normalize_whitespace(str(item.get("display_text", "")))
-        if not raw_text and not display_text:
-            continue
-        sanitized.append(
-            {
-                "raw_text": raw_text,
-                "display_text": display_text,
-                "page_hint": normalize_whitespace(str(item.get("page_hint", ""))),
-                "doi": normalize_whitespace(str(item.get("doi", ""))),
-                "arxiv_id": normalize_whitespace(str(item.get("arxiv_id", ""))),
-                "wikilink": normalize_whitespace(str(item.get("wikilink", ""))),
-                "vault_target": normalize_whitespace(str(item.get("vault_target", ""))),
-                "match_status": normalize_whitespace(
-                    str(item.get("match_status", "no_vault_match"))
-                ),
-                "match_reason": normalize_whitespace(str(item.get("match_reason", "none"))),
-            }
+
+def recalled_connections(
+    evidence_pack: dict, source_manifest: dict, config: dict, language: str, own_directory: str
+) -> dict:
+    references = evidence_pack.get("reference_candidates", []) or []
+    try:
+        return connection_candidates(
+            config,
+            references if isinstance(references, list) else [],
+            # Body only: a dataset named just in the bibliography is not shared work.
+            body_text_from_raw_sections(source_manifest.get("raw_sections_path")),
+            language,
+            own_directory=own_directory or None,
         )
-    return sanitized
+    except Exception:
+        return {"status": "vault_unavailable", "cited": [], "related": []}
 
 
 def figure_quality_summary(assets_wrapper: dict) -> dict[str, int]:
@@ -180,47 +167,6 @@ def appendix_evidence_counts(evidence_pack: dict) -> dict[str, int]:
     }
 
 
-def sanitize_page_assets(assets_wrapper: dict, *, limit: int = 24) -> list[dict]:
-    sanitized: list[dict] = []
-    for item in (assets_wrapper.get("page_assets", []) or [])[:limit]:
-        if not isinstance(item, dict):
-            continue
-        sanitized.append(
-            {
-                "page_number": item.get("page_number", 0),
-                "searchable_text_chars": item.get("searchable_text_chars", 0),
-                "text_extraction_method": item.get("text_extraction_method", ""),
-                "ocr_used": item.get("ocr_used", False),
-                "image_count": item.get("image_count", 0),
-                "text_preview": item.get("text_preview", ""),
-            }
-        )
-    return sanitized
-
-
-def sanitize_figure_assets(assets_wrapper: dict, *, limit: int = 48) -> list[dict]:
-    sanitized: list[dict] = []
-    for item in (assets_wrapper.get("figure_assets", []) or [])[:limit]:
-        if not isinstance(item, dict):
-            continue
-        record = {
-            "filename": item.get("filename", ""),
-            "path": item.get("path", ""),
-            "page_number": item.get("page_number", 0),
-            "label": item.get("label", ""),
-            "kind": item.get("kind", ""),
-            "caption_text": normalize_whitespace(str(item.get("caption_text", ""))),
-            "width": item.get("width", 0),
-            "height": item.get("height", 0),
-            "size_bytes": item.get("size_bytes", 0),
-            "extraction_level": item.get("extraction_level", ""),
-        }
-        if isinstance(item.get("quality_signals"), dict):
-            record["quality_signals"] = item.get("quality_signals")
-        sanitized.append(record)
-    return sanitized
-
-
 def source_index(source_manifest: dict) -> dict:
     if not isinstance(source_manifest, dict):
         return {}
@@ -285,14 +231,10 @@ def figure_table_manifest(
     figure_decisions_wrapper: dict,
     source_manifest: dict,
     figure_plan: dict,
+    figures_path: str,
+    assets_path: str,
 ) -> dict:
-    decisions = (
-        figure_decisions_wrapper.get("decisions", [])
-        if isinstance(figure_decisions_wrapper, dict)
-        else []
-    )
-    if not isinstance(decisions, list):
-        decisions = []
+    """Point at the figure artifacts; decisions change during Visual Review, so read them live."""
     captions = (
         source_manifest.get("captions", {})
         if isinstance(source_manifest.get("captions"), dict)
@@ -308,7 +250,8 @@ def figure_table_manifest(
     )
     return {
         "decisions_path": decisions_path,
-        "decisions": decisions,
+        "figures_path": figures_path,
+        "assets_path": assets_path,
         "caption_counts": {
             "figures": len(captions.get("figures", []) or []),
             "tables": len(captions.get("tables", []) or []),
@@ -316,6 +259,32 @@ def figure_table_manifest(
         "planned_items": planned_items,
         "requires_full_decision_table": True,
     }
+
+
+def note_plan_template(rules: dict) -> dict:
+    """Give the plan's shape with every value empty, so an unfilled template fails the gates."""
+    empty = {"string": "", "array": []}
+    template: dict = {"output_language": rules["language"]}
+    for field in NOTE_PLAN_REQUIRED_FIELDS:
+        template[field] = deepcopy(empty[rules["note_plan_field_types"][field]])
+    claim_fields = rules["analysis_coverage_contract"]["central_claim_fields"]
+    claim_types = rules["analysis_coverage_contract"]["central_claim_field_types"]
+    template["central_claims"] = [
+        {field: deepcopy(empty[claim_types[field]]) for field in claim_fields}
+    ]
+    for field in NOTE_PLAN_OPTIONAL_STRING_FIELDS:
+        template[field] = ""
+    for field in NOTE_PLAN_OPTIONAL_LIST_FIELDS:
+        template[field] = []
+    for field, field_type in NOTE_PLAN_TYPE_FIELDS.items():
+        template[field] = {"string": "", "array": [], "object": {}}[field_type]
+    focus_field = rules["note_plan_depth_requirements"]["required_section_focus_fields"][0]
+    # One entry per middle section of the chosen paper_type, then limitations.
+    template["section_plan"] = [
+        {"section": section, focus_field: "", "subsections": [], "evidence_sources": []}
+        for section in ("", rules["limitations_section"])
+    ]
+    return template
 
 
 def compact_writing_contract(language: str | None = None) -> dict:
@@ -345,9 +314,6 @@ def compact_writing_contract(language: str | None = None) -> dict:
     analysis_coverage["required_plan_fields"] = list(
         analysis_coverage["required_plan_fields"]
     )
-    analysis_coverage["final_quality_review_checks"] = list(
-        analysis_coverage["final_quality_review_checks"]
-    )
     contract = {
         "language": rules["language"],
         "contract_role": "manifest_quality_contract",
@@ -355,12 +321,17 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "SKILL.md defines the workflow; scripts/contracts.py defines "
             "machine-checkable contract data."
         ),
-        "must_include_sections": list(rules["required_sections"]),
+        "section_order": {
+            "head": list(rules["fixed_head_sections"]),
+            "middle": rules["type_structure_contract"]["middle_sections_source"],
+            "tail": list(rules["fixed_tail_sections"]),
+        },
         "core_info_fields": list(rules["core_info_fields"]),
         "figure_labels": dict(rules["figure_labels"]),
-        "mechanism_flow_heading": rules["mechanism_flow_heading"],
         "note_plan_contract": {
             "required_fields": ["output_language", *NOTE_PLAN_REQUIRED_FIELDS],
+            "optional_fields": [*NOTE_PLAN_OPTIONAL_STRING_FIELDS, *NOTE_PLAN_OPTIONAL_LIST_FIELDS],
+            "type_fields": dict(NOTE_PLAN_TYPE_FIELDS),
             "field_types": {
                 "output_language": "string",
                 **dict(rules["note_plan_field_types"]),
@@ -371,6 +342,7 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "artifact_preference": "short_json_planning_file",
             "grounding_field": "section_plan[*].evidence_sources",
             "analysis_coverage_field": "central_claims[*]",
+            "template": note_plan_template(rules),
         },
         "paper_type_selection": {
             "source_of_truth": "note_plan.paper_type",
@@ -378,6 +350,15 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "allowed_paper_types": list(PAPER_TYPE_VALUES),
         },
         "contracts_by_paper_type": paper_type_contracts(rules["language"]),
+        "type_structure_contract": {
+            "plan_fields": list(rules["type_structure_contract"]["plan_fields"]),
+            "core_answer_forms": deepcopy(list(rules["type_structure_contract"]["core_answer_forms"])),
+            "secondary_question_limit": rules["type_structure_contract"]["secondary_question_limit"],
+            "workflow_step_range": list(rules["type_structure_contract"]["workflow_step_range"]),
+            "weak_evidence_rule": rules["type_structure_contract"]["weak_evidence_rule"],
+            "weak_evidence_callout": rules["weak_evidence_callout"],
+            "not_reported_phrase": rules["not_reported_phrase"],
+        },
         "grounding_contract": {
             "source_of_truth": "source_manifest",
             "source_index_source_of_truth": "source_manifest",
@@ -386,7 +367,10 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "accepted_reference_forms": list(
                 rules["allowed_grounding_reference_forms"]
             ),
-            "required_sections": list(rules["grounding_required_sections"]),
+            "required_sections": [
+                rules["type_structure_contract"]["middle_sections_source"],
+                rules["limitations_section"],
+            ],
             "note_plan_depth_requirements": depth_requirements,
             "excluded_model_input_fields": list(
                 rules["excluded_model_input_fields"]
@@ -394,7 +378,7 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "reject_old_references": list(rules["old_bundle_reference_prefixes"]),
             "lint_command": (
                 "scripts/lint_grounding.py --note-plan ... "
-                "--source-manifest ... --bundle-json ... --figure-decisions ..."
+                "--source-manifest ... --bundle-json ... --figure-decisions ... --output ..."
             ),
         },
         "figure_table_contract": {
@@ -416,6 +400,36 @@ def compact_writing_contract(language: str | None = None) -> dict:
             "visual_review": visual_review_contract,
         },
         "analysis_coverage_contract": analysis_coverage,
+        "takeaways_contract": {
+            **rules["takeaways_contract"],
+            "plan_fields": list(rules["takeaways_contract"]["plan_fields"]),
+            "subsections": list(rules["takeaways_contract"]["subsections"]),
+        },
+        "connections_contract": {
+            key: list(value) if isinstance(value, tuple) else deepcopy(value)
+            for key, value in rules["connections_contract"].items()
+        },
+        "storyline_contract": {
+            **rules["storyline_contract"],
+            "sentences": list(rules["storyline_contract"]["sentences"]),
+        },
+        "my_notes_contract": dict(rules["my_notes_contract"]),
+        "frontmatter_contract": {
+            key: list(value) if isinstance(value, tuple) else value
+            for key, value in rules["frontmatter_contract"].items()
+        },
+        "final_quality_gate": {
+            "schema_version": QUALITY_REVIEW_SCHEMA_VERSION,
+            "checks": list(QUALITY_CHECKS),
+            "reference": "references/final-quality-review.md",
+            "reviewed_bytes": "raw_sha256",
+            "max_revisions": 2,
+            "record_command": "scripts/write_obsidian_note.py --record-final-quality-review",
+            "save_requires": [
+                "--content-file", "--plan-file", "--final-quality-review",
+                "--final-readability-review",
+            ],
+        },
     }
     abstract_contract = rules.get("abstract_contract")
     if abstract_contract:
@@ -431,6 +445,9 @@ def bundle(
     source_manifest: dict | None = None,
     figure_decisions_wrapper: dict | None = None,
     output_language: str | None = None,
+    figures_path: str = "",
+    assets_path: str = "",
+    own_directory: str = "",
 ) -> dict:
     evidence_pack = (
         evidence_wrapper.get("evidence_pack", {})
@@ -504,23 +521,27 @@ def bundle(
             "coverage": source_manifest.get("coverage", {}) or {},
         },
         "source_index": source_index(source_manifest),
-        "references": {"candidates": sanitize_reference_candidates(evidence_pack, config)},
-        "figure_plan": figure_plan,
+        "connection_candidates": recalled_connections(
+            evidence_pack, source_manifest, config, resolved_output_language, own_directory
+        ),
+        "glossary_terms": glossary_terms(
+            config, body_text_from_raw_sections(source_manifest.get("raw_sections_path"))
+        ),
+        "research_memory": read_research_memory(config, resolved_output_language),
         "figure_table_manifest": figure_table_manifest(
             figure_decisions_wrapper,
             source_manifest,
             figure_plan,
+            figures_path,
+            assets_path,
         ),
-        "pdf_assets": {
-            "asset_root": assets_wrapper.get("asset_root", ""),
-            "images_dir": assets_wrapper.get("images_dir", ""),
-            "page_assets": sanitize_page_assets(assets_wrapper),
-            "image_assets": assets_wrapper.get("image_assets", []),
-            "figure_assets": sanitize_figure_assets(assets_wrapper),
-            "ocr_available": assets_wrapper.get("ocr_available", False),
-        },
         "writing_contract": compact_writing_contract(resolved_output_language),
     }
+
+
+def resolved_file_path(value: str | None) -> str:
+    path = Path(value).expanduser() if value else None
+    return str(path.resolve()) if path is not None and path.is_file() else ""
 
 
 def main() -> None:
@@ -546,6 +567,9 @@ def main() -> None:
             source_manifest,
             figure_decisions,
             args.language,
+            figures_path=resolved_file_path(args.figures),
+            assets_path=resolved_file_path(args.assets),
+            own_directory=admitted_target_directory(args.admission),
         ),
         args.output,
     )

@@ -99,9 +99,10 @@ def test_bundle_compact_writing_contract_keeps_depth_rules_without_old_bundle_fi
     assert contract["grounding_contract"]["excluded_model_input_fields"] == list(
         WRITING_CONTRACT_RULES["excluded_model_input_fields"]
     )
-    assert contract["grounding_contract"]["required_sections"] == list(
-        WRITING_CONTRACT_RULES["grounding_required_sections"]
-    )
+    assert contract["grounding_contract"]["required_sections"] == [
+        "contracts_by_paper_type[note_plan.paper_type].middle_sections",
+        "局限",
+    ]
     assert contract["grounding_contract"]["note_plan_depth_requirements"] == {
         "required_section_focus_min_chars": WRITING_CONTRACT_RULES[
             "note_plan_depth_requirements"
@@ -265,7 +266,6 @@ def test_bundle_uses_only_canonical_accepted_metadata_for_model_input() -> None:
             "identity_contract": {
                 "artifact_type": "canonical_identity",
                 "schema_version": 2,
-                "schema_version": 2,
                 "paper_id": "doi:10.1234/accepted",
                 "identity_verdict": "accepted",
                 "work_level_identity": {
@@ -402,3 +402,62 @@ def test_bundle_preserves_identity_warnings_without_body_writing_instruction() -
     assert "accepted_with_warnings" not in writing_contract_text
     assert "source_manifestation_year_differs_from_work_identity" not in writing_contract_text
     assert "identity warning" not in writing_contract_text.lower()
+
+
+def test_bundle_points_at_figure_artifacts_instead_of_copying_them() -> None:
+    synthesis = bundle(
+        metadata={"title": "Contract Paper"},
+        evidence_wrapper={"evidence_pack": {}},
+        figures_wrapper={
+            "output_language": "zh-CN",
+            "figure_plan": {"figures": [{"id": "Figure 1", "candidate_pages": ["page text"]}]},
+        },
+        assets_wrapper={"image_assets": [{"filename": "page_003_img_01.jpeg"}]},
+        source_manifest=accepted_source_manifest(),
+        figure_decisions_wrapper={
+            "output_language": "zh-CN",
+            "decisions_path": "/run/paper_figure_table_decisions.json",
+            "decisions": [{"source_id": "Figure 1", "decision": "review_pending"}],
+        },
+        output_language="zh-CN",
+        figures_path="/run/paper_figures.json",
+        assets_path="/run/paper_assets.json",
+    )
+
+    assert "figure_plan" not in synthesis
+    assert "pdf_assets" not in synthesis
+    manifest = synthesis["figure_table_manifest"]
+    assert "decisions" not in manifest
+    assert manifest["decisions_path"] == "/run/paper_figure_table_decisions.json"
+    assert manifest["figures_path"] == "/run/paper_figures.json"
+    assert manifest["assets_path"] == "/run/paper_assets.json"
+    assert manifest["planned_items"] == 1
+    assert manifest["requires_full_decision_table"] is True
+
+
+def quality_checklists(data: object, path: str = "") -> dict[str, object]:
+    """Return every bundle field that lists quality-review checks, keyed by dotted path."""
+    found: dict[str, object] = {}
+    if isinstance(data, dict):
+        for key, value in data.items():
+            child = f"{path}.{key}" if path else key
+            if key.endswith("checks") and "quality" in child:
+                found[child] = value
+            found.update(quality_checklists(value, child))
+    return found
+
+
+def test_bundle_carries_only_the_quality_checks_the_recorder_enforces() -> None:
+    from _final_quality import QUALITY_CHECKS
+
+    synthesis = bundle(
+        metadata={"title": "Contract Paper"},
+        evidence_wrapper={"evidence_pack": {}},
+        figures_wrapper={},
+        assets_wrapper={},
+        source_manifest=accepted_source_manifest(),
+    )
+
+    assert quality_checklists(synthesis) == {
+        "writing_contract.final_quality_gate.checks": list(QUALITY_CHECKS)
+    }

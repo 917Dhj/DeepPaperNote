@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "pdf": "npj-genai-mental-health.pdf",
+  "sha256": "0b76842c2a1596c76cb8d9055c777aa0ac35d9c5599336de33510a2ee31f154d",
+  "source": "doi:10.1038/s44184-024-00097-4",
+  "traits": [
+    "journal-pipe-caption",
+    "qualitative",
+    "side-caption",
+    "two-column"
+  ],
+  "readable": true,
+  "title": "“It happened to be the perfect thing”: experiences of generative AI chatbots for mental health",
+  "labels": [
+    "Fig 1",
+    "Fig 2",
+    "Fig 3",
+    "Fig 4"
+  ],
+  "captions": {
+    "Fig 3": {
+      "starts": "Overarching themes, available online",
+      "ends": "created with Mindmeister."
+    },
+    "Fig 4": {
+      "starts": "Comparative summary of perceptions",
+      "ends": "interpreted with caution."
+    }
+  },
+  "review": [
+    "Fig 3",
+    "Fig 4"
+  ],
+  "crops": {},
+  "same_visual": [],
+  "known_gaps": {}
+}

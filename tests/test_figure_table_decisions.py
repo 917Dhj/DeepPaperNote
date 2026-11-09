@@ -61,36 +61,6 @@ def run_decisions(
     return json.loads(output_path.read_text(encoding="utf-8"))
 
 
-def run_review_decisions(
-    tmp_path: Path,
-    decisions: dict,
-    *,
-    check: bool = True,
-) -> tuple[subprocess.CompletedProcess[str], dict | None]:
-    decisions = {"output_language": "zh-CN", **decisions}
-    decisions_path = write_json(tmp_path / "review_decisions.json", decisions)
-    output_path = tmp_path / "reviewed_decisions.json"
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(DECISIONS_SCRIPT),
-            "--review-decisions",
-            str(decisions_path),
-            "--output",
-            str(output_path),
-        ],
-        check=check,
-        capture_output=True,
-        text=True,
-    )
-    payload = (
-        json.loads(output_path.read_text(encoding="utf-8"))
-        if output_path.is_file()
-        else None
-    )
-    return result, payload
-
-
 def test_figure_table_decisions_cover_every_caption(tmp_path: Path) -> None:
     source_manifest = {
         "paper_id": "paper:figures",
@@ -375,167 +345,6 @@ def test_figure_table_decisions_rerender_selected_candidate_at_300_dpi(
     }
 
 
-def test_figure_table_decisions_apply_one_normalized_bbox_repair(
-    tmp_path: Path,
-) -> None:
-    if fitz is None:
-        pytest.skip("PyMuPDF is required for bounded crop repair.")
-    pdf_path = tmp_path / "paper.pdf"
-    doc = fitz.open()
-    try:
-        page = doc.new_page(width=200.0, height=400.0)
-        page.draw_rect(fitz.Rect(20.0, 80.0, 180.0, 240.0), width=2.0)
-        doc.save(pdf_path)
-    finally:
-        doc.close()
-    source_image = tmp_path / "candidate.png"
-    source_image.write_bytes(b"caption-contaminated")
-    digest = hashlib.sha256(b"caption-contaminated").hexdigest()
-    decisions = {
-        "status": "ok",
-        "decisions": [
-            {
-                "source_id": "Figure 1",
-                "kind": "figure",
-                "decision": "review_pending",
-                "source_image_path": str(source_image),
-                "source_image_filename": source_image.name,
-                "source_image_sha256": digest,
-                "review_evidence": {
-                    "candidate_path": str(source_image),
-                    "page_preview_path": str(tmp_path / "page.png"),
-                    "source_pdf_path": str(pdf_path),
-                    "source_page": 1,
-                    "caption": "Architecture",
-                    "bbox_pt": [0.0, 0.0, 200.0, 300.0],
-                    "normalized_bbox": [0.0, 0.0, 1.0, 0.75],
-                    "render_dpi": 300,
-                },
-                "visual_review": {
-                    "status": "repair_requested",
-                    "reviewed_asset_sha256": digest,
-                    "preserved_scientific_elements": ["diagram"],
-                    "omitted_scientific_elements": [],
-                    "notes": "Remove external caption below the diagram.",
-                    "failure_reason": "caption_contamination",
-                    "repair_attempts": 0,
-                    "revised_bbox": [0.1, 0.2, 0.9, 0.6],
-                },
-            }
-        ],
-    }
-
-    result, payload = run_review_decisions(
-        tmp_path,
-        {"output_language": "en", **decisions},
-        check=False,
-    )
-    assert result.returncode != 0
-    assert payload is None
-    assert "does not match resolved output_language zh-CN" in result.stderr
-    assert not (tmp_path / "candidate_repair1.png").exists()
-
-    _, payload = run_review_decisions(tmp_path, decisions)
-    assert payload is not None
-    decision = payload["decisions"][0]
-    repair_path = Path(decision["source_image_path"])
-
-    assert repair_path.name == "candidate_repair1.png"
-    assert repair_path.is_file()
-    pixmap = fitz.Pixmap(str(repair_path))
-    assert pixmap.width == 667
-    assert pixmap.height == 667
-    assert decision["decision"] == "review_pending"
-    assert decision["visual_review"]["status"] == "pending"
-    assert decision["visual_review"]["repair_attempts"] == 1
-    assert decision["visual_review"]["revised_bbox"] == [0.1, 0.2, 0.9, 0.6]
-    assert decision["review_evidence"]["bbox_pt"] == [20.0, 80.0, 180.0, 240.0]
-    assert decision["source_image_sha256"] == hashlib.sha256(
-        repair_path.read_bytes()
-    ).hexdigest()
-
-
-@pytest.mark.parametrize(
-    "bbox",
-    (
-        [],
-        [-0.1, 0.1, 0.8, 0.8],
-        [0.1, 0.1, 1.1, 0.8],
-        [0.8, 0.1, 0.2, 0.8],
-        [0.1, 0.8, 0.8, 0.2],
-    ),
-)
-def test_figure_table_decisions_reject_invalid_normalized_bbox(
-    tmp_path: Path,
-    bbox: list[float],
-) -> None:
-    source_image = tmp_path / "candidate.png"
-    source_image.write_bytes(b"candidate")
-    digest = hashlib.sha256(b"candidate").hexdigest()
-    decisions = {
-        "decisions": [
-            {
-                "decision": "review_pending",
-                "source_image_path": str(source_image),
-                "source_image_sha256": digest,
-                "visual_review": {
-                    "status": "repair_requested",
-                    "reviewed_asset_sha256": digest,
-                    "preserved_scientific_elements": [],
-                    "omitted_scientific_elements": [],
-                    "notes": "",
-                    "failure_reason": "caption_contamination",
-                    "repair_attempts": 0,
-                    "revised_bbox": bbox,
-                },
-            }
-        ]
-    }
-
-    result, payload = run_review_decisions(tmp_path, decisions, check=False)
-
-    assert result.returncode != 0
-    assert payload is None
-    assert "revised_bbox" in result.stderr
-
-
-def test_figure_table_decisions_fail_closed_after_repair_limit(
-    tmp_path: Path,
-) -> None:
-    source_image = tmp_path / "candidate_repair1.png"
-    source_image.write_bytes(b"still-contaminated")
-    digest = hashlib.sha256(b"still-contaminated").hexdigest()
-    decisions = {
-        "decisions": [
-            {
-                "source_id": "Figure 1",
-                "decision": "review_pending",
-                "source_image_path": str(source_image),
-                "source_image_sha256": digest,
-                "visual_review": {
-                    "status": "repair_requested",
-                    "reviewed_asset_sha256": digest,
-                    "preserved_scientific_elements": ["diagram"],
-                    "omitted_scientific_elements": [],
-                    "notes": "Caption remains after the first repair.",
-                    "failure_reason": "caption_contamination",
-                    "repair_attempts": 1,
-                    "revised_bbox": [0.1, 0.1, 0.9, 0.7],
-                },
-            }
-        ]
-    }
-
-    _, payload = run_review_decisions(tmp_path, decisions)
-    assert payload is not None
-    decision = payload["decisions"][0]
-
-    assert decision["decision"] == "visual_defect"
-    assert decision["skip_reason"] == "repair_limit_exhausted"
-    assert decision["visual_review"]["status"] == "fail"
-    assert decision["visual_review"]["failure_reason"] == "repair_limit_exhausted"
-
-
 def test_figure_table_decisions_dedupe_figure_and_fig_variants(tmp_path: Path) -> None:
     source_image = tmp_path / "page_011_fig_figure_14.png"
     source_image.write_bytes(b"figure-14")
@@ -652,3 +461,90 @@ def test_figure_table_decisions_insert_selected_usable_tables(tmp_path: Path) ->
 
     assert decision["decision"] == "review_pending"
     assert decision["skip_reason"] == ""
+
+
+@pytest.mark.parametrize(
+    ("items", "expected"),
+    (
+        (
+            [("figure", "Figure 1"), ("table", "Table 3"), ("figure", "Figure S2")],
+            ["figure_1.png", "table_3.png", "figure_s2.png"],
+        ),
+        (
+            [("figure", "Figure 3a"), ("figure", "Figure 3b")],
+            ["figure_3a.png", "figure_3b.png"],
+        ),
+        (
+            [("figure", "Fig. 3"), ("figure", "Figure 3"), ("figure", "FIG. 3")],
+            ["figure_3.png", "figure_3_2.png", "figure_3_3.png"],
+        ),
+        (
+            # A real label keeps its own name; a duplicate's suffix steps around it.
+            [("figure", "Figure 3"), ("figure", "Figure 3"), ("figure", "Figure 3.2")],
+            ["figure_3.png", "figure_3_3.png", "figure_3_2.png"],
+        ),
+        (
+            [("figure", ""), ("table", "表 ?"), ("figure", "图"), ("", "")],
+            [
+                "figure_unlabeled.png",
+                "table_unlabeled.png",
+                "figure_unlabeled_2.png",
+                "item_unlabeled.png",
+            ],
+        ),
+        (
+            [("table", "Table 3."), ("figure", "Extended Data Fig. 4"), ("table", "4")],
+            ["table_3.png", "extended_data_figure_4.png", "table_4.png"],
+        ),
+    ),
+)
+def test_vault_image_filenames_are_label_named_unique_and_stable(
+    items: list[tuple[str, str]], expected: list[str]
+) -> None:
+    from plan_figure_table_decisions import vault_image_filenames
+
+    records = [{"kind": kind, "label": label} for kind, label in items]
+
+    assert vault_image_filenames(records) == expected
+    assert vault_image_filenames(records) == expected
+
+
+def test_figure_table_decisions_keep_subfigure_labels_apart(tmp_path: Path) -> None:
+    images = []
+    for name in ("page_004_fig_figure_3a.png", "page_004_fig_figure_3b.png"):
+        image = tmp_path / name
+        image.write_bytes(name.encode())
+        images.append(image)
+    source_manifest = {
+        "captions": {
+            "figures": [
+                {"id": "Figure 3a", "caption": "Left panel", "page": 4},
+                {"id": "Figure 3b", "caption": "Right panel", "page": 4},
+            ],
+            "tables": [],
+        }
+    }
+    figures = {
+        "figure_plan": {
+            "figures": [
+                {
+                    "id": label,
+                    "section": "关键结果",
+                    "priority": 1,
+                    "figure_asset_candidate": {
+                        "filename": image.name,
+                        "path": str(image),
+                        "candidate_status": "usable_candidate",
+                    },
+                }
+                for label, image in zip(("Figure 3a", "Figure 3b"), images)
+            ]
+        }
+    }
+
+    payload = run_decisions(tmp_path, source_manifest, figures)
+
+    assert [item["relative_markdown_embed"] for item in payload["decisions"]] == [
+        "![Figure 3a](images/figure_3a.png)",
+        "![Figure 3b](images/figure_3b.png)",
+    ]

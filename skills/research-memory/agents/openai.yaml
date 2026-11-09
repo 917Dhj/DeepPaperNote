@@ -1,0 +1,4 @@
+interface:
+  display_name: "Research Memory"
+  short_description: "Interview me to build or update my research memory in Obsidian."
+  default_prompt: "Use $research-memory to build or update my research memory: read my vault, propose directions with evidence from what I have read, ask me in short rounds, then show the preview and write only what I confirm."

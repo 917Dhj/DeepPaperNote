@@ -1,6 +1,6 @@
-# DeepPaperNote Note Evaluation Rubric v1
+# DeepPaperNote Note Evaluation Rubric v3
 
-Status: v1 stable
+Status: v3
 Audience: evaluation agents
 Scope: final DeepPaperNote Markdown notes after generation
 
@@ -8,47 +8,83 @@ This rubric is for evaluating finished notes. It is not a writing reference for 
 DeepPaperNote note-generation workflow, and it must not be used to rewrite,
 repair, or complete the note under evaluation.
 
+v3 changes from v2: the paper type sets what the note must cover. H5 checks the analytical surface of the paper's type; D2 judges how clearly the note explains the paper's mechanism or flow; D8 adds plain language and term explanation; D9 (core question coverage) and D10 (narrative and logic) are new; the weights are rebalanced to make room for them.
+
 ## Evaluator Role
 
 The evaluation agent judges finished outputs. It must:
 
 - compare raw generated notes as they are
-- keep baseline and candidate notes unmodified
+- keep both notes unmodified
 - cite concrete evidence for every material judgment
 - separate hard failures from score differences
-- avoid rewarding a note only because it is longer, cleaner, or more polished
+- judge content wherever it appears: section names, layout, and length earn nothing by themselves
 
 The evaluation agent must not:
 
 - generate a replacement note
 - patch missing sections
 - add citations or images
-- infer that a candidate improved simply because it came from a newer run
+- guess which note comes from which version, or let such a guess affect a judgment
 - collapse the result into one scalar score without recording the failure mode
 
 ## Required Inputs
 
-For a single-paper evaluation, the evaluator should receive:
+For one pair, the evaluator receives:
 
+- the pair id
 - the paper title and stable identity evidence, such as DOI, arXiv ID, venue, or PDF path
-- the baseline final note
-- the candidate final note
-- available source evidence, preferably `source_manifest.json` and `raw_sections.jsonl`
-- available run artifacts, such as `synthesis_bundle.json`, note plan JSON, grounding lint output, figure/table decisions, and note lint output
+- the output language of both notes
+- the paper type and its core questions: the expected `paper_type` and the id and wording of each core question for that type, identical for both notes
+- note A and note B
+- available source evidence for each note, preferably `source_manifest.json` and `raw_sections.jsonl`
+- available run artifacts for each note, such as `synthesis_bundle.json`, note plan JSON, grounding lint output, figure/table decisions, and note lint output
+
+The experimenter takes the core questions from `core_questions` of that type in `skills/deeppapernote/scripts/type_profiles.py` at the candidate commit, in the notes' output language. The evaluator never receives which note is the baseline, commit ids, run manifests, or timestamps.
 
 If source evidence is unavailable, the evaluator may still compare note readability
 and structure, but it must mark evidence-grounded dimensions as low-confidence.
 
 ## Evaluation Order
 
-1. Run hard gates.
-2. Score baseline and candidate independently.
-3. Perform pairwise comparison.
-4. Assign the final verdict.
+1. Run the hard gates on each note.
+2. Check each core question against each note.
+3. Score note A and note B independently.
+4. Perform the pairwise comparison.
 5. Emit the required JSON report.
 
-Hard gates override numeric scores. A note with a severe hard-gate failure cannot
-be treated as a real improvement, even if it scores well on some dimensions.
+Hard gates override numeric scores. A note that fails a severe hard gate cannot
+win the comparison on its scores alone.
+
+## Paper Type
+
+The paper type decides what a complete note covers. Read every dimension through it:
+
+| `paper_type` | The paper's core (D2) | Its results (D3) |
+| --- | --- | --- |
+| `method` | the mechanism and its pipeline | experiments against baselines, ablations |
+| `system` | the design, its trade-offs, and the request or data path | measured performance under the workloads |
+| `theory` | the assumptions and the proof idea | the theorems and the conditions they hold under |
+| `position` | the stance and the argument for it | the conclusions argued and the evidence offered |
+| `benchmark_or_dataset` | the construction pipeline and the evaluation protocol | model results and what they reveal |
+| `discovery_empirical` | the hypotheses and the experiment design | the findings and what they rule out |
+| `human_subjects_empirical` | the study design, participants, and measures | effects with their uncertainty |
+| `survey_or_review` | the scope, the search, and the taxonomy | the consensus, disagreements, and gaps found |
+| `qualitative_empirical` | the sampling and the analysis process | the themes and the material behind them |
+| `humanities_argument` | the claim and the argument's structure | the conclusions and their qualifications |
+
+Numbers matter where the paper reports them. A note on a paper without experiments is not penalized for having few numbers.
+
+## Core Questions
+
+Each core question is one check per note, recorded in the JSON as one of:
+
+- `answered`: the note answers it specifically for this paper, and the answer is traceable to the paper. The answer may sit in any section, under any heading.
+- `not_reported_stated`: the paper does not report it, and the note says so ("论文没有报告 X" / "The paper does not report X").
+- `missing`: the note does not address it, or answers it only with generic text that would fit any paper.
+- `misframed`: the note answers it, but the answer contradicts the paper, invents what the paper does not report, turns an unreported item into a fault ("the authors did not do X"), or adds a score or a low/high rating.
+
+A `misframed` answer that misstates a central point also fails H2 or H4.
 
 ## Hard Gates
 
@@ -78,11 +114,12 @@ figures, or supplied artifacts.
 Fail if the note presents unproven, unvalidated, or speculative claims as proven
 paper conclusions.
 
-### H5. Core Analytical Sections Exist
+### H5. Core Analytical Surface Exists
 
-Fail if the note is missing the core analytical surface needed for a deep note:
-research problem, data/task definition, method or analysis flow, key results,
-limitations, and reusable takeaways.
+Fail if the note is missing the analytical surface its paper type needs: the
+problem the paper addresses, the paper's core as the Paper Type table describes it,
+its results, limitations, and reusable takeaways. Judge by content, not by section
+names.
 
 ### H6. No Degraded-Source Pretending
 
@@ -95,12 +132,17 @@ not explicitly acknowledged.
 Fail if broken image embeds, invalid local paths, incorrect figure/table identity,
 or misleading citation links materially damage the note.
 
-### H8. Final Note Is Readable Chinese
+### H8. Final Note Is Readable In Its Output Language
 
-Fail if the note contains substantial mixed-language prose, raw extraction
-fragments, broken paragraph flow, or English clauses where natural Chinese
-analysis is expected. Stable proper nouns, model names, datasets, metrics, code
-tokens, URLs, DOI strings, and paper figure IDs may remain in English.
+Fail if the note contains raw extraction fragments, broken paragraph flow, or
+substantial prose in a language other than its output language:
+
+- `zh-CN`: English clauses where natural Chinese analysis is expected.
+- `en`: Chinese prose anywhere outside citation metadata, such as a Chinese title
+  or author list.
+
+Stable proper nouns, model names, datasets, metrics, code tokens, URLs, DOI
+strings, and paper figure IDs may stay in their original form in either language.
 
 ## Scored Dimensions
 
@@ -109,46 +151,53 @@ only when the evidence genuinely falls between anchors.
 
 ### D1. Evidence Chain Coverage
 
-Weight: 20
+Weight: 15
 
 - 0: The note mostly repeats the abstract or introduction.
 - 1: It mentions the paper's topic but misses the main evidence chain.
-- 2: It covers some problem/method/result pieces but leaves major links unclear.
+- 2: It covers some problem/core/result pieces but leaves major links unclear.
 - 3: It reconstructs the basic claim-to-evidence chain with some omissions.
 - 4: It covers the central claims, supporting evidence, and main interpretation.
 - 5: It clearly explains the full evidence chain, including what each result does
   and does not prove.
 
-### D2. Mechanism Or Protocol Depth
-
-Weight: 20
-
-- 0: No mechanism or protocol explanation.
-- 1: Names methods, datasets, or stages without explaining how they work.
-- 2: Gives a rough flow but misses key inputs, transformations, or outputs.
-- 3: Explains the main mechanism or protocol but lacks important training,
-  inference, evaluation, formula, or implementation details.
-- 4: Connects mechanism or protocol choices to the observed result pattern.
-- 5: Provides replication-grade explanation that a technical reader could reuse
-  to re-explain, compare, or partially reproduce the paper.
-
-### D3. Results, Settings, And Numbers
+### D2. Mechanism Or Flow Clarity
 
 Weight: 15
 
+Judge the paper's core as the Paper Type table describes it.
+
+- 0: No explanation of the paper's core.
+- 1: Names stages, components, or arguments without explaining how they work.
+- 2: Gives a rough flow, but the order, the inputs and outputs, or the logic
+  between steps stays unclear, or the explanation is buried in jargon.
+- 3: The main flow is clear, but a key step, or which step is new in this paper,
+  stays unclear.
+- 4: Each key step's input, operation, and output is clear, what is new is marked,
+  and design choices are tied to the results.
+- 5: A researcher from an adjacent field could re-explain the flow and why each key
+  step is there, and a specialist finds the details needed to compare or partially
+  reproduce it.
+
+### D3. Results, Settings, And Numbers
+
+Weight: 10
+
+Judge the paper's results as the Paper Type table describes them.
+
 - 0: Omits the key results.
-- 1: Mentions results only qualitatively.
-- 2: Includes some numbers but not the settings, baselines, or metrics needed to
-  interpret them.
-- 3: Covers the main numbers and settings with minor omissions.
-- 4: Explains the most important comparisons, settings, metrics, and result
+- 1: Mentions results only qualitatively, where the paper gives specifics.
+- 2: Includes some results but not the settings, baselines, conditions, or
+  metrics needed to interpret them.
+- 3: Covers the main results and their settings with minor omissions.
+- 4: Explains the most important comparisons, settings, conditions, and result
   patterns.
 - 5: Selects the meaningful results, interprets them correctly, and avoids
   over-weighting decorative or weak numbers.
 
 ### D4. Claim Boundaries And Limitations
 
-Weight: 15
+Weight: 10
 
 - 0: No real limitations or claim boundaries.
 - 1: Uses generic limitations that could apply to any paper.
@@ -160,7 +209,7 @@ Weight: 15
 
 ### D5. Comparative Positioning And Novelty
 
-Weight: 10
+Weight: 5
 
 - 0: No positioning or novelty judgment.
 - 1: Says the work is novel or important without locating why.
@@ -184,6 +233,12 @@ Weight: 10
 - 5: A future reader could use the takeaways to guide implementation,
   reproduction, comparison, or research planning.
 
+Score mainly from the Takeaways section (`阅读收获` / `Takeaways`): a transferable
+idea that names the paper's mechanism, its transfer target, and the precondition,
+plus a follow-up question or experiment specific to the paper, supports a 4 or 5.
+Do not score the user-owned My Notes section (`我的笔记` / `My Notes`); in a
+generated note it holds only the standard guidance.
+
 ### D7. Obsidian Note Usability
 
 Weight: 5
@@ -195,17 +250,62 @@ Weight: 5
 - 4: Clear Obsidian-friendly layout, links, figures, and sections.
 - 5: Excellent long-term vault usability without sacrificing technical depth.
 
-### D8. Language And Readability
+### D8. Language, Plainness, And Readability
 
-Weight: 5
+Weight: 10
+
+The reader is a smart researcher from an adjacent field. Plain prose leads each
+paragraph with its conclusion, explains a term in one plain sentence where it first
+appears, keeps one point per paragraph, and keeps only the numbers that carry a
+conclusion in the prose. Formulas and implementation detail belong to `method`,
+`system`, and `theory` notes.
 
 - 0: Hard to read, raw extraction-like, or heavily mixed-language.
-- 1: Frequent awkward phrasing or untranslated English prose.
-- 2: Understandable but noticeably rough.
-- 3: Mostly fluent Chinese with minor residue.
-- 4: Clear, natural, technically precise Chinese.
-- 5: Polished analytical prose that stays faithful to the paper and easy to
-  reread later.
+- 1: Frequent awkward phrasing, stiff literal translation, or prose left in
+  another language.
+- 2: Understandable, but dense: terms go unexplained, or conclusions are buried
+  under detail.
+- 3: Mostly fluent in the output language; a few terms go unexplained or a few
+  paragraphs run several points together.
+- 4: Clear, natural prose; terms are explained where they first appear, and
+  paragraphs lead with their point.
+- 5: An adjacent-field reader follows every paragraph on one read, with no loss of
+  technical precision or faithfulness to the paper.
+
+### D9. Core Question Coverage
+
+Weight: 10
+
+Score from the core question checks.
+
+- 0: Most core questions are `missing`.
+- 1: A few are `answered`; most are `missing` or `misframed`.
+- 2: About half are `answered` or `not_reported_stated`.
+- 3: Most are `answered` or `not_reported_stated`; one or two are `missing`, or
+  answers are thin.
+- 4: Every question is `answered` or `not_reported_stated`, with no `misframed`
+  item; a few answers are thin.
+- 5: Every question is answered precisely with evidence, and every unreported item
+  that limits a conclusion is carried into the limitations.
+
+Any `misframed` item caps the score at 3.
+
+### D10. Narrative And Logic
+
+Weight: 10
+
+The narrative is the paper's own story: what problem it takes on, what it does
+about it, what the evidence shows, and where the conclusion stops.
+
+- 0: A list of disconnected facts.
+- 1: Sections stand alone; the reader cannot tell what the paper's story is.
+- 2: The story is stated at the top, but the sections drift from it, or paragraphs
+  sit outside it.
+- 3: A throughline is visible and most sections connect to it, with some detours.
+- 4: Each section advances one story, and the reader can tell why each section
+  follows the one before.
+- 5: An adjacent-field reader could retell the paper's argument after one read; the
+  summary at the top, the body, the limitations, and the takeaways agree.
 
 ## Weighted Score
 
@@ -213,99 +313,110 @@ For each dimension:
 
 `weighted_points = score / 5 * weight`
 
-The maximum total is 100.
+The weights sum to 100, so the maximum total is 100.
 
 Scores are secondary. A high numeric score does not override a hard-gate failure.
 
 ## Pairwise Comparison
 
-When comparing a baseline note with a candidate note, evaluate both notes first
-without assuming which is newer.
+Evaluate both notes before comparing them. Then assign one of:
 
-Then assign one of:
-
-- `candidate_wins`
-- `baseline_wins`
+- `a_wins`
+- `b_wins`
 - `tie`
 - `mixed`
 
-Prefer `mixed` when the candidate improves some content dimensions but regresses
-on hard gates, factuality, grounding, or important usability.
+Prefer `mixed` when one note is better on some content dimensions but worse on
+hard gates, factuality, grounding, or important usability.
 
-## Improvement Verdict
+Set `material_difference` to true only when the difference would change what a
+reader learns about the paper, not when it is cosmetic, a matter of length, or
+formatting alone. For each material difference, record the dimension, which note
+is better, and the evidence.
 
-Use exactly one final verdict:
-
-- `hard_fail`: the candidate fails any severe hard gate.
-- `regression`: the candidate is materially worse than baseline.
-- `no_material_change`: differences are cosmetic, noisy, or too small to matter.
-- `partial_improvement`: the candidate improves some dimensions but not enough to
-  claim broad quality improvement.
-- `real_improvement`: the candidate is materially better on core content
-  dimensions without introducing hard-gate failures.
-
-To assign `real_improvement`, the candidate should usually:
-
-- pass all known hard gates
-- improve Evidence Chain Coverage or Mechanism/Protocol Depth
-- not regress on Claim Boundaries and Limitations
-- avoid major factual, grounding, citation, figure, or readability regressions
-- improve for reasons tied to paper evidence, not only cleaner formatting
+The evaluator does not decide whether a change improved DeepPaperNote. The
+Regression Judge in `evals/regression-workflow.md` unblinds the pairs, compares
+them against the noise between two baseline runs, and assigns the improvement
+verdict.
 
 ## Required JSON Output
 
-The evaluator must emit a JSON object with this shape:
+The evaluator must emit a JSON object with this shape. `core_questions` holds one
+entry per supplied question id, in the supplied order.
 
 ```json
 {
-  "rubric_version": "v1",
+  "rubric_version": "v3",
+  "pair_id": "",
   "paper_id": "",
   "paper_title": "",
+  "paper_type": "",
+  "output_language": "zh-CN|en",
   "evidence_confidence": "high|medium|low",
-  "hard_gates": {
-    "paper_identity_valid": {"status": "pass|fail|unknown", "evidence": ""},
-    "no_major_factual_error": {"status": "pass|fail|unknown", "evidence": ""},
-    "central_claims_grounded": {"status": "pass|fail|unknown", "evidence": ""},
-    "claim_boundaries_honest": {"status": "pass|fail|unknown", "evidence": ""},
-    "core_analytical_sections_exist": {"status": "pass|fail|unknown", "evidence": ""},
-    "no_degraded_source_pretending": {"status": "pass|fail|unknown", "evidence": ""},
-    "figure_table_citation_paths_not_broken": {"status": "pass|fail|unknown", "evidence": ""},
-    "readable_chinese_final_note": {"status": "pass|fail|unknown", "evidence": ""}
-  },
-  "baseline": {
+  "note_a": {
+    "hard_gates": {
+      "paper_identity_valid": {"status": "pass|fail|unknown", "evidence": ""},
+      "no_major_factual_error": {"status": "pass|fail|unknown", "evidence": ""},
+      "central_claims_grounded": {"status": "pass|fail|unknown", "evidence": ""},
+      "claim_boundaries_honest": {"status": "pass|fail|unknown", "evidence": ""},
+      "core_analytical_surface_exists": {"status": "pass|fail|unknown", "evidence": ""},
+      "no_degraded_source_pretending": {"status": "pass|fail|unknown", "evidence": ""},
+      "figure_table_citation_paths_not_broken": {"status": "pass|fail|unknown", "evidence": ""},
+      "readable_in_output_language": {"status": "pass|fail|unknown", "evidence": ""}
+    },
+    "core_questions": [
+      {"id": "", "status": "answered|not_reported_stated|missing|misframed", "evidence": ""}
+    ],
     "scores": {
       "evidence_chain_coverage": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
-      "mechanism_protocol_depth": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
+      "mechanism_flow_clarity": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "results_settings_numbers": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "claim_boundaries_limitations": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "comparative_positioning_novelty": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "reusable_takeaways": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "obsidian_usability": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
-      "language_readability": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""}
+      "plain_language_readability": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
+      "core_question_coverage": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
+      "narrative_logic": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""}
     },
     "total_score": 0
   },
-  "candidate": {
+  "note_b": {
+    "hard_gates": {
+      "paper_identity_valid": {"status": "pass|fail|unknown", "evidence": ""},
+      "no_major_factual_error": {"status": "pass|fail|unknown", "evidence": ""},
+      "central_claims_grounded": {"status": "pass|fail|unknown", "evidence": ""},
+      "claim_boundaries_honest": {"status": "pass|fail|unknown", "evidence": ""},
+      "core_analytical_surface_exists": {"status": "pass|fail|unknown", "evidence": ""},
+      "no_degraded_source_pretending": {"status": "pass|fail|unknown", "evidence": ""},
+      "figure_table_citation_paths_not_broken": {"status": "pass|fail|unknown", "evidence": ""},
+      "readable_in_output_language": {"status": "pass|fail|unknown", "evidence": ""}
+    },
+    "core_questions": [
+      {"id": "", "status": "answered|not_reported_stated|missing|misframed", "evidence": ""}
+    ],
     "scores": {
       "evidence_chain_coverage": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
-      "mechanism_protocol_depth": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
+      "mechanism_flow_clarity": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "results_settings_numbers": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "claim_boundaries_limitations": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "comparative_positioning_novelty": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "reusable_takeaways": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
       "obsidian_usability": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
-      "language_readability": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""}
+      "plain_language_readability": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
+      "core_question_coverage": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""},
+      "narrative_logic": {"score": 0, "weighted_points": 0, "reason": "", "evidence": ""}
     },
     "total_score": 0
   },
   "pairwise_result": {
-    "winner": "candidate_wins|baseline_wins|tie|mixed",
-    "material_improvement": true,
-    "improvement_summary": "",
-    "candidate_regressions": []
-  },
-  "verdict": "hard_fail|regression|no_material_change|partial_improvement|real_improvement",
-  "next_recommendation": ""
+    "winner": "a_wins|b_wins|tie|mixed",
+    "material_difference": true,
+    "difference_summary": "",
+    "differences": [
+      {"dimension": "", "better": "a|b", "evidence": ""}
+    ]
+  }
 }
 ```
 

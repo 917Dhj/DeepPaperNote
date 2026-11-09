@@ -7,27 +7,42 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
-from common import (
+from _identity import (
+    paper_id_for_record,
+    require_accepted_fetch_artifact,
+)
+from _pdf_text import (
+    caption_label_key,
     clean_pdf_line,
-    emit,
-    ensure_parent,
     extract_appendix_index,
     extract_caption_lines,
-    file_sha256,
-    fitz,
     match_section_heading,
-    maybe_load_json_record,
     normalize_heading,
-    normalize_whitespace,
-    paper_id_for_record,
     pdf_coverage_summary,
-    require_accepted_fetch_artifact,
     stop_section_reason,
 )
+from common import (
+    emit,
+    ensure_parent,
+    file_sha256,
+    fitz,
+    maybe_load_json_record,
+    normalize_whitespace,
+)
+from pdf_captions import caption_item, select_caption_blocks
 
+# Real papers score above 0.4 on one of these; a broken font encoding scores near 0.
+MIN_READABLE_RATIO = 0.2
+READABLE_WORD_RE = re.compile(r"[(\[]?[^\W\d_]{2,}[)\],.;:]*")
+CJK_CHAR_RE = re.compile(r"[\u3400-\u9fff]")
+UNREADABLE_TEXT_MESSAGE = (
+    "The PDF text layer is unreadable, likely from a custom font encoding. "
+    "Provide an OCR version or another copy of this paper."
+)
 MATH_SIGNAL_RE = re.compile(
     r"(?:\\(?:frac|sum|log|exp|argmax|argmin|mathbb|mathbf)|[$=]|[<>]=?|[∑∏≤≥≈∈]|O\([^)]+\))"
 )
@@ -203,16 +218,45 @@ def primary_section_for_page(sections: list[dict[str, Any]], page_number: int) -
     return ids[0] if ids else ""
 
 
+def extract_block_captions(pdf_path: Path) -> dict[int, list[dict[str, Any]]]:
+    doc = fitz.open(pdf_path)
+    try:
+        return select_caption_blocks(doc)
+    finally:
+        doc.close()
+
+
+def page_caption_items(
+    page: dict[str, Any],
+    kind: str,
+    block_captions: dict[int, list[dict[str, Any]]],
+) -> list[dict[str, str]]:
+    text_items = extract_caption_lines(str(page.get("text", "")), kind)
+    if not any(block_captions.values()):
+        return text_items
+    text_captions = {caption_label_key(item["id"]): item["caption"] for item in text_items}
+    items = []
+    for anchor in block_captions.get(int(page["page"]), []):
+        if anchor["kind"] == kind:
+            item = caption_item(anchor)
+            item["caption"] = item["caption"] or text_captions.get(
+                caption_label_key(item["id"]), ""
+            )
+            items.append(item)
+    return items
+
+
 def caption_manifest(
     page_texts: list[dict[str, Any]],
     sections: list[dict[str, Any]],
+    block_captions: dict[int, list[dict[str, Any]]] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     captions = {"figures": [], "tables": []}
     for page in page_texts:
         page_number = int(page["page"])
         section = primary_section_for_page(sections, page_number)
         for key, kind in (("figures", "figure"), ("tables", "table")):
-            for item in extract_caption_lines(str(page.get("text", "")), kind):
+            for item in page_caption_items(page, kind, block_captions or {}):
                 captions[key].append(
                     {
                         **item,
@@ -270,6 +314,21 @@ def write_full_text_markdown(records: list[dict[str, Any]], output_path: str, ti
         "\n".join(lines).rstrip() + "\n",
         encoding="utf-8",
     )
+
+
+def text_quality(full_text: str) -> dict[str, Any]:
+    """Measure whether extracted text reads as language or as a broken font encoding."""
+    tokens = full_text.split()
+    if not tokens:
+        return {"status": "empty", "readable_word_ratio": 0.0, "cjk_ratio": 0.0}
+    word_ratio = sum(1 for token in tokens if READABLE_WORD_RE.fullmatch(token)) / len(tokens)
+    cjk_ratio = len(CJK_CHAR_RE.findall(full_text)) / max(1, sum(map(len, tokens)))
+    readable = word_ratio >= MIN_READABLE_RATIO or cjk_ratio >= MIN_READABLE_RATIO
+    return {
+        "status": "readable" if readable else "unreadable",
+        "readable_word_ratio": round(word_ratio, 4),
+        "cjk_ratio": round(cjk_ratio, 4),
+    }
 
 
 def build_manifest(
@@ -335,10 +394,11 @@ def build_manifest(
             for section in sections
         ],
         "pages": build_pages(page_texts, sections),
-        "captions": caption_manifest(page_texts, sections),
+        "captions": caption_manifest(page_texts, sections, extract_block_captions(pdf_path)),
         "math_index": math_index(sections),
         "appendix_index": extract_appendix_index(pdf_path, coverage),
         "language_hint": language_hint_for_text(full_text),
+        "text_quality": text_quality(full_text),
         "text_hash_sha256": text_hash(full_text),
     }
     if isinstance(record.get("archive_source"), dict):
@@ -387,6 +447,12 @@ def main() -> None:
         full_text_output=args.full_text_output,
         max_pages=args.max_pages,
     )
+    if manifest["text_quality"]["status"] == "unreadable":
+        manifest["status"] = "blocked"
+        manifest["blocked_code"] = "unreadable_text"
+        emit(manifest, args.output)
+        print(UNREADABLE_TEXT_MESSAGE, file=sys.stderr)
+        raise SystemExit(2)
     emit(manifest, args.output)
 
 

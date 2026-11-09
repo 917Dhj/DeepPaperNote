@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "pdf": "zh-libs-soil.pdf",
+  "sha256": "330ffc2f53d06c8630cd56745912402086a5f2efd611406efedfe35b33258736",
+  "source": "doi:10.3969/j.issn.2095-1035.2024.02.002",
+  "traits": [
+    "chinese",
+    "fullwidth-characters",
+    "cnki-export"
+  ],
+  "readable": true,
+  "title": "便携式激光诱导击穿光谱仪测定土壤中重金属",
+  "labels": [
+    "图 1",
+    "图 2",
+    "图 3",
+    "图 4",
+    "图 5",
+    "图 6",
+    "图 7",
+    "图 8",
+    "图 9",
+    "表 1",
+    "表 2"
+  ],
+  "captions": {
+    "图 1": {
+      "starts": "便携式土壤重金属LIBS检测仪",
+      "ends": "检测仪"
+    },
+    "表 2": {
+      "starts": "检测结果性能评价",
+      "ends": "性能评价"
+    }
+  },
+  "review": [
+    "图 1",
+    "图 2",
+    "图 3",
+    "图 4",
+    "图 5",
+    "图 6",
+    "图 7",
+    "图 8",
+    "图 9",
+    "表 1",
+    "表 2"
+  ],
+  "crops": {
+    "图 1": {
+      "contains": [],
+      "excludes": [
+        "胡梦颖"
+      ]
+    },
+    "图 7": {
+      "contains": [],
+      "excludes": [
+        "如图７所示"
+      ]
+    },
+    "表 1": {
+      "contains": [
+        "Ｅｘｃｉｔａｔｉｏｎ"
+      ],
+      "excludes": [
+        "火花放电对电极"
+      ]
+    },
+    "表 2": {
+      "contains": [
+        "Ｃｄ"
+      ],
+      "excludes": [
+        "自主研制"
+      ]
+    }
+  },
+  "same_visual": [],
+  "known_gaps": {
+    "caption:图 1": "Fullwidth Latin letters such as ＬＩＢＳ are not normalized in caption text.",
+    "crop:图 ?": "The crop takes in body text from a neighboring column or the line above.",
+    "crop:表 ?": "The crop runs past the table into body text."
+  }
+}

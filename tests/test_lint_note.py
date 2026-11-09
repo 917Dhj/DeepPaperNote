@@ -6,6 +6,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+from formal_save_helpers import formal_save_args, reviewed_insert_fields, tagged
+
+import lint_note
+from localization import note_schema
 from lint_note import (
     core_info_structure_issues,
     figure_structure_issues,
@@ -26,8 +31,46 @@ from lint_note import (
 )
 
 
+MY_NOTES_GUIDANCE = note_schema("zh-CN")["my_notes_guidance"]
+
+
+@pytest.fixture(autouse=True)
+def _method_note_structure():
+    """Module-level lint helpers read the configured language and paper type."""
+    lint_note.configure_output_language("zh-CN")
+    lint_note.configure_paper_type("method")
+    yield
+    lint_note.configure_output_language("zh-CN")
+
+
+def _type_fields() -> dict:
+    """Plan fields added with the type-specific note body (the storyline rides along)."""
+    return {
+        "storyline": _valid_plan_payload()["storyline"],
+        "positioning": "technique",
+        "survey_mode": "",
+        "secondary_type": "",
+        "secondary_host_section": "",
+        "core_answers": _method_core_answers(),
+        "workflow": [_method_workflow()],
+    }
+
+
 def _valid_note_text() -> str:
-    return """# Paper
+    return """---
+tags:
+  - papers/机器学习
+aliases:
+  - "Paper"
+date: 2024
+paper_type: method
+methods: [tool-state tracking]
+datasets: []
+tasks: [multi-hop question answering]
+read_date: 2026-11-06
+---
+
+# Paper
 
 ## 核心信息
 
@@ -48,26 +91,36 @@ def _valid_note_text() -> str:
 
 这篇论文用可审计的工具调用状态机降低长链路问答中的错误累积。
 
-## 研究问题
+## 背景与问题
 
 论文关注多步问答系统在检索证据不完整、工具调用失败和中间状态被误用时，如何保持最终答案的可追溯性与可靠性。
 
-## 数据与任务定义
+## 现有方法的局限
 
-任务输入包括用户问题、候选检索证据和可调用工具列表；输出包括最终答案、每一步工具调用记录以及失败原因标注。
+已有的只看答案的方法无法区分证据不足和推理错误，失败的工具调用也不会留下可检查的记录。
 
-## 方法主线
+## 核心思路与挑战
 
-### 机制流程
+核心思路是把每一步工具调用写进可审计的状态机；难点在于失败调用的置信度和异常类型需要在后续步骤中被显式消费。
 
-输入问题先进入证据筛选模块，随后工具规划器选择下一步调用，最后由答案生成器结合状态日志输出可追溯结论。
+## 方法
+
+### 方法流程
+
+证据筛选 → 工具规划 → 答案生成
+
+| 步骤 | 输入 | 做什么 | 输出 | 本文新做法 |
+| --- | --- | --- | --- | --- |
+| 证据筛选 | 问题与候选证据 | 过滤低置信证据 | 证据集合 | 否 |
+| 工具规划 | 证据集合与状态日志 | 选择下一步调用 | 调用记录 | 是 |
+| 答案生成 | 状态日志 | 结合日志输出结论 | 可追溯答案 | 是 |
 
 > [!figure] 图一 方法概览
-> 建议位置：方法主线
+> 建议位置：方法
 > 放置原因：帮助理解整体过程。
 > 当前状态：保留占位；未找到高置信度整图。
 
-## 关键结果
+## 实验证据
 
 在三个多步问答数据集上，方法把答案准确率从 71.2% 提升到 78.5%，并将不可追溯错误比例从 18% 降到 9%。
 
@@ -79,23 +132,47 @@ def _valid_note_text() -> str:
 
 论文主要在英文问答数据上验证，工具集合也集中在检索和计算两类，尚未证明该状态机能稳定覆盖多模态工具或高延迟外部服务。
 
+## 阅读收获
+
+### 可迁移
+
+- 失败回溯机制可以迁移到论文精读流程：把证据缺失和模型总结不足记录成两类不同的状态，前提是每一步都有可判定的返回结果。
+
+### 下一步
+
+- 怀疑状态机在高延迟外部服务下会失效，可以在注入超时的环境里复跑主实验来检验。
+
+## 关联
+
+### 库内笔记
+
+库里暂无相关笔记
+
+### 关键前置文献
+
+- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering（基线）
+- Yao et al. 2023. ReAct: Synergizing Reasoning and Acting in Language Models（方法来源）
+- Schick et al. 2023. Toolformer: Language Models Can Teach Themselves to Use Tools（方法来源）
+
 ## 我的笔记
 
-我会重点关注它的失败回溯机制是否能迁移到论文精读流程，因为 DeepPaperNote 同样需要区分证据缺失和模型总结不足。
-
-## 引用
-
-- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example
-"""
+""" + MY_NOTES_GUIDANCE + "\n"
 
 
 def _valid_plan_payload() -> dict:
     return {
         "output_language": "zh-CN",
-        "paper_type": "AI_method",
+        "paper_type": "method",
         "paper_type_rationale": "The paper proposes a model mechanism and evaluates it experimentally.",
+        "positioning": "technique",
+        "survey_mode": "",
+        "secondary_type": "",
+        "secondary_host_section": "",
+        "core_answers": _method_core_answers(),
+        "workflow": [_method_workflow()],
+        "storyline": "多步问答在工具失败后会悄悄累积错误。作者把每次工具调用写进可审计的状态机。消融显示收益来自状态日志而不是额外重试。所以这条思路适合需要审计链路的问答系统。",
         "dominant_domain": "reasoning",
-        "must_cover": ["方法主线"],
+        "must_cover": ["方法"],
         "key_numbers": ["78.5"],
         "real_comparisons": ["baseline"],
         "central_claims": [
@@ -110,10 +187,31 @@ def _valid_plan_payload() -> dict:
         "negative_or_limiting_results": ["The paper does not report multi-service failures."],
         "mechanism_result_map": ["The failure-state mechanism explains lower unrecoverable errors."],
         "comparative_positioning": ["The method is compared against answer-only baselines."],
-        "reuse_takeaways": ["Track failure state explicitly."],
-        "followup_questions": ["Check whether the mechanism survives missing tool outputs."],
-        "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
+        "reuse_takeaways": ["Track tool failure state explicitly so later steps can tell missing evidence apart."],
+        "followup_questions": ["Check whether the mechanism survives missing tool outputs under injected timeouts."],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
+        "section_plan": [{"section": "方法", "evidence_sources": [{"section_id": "sec:method"}]}],
     }
+
+
+def _method_core_answers() -> dict:
+    answers = {
+        qid: {"answer": f"Answer for {qid}.", "evidence_refs": [{"section_id": "sec:method"}]}
+        for qid in ("method.problem", "method.prior_gaps", "method.key_idea", "method.claim_evidence", "method.boundary_cost")
+    }
+    answers["method.comparison"] = {"not_reported": True, "reason": "The paper reports a single run without error bars."}
+    return answers
+
+
+def _method_workflow() -> dict:
+    steps = [("证据筛选", "问题与候选证据", "过滤低置信证据", "证据集合", False),
+             ("工具规划", "证据集合与状态日志", "选择下一步调用", "调用记录", True),
+             ("答案生成", "状态日志", "结合日志输出结论", "可追溯答案", True)]
+    return {"name": "推理", "steps": [
+        {"step": step, "input": inp, "operation": op, "output": out, "novel": novel}
+        for step, inp, op, out, novel in steps
+    ]}
 
 
 def _source_manifest_path(tmp_path: Path) -> Path:
@@ -142,8 +240,8 @@ def test_reference_hygiene_gate_flags_runtime_artifact_references(tmp_path) -> N
     plan_path = tmp_path / "Paper.plan.json"
     note_path.write_text(
         _valid_note_text().replace(
-            "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
-            "- LLaMA source: /private/tmp/dpn-test-runs/candidate/artifacts/llama_source_manifest.json",
+            "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering（基线）",
+            "- LLaMA source: /private/tmp/dpn-test-runs/candidate/artifacts/llama_source_manifest.json（基线）",
         ),
         encoding="utf-8",
     )
@@ -219,7 +317,7 @@ def test_figure_callout_target_section_mismatch_is_flagged() -> None:
 ## 深度分析
 
 > [!figure] Fig. 1 问题边界图
-> 建议位置：研究问题
+> 建议位置：背景与问题
 > 放置原因：帮助定义问题边界。
 > 当前状态：保留占位；未找到高置信度整图。
 """
@@ -230,12 +328,12 @@ def test_figure_callout_target_section_mismatch_is_flagged() -> None:
 def test_figure_callout_inside_declared_section_passes() -> None:
     note = """# Title
 
-## 方法主线
+## 方法
 
-### 机制流程
+### 方法流程
 
 > [!figure] Fig. 2 总体流程
-> 建议位置：方法主线
+> 建议位置：方法
 > 放置原因：帮助理解执行链。
 > 当前状态：保留占位；未找到高置信度整图。
 
@@ -401,10 +499,10 @@ def test_usable_candidate_soft_placeholder_reasons_fail_figure_structure_gate() 
 def test_usable_candidate_visual_defect_placeholder_reason_passes() -> None:
     note = """# Title
 
-## 方法主线
+## 方法
 
 > [!figure] Table 5 评测表
-> 建议位置：方法主线
+> 建议位置：方法
 > 放置原因：帮助理解评测协议。
 > 当前状态：候选裁剪可用，但混入相邻 Table 6。
 """
@@ -430,10 +528,10 @@ def test_usable_candidate_lower_priority_placeholder_reason_fails() -> None:
 def test_usable_candidate_materialization_blocked_reason_passes() -> None:
     note = """# Title
 
-## 方法主线
+## 方法
 
 > [!figure] Fig. 4 工具链图
-> 建议位置：方法主线
+> 建议位置：方法
 > 放置原因：帮助理解工具链。
 > 当前状态：候选可用但 materialize_figure_asset.py 复制失败/权限不足。
 """
@@ -549,6 +647,78 @@ def test_mixed_language_detector_flags_summary_section_when_mixed() -> None:
 """
     issues = mixed_language_issues(note)
     assert len(issues) == 1
+
+
+def test_mixed_language_detector_ignores_inline_math() -> None:
+    note = r"注意力计算为 $\mathrm{softmax}(QK^T/\sqrt{d})V$，其中 KV cache 会随序列长度增长。"
+
+    assert mixed_language_issues(note) == []
+
+
+def test_mixed_language_detector_ignores_backticked_proper_nouns() -> None:
+    note = "作者在 `MMLU`、`GSM8K`、`HumanEval`、`MATH`、`BBH`、`ARC-C` 和 `LLaMA-2-7B` 上评测。"
+
+    assert mixed_language_issues(note) == []
+
+
+def test_mixed_language_detector_counts_bare_proper_noun_lists() -> None:
+    note = "作者在 MMLU、GSM8K、HumanEval、MATH、BBH、ARC-C 和 LLaMA-2-7B 上做了评测。"
+
+    issues = mixed_language_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["signal"] == "scattered_english_words"
+
+
+def test_mixed_language_detector_flags_scattered_english_words() -> None:
+    note = "下游 consumption 前要 fail closed；fetch 使用了 stale 或 wrong identity 时直接停止。"
+
+    issues = mixed_language_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["english_words"] == [
+        "consumption", "fail", "closed", "fetch", "stale", "wrong", "identity",
+    ]
+
+
+def test_mixed_language_detector_ignores_wikilinks_and_citations() -> None:
+    note = "这沿用了 [[Segment Anything in the Wild]] 的评测 (Kirillov et al., 2023) [12, 13]。"
+
+    assert mixed_language_issues(note) == []
+
+
+def test_mixed_language_detector_ignores_fenced_code() -> None:
+    note = "```python\nx = encoder(x)  # 计算 the output of the encoder layer\n```"
+
+    assert mixed_language_issues(note) == []
+
+
+def test_mixed_language_detector_reports_the_english_run() -> None:
+    note = "我们发现 the model is used to predict the mask，这是一处翻译残留。"
+
+    issues = mixed_language_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["signal"] == "english_clause"
+    assert issues[0]["english_run"] == "the model is used to predict the mask"
+
+
+def test_mixed_language_detector_flags_clause_hidden_in_backticks() -> None:
+    note = "作者认为 `the model is used to predict the mask` 是关键。"
+
+    issues = mixed_language_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["english_run"] == "the model is used to predict the mask"
+
+
+def test_mixed_language_detector_flags_clause_around_inline_math() -> None:
+    note = r"其中 the loss $\mathcal{L}$ is minimized over the training set，这一点很重要。"
+
+    issues = mixed_language_issues(note)
+
+    assert len(issues) == 1
+    assert issues[0]["english_run"] == "the loss is minimized over the training set"
 
 
 def test_mid_sentence_linebreak_detector_flags_pdf_style_wrapping() -> None:
@@ -727,50 +897,29 @@ def test_substantive_gate_rejects_honest_missing_in_key_results() -> None:
 
 def test_substantive_gate_rejects_honest_missing_outside_references() -> None:
     note = _valid_note_text().replace(
-        "输入问题先进入证据筛选模块，随后工具规划器选择下一步调用，最后由答案生成器结合状态日志输出可追溯结论。",
+        "已有的只看答案的方法无法区分证据不足和推理错误，失败的工具调用也不会留下可检查的记录。",
         "本文未给出可复现的方法流程；依据是正文和附录都没有展开模块输入输出，因此这里不能补写机制细节，只能说明方法理解受限。",
     )
 
     issues = inspect_substantive_content(note)
 
     assert any(issue["reason"] == "section_honest_missing_not_allowed" for issue in issues)
-    assert any(issue["section"] == "方法主线" for issue in issues)
+    assert any(issue["section"] == "现有方法的局限" for issue in issues)
     assert any(issue["severity"] == "error" for issue in issues)
 
 
-def test_substantive_gate_rejects_placeholder_references() -> None:
-    note = _valid_note_text().replace(
-        "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
-        "待补充。",
-    )
+def test_connections_gate_rejects_placeholder_text() -> None:
+    note = _valid_note_text().replace("库里暂无相关笔记", "待补充。")
 
-    issues = inspect_substantive_content(note)
+    issues = lint_note.inspect_connections(note, {"connections": []})
 
-    assert any(issue["reason"] == "references_placeholder" for issue in issues)
-    assert any(issue["severity"] == "error" for issue in issues)
+    assert [issue["reason"] for issue in issues] == ["connections_empty_statement_invalid"]
 
 
-def test_substantive_gate_accepts_real_reference_entry() -> None:
-    note = _valid_note_text().replace(
-        "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
-        "- [[Auditable Tool Use|Smith et al. 2024]] 提供了工具调用审计的直接参考。",
-    )
+def test_substantive_gate_accepts_the_empty_vault_statement() -> None:
+    issues = inspect_substantive_content(_valid_note_text())
 
-    issues = inspect_substantive_content(note)
-
-    assert not any(issue["section"] == "引用" for issue in issues)
-
-
-def test_substantive_gate_allows_honest_missing_in_references() -> None:
-    note = _valid_note_text().replace(
-        "- Smith et al. 2024. Auditable Tool Use for Multi-hop Question Answering. DOI: 10.1234/example",
-        "本文未给出可解析的参考文献条目；依据是正文和附录未提供 DOI、arXiv 或编号引用，因此引用完整性受限。",
-    )
-
-    issues = inspect_substantive_content(note)
-
-    assert not any(issue["severity"] == "error" for issue in issues)
-    assert any(issue["reason"] == "references_unavailable_declared" for issue in issues)
+    assert not any(issue["section"] == "关联" for issue in issues)
 
 
 def test_substantive_gate_rejects_generic_limitation() -> None:
@@ -918,6 +1067,8 @@ def test_core_info_issues_fail_basic_structure_gate(tmp_path) -> None:
                 "comparative_positioning": ["The method is compared against answer-only baselines."],
                 "reuse_takeaways": ["Track failure state explicitly."],
                 "followup_questions": ["Check whether the mechanism survives missing tool outputs."],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
             }
         ),
@@ -1026,6 +1177,8 @@ def test_mechanical_translation_artifacts_fail_style_gate(tmp_path) -> None:
                 "comparative_positioning": ["The method is compared against answer-only baselines."],
                 "reuse_takeaways": ["Track failure state explicitly."],
                 "followup_questions": ["Check whether the mechanism survives missing tool outputs."],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线", "evidence_sources": [{"section_id": "sec:method"}]}],
             }
         ),
@@ -1064,6 +1217,7 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
                     "paper_type": "",
                 "paper_type_rationale": "",
                 "dominant_domain": "   ",
+                "storyline": "",
                 "must_cover": [],
                 "key_numbers": [],
                 "real_comparisons": [],
@@ -1074,6 +1228,8 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
                 "comparative_positioning": [],
                 "reuse_takeaways": [],
                 "followup_questions": [],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [],
             }
         ),
@@ -1095,6 +1251,7 @@ def test_note_plan_empty_required_values_fail_plan_gate(tmp_path) -> None:
         "planning_paper_type_empty",
         "planning_paper_type_rationale_empty",
         "planning_dominant_domain_empty",
+        "planning_storyline_empty",
         "planning_must_cover_empty",
         "planning_key_numbers_empty",
         "planning_real_comparisons_empty",
@@ -1117,7 +1274,8 @@ def test_note_plan_explicit_not_reported_entries_pass_plan_gate(tmp_path) -> Non
         json.dumps(
                 {
                     "output_language": "zh-CN",
-                    "paper_type": "AI_method",
+                    "paper_type": "method",
+                    **_type_fields(),
                 "paper_type_rationale": "The paper proposes a model mechanism and evaluates it experimentally.",
                 "dominant_domain": "reasoning",
                 "must_cover": ["方法主线"],
@@ -1137,6 +1295,8 @@ def test_note_plan_explicit_not_reported_entries_pass_plan_gate(tmp_path) -> Non
                 "comparative_positioning": ["The method is positioned against answer-only tool use."],
                 "reuse_takeaways": ["Use explicit state logs when evaluating tool chains."],
                 "followup_questions": ["Test the state log with slower external tools."],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),
@@ -1180,14 +1340,9 @@ def test_write_obsidian_note_refuses_failed_plan_gate(tmp_path) -> None:
             str(script_path),
             "--title",
             "Plan Gate Paper",
-            "--content",
-            "# Plan Gate Paper",
-            "--lint-json",
-            str(lint_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(tmp_path / "vault"),
+            *formal_save_args(tmp_path, '# Plan Gate Paper', lint_path=lint_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
@@ -1222,14 +1377,9 @@ def test_write_obsidian_note_reports_lint_warning_details(tmp_path) -> None:
             str(script_path),
             "--title",
             "Style Gate Paper",
-            "--content",
-            "# Style Gate Paper",
-            "--lint-json",
-            str(lint_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(tmp_path / "vault"),
+            *formal_save_args(tmp_path, '# Style Gate Paper', lint_path=lint_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
@@ -1239,6 +1389,82 @@ def test_write_obsidian_note_reports_lint_warning_details(tmp_path) -> None:
     assert "style gate failed" in result.stderr
     assert "mixed_language_lines_present" in result.stderr
     assert "Table 2 是主结果表" in result.stderr
+
+
+def test_write_obsidian_note_reports_all_lint_issue_details(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "passes_plan_gate": False,
+                "warnings": ["planning_required_fields_missing"],
+                "core_info_structure_issues": [
+                    {"reason": "core first", "line": "unused core line"},
+                    {"reason": "core second", "snippet": "unused core snippet"},
+                ],
+                "figure_structure_issues": [
+                    {"reason": "", "line": "figure first", "snippet": "unused figure snippet"},
+                    {"line": "figure second"},
+                ],
+                "planning_artifact_issues": [
+                    "planning_must_cover_missing",
+                    "planning_key_numbers_missing",
+                ],
+                "substantive_content_issues": [
+                    {"reason": "", "line": "", "snippet": "content first"},
+                    {"snippet": "content second"},
+                ],
+                "math_render_issues": [{"reason": "math first"}, {"reason": "math second"}],
+                "reference_hygiene_issues": [
+                    {"reason": "reference first"},
+                    {"reason": "reference second"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    script_path = (
+        Path(__file__).resolve().parents[1]
+        / "skills/deeppapernote/scripts/write_obsidian_note.py"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--title",
+            "Lint Details Paper",
+            "--vault",
+            str(vault),
+            *formal_save_args(tmp_path, "# Lint Details Paper", lint_path=lint_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "plan gate failed" in result.stderr
+    assert "planning_required_fields_missing" in result.stderr
+    for detail in (
+        "core_info_structure_issues: core first",
+        "core_info_structure_issues: core second",
+        "figure_structure_issues: figure first",
+        "figure_structure_issues: figure second",
+        "planning_artifact_issues: planning_must_cover_missing",
+        "planning_artifact_issues: planning_key_numbers_missing",
+        "substantive_content_issues: content first",
+        "substantive_content_issues: content second",
+        "math_render_issues: math first",
+        "math_render_issues: math second",
+        "reference_hygiene_issues: reference first",
+        "reference_hygiene_issues: reference second",
+    ):
+        assert detail in result.stderr
+    assert "unused" not in result.stderr
+    assert f"See lint JSON: {lint_path}" in result.stderr
+    assert not list(vault.rglob("*.md"))
 
 
 def test_real_image_embed_counts_as_figure_marker_in_full_lint(tmp_path) -> None:
@@ -1345,14 +1571,9 @@ def test_write_obsidian_note_refuses_failed_substantive_gate(tmp_path) -> None:
             str(script_path),
             "--title",
             "Substantive Gate Paper",
-            "--content",
-            "# Substantive Gate Paper",
-            "--lint-json",
-            str(lint_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(tmp_path / "vault"),
+            *formal_save_args(tmp_path, '# Substantive Gate Paper', lint_path=lint_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
@@ -1375,30 +1596,13 @@ def passing_lint_payload(note_text: str) -> dict:
     }
 
 
-def reviewed_insert_fields(source_image: Path) -> dict:
-    digest = hashlib.sha256(source_image.read_bytes()).hexdigest()
-    return {
-        "source_image_sha256": digest,
-        "visual_review": {
-            "status": "pass",
-            "reviewed_asset_sha256": digest,
-            "preserved_scientific_elements": ["complete figure"],
-            "omitted_scientific_elements": [],
-            "notes": "Caption-free visual body.",
-            "failure_reason": "",
-            "repair_attempts": 0,
-            "revised_bbox": [],
-        },
-    }
-
-
 def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
     digest = hashlib.sha256(b"fake-png").hexdigest()
-    note_text = "# Figure Insert Paper\n\n![Figure 1](images/page_001_fig_figure_1.png)\n*Fig. 1 caption.*\n"
+    note_text = tagged("# Figure Insert Paper\n\n![Figure 1](images/figure_1.png)\n*Fig. 1 caption.*\n", "Figure_Insert_Paper")
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
@@ -1411,8 +1615,9 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
                         "source_id": "Figure 1",
                         "decision": "insert",
                         "source_image_path": str(source_image),
-                        "source_image_filename": source_image.name,
+                        "vault_image_filename": "figure_1.png",
                         "source_image_sha256": digest,
+                        "review_evidence": reviewed_insert_fields(source_image)["review_evidence"],
                         "visual_review": {
                             "status": "pass",
                             "reviewed_asset_sha256": digest,
@@ -1440,20 +1645,11 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
             "Figure Insert Paper",
             "--filename",
             "Figure Insert Paper.md",
-            "--subdir",
-            "Research/Papers/Figure Insert Paper",
-            "--content",
-            note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
             "--output",
             str(output_path),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path), domain="Figure_Insert_Paper"),
         ],
         check=True,
         capture_output=True,
@@ -1463,7 +1659,7 @@ def test_write_obsidian_note_materializes_insert_decision(tmp_path) -> None:
     payload = json.loads(output_path.read_text(encoding="utf-8"))
 
     materialized = payload["materialized_figures"][0]
-    assert materialized["relative_markdown_path"] == "images/page_001_fig_figure_1.png"
+    assert materialized["relative_markdown_path"] == "images/figure_1.png"
     assert Path(materialized["dest_image_path"]).read_bytes() == b"fake-png"
 
 
@@ -1473,7 +1669,7 @@ def test_write_obsidian_note_rejects_stale_reviewed_insert_bytes(tmp_path) -> No
     source_image = tmp_path / "page_001_fig_figure_1.png"
     reviewed_digest = hashlib.sha256(b"reviewed").hexdigest()
     source_image.write_bytes(b"changed-after-review")
-    note_text = "# Stale Figure Review\n\n![Figure 1](images/page_001_fig_figure_1.png)\n*Fig. 1 caption.*\n"
+    note_text = tagged("# Stale Figure Review\n\n![Figure 1](images/figure_1.png)\n*Fig. 1 caption.*\n")
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
@@ -1486,8 +1682,9 @@ def test_write_obsidian_note_rejects_stale_reviewed_insert_bytes(tmp_path) -> No
                         "source_id": "Figure 1",
                         "decision": "insert",
                         "source_image_path": str(source_image),
-                        "source_image_filename": source_image.name,
+                        "vault_image_filename": "figure_1.png",
                         "source_image_sha256": reviewed_digest,
+                        "review_evidence": reviewed_insert_fields(source_image)["review_evidence"],
                         "visual_review": {
                             "status": "pass",
                             "reviewed_asset_sha256": reviewed_digest,
@@ -1518,23 +1715,16 @@ def test_write_obsidian_note_rejects_stale_reviewed_insert_bytes(tmp_path) -> No
             str(script_path),
             "--title",
             "Stale Figure Review",
-            "--content",
-            note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
     )
 
     assert result.returncode != 0
-    assert "reviewed asset SHA-256" in result.stderr
+    assert "figure_visual_review_stale" in result.stderr
 
 
 def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> None:
@@ -1542,7 +1732,7 @@ def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> N
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
-    note_text = "# Figure Insert Paper\n\n正文没有引用图片。\n"
+    note_text = tagged("# Figure Insert Paper\n\n正文没有引用图片。\n")
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
@@ -1555,7 +1745,7 @@ def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> N
                         "source_id": "Figure 1",
                         "decision": "insert",
                         "source_image_path": str(source_image),
-                        "source_image_filename": source_image.name,
+                        "vault_image_filename": "figure_1.png",
                         **reviewed_insert_fields(source_image),
                     }
                 ]
@@ -1571,16 +1761,9 @@ def test_write_obsidian_note_rejects_unreferenced_insert_decision(tmp_path) -> N
             str(script_path),
             "--title",
             "Figure Insert Paper",
-            "--content",
-            note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path)),
         ],
         capture_output=True,
         text=True,
@@ -1595,7 +1778,102 @@ def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) ->
     vault.mkdir()
     source_image = tmp_path / "page_001_fig_figure_1.png"
     source_image.write_bytes(b"fake-png")
-    note_text = "# Figure Insert Paper\n\n正文只提到 images/page_001_fig_figure_1.png 这个路径。\n"
+    note_text = tagged("# Figure Insert Paper\n\n正文只提到 images/figure_1.png 这个路径。\n")
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
+    decisions_path = tmp_path / "figure_decisions.json"
+    decisions_path.write_text(
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "decisions": [
+                    {
+                        "source_id": "Figure 1",
+                        "decision": "insert",
+                        "source_image_path": str(source_image),
+                        "vault_image_filename": "figure_1.png",
+                        **reviewed_insert_fields(source_image),
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--title",
+            "Figure Insert Paper",
+            "--vault",
+            str(vault),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path)),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "is not referenced as an image embed" in result.stderr
+
+
+def test_write_obsidian_note_rejects_unsafe_insert_filename(tmp_path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    source_image = tmp_path / "page_001_fig_figure_1.png"
+    source_image.write_bytes(b"fake-png")
+    note_text = tagged("# Figure Insert Paper\n\n![Figure 1](images/../escaped.png)\n*Fig. 1 caption.*\n")
+    lint_path = tmp_path / "lint.json"
+    lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
+    decisions_path = tmp_path / "figure_decisions.json"
+    decisions_path.write_text(
+        json.dumps(
+            {
+                "output_language": "zh-CN",
+                "decisions": [
+                    {
+                        "source_id": "Figure 1",
+                        "decision": "insert",
+                        "source_image_path": str(source_image),
+                        "vault_image_filename": "../escaped.png",
+                        **reviewed_insert_fields(source_image),
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--title",
+            "Figure Insert Paper",
+            "--vault",
+            str(vault),
+            *formal_save_args(tmp_path, note_text, lint_path=lint_path, decisions_path=decisions_path, source_manifest_path=_source_manifest_path(tmp_path)),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "Unsafe figure image filename" in result.stderr
+
+
+def test_write_obsidian_note_requires_the_planned_vault_filename(tmp_path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    source_image = tmp_path / "page_001_fig_figure_1_review.png"
+    source_image.write_bytes(b"fake-png")
+    note_text = tagged(
+        f"# Figure Insert Paper\n\n![Figure 1](images/{source_image.name})\n"
+        "*Fig. 1 caption.*\n"
+    )
     lint_path = tmp_path / "lint.json"
     lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
     decisions_path = tmp_path / "figure_decisions.json"
@@ -1616,7 +1894,10 @@ def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) ->
         ),
         encoding="utf-8",
     )
-    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
+    script_path = (
+        Path(__file__).resolve().parents[1]
+        / "skills/deeppapernote/scripts/write_obsidian_note.py"
+    )
 
     result = subprocess.run(
         [
@@ -1624,76 +1905,23 @@ def test_write_obsidian_note_rejects_plain_path_for_insert_decision(tmp_path) ->
             str(script_path),
             "--title",
             "Figure Insert Paper",
-            "--content",
-            note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
             "--vault",
             str(vault),
+            *formal_save_args(
+                tmp_path,
+                note_text,
+                lint_path=lint_path,
+                decisions_path=decisions_path,
+                source_manifest_path=_source_manifest_path(tmp_path),
+            ),
         ],
         capture_output=True,
         text=True,
     )
 
     assert result.returncode != 0
-    assert "is not referenced as an image embed" in result.stderr
-
-
-def test_write_obsidian_note_rejects_unsafe_insert_filename(tmp_path) -> None:
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    source_image = tmp_path / "page_001_fig_figure_1.png"
-    source_image.write_bytes(b"fake-png")
-    note_text = "# Figure Insert Paper\n\n![Figure 1](images/../escaped.png)\n*Fig. 1 caption.*\n"
-    lint_path = tmp_path / "lint.json"
-    lint_path.write_text(json.dumps(passing_lint_payload(note_text)), encoding="utf-8")
-    decisions_path = tmp_path / "figure_decisions.json"
-    decisions_path.write_text(
-        json.dumps(
-            {
-                "output_language": "zh-CN",
-                "decisions": [
-                    {
-                        "source_id": "Figure 1",
-                        "decision": "insert",
-                        "source_image_path": str(source_image),
-                        "source_image_filename": "../escaped.png",
-                        **reviewed_insert_fields(source_image),
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    script_path = Path(__file__).resolve().parents[1] / "skills" / "deeppapernote" / "scripts" / "write_obsidian_note.py"
-
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(script_path),
-            "--title",
-            "Figure Insert Paper",
-            "--content",
-            note_text,
-            "--lint-json",
-            str(lint_path),
-            "--figure-decisions",
-            str(decisions_path),
-            "--source-manifest",
-            str(_source_manifest_path(tmp_path)),
-            "--vault",
-            str(vault),
-        ],
-        capture_output=True,
-        text=True,
-    )
-
-    assert result.returncode != 0
-    assert "Unsafe figure image filename" in result.stderr
+    assert "no vault_image_filename" in result.stderr
+    assert not list(vault.rglob("*.png"))
 
 
 def test_inspect_note_plan_reports_missing_file(tmp_path) -> None:
@@ -1711,13 +1939,31 @@ def test_inspect_note_plan_reports_invalid_json(tmp_path) -> None:
     assert issues == ["planning_artifact_invalid_json"]
 
 
-def test_inspect_note_plan_reports_missing_required_fields(tmp_path) -> None:
+def test_inspect_note_plan_reports_non_object(tmp_path: Path) -> None:
     plan_path = tmp_path / "note.plan.json"
-    plan_path.write_text(json.dumps({"paper_type": "AI_method"}), encoding="utf-8")
+    plan_path.write_text("[]", encoding="utf-8")
 
     found, issues = inspect_note_plan(plan_path)
+
     assert found is True
-    assert "planning_required_fields_missing" in issues
+    assert issues == ["planning_artifact_not_object"]
+
+
+def test_inspect_note_plan_names_all_missing_fields(tmp_path: Path) -> None:
+    plan = _valid_plan_payload()
+    del plan["paper_type_rationale"]
+    del plan["must_cover"]
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    found, issues = inspect_note_plan(plan_path)
+
+    assert found is True
+    assert issues == [
+        "planning_required_fields_missing",
+        "planning_paper_type_rationale_missing",
+        "planning_must_cover_missing",
+    ]
 
 
 def test_inspect_note_plan_rejects_invalid_paper_type(tmp_path) -> None:
@@ -1725,7 +1971,7 @@ def test_inspect_note_plan_rejects_invalid_paper_type(tmp_path) -> None:
     plan_path.write_text(
         json.dumps(
             {
-                "paper_type": "method",
+                "paper_type": "AI_method",
                 "paper_type_rationale": "The model-facing plan should use the shared paper type enum.",
                 "dominant_domain": "reasoning",
                 "must_cover": ["方法主线"],
@@ -1745,6 +1991,8 @@ def test_inspect_note_plan_rejects_invalid_paper_type(tmp_path) -> None:
                 "comparative_positioning": ["The plan names the relevant baseline comparison."],
                 "reuse_takeaways": ["Track the mechanism separately from the final result."],
                 "followup_questions": ["Check whether the mechanism transfers to a new dataset."],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),
@@ -1762,7 +2010,8 @@ def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
         json.dumps(
                 {
                     "output_language": "zh-CN",
-                    "paper_type": "AI_method",
+                    "paper_type": "method",
+                    **_type_fields(),
                 "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": "method",
@@ -1775,6 +2024,8 @@ def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
                 "comparative_positioning": [],
                 "reuse_takeaways": [],
                 "followup_questions": [],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),
@@ -1784,6 +2035,67 @@ def test_inspect_note_plan_reports_invalid_field_types(tmp_path) -> None:
     found, issues = inspect_note_plan(plan_path)
     assert found is True
     assert "planning_required_fields_invalid" in issues
+    assert "planning_must_cover_invalid: expected array" in issues
+    assert "planning_central_claims_invalid: expected array" in issues
+
+
+def test_inspect_note_plan_names_each_missing_field(tmp_path) -> None:
+    plan_path = tmp_path / "note.plan.json"
+    plan = {
+        "output_language": "zh-CN",
+        "paper_type": "AI_method",
+        "paper_type_rationale": "The paper proposes a model mechanism.",
+        "dominant_domain": "reasoning",
+        "must_cover": ["方法主线"],
+        "key_numbers": ["42"],
+        "real_comparisons": ["baseline"],
+        "central_claims": [
+            {
+                "claim": "The method improves a target behavior.",
+                "supporting_evidence": [{"section_id": "sec:method"}],
+                "what_it_actually_proves": "The source states the reported setting.",
+                "what_it_does_not_prove": "It does not prove all deployment cases.",
+            }
+        ],
+        "negative_or_limiting_results": ["No external failure case is reported."],
+        "mechanism_result_map": ["The mechanism explains the target behavior."],
+        "comparative_positioning": ["The plan names the baseline comparison."],
+        "reuse_takeaways": ["Track the mechanism separately from the result."],
+        "followup_questions": ["Check whether the mechanism transfers."],
+        "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+        "connections": [],
+    }
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    found, issues = inspect_note_plan(plan_path)
+    assert found is True
+    assert "planning_required_fields_missing" in issues
+    assert "planning_claim_boundaries_missing" in issues
+    assert "planning_section_plan_missing" in issues
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected_type"),
+    [
+        ("paper_type_rationale", [], "string"),
+        ("must_cover", "method", "array"),
+    ],
+)
+def test_inspect_note_plan_reports_expected_field_types(
+    tmp_path: Path, field: str, value: object, expected_type: str
+) -> None:
+    plan = _valid_plan_payload()
+    plan[field] = value
+    plan_path = tmp_path / "note.plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    found, issues = inspect_note_plan(plan_path)
+
+    assert found is True
+    assert issues == [
+        "planning_required_fields_invalid",
+        f"planning_{field}_invalid: expected {expected_type}",
+    ]
 
 
 def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
@@ -1792,7 +2104,8 @@ def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
         json.dumps(
                 {
                     "output_language": "zh-CN",
-                    "paper_type": "AI_method",
+                    "paper_type": "method",
+                    **_type_fields(),
                 "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": [],
@@ -1805,6 +2118,8 @@ def test_inspect_note_plan_reports_empty_section_plan(tmp_path) -> None:
                 "comparative_positioning": [],
                 "reuse_takeaways": [],
                 "followup_questions": [],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [],
             }
         ),
@@ -1834,7 +2149,8 @@ def test_inspect_note_plan_accepts_valid_plan(tmp_path) -> None:
         json.dumps(
                 {
                     "output_language": "zh-CN",
-                    "paper_type": "AI_method",
+                    "paper_type": "method",
+                    **_type_fields(),
                 "paper_type_rationale": "The paper proposes a model mechanism.",
                 "dominant_domain": "reasoning",
                 "must_cover": ["方法主线"],
@@ -1854,6 +2170,8 @@ def test_inspect_note_plan_accepts_valid_plan(tmp_path) -> None:
                 "comparative_positioning": ["The plan names the relevant baseline comparison."],
                 "reuse_takeaways": ["Track the mechanism separately from the final result."],
                 "followup_questions": ["Check whether the mechanism transfers to a new dataset."],
+                "key_prior_work": [{"work": "Smith et al. 2024. Auditable Tool Use", "role": "baseline"}, {"work": "Yao et al. 2023. ReAct", "role": "method source"}, {"work": "Schick et al. 2023. Toolformer", "role": "method source"}],
+                "connections": [],
                 "section_plan": [{"section": "方法主线"}],
             }
         ),

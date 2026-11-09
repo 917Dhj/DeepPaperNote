@@ -6,7 +6,15 @@ from __future__ import annotations
 import argparse
 import re
 
-from common import caption_preference_score, maybe_load_json_record, normalize_whitespace, runtime_config
+from _pdf_text import (
+    caption_preference_score,
+    normalize_caption_label,
+)
+from common import (
+    maybe_load_json_record,
+    normalize_whitespace,
+    runtime_config,
+)
 from localization import normalize_output_language
 
 
@@ -18,7 +26,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
     p.add_argument("--language", default="", help="Output language: en or zh-CN.")
-    p.add_argument("--max-items", type=int, default=12, help="Maximum number of figure/table items to keep. 0 means keep all.")
+    p.add_argument("--max-items", type=int, default=12, help="Target number of figure/table items. High-priority main items always stay, and supporting figures keep at least a third of this target. 0 means keep all.")
     return p
 
 
@@ -31,9 +39,12 @@ def merge_inputs(primary: dict | None, evidence: dict | None, assets: dict | Non
         merged["evidence_pack"] = evidence["evidence_pack"]
     if assets and assets.get("page_assets"):
         merged["page_assets"] = assets["page_assets"]
-        merged["image_assets"] = assets.get("image_assets", [])
         merged["figure_assets"] = assets.get("figure_assets", [])
     return merged
+
+
+CAPTION_SENTENCE_BREAK_RE = re.compile(r"(?<=[.!?。！？])\s*(?=[A-Z(\u3400-\u9fff])")
+SUPPLEMENTARY_LABEL_RE = re.compile(r"^(?:extended data |(?:fig|table|图|表) [as]\d)")
 
 
 def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str]:
@@ -67,7 +78,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
         r"(?:produces|achieves|outperforms|improves|reduces|increases)\b",
         text,
     ):
-        return "main_result", "关键结果", "这张图或表直接承载主结果，适合放在关键结果部分。"
+        return "main_result", "结果节", "这张图或表直接承载主结果，适合放在本类型承载结果的那一节。"
     if any(
         token in text
         for token in [
@@ -81,7 +92,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
             "identification of studies",
         ]
     ):
-        return "data_or_task_overview", "数据与任务定义", "这张图解释文献筛选或纳入流程；如果候选图质量足够，适合放在数据与任务定义部分帮助读者理解综述证据来源。"
+        return "data_or_task_overview", "流程小节", "这张图解释文献筛选或纳入流程；如果候选图质量足够，适合放在检索与筛选流程小节帮助读者理解综述证据来源。"
     if any(
         token in text
         for token in [
@@ -96,7 +107,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
             "process",
         ]
     ):
-        return "method_overview", "机制流程", "这张图概括了整体方法或系统流程；如果匹配置信度足够高，最适合放在 `### 机制流程` 帮助快速建立执行链理解。"
+        return "method_overview", "流程小节", "这张图概括了整体方法或系统流程；如果匹配置信度足够高，最适合紧跟在流程小节的步骤表后面，帮助快速建立执行链理解。"
     if any(
         token in text
         for token in [
@@ -110,7 +121,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
             "issue",
         ]
     ):
-        return "data_or_task_overview", "数据与任务定义", "这张图解释任务或数据集如何被构造；如果候选图质量足够，适合放在数据与任务定义部分帮助读者理解数据来源。"
+        return "data_or_task_overview", "流程小节", "这张图解释任务或数据集如何被构造；如果候选图质量足够，适合放在构造流程小节帮助读者理解数据来源。"
     if any(
         token in text
         for token in [
@@ -127,7 +138,7 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
             "attribute",
         ]
     ):
-        return "data_or_task", "数据与任务定义", "这张图更像任务设定或数据说明，放在数据与任务定义最合适。"
+        return "data_or_task", "任务或数据相关节", "这张图更像任务设定或数据说明，放在本类型介绍任务或数据的那一节最合适。"
     if any(
         token in text
         for token in [
@@ -144,30 +155,63 @@ def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str
             "block translation",
         ]
     ):
-        return "method_detail", "方法主线", "这张图解释方法内部机制或关键执行状态，适合放在方法主线部分作为机制细节占位。"
-    if item_id.lower().startswith("table"):
-        return "table_result", "关键结果", "这是关键结果表，适合放在关键结果部分辅助定位核心数值。"
-    return "supporting_figure", "深度分析", "这张图更适合作为补充图，放在深度分析部分帮助解释作者论点。"
+        return "method_detail", "方法或设计节", "这张图解释方法内部机制或关键执行状态，适合放在方法或设计那一节作为机制细节。"
+    if item_id.lower().startswith(("table", "表")):
+        return "table_result", "结果节", "这是关键结果表，适合放在本类型承载结果的那一节辅助定位核心数值。"
+    return "supporting_figure", "分析节", "这张图更适合作为补充图，放在分析或讨论那一节帮助解释作者论点。"
 
 
 ENGLISH_FIGURE_PLACEMENT: dict[str, tuple[str, str]] = {
-    "main_result": ("Key Results", "This figure or table carries a primary result and belongs in Key Results."),
-    "data_or_task_overview": ("Data and Task Definition", "This visual explains the source, construction, screening, or scope of the data and task."),
-    "method_overview": ("Mechanism Flow", "This visual summarizes the method or system flow and belongs in Mechanism Flow when the match is reliable."),
-    "data_or_task": ("Data and Task Definition", "This visual clarifies the task setting, sample, or dataset."),
-    "method_detail": ("Method", "This visual explains an internal mechanism or execution state and belongs in Method."),
-    "table_result": ("Key Results", "This result table helps readers locate the central quantitative evidence."),
-    "supporting_figure": ("Deep Analysis", "This supporting visual helps explain the authors' argument in Deep Analysis."),
+    "main_result": ("results section", "This figure or table carries a primary result and belongs in the section that carries results for this paper type."),
+    "data_or_task_overview": ("workflow subsection", "This visual explains the source, construction, screening, or scope of the data and belongs with the workflow subsection."),
+    "method_overview": ("workflow subsection", "This visual summarizes the method or system flow and belongs right after the workflow table when the match is reliable."),
+    "data_or_task": ("task or data section", "This visual clarifies the task setting, sample, or dataset."),
+    "method_detail": ("method or design section", "This visual explains an internal mechanism or execution state and belongs in the method or design section."),
+    "table_result": ("results section", "This result table helps readers locate the central quantitative evidence."),
+    "supporting_figure": ("analysis section", "This supporting visual helps explain the authors' argument in the analysis section."),
 }
 
 
+def _classify_caption_by_title(item_id: str, caption: str) -> tuple[str, str, str]:
+    """Let the title sentence say what a visual is; later text only adds result evidence."""
+    title = CAPTION_SENTENCE_BREAK_RE.split(caption, maxsplit=1)[0]
+    titled = _classify_caption_kind_zh(item_id, title)
+    full = _classify_caption_kind_zh(item_id, caption)
+    if titled[0] == "supporting_figure":
+        return full
+    if full[0] == "main_result" and titled[0] != "method_overview":
+        return full
+    return titled
+
+
 def classify_caption_kind(item_id: str, caption: str, language: str | None = None) -> tuple[str, str, str]:
-    result = _classify_caption_kind_zh(item_id, caption)
+    result = _classify_caption_by_title(item_id, caption)
     if normalize_output_language(language) != "en":
         return result
     kind = result[0]
     section, reason = ENGLISH_FIGURE_PLACEMENT[kind]
     return kind, section, reason
+
+
+def _is_supplementary_item(item: dict) -> bool:
+    return bool(SUPPLEMENTARY_LABEL_RE.match(_normalize_label_for_match(item["id"])))
+
+
+def _plan_sort_key(item: dict) -> tuple:
+    label = _normalize_label_for_match(item["id"])
+    numbered = [int(part) if part.isdecimal() else part for part in re.split(r"(\d+)", label)]
+    return _is_supplementary_item(item), item["priority"], numbered
+
+
+def _limit_plan_items(ranked: list[dict], limit: int) -> list[dict]:
+    """Spend the limit on main items first; supplementary items take what is left."""
+    main = [item for item in ranked if not _is_supplementary_item(item)]
+    high_priority = [item for item in main if item["priority"] <= 2]
+    supporting = [item for item in main if item["priority"] > 2]
+    # Tables default to high priority, so without this floor they can crowd out every figure.
+    kept = high_priority + supporting[: max(limit - len(high_priority), limit // 3)]
+    supplementary = [item for item in ranked if _is_supplementary_item(item)]
+    return kept + supplementary[: max(limit - len(kept), 0)]
 
 
 def build_figure_items(evidence_pack: dict, *, limit: int = 12, language: str | None = None) -> list[dict]:
@@ -225,13 +269,9 @@ def build_figure_items(evidence_pack: dict, *, limit: int = 12, language: str | 
                 "insert_mode": "placeholder",
             }
         )
-    picked.sort(key=lambda item: (item["priority"], item["id"]))
+    picked.sort(key=_plan_sort_key)
     if limit and limit > 0:
-        high_priority = [item for item in picked if int(item.get("priority", 99)) <= 2]
-        supporting = [item for item in picked if int(item.get("priority", 99)) > 2]
-        if len(high_priority) >= limit:
-            return high_priority
-        return high_priority + supporting[: limit - len(high_priority)]
+        return _limit_plan_items(picked, limit)
     return picked
 
 
@@ -318,7 +358,7 @@ def _normalize_label_for_match(label: str) -> str:
     'Figure 3' / 'Fig. 3' / 'fig 3' / 'Figure. 3' all become 'fig 3'.
     'Table 2' / 'table. 2' / 'Table. 2' all become 'table 2'.
     """
-    text = normalize_whitespace(label).lower()
+    text = normalize_caption_label(label).lower()
     extended_figure_match = re.match(
         r"^extended\s+data\s+fig(?:ure)?\.?\s*(\d+[a-z]?)$",
         text,
@@ -370,39 +410,28 @@ def _candidate_status_for_quality(asset: dict) -> str:
     return "needs_visual_quality_check"
 
 
-def _asset_candidate(asset: dict, *, include_label: bool = False) -> dict:
+def _asset_candidate(asset: dict) -> dict:
     candidate = {
         "filename": asset.get("filename", ""),
         "path": asset.get("path", ""),
         "width": asset.get("width", 0),
         "height": asset.get("height", 0),
         "size_bytes": asset.get("size_bytes", 0),
+        "label": asset.get("label", ""),
+        "extraction_level": asset.get("extraction_level", "figure"),
     }
-    if include_label:
-        candidate["label"] = asset.get("label", "")
-        candidate["extraction_level"] = asset.get("extraction_level", "figure")
-        if isinstance(asset.get("quality_signals"), dict):
-            candidate["quality_signals"] = asset.get("quality_signals")
-        candidate["candidate_status"] = _candidate_status_for_quality(asset)
+    if isinstance(asset.get("quality_signals"), dict):
+        candidate["quality_signals"] = asset.get("quality_signals")
+    candidate["candidate_status"] = _candidate_status_for_quality(asset)
     return candidate
 
 
 def attach_candidate_images(
     items: list[dict],
     page_assets: list[dict],
-    image_assets: list[dict],
     figure_assets: list[dict] | None = None,
 ) -> list[dict]:
     figure_assets = figure_assets or []
-
-    image_map: dict[int, list[dict]] = {}
-    for image in image_assets:
-        if not isinstance(image, dict):
-            continue
-        page_number = int(image.get("page_number", 0) or 0)
-        if page_number <= 0:
-            continue
-        image_map.setdefault(page_number, []).append(image)
 
     figure_map: dict[int, list[dict]] = {}
     for asset in figure_assets:
@@ -432,7 +461,7 @@ def attach_candidate_images(
 
         fig_match = _match_figure_asset(item_id, figure_assets)
         if fig_match:
-            item["figure_asset_candidate"] = _asset_candidate(fig_match, include_label=True)
+            item["figure_asset_candidate"] = _asset_candidate(fig_match)
 
         variants = label_variants(item_id)
         keywords = caption_keywords(str(item.get("caption", "")))
@@ -473,12 +502,8 @@ def attach_candidate_images(
                     "score": score,
                     "matched_terms": matched_terms[:6],
                     "snippet": snippets[0] if snippets else normalize_whitespace(str(page.get("text_preview", "")))[:220],
-                    "images": [
-                        _asset_candidate(img)
-                        for img in image_map.get(page_number, [])[:3]
-                    ],
                     "figure_assets": [
-                        _asset_candidate(asset, include_label=True)
+                        _asset_candidate(asset)
                         for asset in figure_map.get(page_number, [])[:3]
                     ],
                 }
@@ -509,13 +534,12 @@ def main() -> None:
 
     evidence_pack = data.get("evidence_pack", {}) if isinstance(data.get("evidence_pack"), dict) else {}
     page_assets = data.get("page_assets", []) if isinstance(data.get("page_assets"), list) else []
-    image_assets = data.get("image_assets", []) if isinstance(data.get("image_assets"), list) else []
     figure_assets = data.get("figure_assets", []) if isinstance(data.get("figure_assets"), list) else []
     language = normalize_output_language(
         runtime_config(cli_overrides={"output_language": args.language})["output_language"]
     )
     items = build_figure_items(evidence_pack, limit=args.max_items, language=language)
-    items = attach_candidate_images(items, page_assets, image_assets, figure_assets)
+    items = attach_candidate_images(items, page_assets, figure_assets)
     payload = {
         "status": "ok",
         "script": "plan_figures.py",

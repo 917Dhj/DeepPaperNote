@@ -19,11 +19,12 @@ Priority order:
 
 ## Placement Logic
 
-- Put method overview figures in `### 机制流程` when they directly explain the core execution chain
-- If the match is weaker or the note does not need that micro-structure, keep them in `方法主线`
-- Put data or task figures in `数据与任务定义`
-- Put main result figures or tables in `关键结果`
-- Put conceptual diagrams in `研究问题` or `深度分析` if they clarify the argument
+- Put pipeline, framework, or construction overview figures right after the step table of the workflow subsection when they directly explain the execution chain
+- If the match is weaker, keep them in the method or design section of the paper type
+- Put data or task figures in the section that introduces the task or data
+- Put main result figures or tables in the section that carries the results
+- Put conceptual diagrams in the opening or analysis section if they clarify the argument
+- The figure plan's `section` is a role such as `结果节` or `流程小节`; write the type's actual section name in `建议位置`
 
 ## What to Read
 
@@ -74,12 +75,68 @@ Fail closed when visual usability is weak: keep the placeholder instead of inser
 
 Every selected candidate begins as `review_pending`. Review it after the synthesis bundle exists and before `note_plan`:
 
-1. Open the exact candidate crop and its complete source page preview.
+1. Open the exact candidate crop and its complete source page preview. Each page preview carries a 10% grid; it stays out of every crop and saved image.
 2. Compare them with the matched Figure/Table identity and external caption.
 3. Confirm that the crop is a Visual-Body Crop: the complete scientific visual is present, all internal labels remain readable, and the external caption and surrounding paper prose are absent.
-4. Record the review in that candidate's existing decision entry using the generated `writing_contract.figure_table_contract.visual_review` fields and values.
+4. Record your verdict with the `review` command. Do not edit the decisions file by hand.
+
+```bash
+python3 scripts/plan_figure_table_decisions.py review \
+  --decisions <figure_table_decisions.json> --item "Figure 1" \
+  --verdict pass --preserved "<scientific element>" --preserved "<scientific element>"
+
+python3 scripts/plan_figure_table_decisions.py review \
+  --decisions <figure_table_decisions.json> --item "Figure 2" \
+  --verdict fail --failure <terminal failure reason> --notes "<what you saw>"
+```
+
+`pass` requires at least one `--preserved` element you actually saw, and turns the item into `insert`. `fail` turns it into `visual_defect`. `drop` records that the note does not need the item; see Dropping. The script writes the asset SHA-256 and refuses a crop whose bytes changed after planning. The verdict remains yours: the command only records it.
 
 A passing review is valid only for the decision entry's current asset SHA-256. Any asset change returns the item to `review_pending`. Complete the Figure/Table Decision Freeze before planning or drafting; grounding must reject an unresolved or stale review.
+
+## Promotion
+
+The planner's selection is only a starting point. When a Figure/Table the note needs is `low_priority`, a `placeholder`, or an automatic `visual_defect`, send it into review:
+
+```bash
+python3 scripts/plan_figure_table_decisions.py promote \
+  --decisions <figure_table_decisions.json> --assets <assets.json> --item "Figure 9"
+```
+
+With a usable crop on file, the command rerenders it at the contract's 300 dpi. Without one, it names the page preview to open; read the region off the grid and rerun with `--bbox x0,y0,x1,y1`, adding `--page <n>` when the body is not on the caption's page. The promoted item starts at `review_pending` and takes the same review as any other candidate. Items already in review cannot be promoted again.
+
+## Dropping
+
+Review selects for the note, not only for crop quality. After opening a candidate, drop it when the note has no use for it, for example a third example gallery that repeats a pattern already shown:
+
+```bash
+python3 scripts/plan_figure_table_decisions.py review \
+  --decisions <figure_table_decisions.json> --item "Figure 12" \
+  --verdict drop --reason "<why this note does not need it>"
+```
+
+`--reason` is required, is stored as the item's `skip_reason`, and states your editorial judgment about this paper. The item becomes `dropped`, stays in the decision table with its reviewed asset SHA-256, and appears with its reason in the `run_state.py` summary and the Final user report. Keep no callout for it in the note.
+
+A drop is an editorial choice, never a visual verdict:
+
+- A crop with a visual problem takes `repair` or `fail`. If the note needs the visual, repair it instead of dropping it. A failure reason is refused as a `--reason`, and an item with a recorded visual failure cannot become a drop.
+- Keep the key method overview and main result figures; the priorities in What to Prefer still apply. A table you write in the note reports numbers, but it does not replace the paper's own result figure. Grounding fails a run that drops every item the planner marked `main_result`.
+- Give each drop its own reason about that item. One reason copied across many items is a sign you are dropping by category instead of judging each item.
+- An item the planner left out of review needs no drop: it is already not inserted.
+- Later verdicts replace a drop if your judgment changes. Grounding rejects a drop with no reason, no recorded review, or a stale asset hash.
+
+## Reading the Frozen Decisions
+
+The synthesis bundle carries only the paths of the figure plan, the PDF assets, and the decisions file, because decisions change during review. Before `note_plan`, read the current table:
+
+```bash
+python3 scripts/plan_figure_table_decisions.py summary \
+  --decisions <figure_table_decisions.json>
+```
+
+It prints one line per Figure/Table with its decision, target section, skip reason, and caption, plus `review_pending_labels`. Only `insert` items carry an `embed`; use that exact value. An empty `review_pending_labels` means the review is finished; Grounding still decides whether the freeze is valid. The command never writes the file.
+
+The planner names each item's image in the Vault after its label, such as `figure_1.png`, `table_3.png`, or `figure_s2.png`, inside the admitted `asset_subdir`. Labels that collide take a `_2` or `_3` suffix in caption order, and an item with no usable label falls back to `<kind>_unlabeled.png`. Crops in the run directory keep their working names; only the saved copy and the embed use the Vault name. Notes saved before this naming keep their old image names.
 
 ## Visual-Body Crop Boundary
 
@@ -89,15 +146,15 @@ If the external caption cannot be separated without damaging the scientific visu
 
 ## Bounded Crop Repair
 
-Use a Bounded Crop Repair only for a geometry-only failure allowed by the generated contract. Put the page-relative normalized bbox and repair request into the same decision entry, then run:
+Use a Bounded Crop Repair only for a geometry-only failure allowed by the generated contract. Read the corrected region off the grid on the page preview. The bbox is relative to the whole page, not to the crop. Then run:
 
 ```bash
-python3 scripts/plan_figure_table_decisions.py \
-  --review-decisions <figure_table_decisions.json> \
-  --output <figure_table_decisions.json>
+python3 scripts/plan_figure_table_decisions.py review \
+  --decisions <figure_table_decisions.json> --item "Table 3" \
+  --verdict repair --failure <repairable failure reason> --bbox x0,y0,x1,y1
 ```
 
-The script validates the bbox, rerenders once from the source PDF at the contract's 300 dpi, refreshes the asset SHA-256, and returns the item to `review_pending` for a full fresh review. A terminal defect or a failed repaired crop remains a placeholder; never request a second recrop.
+The script validates the bbox, rerenders once from the source PDF at the contract's 300 dpi, refreshes the asset SHA-256, keeps the item's vault filename and `embed`, and returns the item to `review_pending` for a full fresh review. A terminal defect or a failed repaired crop remains a placeholder; a second repair request closes the item as `repair_limit_exhausted`.
 
 Reject candidates that are:
 - caption-only crops
