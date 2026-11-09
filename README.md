@@ -22,7 +22,7 @@
 
 **When you study an important paper, the hard part is rarely the reading. It is turning what you understood into a note you can still use later.** Finding the source, matching figures to the text, copying numbers over, and tracing the method often take the better part of a day. And the papers you have read end up scattered, with nothing connecting one to another.
 
-DeepPaperNote is an agent skill that runs in Claude Code, Codex, and any other agent that supports skills. Hand it a paper, and it reads the full text, writes an illustrated deep-reading note, saves it into your Obsidian vault, and links it to the other papers you have read. **Every paper you read grows your academic wiki a little.**
+**DeepPaperNote is an agent skill that runs in Claude Code, Codex, and any other agent that supports skills.** Hand it a paper, and it reads the full text, writes an illustrated deep-reading note, saves it into your Obsidian vault, and links it to the other papers you have read. **Every paper you read grows your academic wiki a little.**
 
 - 🚀 **One sentence, one note.** No prompts to learn, no templates to set up. Say "Generate a deep-reading note for this paper" with a title, DOI, arXiv ID, or PDF, and it finds the paper, reads it in full, extracts the figures, and saves the note into your vault.
 - 🎓 **Reads like a domain expert.** From CS and AI to medicine, psychology, and the humanities, from new methods and benchmarks to surveys and clinical trials, your papers can all go to DeepPaperNote. Each of 10 paper types gets its own way of reading, drawn from more than 50 reviewer guidelines and reporting standards such as the NeurIPS review criteria and CONSORT, and tested on 34 real papers.
