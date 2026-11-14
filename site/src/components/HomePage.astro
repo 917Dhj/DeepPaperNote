@@ -68,6 +68,7 @@ const demoSrc = `${basePath}demos/deeppapernote-note-demo/index.html?lang=${demo
 const releaseHref = "https://github.com/917Dhj/DeepPaperNote/releases/tag/v3.0.0";
 const copyCommandLabel = locale === "zh" ? "复制命令" : "Copy command";
 const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
+const copyFailedLabel = locale === "zh" ? "复制失败" : "Copy failed";
 ---
 
 <html lang={content.lang} data-theme-preference="system" data-theme="dark">
@@ -103,32 +104,12 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
           });
         };
 
-        const syncDemos = (theme) => {
-          document.querySelectorAll("[data-demo-frame]").forEach((frame) => {
-            const src = frame.getAttribute("src");
-
-            if (!src) {
-              return;
-            }
-
-            const url = new URL(src, window.location.href);
-
-            if (url.searchParams.get("theme") === theme) {
-              return;
-            }
-
-            url.searchParams.set("theme", theme);
-            frame.setAttribute("src", url.toString());
-          });
-        };
-
         const applyTheme = (preference) => {
           const normalizedPreference = allowedThemes.has(preference) ? preference : "system";
           const theme = resolveTheme(normalizedPreference);
           document.documentElement.dataset.themePreference = normalizedPreference;
           document.documentElement.dataset.theme = theme;
           syncButtons(normalizedPreference);
-          syncDemos(theme);
         };
 
         const initialPreference = readPreference();
@@ -438,7 +419,9 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
         </div>
       </section>
 
-      <section class="install-section" id="install" aria-labelledby="install-title">
+      <!-- The anchor sits on a still wrapper: the section's scroll-driven transform would skew the scroll target. -->
+      <div id="install">
+      <section class="install-section" aria-labelledby="install-title">
         <div class="install-copy">
           <h2 id="install-title">{content.install.title}</h2>
           <p>{content.install.body}</p>
@@ -484,6 +467,7 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
                   data-copy-command={tab.command}
                   data-copy-label={copyCommandLabel}
                   data-copied-label={copiedCommandLabel}
+                  data-failed-label={copyFailedLabel}
                 >
                   <svg
                     class="copy-command-icon copy-command-icon-copy"
@@ -503,6 +487,7 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
                     <path d="M20 6 9 17l-5-5"></path>
                   </svg>
                 </button>
+                <span class="copy-status" role="status"></span>
               </div>
               </div>
             ))
@@ -521,6 +506,7 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
                   data-copy-command={step.command}
                   data-copy-label={copyCommandLabel}
                   data-copied-label={copiedCommandLabel}
+                  data-failed-label={copyFailedLabel}
                 >
                   <svg
                     class="copy-command-icon copy-command-icon-copy"
@@ -540,12 +526,14 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
                     <path d="M20 6 9 17l-5-5"></path>
                   </svg>
                 </button>
+                <span class="copy-status" role="status"></span>
               </div>
               </div>
             ))
           }
         </div>
       </section>
+      </div>
     </main>
 
     <section class="closing-note">
@@ -572,33 +560,6 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
       </div>
     </footer>
     <script>
-      const revealSelector =
-        ".section-heading, .feature-card, .pair-title, .paper-card, .note-card, .skill-card, .install-section, .closing-note";
-      const supportsScrollTimeline = CSS.supports("animation-timeline: view()");
-      const allowsMotion = window.matchMedia("(prefers-reduced-motion: no-preference)").matches;
-
-      if (!supportsScrollTimeline && allowsMotion && "IntersectionObserver" in window) {
-        const observer = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting) {
-                entry.target.classList.add("is-revealed");
-                observer.unobserve(entry.target);
-              }
-            });
-          },
-          { rootMargin: "0px 0px -12% 0px" },
-        );
-
-        document.querySelectorAll(revealSelector).forEach((element) => {
-          if (element.getBoundingClientRect().top < window.innerHeight * 0.88) {
-            return;
-          }
-          element.classList.add("reveal-pending");
-          observer.observe(element);
-        });
-      }
-
       const drawPairLinks = () => {
         const wide = window.matchMedia("(min-width: 1024px)").matches;
         document.querySelectorAll("[data-pair]").forEach((grid) => {
@@ -639,12 +600,10 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
 
       drawPairLinks();
       window.addEventListener("resize", drawPairLinks);
-      if ("ResizeObserver" in window) {
-        const pairObserver = new ResizeObserver(() => drawPairLinks());
-        document.querySelectorAll("[data-pair]").forEach((grid) => pairObserver.observe(grid));
-      }
+      const pairObserver = new ResizeObserver(() => drawPairLinks());
+      document.querySelectorAll("[data-pair]").forEach((grid) => pairObserver.observe(grid));
       window.addEventListener("load", drawPairLinks);
-      document.fonts?.ready.then(drawPairLinks);
+      document.fonts.ready.then(drawPairLinks);
 
       const installTabs = [...document.querySelectorAll("[data-install-tab]")];
       const selectInstallTab = (tab, focus = false) => {
@@ -653,24 +612,23 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
           other.setAttribute("aria-selected", String(active));
           other.tabIndex = active ? 0 : -1;
           const panel = document.querySelector(`[data-install-panel="${other.dataset.installTab}"]`);
-          if (panel) {
-            panel.hidden = !active;
-            if (active) {
-              panel.classList.remove("is-entering");
-              void panel.offsetWidth;
-              panel.classList.add("is-entering");
-            }
-          }
+          if (panel) panel.hidden = !active;
         });
         if (focus) tab.focus();
       };
       installTabs.forEach((tab, index) => {
         tab.addEventListener("click", () => selectInstallTab(tab));
         tab.addEventListener("keydown", (event) => {
-          if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+          const last = installTabs.length - 1;
+          const target = {
+            ArrowRight: index === last ? 0 : index + 1,
+            ArrowLeft: index === 0 ? last : index - 1,
+            Home: 0,
+            End: last,
+          }[event.key];
+          if (target === undefined) return;
           event.preventDefault();
-          const step = event.key === "ArrowRight" ? 1 : -1;
-          selectInstallTab(installTabs[(index + step + installTabs.length) % installTabs.length], true);
+          selectInstallTab(installTabs[target], true);
         });
       });
 
@@ -777,38 +735,12 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
         }
       }
 
+      // VoiceOver skips a repeat of the previous message, so a repeat gets an invisible no-break space.
+      let lastCopyMessage = "";
+
       document.querySelectorAll("[data-copy-command]").forEach((button) => {
         let resetTimer;
-
-        const copyTextFallback = (text) => {
-          const textarea = document.createElement("textarea");
-          textarea.value = text;
-          textarea.setAttribute("readonly", "");
-          textarea.style.position = "fixed";
-          textarea.style.opacity = "0";
-          document.body.appendChild(textarea);
-          textarea.select();
-          const copied = document.execCommand("copy");
-          textarea.remove();
-
-          if (!copied) {
-            throw new Error("Copy command failed");
-          }
-        };
-
-        const copyText = async (text) => {
-          if (navigator.clipboard?.writeText) {
-            try {
-              await navigator.clipboard.writeText(text);
-              return;
-            } catch {
-              copyTextFallback(text);
-              return;
-            }
-          }
-
-          copyTextFallback(text);
-        };
+        const status = button.nextElementSibling;
 
         button.addEventListener("click", async () => {
           const command = button.getAttribute("data-copy-command");
@@ -818,22 +750,29 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
           }
 
           const copyLabel = button.getAttribute("data-copy-label") || "Copy command";
-          const copiedLabel = button.getAttribute("data-copied-label") || "Copied";
+          let copied = true;
 
           try {
-            await copyText(command);
-            window.clearTimeout(resetTimer);
-            button.classList.add("is-copied");
-            button.setAttribute("aria-label", copiedLabel);
-            button.setAttribute("title", copiedLabel);
-            resetTimer = window.setTimeout(() => {
-              button.classList.remove("is-copied");
-              button.setAttribute("aria-label", copyLabel);
-              button.setAttribute("title", copyLabel);
-            }, 1600);
+            await navigator.clipboard.writeText(command);
           } catch {
-            button.classList.remove("is-copied");
+            copied = false;
           }
+
+          const label = copied
+            ? button.getAttribute("data-copied-label") || "Copied"
+            : button.getAttribute("data-failed-label") || "Copy failed";
+          const message = label === lastCopyMessage ? `${label} ` : label;
+          lastCopyMessage = message;
+
+          window.clearTimeout(resetTimer);
+          button.classList.toggle("is-copied", copied);
+          button.setAttribute("title", label);
+          status.textContent = message;
+          resetTimer = window.setTimeout(() => {
+            button.classList.remove("is-copied");
+            button.setAttribute("title", copyLabel);
+            status.textContent = "";
+          }, 1600);
         });
       });
     </script>

@@ -109,6 +109,8 @@ html[data-theme="light"] {
 html {
   background: var(--canvas);
   scroll-behavior: smooth;
+  /* keep anchor targets clear of the sticky header */
+  scroll-padding-top: 64px;
 }
 
 body {
@@ -744,16 +746,26 @@ a {
   font-size: 12.5px;
 }
 
-@keyframes panel-in {
-  from {
+/* A newly shown tab panel fades in from its @starting-style; no script needed. */
+@media (prefers-reduced-motion: no-preference) {
+  .terminal-step[role="tabpanel"] {
+    transition: opacity 150ms var(--ease-out, ease-out);
+  }
+}
+
+@starting-style {
+  .terminal-step[role="tabpanel"] {
     opacity: 0;
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .terminal-step.is-entering {
-    animation: panel-in 150ms var(--ease-out, ease-out);
-  }
+.copy-status {
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 .copy-command-button {
@@ -917,6 +929,11 @@ a {
 }
 
 @media (max-width: 640px) {
+  html {
+    /* the header wraps to two rows here */
+    scroll-padding-top: 97px;
+  }
+
   .site-header {
     gap: 10px;
     grid-template-columns: 1fr;
@@ -1684,8 +1701,8 @@ html:lang(en) .install-section h2 {
 }
 
 /* ---- motion ----
-   Content is visible by default. Browsers with scroll-driven animations tie each
-   reveal to scroll position; others get a one-shot fallback from the page script. */
+   Content is visible by default. Reveals are decorative: browsers with scroll-driven
+   animations tie each one to scroll position, others simply show the content. */
 :root {
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1763,22 +1780,9 @@ html:lang(en) .install-section h2 {
     }
   }
 
-  /* fallback: the page script adds .reveal-pending, then .is-revealed on intersection */
-  .reveal-pending {
-    filter: blur(10px);
-    opacity: 0;
-    transform: translateY(36px);
-  }
-
-  .reveal-pending.is-revealed {
-    filter: none;
-    opacity: 1;
-    transform: none;
-    transition:
-      opacity 800ms var(--ease-out),
-      transform 900ms var(--ease-out),
-      filter 800ms var(--ease-out);
-    transition-delay: calc(var(--reveal-step, 0) * 90ms);
+  /* cross-fade between the EN and ZH pages where cross-document view transitions exist */
+  @view-transition {
+    navigation: auto;
   }
 }
 

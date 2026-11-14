@@ -4,12 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DeepPaperNote Demo</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=block" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous" referrerpolicy="no-referrer">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
+  /* Latin subsets copied from @fontsource; the stage stays hidden until fonts load, so swap never shows. */
+  @font-face { font-family: "Cormorant Garamond"; font-weight: 500; font-display: swap; src: url("fonts/cormorant-garamond-latin-500-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Cormorant Garamond"; font-weight: 600; font-display: swap; src: url("fonts/cormorant-garamond-latin-600-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Cormorant Garamond"; font-weight: 700; font-display: swap; src: url("fonts/cormorant-garamond-latin-700-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("fonts/inter-latin-400-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 500; font-display: swap; src: url("fonts/inter-latin-500-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("fonts/inter-latin-600-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 700; font-display: swap; src: url("fonts/inter-latin-700-normal.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
   :root {
     --canvas: #11100f; --surface-dark: #181715; --surface-elevated: #252320; --surface-elevated-2: #2f2c28;
     --cream: #faf9f5; --card: #efe9de; --cream-strong: #e8e0d2; --hairline-cream: #e6dfd8;
@@ -24,7 +31,7 @@
   html, body { width: 100%; height: 100%; overflow: hidden; background: var(--canvas); }
   body { font-family: var(--sans); color: var(--on-dark); -webkit-font-smoothing: antialiased; }
   .abs { position: absolute; }
-  #stage { position: absolute; left: 0; top: 0; width: 960px; height: 560px; overflow: hidden; transform-origin: 0 0;
+  #stage { position: absolute; left: 0; top: 0; width: 960px; height: 560px; overflow: hidden; transform-origin: 0 0; opacity: 0;
     background: radial-gradient(circle at 14% 8%, rgba(204,120,92,.14), transparent 360px),
                 radial-gradient(circle at 90% 20%, rgba(93,184,166,.08), transparent 380px), var(--canvas); }
 
@@ -112,15 +119,33 @@
   #tagline { width: 960px; text-align: center; font-family: var(--serif); font-size: 32px; font-weight: 600; color: var(--on-dark); }
   #tagline em { font-style: normal; color: var(--primary); }
   #brand { width: 960px; text-align: center; font-size: 12px; font-weight: 600; letter-spacing: 3px; color: var(--on-dark-soft); }
+
+  /* ---- playback control ---- */
+  #playback { position: fixed; right: 14px; bottom: 14px; z-index: 10; display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; padding: 0; border: 1px solid rgba(250,249,245,.16); border-radius: 50%;
+    background: rgba(24,23,21,.52); color: var(--cream); cursor: pointer; opacity: .7;
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    transition: opacity 160ms ease, background-color 160ms ease, border-color 160ms ease; }
+  #playback[hidden] { display: none; }
+  #playback:hover, #playback:focus-visible { opacity: 1; background: rgba(37,35,32,.82); border-color: rgba(204,120,92,.55); }
+  #playback:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  #playback svg { display: block; width: 16px; height: 16px; fill: currentColor; }
+  #playback .i-play, #playback[data-paused] .i-pause { display: none; }
+  #playback[data-paused] .i-play { display: block; }
 </style>
 </head>
 <body>
 <div id="stage"></div>
+<button id="playback" type="button" hidden>
+  <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
+  <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.6v12.8a1 1 0 0 0 1.52.85l10.2-6.4a1 1 0 0 0 0-1.7L9.52 4.75A1 1 0 0 0 8 5.6Z"/></svg>
+</button>
 <script>
 const LANG = new URLSearchParams(location.search).get("lang") || "zh";
 const T = {
 zh: {
   bar: "Claude Code · Codex · 任何支持 skill 的 Agent",
+  pause: "暂停演示", play: "播放演示",
   prompt: "给这篇论文生成深度笔记：Attention Is All You Need",
   steps: ["找到原文", "读完全文", "提取图表", "写成笔记，存进知识库"],
   sub: "以自注意力重构序列转换",
@@ -228,6 +253,7 @@ zh: {
 },
 en: {
   bar: "Claude Code · Codex · any agent that supports skills",
+  pause: "Pause demo", play: "Play demo",
   prompt: "Write a deep-reading note for Attention Is All You Need",
   steps: ["Find the paper", "Read it in full", "Extract figures", "Write the note into your vault"],
   sub: "Sequence transduction rebuilt on self-attention",
@@ -355,8 +381,11 @@ ${[1, 3, 5].map((n, i) => `<div class="pdfp abs" id="pdf${i}" style="left:${132 
   <div id="tagline" class="abs" style="left:0;top:458px">${L.graph.tagline}</div>
   <div id="brand" class="abs" style="left:0;top:512px">DEEPPAPERNOTE</div></div>`;
 for (const [id, h] of Object.entries(L.tagtext)) $id0(id).innerHTML = `<span class="h">${h}</span>`;
-document.querySelectorAll(".tex").forEach(el => katex.render(el.dataset.tex, el, { displayMode: true, throwOnError: false }));
-document.querySelectorAll(".itex").forEach(el => katex.render(el.textContent, el, { throwOnError: false }));
+// KaTeX loads with defer, so this runs after DOMContentLoaded.
+const renderMath = () => {
+  document.querySelectorAll(".tex").forEach(el => katex.render(el.dataset.tex, el, { displayMode: true, throwOnError: false }));
+  document.querySelectorAll(".itex").forEach(el => katex.render(el.textContent, el, { throwOnError: false }));
+};
 
 /* graph */
 const NODES = [["seq", "Seq2Seq", 140, 175, "t"], ["bahd", "Bahdanau Attention", 250, 290, "l"], ["conv", "ConvS2S", 315, 140, "t"], ["gnmt", "GNMT", 300, 415, "l"],
@@ -472,7 +501,31 @@ function setTime(t) {
   vis($("brand"), p(t, G + 2.40, G + 2.80));
 }
 
+/* Plays only while on screen and not paused by the user; reduced motion starts paused on a still frame. */
+const STILL_T = 6.2;
+function startPlayback() {
+  const button = $("playback");
+  const motionOK = matchMedia("(prefers-reduced-motion: no-preference)").matches;
+  let clock = motionOK ? 0 : STILL_T, from = 0, frame = 0, userPaused = !motionOK, onScreen = true;
+  const loop = now => { clock = (clock + (now - from) / 1000) % DURATION; from = now; setTime(clock); frame = requestAnimationFrame(loop); };
+  const sync = () => {
+    const run = onScreen && !userPaused;
+    if (run && !frame) { from = performance.now(); frame = requestAnimationFrame(loop); }
+    if (!run && frame) { cancelAnimationFrame(frame); frame = 0; }
+    button.toggleAttribute("data-paused", userPaused);
+    button.setAttribute("aria-label", userPaused ? L.play : L.pause);
+  };
+  setTime(clock);
+  button.addEventListener("click", () => { userPaused = !userPaused; sync(); });
+  new IntersectionObserver(([entry]) => { onScreen = entry.isIntersecting; sync(); }).observe(stage);
+  button.hidden = false;
+  sync();
+}
+
 window.ready = (async () => {
+  if (document.readyState === "loading") await new Promise(r => addEventListener("DOMContentLoaded", r, { once: true }));
+  renderMath();
+  await Promise.all([...document.fonts].filter(f => /Cormorant|Inter|JetBrains/.test(f.family)).map(f => f.load()));
   await document.fonts.ready;
   await Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => i.onload = r)));
   measure();
@@ -480,11 +533,8 @@ window.ready = (async () => {
     stage.style.transform = `translate(${(innerWidth - 960 * k) / 2}px, ${(innerHeight - 560 * k) / 2}px) scale(${k})`; };
   fit(); addEventListener("resize", fit);
   window.setTime = setTime; window.DURATION = DURATION;
-  if (!new URLSearchParams(location.search).has("still")) {
-    const start = performance.now();
-    const loop = now => { setTime(((now - start) / 1000) % DURATION); requestAnimationFrame(loop); };
-    requestAnimationFrame(loop);
-  } else setTime(0);
+  if (new URLSearchParams(location.search).has("still")) setTime(0);
+  else startPlayback();
 })();
 </script>
 </body>
