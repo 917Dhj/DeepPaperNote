@@ -7,6 +7,8 @@ import "@fontsource/inter/latin-600.css";
 import "@fontsource/jetbrains-mono/latin-400.css";
 import "@fontsource/jetbrains-mono/latin-600.css";
 import "../styles/global.css";
+import type { ImageMetadata } from "astro";
+import { Picture } from "astro:assets";
 import type { HomePageContent, Locale } from "../data/home";
 
 interface Props {
@@ -50,10 +52,20 @@ const localePaths = {
 const currentPath = localePaths[locale];
 const faviconHref = `${basePath}favicon.svg`;
 const demoLang = locale === "zh" ? "zh" : "en";
-const paperDims: Record<string, [number, number]> = {
-  "showcase/paper-figure-1.png": [924, 1412],
-  "showcase/paper-table-2.png": [1616, 716],
-  "showcase/paper-table-3.png": [1616, 1304],
+const showcaseImages = import.meta.glob<{ default: ImageMetadata }>("../assets/showcase/*.png", {
+  eager: true,
+});
+// The paper sheet caps a page image at 440px tall and about 500px wide.
+const paperImage = (src: string) => {
+  const image = showcaseImages[`../assets/${src}`].default;
+  const maxWidth = Math.round((440 * image.width) / image.height);
+  const shown = Math.min(maxWidth, 500);
+  return {
+    image,
+    maxWidth,
+    widths: [shown, Math.min(shown * 2, image.width)],
+    sizes: `(min-width: 1024px) ${shown}px, min(${shown}px, calc(100vw - 72px))`,
+  };
 };
 const escapeHtml = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -71,87 +83,23 @@ const copiedCommandLabel = locale === "zh" ? "已复制" : "Copied";
 const copyFailedLabel = locale === "zh" ? "复制失败" : "Copy failed";
 ---
 
-<html lang={content.lang} data-theme-preference="system" data-theme="dark">
+<html lang={content.lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={content.description} />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Apply a stored light/dark override before first paint; "light dark" follows the system. -->
+    <script is:inline>
+      try {
+        const storedTheme = localStorage.getItem("deeppapernote:theme");
+        if (storedTheme === "light" || storedTheme === "dark") {
+          document.querySelector('meta[name="color-scheme"]').content = storedTheme;
+        }
+      } catch {}
+    </script>
     <link rel="icon" type="image/svg+xml" href={faviconHref} />
     <title>{content.title}</title>
-    <script is:inline>
-      (() => {
-        const storageKey = "deeppapernote:theme";
-        const allowedThemes = new Set(["system", "light", "dark"]);
-        const media = window.matchMedia("(prefers-color-scheme: dark)");
-
-        const readPreference = () => {
-          try {
-            const storedTheme = localStorage.getItem(storageKey);
-            return allowedThemes.has(storedTheme) ? storedTheme : "system";
-          } catch {
-            return "system";
-          }
-        };
-
-        const resolveTheme = (preference) =>
-          preference === "system" ? (media.matches ? "dark" : "light") : preference;
-
-        const syncButtons = (preference) => {
-          document.querySelectorAll("[data-theme-choice]").forEach((button) => {
-            const isActive = button.getAttribute("data-theme-choice") === preference;
-            button.classList.toggle("is-active", isActive);
-            button.setAttribute("aria-pressed", String(isActive));
-          });
-        };
-
-        const applyTheme = (preference) => {
-          const normalizedPreference = allowedThemes.has(preference) ? preference : "system";
-          const theme = resolveTheme(normalizedPreference);
-          document.documentElement.dataset.themePreference = normalizedPreference;
-          document.documentElement.dataset.theme = theme;
-          syncButtons(normalizedPreference);
-        };
-
-        const initialPreference = readPreference();
-        document.documentElement.dataset.themePreference = initialPreference;
-        document.documentElement.dataset.theme = resolveTheme(initialPreference);
-
-        const bindControls = () => {
-          applyTheme(readPreference());
-          document.querySelectorAll("[data-theme-choice]").forEach((button) => {
-            button.addEventListener("click", () => {
-              const preference = button.getAttribute("data-theme-choice") || "system";
-
-              try {
-                localStorage.setItem(storageKey, preference);
-              } catch {
-                // Strict storage settings can reject localStorage writes.
-              }
-
-              applyTheme(preference);
-            });
-          });
-        };
-
-        const handleSystemChange = () => {
-          if (readPreference() === "system") {
-            applyTheme("system");
-          }
-        };
-
-        if (media.addEventListener) {
-          media.addEventListener("change", handleSystemChange);
-        } else {
-          media.addListener(handleSystemChange);
-        }
-
-        if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", bindControls, { once: true });
-        } else {
-          bindControls();
-        }
-      })();
-    </script>
   </head>
   <body>
     <header class="site-header" aria-label={content.navLabel}>
@@ -315,19 +263,21 @@ const copyFailedLabel = locale === "zh" ? "复制失败" : "Copy failed";
           {
             content.showcase.pairs.map((pair) => {
               const [x0, y0, x1, y1] = pair.paper.box;
-              const dims = paperDims[pair.paper.src];
+              const paper = paperImage(pair.paper.src);
               return (
                 <article class="pair">
                   <h3 class="pair-title">{pair.title}</h3>
                   <div class="pair-grid" data-pair>
                     <figure class="paper-card">
                       <div class="paper-sheet">
-                        <div class="paper-frame">
-                        <img
-                          src={`${basePath}${pair.paper.src}`}
+                        <div class="paper-frame" style={`--paper-w:${paper.maxWidth}px`}>
+                        <Picture
+                          src={paper.image}
+                          formats={["webp"]}
+                          widths={paper.widths}
+                          sizes={paper.sizes}
+                          quality="high"
                           alt={pair.paper.alt}
-                          width={dims?.[0]}
-                          height={dims?.[1]}
                           loading="lazy"
                           decoding="async"
                         />
@@ -560,6 +510,45 @@ const copyFailedLabel = locale === "zh" ? "复制失败" : "Copy failed";
       </div>
     </footer>
     <script>
+      // Theme: the <meta name="color-scheme"> content is the single source of truth; CSS follows it.
+      const themeKey = "deeppapernote:theme";
+      const schemeMeta = document.querySelector('meta[name="color-scheme"]');
+      const themeButtons = document.querySelectorAll("[data-theme-choice]");
+
+      const showTheme = () => {
+        const choice = schemeMeta.content === "light dark" ? "system" : schemeMeta.content;
+        themeButtons.forEach((button) => {
+          const isActive = button.getAttribute("data-theme-choice") === choice;
+          button.classList.toggle("is-active", isActive);
+          button.setAttribute("aria-pressed", String(isActive));
+        });
+      };
+
+      const setTheme = (choice) => {
+        schemeMeta.content = choice === "light" || choice === "dark" ? choice : "light dark";
+        showTheme();
+      };
+
+      themeButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const choice = button.getAttribute("data-theme-choice");
+          try {
+            if (choice === "light" || choice === "dark") localStorage.setItem(themeKey, choice);
+            else localStorage.removeItem(themeKey);
+          } catch {
+            // Strict storage settings can reject writes; the choice still applies to this page.
+          }
+          setTheme(choice);
+        });
+      });
+
+      // Keep other open tabs in step with a change made here.
+      window.addEventListener("storage", (event) => {
+        if (event.key === themeKey || event.key === null) setTheme(event.newValue);
+      });
+
+      showTheme();
+
       const drawPairLinks = () => {
         const wide = window.matchMedia("(min-width: 1024px)").matches;
         document.querySelectorAll("[data-pair]").forEach((grid) => {
